@@ -1,8 +1,8 @@
+use crate::connection_monitor::ConnectionMonitor;
 use axum::{extract::Extension, routing::get, AddExtensionLayer, Json, Router};
+use clap::Parser;
 use connection_monitor::ConnectionState;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
-use crate::connection_monitor::ConnectionMonitor;
-use clap::Parser;
 
 mod connection_monitor;
 mod parse_helpers;
@@ -13,15 +13,15 @@ const TCP_FILE: &str = "/proc/net/tcp";
 #[derive(Parser)]
 struct Opts {
     /// The port to open an HTTP server on to serve metrics requests.
-    #[clap(long, default_value="7070")]
+    #[clap(long, default_value = "7070")]
     serve_port: u16,
 
     /// The TCP port to monitor connection activity on.
-    #[clap(long, default_value="8080")]
+    #[clap(long, default_value = "8080")]
     monitor_port: u16,
 
     /// The rate (in seconds) at which to check for activity.
-    #[clap(long, default_value="10")]
+    #[clap(long, default_value = "10")]
     refresh_rate_seconds: u64,
 }
 
@@ -33,7 +33,9 @@ async fn main() {
         .init();
 
     let Opts {
-        serve_port, refresh_rate_seconds, monitor_port
+        serve_port,
+        refresh_rate_seconds,
+        monitor_port,
     } = Opts::parse();
 
     log::info!(
@@ -44,25 +46,28 @@ async fn main() {
     );
 
     // Set up network monitor.
-    let mut connection_monitor = ConnectionMonitor::new(monitor_port, PathBuf::from(TCP_FILE));
-    
-    // TODO: this clones the current value of the state!
-    let state = connection_monitor.state();
+    let connection_monitor = Arc::new(ConnectionMonitor::new(
+        monitor_port,
+        PathBuf::from(TCP_FILE),
+    ));
 
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(Duration::from_secs(refresh_rate_seconds)).await;
-            connection_monitor.refresh();
-        }
-    });
+    {
+        let connection_monitor = connection_monitor.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(refresh_rate_seconds)).await;
+                connection_monitor.refresh();
+            }
+        });
+    }
 
     // Serve.
     let app = Router::new()
         .route("/", get(info))
-        .layer(AddExtensionLayer::new(state));
+        .layer(AddExtensionLayer::new(connection_monitor));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], serve_port));
-    
+
     log::info!("Listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -72,5 +77,6 @@ async fn main() {
 
 /// HTTP endpoint which serves the connection state as JSON.
 async fn info(monitor: Extension<Arc<ConnectionMonitor>>) -> Json<ConnectionState> {
+    monitor.refresh();
     Json(monitor.state())
 }

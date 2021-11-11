@@ -1,10 +1,10 @@
 /// Parse helpers.
-/// 
+///
 /// Following the approach of [nom](https://github.com/Geal/nom), parsing is
 /// decomposed into functions that return a pair of a value and a pointer to
 /// the new position in the string. Functions which do not need to return a
 /// value return only the pointer to the new position.
-/// 
+///
 /// Functions which fail to match the expected token return `None`.
 
 /// Expect at least one whitespace character, but consume any additional
@@ -118,10 +118,7 @@ mod test {
     #[test]
     fn test_consume_until_newline() {
         assert_eq!(&[] as &[u8], consume_until_newline(b""));
-        assert_eq!(
-            &b"bar\nbaz"[..],
-            consume_until_newline(b"foo\nbar\nbaz")
-        );
+        assert_eq!(&b"bar\nbaz"[..], consume_until_newline(b"foo\nbar\nbaz"));
     }
 
     #[test]
