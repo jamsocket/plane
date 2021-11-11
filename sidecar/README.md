@@ -1,6 +1,6 @@
 # spawner-sidecar
 
-Spawner Sidecar is a lightweight tool for remotely monitoring whether a given
+**Spawner Sidecar** is a lightweight tool for remotely monitoring whether a given
 TCP port is in use. Spawner uses this to ensure that it only shuts down pods
 which do not have active connections.
 
@@ -19,7 +19,7 @@ connections, and serves its current connection state as a JSON blob like this:
 {
     "active_connections": 0,
     "waiting_connections": 0,
-    "seconds_since_active": 20,
+    "seconds_inactive": 20,
     "listening": true
 }
 ```

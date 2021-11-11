@@ -39,7 +39,7 @@ pub fn hex_u8(st: &[u8]) -> Option<(&[u8], u8)> {
 
     let (byte, rest) = st.split_at(2);
 
-    if let Ok(result) = u8::from_str_radix(std::str::from_utf8(&byte).ok()?, 16) {
+    if let Ok(result) = u8::from_str_radix(std::str::from_utf8(byte).ok()?, 16) {
         Some((rest, result))
     } else {
         None
@@ -54,7 +54,7 @@ pub fn hex_u16(st: &[u8]) -> Option<(&[u8], u16)> {
 
     let (byte, rest) = st.split_at(4);
 
-    if let Ok(result) = u16::from_str_radix(std::str::from_utf8(&byte).ok()?, 16) {
+    if let Ok(result) = u16::from_str_radix(std::str::from_utf8(byte).ok()?, 16) {
         Some((rest, result))
     } else {
         None
@@ -97,7 +97,7 @@ pub fn decimal(st: &[u8]) -> Option<(&[u8], u32)> {
     if ix == 0 {
         None
     } else {
-        let result = u32::from_str_radix(std::str::from_utf8(&st[0..ix]).ok()?, 10).ok()?;
+        let result = (std::str::from_utf8(&st[0..ix]).ok()?).parse::<u32>().ok()?;
         Some((&st[ix..], result))
     }
 }

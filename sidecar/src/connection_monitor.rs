@@ -115,7 +115,7 @@ impl ConnectionMonitor {
         let first_inactive = if active_connections > 0 || waiting_connections > 0 {
             None
         } else {
-            state.first_inactive.or(Some(SystemTime::now()))
+            state.first_inactive.or_else(|| Some(SystemTime::now()))
         };
 
         let seconds_inactive = if let Some(first_inactive) = first_inactive {
