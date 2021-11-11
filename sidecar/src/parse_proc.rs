@@ -48,18 +48,22 @@ impl TryFrom<u8> for TcpConnectionState {
     }
 }
 
+/// Represents an actual port or the "*" wildcard port, which Linux
+/// represents with port number 0.
 #[derive(PartialEq, Debug)]
 pub enum Port {
     Wildcard,
     Port(u16),
 }
 
+/// Represents an address, which is an IP address paired with a port number.
 #[derive(PartialEq, Debug)]
 pub struct Address {
     pub ip: Ip,
     pub port: Port,
 }
 
+/// Represents metadata about a TCP connection.
 #[derive(PartialEq, Debug)]
 pub struct TcpConnection {
     pub local_address: Address,
@@ -67,6 +71,7 @@ pub struct TcpConnection {
     pub state: TcpConnectionState,
 }
 
+/// Parse a port number from a byte string, represented as four hex digits.
 fn parse_port(data: &[u8]) -> Option<(&[u8], Port)> {
     let (data, port) = hex_u16(data)?;
 
@@ -79,13 +84,15 @@ fn parse_port(data: &[u8]) -> Option<(&[u8], Port)> {
     Some((data, port))
 }
 
+/// Parse an Address from a byte string, represented as eight hex digits
+/// for the IP followed by a colon and four hex digits for the port.
 fn parse_address(data: &[u8]) -> Option<(&[u8], Address)> {
     let (data, p4) = hex_u8(data)?;
     let (data, p3) = hex_u8(data)?;
     let (data, p2) = hex_u8(data)?;
     let (data, p1) = hex_u8(data)?;
 
-    let (data, _) = colon(data)?;
+    let data = colon(data)?;
 
     let (data, port) = parse_port(data)?;
 
@@ -97,28 +104,30 @@ fn parse_address(data: &[u8]) -> Option<(&[u8], Address)> {
     Some((data, address))
 }
 
+/// Parse a TcpConnection from the beginning of a byte string,
+/// in /proc/net/tcp format.
 fn parse_connection(data: &[u8]) -> Option<(&[u8], TcpConnection)> {
     // The entry number is provided in decimal, (possibly) with leading spaces,
     // and followed by a colon.
-    let (data, _) = whitespace(data).unwrap_or((data, ()));
+    let data = whitespace(data).unwrap_or(data);
     let (data, _entry_number) = decimal(data)?;
-    let (data, _) = colon(data)?;
-    let (data, _) = whitespace(data)?;
+    let data = colon(data)?;
+    let data = whitespace(data)?;
 
     // The local address.
     let (data, local_address) = parse_address(data)?;
-    let (data, _) = whitespace(data)?;
+    let data = whitespace(data)?;
 
     // The remote address.
     let (data, remote_address) = parse_address(data)?;
-    let (data, _) = whitespace(data)?;
+    let data = whitespace(data)?;
 
     // The connection state is provided as a hex byte.
     let (data, state) = hex_u8(data)?;
-    let (data, _) = whitespace(data)?;
+    let data = whitespace(data)?;
 
     // We don't need anything that comes after this point on this line.
-    let (data, _) = consume_until_newline(data)?;
+    let data = consume_until_newline(data);
 
     // Convert the state into our enum representation.
     let state = TcpConnectionState::try_from(state).ok()?;
@@ -133,8 +142,10 @@ fn parse_connection(data: &[u8]) -> Option<(&[u8], TcpConnection)> {
     ))
 }
 
+/// Parse all TcpConnections from a byte string representing an entire
+/// /proc/net/tcp buffer.
 pub fn parse_connections(data: &[u8]) -> Option<Vec<TcpConnection>> {
-    let (mut data, _) = consume_until_newline(data)?;
+    let mut data = consume_until_newline(data);
 
     let mut result: Vec<TcpConnection> = Vec::new();
 
@@ -143,12 +154,15 @@ pub fn parse_connections(data: &[u8]) -> Option<Vec<TcpConnection>> {
         result.push(connection);
     }
 
+    // If there is data left over, we don't crash but do log a warning.
     if !data.is_empty() {
         let next_began = std::str::from_utf8(&data[..30]).unwrap_or("(could not parse as utf-8)");
         log::warn!("Did not fully consume connections due to parse error. Consumed {}; next line began: {}",
             result.len(),
             next_began
         );
+
+        return None;
     }
 
     Some(result)

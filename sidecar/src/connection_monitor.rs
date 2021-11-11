@@ -10,6 +10,8 @@ use std::{
 
 pub const LOCK_ERROR: &str = "state lock should never be poisoned, but was.";
 
+/// Represents the connection state, both as internal representation and to be
+/// serialized into JSON for the remote data consumer.
 #[derive(Serialize, Clone)]
 pub struct ConnectionState {
     active_connections: u32,
@@ -18,6 +20,8 @@ pub struct ConnectionState {
     listening: bool,
 }
 
+/// Utility for monitoring the connection on a given port. State is read from the
+/// kernel upon construction and after that whenever `refresh()` is called.
 pub struct ConnectionMonitor {
     state: Arc<RwLock<ConnectionState>>,
     last_active: SystemTime,

@@ -45,12 +45,13 @@ async fn main() {
 
     // Set up network monitor.
     let mut connection_monitor = ConnectionMonitor::new(monitor_port, PathBuf::from(TCP_FILE));
+    
+    // TODO: this clones the current value of the state!
     let state = connection_monitor.state();
 
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(refresh_rate_seconds)).await;
-            log::info!("Refreshing.");
             connection_monitor.refresh();
         }
     });
@@ -61,8 +62,8 @@ async fn main() {
         .layer(AddExtensionLayer::new(state));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], serve_port));
+    
     log::info!("Listening on {}", addr);
-
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
@@ -71,6 +72,5 @@ async fn main() {
 
 /// HTTP endpoint which serves the connection state as JSON.
 async fn info(monitor: Extension<Arc<ConnectionMonitor>>) -> Json<ConnectionState> {
-    let state = monitor.state();
-    Json(state)
+    Json(monitor.state())
 }

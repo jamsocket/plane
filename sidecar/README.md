@@ -1,11 +1,12 @@
 # spawner-sidecar
 
-Spawner Sidecar is a lightweight tool to monitor the activity of a given
-TCP port. This is useful to ensure that Kubernetes pods are only shut down
-if they do not have active connections.
+Spawner Sidecar is a lightweight tool for remotely monitoring whether a given
+TCP port is in use. Spawner uses this to ensure that it only shuts down pods
+which do not have active connections.
 
-It is built for use with Spawner, but can also be used standalone with custom
-tools, because its interface is very easy to consume.
+Although it is built for use with Spawner, it does not depend on Spawner and
+could be a useful component when building bespoke Kubernetes controllers. Its
+interface is a generic and easy to consume read-only HTTP/JSON API.
 
 Spawner Sidecar works by asking the kernel for information about TCP connections
 every 10 seconds (configurable). It uses that information to count the number
@@ -15,12 +16,12 @@ Simultaneously, it listens on another port (default 7070) for incoming HTTP
 connections, and serves its current connection state as a JSON blob like this:
 
 ```json
-    {
-        "active_connections": 0,
-        "waiting_connections": 0,
-        "seconds_since_active": 20,
-        "listening": true
-    }
+{
+    "active_connections": 0,
+    "waiting_connections": 0,
+    "seconds_since_active": 20,
+    "listening": true
+}
 ```
 
 - **`active_connections`** is the number of TCP connections in the `ESTABLISHED` state.
