@@ -6,7 +6,12 @@ use hyper::Uri;
 use name_generator::NameGenerator;
 use serde::Deserialize;
 use server::serve;
-use std::{collections::HashSet, str::FromStr, sync::{Arc, Mutex}, time::Duration};
+use std::{
+    collections::HashSet,
+    str::FromStr,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 mod hashutil;
 mod kubernetes;
@@ -93,39 +98,56 @@ impl SpawnerState {
         }
     }
 
+    async fn get_pod_state(&self, pod_name: &str) -> anyhow::Result<ConnectionState> {
+        // TODO: use monitor port if provided.
+        let status_url = Uri::from_str(&format!(
+            "http://{}.{}.svc.cluster.local:{}/status",
+            pod_name, self.namespace, self.application_port
+        ))
+        .expect("Should always be able to construct URL.");
+        tracing::info!(%status_url, "Asking container for status.");
+
+        let client = hyper::Client::new();
+        let result = client.get(status_url).await?;
+        let body = result
+            .into_body()
+            .data()
+            .await
+            .ok_or(anyhow::anyhow!("Empty body when ConnectionState expected"))??;
+
+        let connection_state: ConnectionState = serde_json::from_slice(&body)?;
+        tracing::info!(?connection_state, "Got connection state.");
+
+        Ok(connection_state)
+    }
+
     pub async fn cleanup_containers(&self) {
         tracing::info!("Cleaning up unused containers.");
 
         let mut keys_to_remove: HashSet<String> = HashSet::new();
 
         for container in self.key_map.iter() {
-            let _span = tracing::info_span!("Container", key=%container.key(), value=%container.value());
+            let _span =
+                tracing::info_span!("Container", key=%container.key(), value=%container.value());
             let _enter = _span.enter();
-            
+
             tracing::info!("Checking container.");
             let pod_name = container.value();
-            // TODO: use monitor port if provided.
-            let status_url = Uri::from_str(&format!(
-                "http://{}.{}.svc.cluster.local:{}/status",
-                pod_name, self.namespace, self.application_port
-            ))
-            .unwrap();
-            tracing::info!(%status_url, "Asking container for status.");
 
-            let client = hyper::Client::new();
-            let result = client.get(status_url).await.unwrap();
+            match self.get_pod_state(pod_name).await {
+                Ok(connection_state) => {
+                    // TODO: don't hard-code duration
+                    if connection_state.seconds_inactive > 30 {
+                        tracing::info!("Shutting down.");
+                        delete_pod(pod_name, &self).await.unwrap();
 
-            let body = result.into_body().data().await.unwrap().unwrap();
-
-            let connection_state: ConnectionState = serde_json::from_slice(&body).unwrap();
-            tracing::info!(?connection_state, "Got connection state.");
-
-            // TODO: don't hard-code
-            if connection_state.seconds_inactive > 30 {
-                tracing::info!("Shutting down.");
-                delete_pod(pod_name, &self).await.unwrap();
-
-                keys_to_remove.insert(container.key().clone());
+                        keys_to_remove.insert(container.key().clone());
+                    }
+                }
+                Err(error) => {
+                    // TODO: should clean up when a container errors a number of times in a row.
+                    tracing::error!(?error, "Encountered error in health check; skipping.")
+                }
             }
         }
 

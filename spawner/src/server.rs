@@ -42,12 +42,16 @@ async fn init(
     };
 
     if spawner_settings.key_map.contains_key(&key) {
+        tracing::warn!(%key, "Tried to create pod, but key already exists.");
+
         // TODO: check if the pod still exists.
         return Err(StatusCode::CONFLICT);
     }
 
     let pod_name = hash_key(&key);
     let pod_url = spawner_settings.url_for(&key, &pod_name);
+
+    tracing::info!(%key, %pod_name, %pod_url, "Creating pod.");
 
     create_pod(
         &key,
