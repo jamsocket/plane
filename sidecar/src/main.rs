@@ -64,6 +64,7 @@ async fn main() {
     // Serve.
     let app = Router::new()
         .route("/", get(info))
+        .route("/status", get(info))
         .layer(AddExtensionLayer::new(connection_monitor));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], serve_port));

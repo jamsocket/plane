@@ -2,7 +2,7 @@ use k8s_openapi::api::core::v1::{
     Container, ContainerPort, EnvVar, Pod, PodSpec, Service, ServicePort, ServiceSpec,
 };
 use kube::{
-    api::{Api, ObjectMeta, PostParams},
+    api::{Api, DeleteParams, ObjectMeta, PostParams},
     Client,
 };
 
@@ -16,6 +16,22 @@ const ENV_SPAWNER_POD_KEY: &str = "SPAWNER_POD_KEY";
 const ENV_SPAWNER_POD_URL: &str = "SPAWNER_POD_URL";
 const APPLICATION: &str = "app";
 const MONITOR: &str = "monitor";
+
+pub async fn delete_pod(
+    pod_name: &str,
+    spawner_state: &SpawnerState,
+) -> Result<(), kube::error::Error> {
+    let namespace = &spawner_state.namespace;
+    let client = Client::try_default().await?;
+
+    let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
+    let services: Api<Service> = Api::namespaced(client, namespace);
+
+    pods.delete(&pod_name, &DeleteParams::default()).await?;
+    services.delete(&pod_name, &DeleteParams::default()).await?;
+
+    Ok(())
+}
 
 pub async fn create_pod(
     key: &str,
@@ -37,7 +53,6 @@ pub async fn create_pod(
 
     let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
     let services: Api<Service> = Api::namespaced(client, namespace);
-    let prefixed_pod_name = format!("spawned-{}", pod_name);
 
     let mut containers = vec![Container {
         name: APPLICATION.to_string(),
@@ -85,10 +100,10 @@ pub async fn create_pod(
         &PostParams::default(),
         &Pod {
             metadata: ObjectMeta {
-                name: Some(prefixed_pod_name.to_string()),
+                name: Some(pod_name.to_string()),
                 labels: Some(
                     vec![
-                        (LABEL_RUN.to_string(), prefixed_pod_name.to_string()),
+                        (LABEL_RUN.to_string(), pod_name.to_string()),
                         (
                             LABEL_ACCOUNT.to_string(),
                             account.to_owned().unwrap_or_default().to_string(),
@@ -110,14 +125,12 @@ pub async fn create_pod(
     )
     .await?;
 
-    let mut service_ports = vec![
-        ServicePort {
-            name: Some(APPLICATION.to_string()),
-            protocol: Some(TCP.to_string()),
-            port: *application_port as _,
-            ..ServicePort::default()
-        }
-    ];
+    let mut service_ports = vec![ServicePort {
+        name: Some(APPLICATION.to_string()),
+        protocol: Some(TCP.to_string()),
+        port: *application_port as _,
+        ..ServicePort::default()
+    }];
 
     if sidecar_image.is_some() {
         service_ports.push(ServicePort {
@@ -133,13 +146,13 @@ pub async fn create_pod(
             &PostParams::default(),
             &Service {
                 metadata: ObjectMeta {
-                    name: Some(prefixed_pod_name.to_string()),
+                    name: Some(pod_name.to_string()),
                     ..ObjectMeta::default()
                 },
 
                 spec: Some(ServiceSpec {
                     selector: Some(
-                        vec![(LABEL_RUN.to_string(), prefixed_pod_name.to_string())]
+                        vec![(LABEL_RUN.to_string(), pod_name.to_string())]
                             .into_iter()
                             .collect(),
                     ),

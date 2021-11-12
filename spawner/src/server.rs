@@ -54,7 +54,7 @@ async fn init(
         &pod_name,
         &pod_url,
         account.as_deref(),
-        &spawner_settings
+        &spawner_settings,
     )
     .await
     .log_error_internal()?;

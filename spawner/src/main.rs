@@ -1,15 +1,30 @@
-use crate::logging::init_logging;
+use crate::{kubernetes::delete_pod, logging::init_logging};
+use axum::body::HttpBody;
 use clap::Parser;
 use dashmap::DashMap;
+use hyper::Uri;
 use name_generator::NameGenerator;
+use serde::Deserialize;
 use server::serve;
-use std::sync::{Arc, Mutex};
+use std::{
+    str::FromStr,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 mod hashutil;
 mod kubernetes;
 mod logging;
 mod name_generator;
 mod server;
+
+#[allow(unused)]
+#[derive(Deserialize, Debug)]
+pub struct ConnectionState {
+    active_connections: u32,
+    seconds_inactive: u32,
+    listening: bool,
+}
 
 #[derive(Parser, Clone)]
 pub struct SpawnerParams {
@@ -18,7 +33,7 @@ pub struct SpawnerParams {
     application_image: String,
 
     /// The container port on which the application runs.
-    #[clap(long, default_value="8080")]
+    #[clap(long, default_value = "8080")]
     application_port: u16,
 
     /// The name of the image to deploy as a monitoring sidecar.
@@ -27,7 +42,7 @@ pub struct SpawnerParams {
 
     /// The container port on which the sidecar runs. Only used if
     /// sidecar_image is set.
-    #[clap(long, default_value="7070")]
+    #[clap(long, default_value = "7070")]
     sidecar_port: u16,
 
     /// The prefix used for public-facing URLs. To construct a full URL, it is
@@ -51,6 +66,10 @@ pub struct SpawnerParams {
     /// The namespace within which pods will be spawned.
     #[clap(long, default_value = "spawner")]
     namespace: String,
+
+    /// How frequently (in seconds) to clean up idle containers.
+    #[clap(long, default_value = "30")]
+    cleanup_frequency_seconds: u16,
 }
 
 #[derive(Clone)]
@@ -66,6 +85,7 @@ pub struct SpawnerState {
     key_map: Arc<DashMap<String, String>>,
     nginx_internal_path: Option<String>,
     namespace: String,
+    cleanup_frequency_seconds: u16,
 }
 
 impl SpawnerState {
@@ -74,6 +94,42 @@ impl SpawnerState {
             format!("{}/{}", self.base_url, key)
         } else {
             format!("{}/{}", self.base_url, name)
+        }
+    }
+
+    pub async fn cleanup_containers(&self) {
+        tracing::info!("Cleaning up unused containers.");
+        for container in self.key_map.iter() {
+            let _span = tracing::info_span!("Container", key=%container.key(), value=%container.value());
+            let _enter = _span.enter();
+            
+            tracing::info!("Checking container.");
+            let pod_name = container.value();
+            // TODO: use monitor port if provided.
+            let status_url = Uri::from_str(&format!(
+                "http://{}.{}.svc.cluster.local:{}/status",
+                pod_name, self.namespace, self.application_port
+            ))
+            .unwrap();
+            let client = hyper::Client::new();
+            let result = client.get(status_url).await.unwrap();
+
+            let body = result.into_body().data().await.unwrap().unwrap();
+
+            let connection_state: ConnectionState = serde_json::from_slice(&body).unwrap();
+            tracing::info!(?connection_state, "Got connection state.");
+
+            // TODO: don't hard-code
+            if connection_state.seconds_inactive > 30 {
+                tracing::info!("Shutting down.");
+                delete_pod(pod_name, &self).await.unwrap();
+
+                let key = container.key().clone();
+                drop(container);
+
+                tracing::info!("Removing from key map.");
+                self.key_map.remove(&key);
+            }
         }
     }
 }
@@ -97,7 +153,18 @@ async fn main() -> Result<(), kube::Error> {
         key_map: Arc::new(DashMap::default()),
         nginx_internal_path: settings.nginx_internal_path,
         namespace: settings.namespace,
+        cleanup_frequency_seconds: settings.cleanup_frequency_seconds,
     };
+
+    {
+        let state = state.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(state.cleanup_frequency_seconds as _)).await;
+                state.cleanup_containers().await;
+            }
+        });
+    }
 
     init_logging();
 
