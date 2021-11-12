@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use axum::http::StatusCode;
 use tracing_subscriber::EnvFilter;
 
-const LOG_MODULES: &[&str] = &["kube_play"];
+const LOG_MODULES: &[&str] = &["spawner"];
 
 pub fn init_logging() {
     let mut env_filter = EnvFilter::default();

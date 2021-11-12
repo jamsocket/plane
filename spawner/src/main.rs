@@ -6,11 +6,7 @@ use hyper::Uri;
 use name_generator::NameGenerator;
 use serde::Deserialize;
 use server::serve;
-use std::{
-    str::FromStr,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{collections::HashSet, str::FromStr, sync::{Arc, Mutex}, time::Duration};
 
 mod hashutil;
 mod kubernetes;
@@ -99,6 +95,9 @@ impl SpawnerState {
 
     pub async fn cleanup_containers(&self) {
         tracing::info!("Cleaning up unused containers.");
+
+        let mut keys_to_remove: HashSet<String> = HashSet::new();
+
         for container in self.key_map.iter() {
             let _span = tracing::info_span!("Container", key=%container.key(), value=%container.value());
             let _enter = _span.enter();
@@ -111,6 +110,8 @@ impl SpawnerState {
                 pod_name, self.namespace, self.application_port
             ))
             .unwrap();
+            tracing::info!(%status_url, "Asking container for status.");
+
             let client = hyper::Client::new();
             let result = client.get(status_url).await.unwrap();
 
@@ -124,13 +125,16 @@ impl SpawnerState {
                 tracing::info!("Shutting down.");
                 delete_pod(pod_name, &self).await.unwrap();
 
-                let key = container.key().clone();
-                drop(container);
-
-                tracing::info!("Removing from key map.");
-                self.key_map.remove(&key);
+                keys_to_remove.insert(container.key().clone());
             }
         }
+
+        for key_to_remove in keys_to_remove {
+            tracing::info!(%key_to_remove, "Removing from key map.");
+            self.key_map.remove(&key_to_remove);
+        }
+
+        tracing::info!("Done cleanup.");
     }
 }
 

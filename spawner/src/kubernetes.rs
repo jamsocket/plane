@@ -57,6 +57,7 @@ pub async fn create_pod(
     let mut containers = vec![Container {
         name: APPLICATION.to_string(),
         image: Some(application_image.to_string()),
+        image_pull_policy: Some("Never".to_string()),
         // NB containerPort is primarily informational, Kubernetes does not use it, but
         // other software may read it.
         // https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#container-v1-core
