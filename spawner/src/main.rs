@@ -92,9 +92,9 @@ pub struct SpawnerState {
 impl SpawnerState {
     pub fn url_for(&self, key: &str, name: &str) -> String {
         if self.nginx_internal_path.is_some() {
-            format!("{}/{}", self.base_url, key)
+            format!("{}/{}/", self.base_url, key)
         } else {
-            format!("{}/{}", self.base_url, name)
+            format!("{}/{}/", self.base_url, name)
         }
     }
 
