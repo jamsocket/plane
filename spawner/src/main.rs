@@ -101,7 +101,7 @@ impl SpawnerState {
     async fn get_pod_state(&self, pod_name: &str) -> anyhow::Result<ConnectionState> {
         // TODO: use monitor port if provided.
         let status_url = Uri::from_str(&format!(
-            "http://{}.{}.svc.cluster.local:{}/status",
+            "http://spawner-{}.{}.svc.cluster.local:{}/status",
             pod_name, self.namespace, self.application_port
         ))
         .expect("Should always be able to construct URL.");

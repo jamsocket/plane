@@ -24,11 +24,13 @@ pub async fn delete_pod(
     let namespace = &spawner_state.namespace;
     let client = Client::try_default().await?;
 
+    let prefixed_pod_name = format!("spawner-{}", pod_name);
+
     let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
     let services: Api<Service> = Api::namespaced(client, namespace);
 
-    pods.delete(&pod_name, &DeleteParams::default()).await?;
-    services.delete(&pod_name, &DeleteParams::default()).await?;
+    pods.delete(&prefixed_pod_name, &DeleteParams::default()).await?;
+    services.delete(&prefixed_pod_name, &DeleteParams::default()).await?;
 
     Ok(())
 }
@@ -48,6 +50,8 @@ pub async fn create_pod(
         namespace,
         ..
     } = spawner_state;
+
+    let prefixed_pod_name = format!("spawner-{}", pod_name);
 
     let client = Client::try_default().await?;
 
@@ -101,10 +105,10 @@ pub async fn create_pod(
         &PostParams::default(),
         &Pod {
             metadata: ObjectMeta {
-                name: Some(pod_name.to_string()),
+                name: Some(prefixed_pod_name.clone()),
                 labels: Some(
                     vec![
-                        (LABEL_RUN.to_string(), pod_name.to_string()),
+                        (LABEL_RUN.to_string(), prefixed_pod_name.clone()),
                         (
                             LABEL_ACCOUNT.to_string(),
                             account.to_owned().unwrap_or_default().to_string(),
@@ -147,13 +151,13 @@ pub async fn create_pod(
             &PostParams::default(),
             &Service {
                 metadata: ObjectMeta {
-                    name: Some(pod_name.to_string()),
+                    name: Some(prefixed_pod_name.clone()),
                     ..ObjectMeta::default()
                 },
 
                 spec: Some(ServiceSpec {
                     selector: Some(
-                        vec![(LABEL_RUN.to_string(), pod_name.to_string())]
+                        vec![(LABEL_RUN.to_string(), prefixed_pod_name.clone())]
                             .into_iter()
                             .collect(),
                     ),
