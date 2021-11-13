@@ -1,6 +1,6 @@
 # Spawner
 
-![Spawner logo](spawner.png)
+![Spawner logo](assets/spawner.png)
 
 **Spawner** is a bridge between a web application and Kuberenetes. It allows a web application to
 create **session-lived** containers that serve WebSocket or HTTP connections. Spawner coordinates with
@@ -12,6 +12,10 @@ Currently, Spawner only supports [NGINX](https://www.nginx.com/) as a reverse pr
 **This is still a work-in-progress. It's demo-stage, and not ready for use in production just yet.** If
 you are interested in being an early adopter, though, feel free to open an issue or email me at
 [hi@driftingin.space](mailto:hi@driftingin.space).
+
+Video Demo
+
+[![Screen shot of YouTube player](assets/video_screenshot.png)](https://www.youtube.com/watch?v=PtJ_vsgwK90)
 
 ## Use cases
 
