@@ -127,11 +127,7 @@ impl SpawnerState {
         let mut keys_to_remove: HashSet<String> = HashSet::new();
 
         for container in self.key_map.iter() {
-            let _span =
-                tracing::info_span!("Container", key=%container.key(), value=%container.value());
-            let _enter = _span.enter();
-
-            tracing::info!("Checking container.");
+            tracing::info!(key=%container.key(), value=%container.value(), "Checking container.");
             let pod_name = container.value();
 
             match self.get_pod_state(pod_name).await {
