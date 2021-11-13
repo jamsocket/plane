@@ -13,6 +13,21 @@ Currently, Spawner only supports [NGINX](https://www.nginx.com/) as a reverse pr
 you are interested in being an early adopter, though, feel free to open an issue or email me at
 [hi@driftingin.space](mailto:hi@driftingin.space).
 
+## Use cases
+
+Spawner is intended for cases where a web app needs a dedicated, stateful back-end to talk to for the
+duration of a session. One area where this approach is currently common is web-based IDEs like
+[GitHub Codespaces](https://github.com/features/codespaces), which spin up a container for each user
+to run code in. It's also useful as a back-end for real-time collaboration, when the document state
+is non-trivial and needs more than just a relay server (see e.g.
+[Figma's description](https://www.figma.com/blog/rust-in-production-at-figma/) of how they run one
+process per active document.) By making it low-stakes to experiment with this architecture, my hope is
+that Spawner will help developers discover new use-cases, like loading a large dataset into system or
+GPU memory to allow real-time interactive data exploration.
+
+Depending on your needs, it may also make sense as a back-end for games and virtual spaces, but also
+see [Agones](https://agones.dev/site/) for that use case.
+
 ## How it works
 
 ### Service Creation
