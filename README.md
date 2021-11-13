@@ -1,5 +1,7 @@
 # Spawner
 
+![Spawner logo](spawner.png)
+
 **Spawner** is a bridge between a web application and Kuberenetes. It allows a web application to
 create **session-lived** containers that serve WebSocket or HTTP connections. Spawner coordinates with
 a reverse proxy, so that your client-side code can talk directly to these servers. *session-lived*
