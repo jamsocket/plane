@@ -7,8 +7,6 @@ create **session-lived** containers that serve WebSocket or HTTP connections. Sp
 a reverse proxy, so that your client-side code can talk directly to these servers. *session-lived*
 means that when the remote client(s) close the connection, the container is cleaned up.
 
-Currently, Spawner only supports [NGINX](https://www.nginx.com/) as a reverse proxy.
-
 **This is still a work-in-progress. It's demo-stage, and not ready for use in production just yet.** If
 you are interested in being an early adopter, though, feel free to open an issue or email me at
 [hi@driftingin.space](mailto:hi@driftingin.space).
@@ -49,6 +47,10 @@ session, and returns a `JSON` object containing a URL specific to that session-l
 connect to it as a regular HTTP host. The proxy server is configured to map paths under the root,
 so that `https://my-domain.com/p/JE3M/my-file.txt` is internally routed to
 `http://hostname-of-pod/my-file.txt`.
+
+Currently, Spawner works best with [NGINX](https://www.nginx.com/) as a reverse proxy, but other reverse
+proxies with a similar feature set should also work. If there's a particular proxy you'd like to see
+supported, feel free to open an issue.
 
 ### Service Destruction
 
