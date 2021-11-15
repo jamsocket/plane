@@ -2,6 +2,7 @@ FROM rust:latest as build
 
 WORKDIR /work
 COPY . .
+RUN cargo test --release
 RUN cargo build --release
 
 FROM gcr.io/distroless/cc-debian11
