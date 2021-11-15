@@ -113,7 +113,7 @@ impl SpawnerState {
             .into_body()
             .data()
             .await
-            .ok_or(anyhow::anyhow!("Empty body when ConnectionState expected"))??;
+            .ok_or_else(|| anyhow::anyhow!("Empty body when ConnectionState expected"))??;
 
         let connection_state: ConnectionState = serde_json::from_slice(&body)?;
         tracing::info!(?connection_state, "Got connection state.");
@@ -135,7 +135,7 @@ impl SpawnerState {
                     // TODO: don't hard-code duration
                     if connection_state.seconds_inactive > 30 {
                         tracing::info!("Shutting down.");
-                        delete_pod(pod_name, &self).await.unwrap();
+                        delete_pod(pod_name, self).await.unwrap();
 
                         keys_to_remove.insert(container.key().clone());
                     }
