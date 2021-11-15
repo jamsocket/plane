@@ -4,8 +4,8 @@ on:
   push:
     branches: [ master ]
     tags: [ 'v*.*.*' ]
-    # paths:
-    #   - 'sidecar/**'
+    paths:
+      - 'sidecar/**'
   pull_request:
     branches: [ master ]
 
