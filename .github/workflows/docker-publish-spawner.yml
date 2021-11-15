@@ -5,13 +5,13 @@ on:
     branches: [ master ]
     tags: [ 'v*.*.*' ]
     # paths:
-    #   - 'sidecar/**'
+    #   - 'spawner/**'
   pull_request:
     branches: [ master ]
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: drifting-in-space/spawner-sidecar
+  IMAGE_NAME: drifting-in-space/spawner
 
 jobs:
   build:
