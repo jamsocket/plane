@@ -11,7 +11,7 @@ means that when the remote client(s) close the connection, the container is clea
 you are interested in being an early adopter, though, feel free to open an issue or email me at
 [hi@driftingin.space](mailto:hi@driftingin.space).
 
-Video Demo
+## Video Demo
 
 [![Screen shot of YouTube player](assets/video_screenshot.png)](https://www.youtube.com/watch?v=PtJ_vsgwK90)
 
