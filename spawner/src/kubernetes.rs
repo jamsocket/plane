@@ -5,7 +5,6 @@ use kube::{
     api::{Api, DeleteParams, ObjectMeta, PostParams},
     Client,
 };
-
 use crate::SpawnerState;
 
 const TCP: &str = "TCP";
