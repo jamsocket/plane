@@ -11,7 +11,7 @@ use axum::{
     routing::{any, get, post},
     AddExtensionLayer, Json, Router,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 
@@ -27,10 +27,17 @@ struct InitQuery {
     account: Option<String>,
 }
 
+#[derive(Serialize)]
+struct PodResult {
+    pod: String,
+    key: String,
+    url: String,
+}
+
 async fn init(
     Extension(spawner_settings): Extension<SpawnerState>,
     Query(InitQuery { key, account }): Query<InitQuery>,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<Json<PodResult>, StatusCode> {
     let key = if let Some(key) = key {
         key
     } else {
@@ -67,12 +74,11 @@ async fn init(
         .key_map
         .insert(key.clone(), pod_name.clone());
 
-    Ok(Json(json!({
-        "result": "ok",
-        "pod": pod_name,
-        "key": key,
-        "url": pod_url,
-    })))
+    Ok(Json(PodResult {
+        pod: pod_name,
+        key: key,
+        url: pod_url,
+    }))
 }
 
 #[derive(Deserialize)]
@@ -83,14 +89,13 @@ struct GetQuery {
 async fn get_name(
     Extension(spawner_settings): Extension<SpawnerState>,
     Query(GetQuery { key }): Query<GetQuery>,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<Json<PodResult>, StatusCode> {
     if let Some(pod_name) = spawner_settings.key_map.get(&key) {
-        Ok(Json(json!({
-            "result": "ok",
-            "pod": pod_name.to_string(),
-            "key": key,
-            "url": spawner_settings.url_for(&key, &pod_name),
-        })))
+        Ok(Json(PodResult {
+            pod: pod_name.to_string(),
+            url: spawner_settings.url_for(&key, &pod_name),
+            key: key,
+        }))
     } else {
         Err(StatusCode::NOT_FOUND)
     }

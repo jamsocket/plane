@@ -29,8 +29,11 @@ pub async fn delete_pod(
     let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
     let services: Api<Service> = Api::namespaced(client, namespace);
 
-    pods.delete(&prefixed_pod_name, &DeleteParams::default()).await?;
-    services.delete(&prefixed_pod_name, &DeleteParams::default()).await?;
+    pods.delete(&prefixed_pod_name, &DeleteParams::default())
+        .await?;
+    services
+        .delete(&prefixed_pod_name, &DeleteParams::default())
+        .await?;
 
     Ok(())
 }

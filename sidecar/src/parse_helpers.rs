@@ -97,7 +97,9 @@ pub fn decimal(st: &[u8]) -> Option<(&[u8], u32)> {
     if ix == 0 {
         None
     } else {
-        let result = (std::str::from_utf8(&st[0..ix]).ok()?).parse::<u32>().ok()?;
+        let result = (std::str::from_utf8(&st[0..ix]).ok()?)
+            .parse::<u32>()
+            .ok()?;
         Some((&st[ix..], result))
     }
 }

@@ -121,7 +121,7 @@ impl SpawnerState {
         Ok(connection_state)
     }
 
-    pub async fn cleanup_containers(&self) {
+    pub async fn clean_up_containers(&self) {
         tracing::info!("Cleaning up unused containers.");
 
         let mut keys_to_remove: HashSet<String> = HashSet::new();
@@ -183,7 +183,7 @@ async fn main() -> Result<(), kube::Error> {
         tokio::spawn(async move {
             loop {
                 tokio::time::sleep(Duration::from_secs(state.cleanup_frequency_seconds as _)).await;
-                state.cleanup_containers().await;
+                state.clean_up_containers().await;
             }
         });
     }
