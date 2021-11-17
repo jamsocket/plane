@@ -1,4 +1,4 @@
-<img src="assets/spawner.png" alt="Drifting in Space: Spawner" style="max-width: 300px;" />
+<img src="assets/spawner.png" alt="Drifting in Space: Spawner" style="width: 300px;" />
 
 **Spawner** is a bridge between a web application and Kuberenetes. It allows a web application to
 create **session-lived** containers that serve WebSocket or HTTP connections. Spawner coordinates with
@@ -12,7 +12,7 @@ you are interested in being an early adopter, though, feel free to open an issue
 ## Video Demo
 
 <a href="https://www.youtube.com/watch?v=PtJ_vsgwK90">
-  <img src="assets/video_screenshot.png" alt="Screen shot of YouTube player" style="max-width: 300px" />
+  <img src="assets/video_screenshot.png" alt="Screen shot of YouTube player" style="width: 300px" />
 </a>
 
 ## Use cases
