@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-
 use axum::http::StatusCode;
 use tracing_subscriber::EnvFilter;
 
