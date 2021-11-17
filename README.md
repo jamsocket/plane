@@ -1,6 +1,4 @@
-# Spawner
-
-![Spawner logo](assets/spawner.png)
+<img src="assets/spawner.png" alt="Drifting in Space: Spawner" style="max-width: 300px;" />
 
 **Spawner** is a bridge between a web application and Kuberenetes. It allows a web application to
 create **session-lived** containers that serve WebSocket or HTTP connections. Spawner coordinates with
