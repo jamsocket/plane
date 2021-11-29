@@ -50,6 +50,7 @@ pub async fn create_pod(
         ..
     } = settings;
 
+    // TODO: don't hard-code this.
     let prefixed_pod_name = format!("spawner-{}", pod_name);
 
     let client = Client::try_default().await?;
