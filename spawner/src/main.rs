@@ -1,14 +1,11 @@
-use crate::{kubernetes::delete_pod, logging::init_logging};
-use axum::body::HttpBody;
+use crate::{kubernetes::delete_pod, logging::init_logging, pod_state::get_pod_state};
 use clap::Parser;
 use dashmap::DashMap;
-use hyper::Uri;
 use name_generator::NameGenerator;
 use serde::Deserialize;
 use server::serve;
 use std::{
     collections::HashSet,
-    str::FromStr,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -18,6 +15,7 @@ mod kubernetes;
 mod logging;
 mod name_generator;
 mod server;
+mod pod_state;
 
 #[allow(unused)]
 #[derive(Deserialize, Debug)]
@@ -98,29 +96,6 @@ impl SpawnerState {
         }
     }
 
-    async fn get_pod_state(&self, pod_name: &str) -> anyhow::Result<ConnectionState> {
-        // TODO: use monitor port if provided.
-        let status_url = Uri::from_str(&format!(
-            "http://spawner-{}.{}.svc.cluster.local:{}/status",
-            pod_name, self.namespace, self.application_port
-        ))
-        .expect("Should always be able to construct URL.");
-        tracing::info!(%status_url, "Asking container for status.");
-
-        let client = hyper::Client::new();
-        let result = client.get(status_url).await?;
-        let body = result
-            .into_body()
-            .data()
-            .await
-            .ok_or_else(|| anyhow::anyhow!("Empty body when ConnectionState expected"))??;
-
-        let connection_state: ConnectionState = serde_json::from_slice(&body)?;
-        tracing::info!(?connection_state, "Got connection state.");
-
-        Ok(connection_state)
-    }
-
     pub async fn clean_up_containers(&self) {
         tracing::info!("Cleaning up unused containers.");
 
@@ -130,7 +105,7 @@ impl SpawnerState {
             tracing::info!(key=%container.key(), value=%container.value(), "Checking container.");
             let pod_name = container.value();
 
-            match self.get_pod_state(pod_name).await {
+            match get_pod_state(pod_name, &self.namespace, self.application_port).await {
                 Ok(connection_state) => {
                     // TODO: don't hard-code duration
                     if connection_state.seconds_inactive > 30 {

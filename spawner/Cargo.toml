@@ -4,19 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-kube = { version = "0.63.2", features = ["runtime","derive"] }
+kube = { version = "0.64.0", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
-# futures = "0.3.17"
 tokio = { version = "1.13.0", features = ["macros", "rt-multi-thread"] }
 axum = "0.3.2"
 serde_json = "1.0.68"
 tracing-subscriber = { version = "0.3.1", features = ["env-filter"] }
 tracing = "0.1.29"
-# tracing-stackdriver = "0.2.0"
-# tower = { version = "0.4.10" }
-# tower-http = { version = "0.1.1", features = ["fs"] }
 anyhow = "1.0.45"
-# rand = "0.8.4"
 clap = "3.0.0-beta.5"
 uuid = { version = "0.8.2", features = ["v4"] }
 tiny_id = "0.1.2"

@@ -12,7 +12,7 @@ you are interested in being an early adopter, though, feel free to open an issue
 ## Video Demo
 
 <a href="https://www.youtube.com/watch?v=PtJ_vsgwK90">
-  <img src="assets/video_screenshot.png" alt="Screen shot of YouTube player" style="width: 300px" />
+  <img src="assets/video_screenshot.png" alt="Screen shot of YouTube player" style="width: 450px" />
 </a>
 
 ## Use cases
