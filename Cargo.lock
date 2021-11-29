@@ -1305,6 +1305,8 @@ dependencies = [
  "clap",
  "convert-base",
  "dashmap",
+ "futures",
+ "futures-util",
  "hyper",
  "k8s-openapi",
  "kube",

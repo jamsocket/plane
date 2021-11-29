@@ -1,3 +1,4 @@
+use crate::SpawnerState;
 use k8s_openapi::api::core::v1::{
     Container, ContainerPort, EnvVar, Pod, PodSpec, Service, ServicePort, ServiceSpec,
 };
@@ -5,7 +6,6 @@ use kube::{
     api::{Api, DeleteParams, ObjectMeta, PostParams},
     Client,
 };
-use crate::SpawnerState;
 
 const TCP: &str = "TCP";
 const LABEL_RUN: &str = "run";
@@ -16,11 +16,7 @@ const ENV_SPAWNER_POD_URL: &str = "SPAWNER_POD_URL";
 const APPLICATION: &str = "app";
 const MONITOR: &str = "monitor";
 
-pub async fn delete_pod(
-    pod_name: &str,
-    spawner_state: &SpawnerState,
-) -> Result<(), kube::error::Error> {
-    let namespace = &spawner_state.namespace;
+pub async fn delete_pod(pod_name: &str, namespace: &str) -> Result<(), kube::error::Error> {
     let client = Client::try_default().await?;
 
     let prefixed_pod_name = format!("spawner-{}", pod_name);

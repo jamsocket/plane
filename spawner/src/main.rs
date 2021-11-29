@@ -1,21 +1,19 @@
-use crate::{kubernetes::delete_pod, logging::init_logging, pod_state::get_pod_state};
+use crate::logging::init_logging;
 use clap::Parser;
 use dashmap::DashMap;
+use idle_pod_collector::IdlePodCollector;
 use name_generator::NameGenerator;
 use serde::Deserialize;
 use server::serve;
-use std::{
-    collections::HashSet,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::sync::{Arc, Mutex};
 
 mod hashutil;
+mod idle_pod_collector;
 mod kubernetes;
 mod logging;
 mod name_generator;
-mod server;
 mod pod_state;
+mod server;
 
 #[allow(unused)]
 #[derive(Deserialize, Debug)]
@@ -68,7 +66,7 @@ pub struct SpawnerParams {
 
     /// How frequently (in seconds) to clean up idle containers.
     #[clap(long, default_value = "30")]
-    cleanup_frequency_seconds: u16,
+    cleanup_frequency_seconds: u32,
 }
 
 #[derive(Clone)]
@@ -84,7 +82,7 @@ pub struct SpawnerState {
     key_map: Arc<DashMap<String, String>>,
     nginx_internal_path: Option<String>,
     namespace: String,
-    cleanup_frequency_seconds: u16,
+    cleanup_frequency_seconds: u32,
 }
 
 impl SpawnerState {
@@ -94,40 +92,6 @@ impl SpawnerState {
         } else {
             format!("{}/{}/", self.base_url, name)
         }
-    }
-
-    pub async fn clean_up_containers(&self) {
-        tracing::info!("Cleaning up unused containers.");
-
-        let mut keys_to_remove: HashSet<String> = HashSet::new();
-
-        for container in self.key_map.iter() {
-            tracing::info!(key=%container.key(), value=%container.value(), "Checking container.");
-            let pod_name = container.value();
-
-            match get_pod_state(pod_name, &self.namespace, self.application_port).await {
-                Ok(connection_state) => {
-                    // TODO: don't hard-code duration
-                    if connection_state.seconds_inactive > 30 {
-                        tracing::info!("Shutting down.");
-                        delete_pod(pod_name, self).await.unwrap();
-
-                        keys_to_remove.insert(container.key().clone());
-                    }
-                }
-                Err(error) => {
-                    // TODO: should clean up when a container errors a number of times in a row.
-                    tracing::error!(?error, "Encountered error in health check; skipping.")
-                }
-            }
-        }
-
-        for key_to_remove in keys_to_remove {
-            tracing::info!(%key_to_remove, "Removing from key map.");
-            self.key_map.remove(&key_to_remove);
-        }
-
-        tracing::info!("Done cleanup.");
     }
 }
 
@@ -149,21 +113,17 @@ async fn main() -> Result<(), kube::Error> {
         name_generator: Arc::new(Mutex::new(name_generator)),
         key_map: Arc::new(DashMap::default()),
         nginx_internal_path: settings.nginx_internal_path,
-        namespace: settings.namespace,
+        namespace: settings.namespace.clone(),
         cleanup_frequency_seconds: settings.cleanup_frequency_seconds,
     };
 
-    {
-        let state = state.clone();
-        tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(Duration::from_secs(state.cleanup_frequency_seconds as _)).await;
-                state.clean_up_containers().await;
-            }
-        });
-    }
+    let pod_collector = IdlePodCollector::new(state.clone());
 
     init_logging();
 
-    serve(state).await
+    tokio::select! {
+        _ = pod_collector => tracing::warn!("controller drained"),
+        _ = serve(state) => tracing::info!("server exited"),
+    }
+    Ok(())
 }

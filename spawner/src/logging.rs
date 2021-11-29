@@ -1,5 +1,5 @@
-use std::fmt::Debug;
 use axum::http::StatusCode;
+use std::fmt::Debug;
 use tracing_subscriber::EnvFilter;
 
 const LOG_MODULES: &[&str] = &["spawner"];

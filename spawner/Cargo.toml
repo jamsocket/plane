@@ -20,3 +20,5 @@ sha2 = "0.9.8"
 convert-base = "1.1.2"
 dashmap = "4.0.2"
 hyper = { version = "0.14.14", features = ["http2"] }
+futures-util = "0.3.18"
+futures = "0.3.18"

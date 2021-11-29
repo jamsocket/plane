@@ -76,7 +76,7 @@ async fn init(
 
     Ok(Json(PodResult {
         pod: pod_name,
-        key: key,
+        key,
         url: pod_url,
     }))
 }
@@ -94,7 +94,7 @@ async fn get_name(
         Ok(Json(PodResult {
             pod: pod_name.to_string(),
             url: spawner_settings.url_for(&key, &pod_name),
-            key: key,
+            key,
         }))
     } else {
         Err(StatusCode::NOT_FOUND)
