@@ -1,6 +1,7 @@
 use crate::hashutil::hash_key;
+use crate::kubernetes::create_pod;
 use crate::logging::LogError;
-use crate::{kubernetes::create_pod, SpawnerState};
+use crate::state::SpawnerState;
 use axum::body::Body;
 use axum::extract::Query;
 use axum::http::header::HeaderName;
@@ -35,28 +36,28 @@ struct PodResult {
 }
 
 async fn init(
-    Extension(spawner_settings): Extension<SpawnerState>,
+    Extension(spawner_state): Extension<SpawnerState>,
     Query(InitQuery { key, account }): Query<InitQuery>,
 ) -> Result<Json<PodResult>, StatusCode> {
     let key = if let Some(key) = key {
         key
     } else {
-        spawner_settings
+        spawner_state
             .name_generator
             .lock()
             .log_error_internal()?
             .generate()
     };
 
-    if spawner_settings.key_map.contains_key(&key) {
-        tracing::warn!(%key, "Tried to create pod, but key already exists.");
+    // if spawner_state.key_map.contains_key(&key) {
+    //     tracing::warn!(%key, "Tried to create pod, but key already exists.");
 
-        // TODO: check if the pod still exists.
-        return Err(StatusCode::CONFLICT);
-    }
+    //     // TODO: check if the pod still exists.
+    //     return Err(StatusCode::CONFLICT);
+    // }
 
     let pod_name = hash_key(&key);
-    let pod_url = spawner_settings.url_for(&key, &pod_name);
+    let pod_url = spawner_state.settings.url_for(&key, &pod_name);
 
     tracing::info!(%key, %pod_name, %pod_url, "Creating pod.");
 
@@ -65,14 +66,14 @@ async fn init(
         &pod_name,
         &pod_url,
         account.as_deref(),
-        &spawner_settings,
+        &spawner_state.settings,
     )
     .await
     .log_error_internal()?;
 
-    spawner_settings
-        .key_map
-        .insert(key.clone(), pod_name.clone());
+    // spawner_state
+    //     .key_map
+    //     .insert(key.clone(), pod_name.clone());
 
     Ok(Json(PodResult {
         pod: pod_name,
@@ -87,13 +88,17 @@ struct GetQuery {
 }
 
 async fn get_name(
-    Extension(spawner_settings): Extension<SpawnerState>,
+    Extension(spawner_state): Extension<SpawnerState>,
     Query(GetQuery { key }): Query<GetQuery>,
 ) -> Result<Json<PodResult>, StatusCode> {
-    if let Some(pod_name) = spawner_settings.key_map.get(&key) {
+    if let Some(_) = spawner_state
+        .store
+        .get(&spawner_state.settings.get_object_ref(&key))
+    {
+        let pod_name = hash_key(&key);
         Ok(Json(PodResult {
             pod: pod_name.to_string(),
-            url: spawner_settings.url_for(&key, &pod_name),
+            url: spawner_state.settings.url_for(&key, &pod_name),
             key,
         }))
     } else {
@@ -102,11 +107,11 @@ async fn get_name(
 }
 
 async fn nginx_redirect(
-    Extension(spawner_settings): Extension<SpawnerState>,
+    Extension(spawner_state): Extension<SpawnerState>,
     mut request: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
     let nginx_internal_path =
-        if let Some(nginx_internal_path) = spawner_settings.nginx_internal_path {
+        if let Some(nginx_internal_path) = &spawner_state.settings.nginx_internal_path {
             nginx_internal_path
         } else {
             return Err(StatusCode::MISDIRECTED_REQUEST);
@@ -125,12 +130,15 @@ async fn nginx_redirect(
         "".to_string()
     };
 
-    if let Some(pod_name) = spawner_settings.key_map.get(key) {
+    if let Some(_) = spawner_state
+        .store
+        .get(&spawner_state.settings.get_object_ref(&key))
+    {
+        let pod_name = hash_key(&key);
         let url = format!(
             "{}/{}/{}{}",
-            nginx_internal_path, *pod_name, path, query_string
+            nginx_internal_path, pod_name, path, query_string
         );
-
         let response = Response::builder()
             .header(
                 HeaderName::from_static("x-accel-redirect"),
@@ -145,7 +153,7 @@ async fn nginx_redirect(
 }
 
 async fn redirect(
-    Extension(spawner_settings): Extension<SpawnerState>,
+    Extension(spawner_state): Extension<SpawnerState>,
     mut request: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
     let uri = request.uri_mut();
@@ -158,10 +166,14 @@ async fn redirect(
         "".to_string()
     };
 
-    if let Some(pod_name) = spawner_settings.key_map.get(key) {
+    if let Some(_) = spawner_state
+        .store
+        .get(&spawner_state.settings.get_object_ref(&key))
+    {
+        let pod_name = hash_key(&key);
         let url = format!(
             "{}/{}/{}{}",
-            spawner_settings.base_url, *pod_name, path, query_string
+            spawner_state.settings.base_url, pod_name, path, query_string
         );
 
         let response = Response::builder()

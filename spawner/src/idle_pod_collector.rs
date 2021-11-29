@@ -4,13 +4,14 @@ use kube::{
     api::ListParams,
     runtime::{
         controller::{Context, ReconcilerAction},
+        reflector::Store,
         Controller,
     },
     Api, Client, ResourceExt,
 };
 use std::{fmt::Display, future::Future, pin::Pin, time::Duration};
 
-use crate::{kubernetes::delete_pod, pod_state::get_pod_state, SpawnerState};
+use crate::{kubernetes::delete_pod, pod_state::get_pod_state, SpawnerSettings};
 
 #[derive(Debug)]
 enum IdlePodCollectorError {
@@ -29,27 +30,33 @@ impl Display for IdlePodCollectorError {
 pub struct IdlePodCollector;
 
 impl IdlePodCollector {
-    pub async fn new(state: SpawnerState) -> (Self, Pin<Box<dyn Future<Output = ()>>>) {
+    pub async fn new(
+        settings: SpawnerSettings,
+    ) -> (Self, Pin<Box<dyn Future<Output = ()>>>, Store<Pod>) {
         let client = Client::try_default()
             .await
             .expect("Couldn't create kube client.");
 
-        let pods = Api::<Pod>::namespaced(client, &state.namespace);
+        let pods = Api::<Pod>::namespaced(client, &settings.namespace);
 
-        let context = Context::new(state);
+        let context = Context::new(settings);
 
-        let drainer = Controller::new(pods, ListParams::default())
+        let controller = Controller::new(pods, ListParams::default());
+
+        let store = controller.store();
+
+        let drainer = controller
             .run(reconcile, error_policy, context)
             .for_each(|_| futures::future::ready(()))
             .boxed();
 
-        (IdlePodCollector, drainer)
+        (IdlePodCollector, drainer, store)
     }
 }
 
 async fn reconcile(
     pod: Pod,
-    ctx: Context<SpawnerState>,
+    ctx: Context<SpawnerSettings>,
 ) -> Result<ReconcilerAction, IdlePodCollectorError> {
     tracing::info!("reconcile called for pod: {}", pod.name());
     let ctx = ctx.get_ref();
@@ -59,7 +66,8 @@ async fn reconcile(
         .await
         .map_err(|_| IdlePodCollectorError::ErrorCheckingStatus)?;
 
-    let seconds_until_expired = ctx.cleanup_frequency_seconds as i32 - pod_state.seconds_inactive as i32;
+    let seconds_until_expired =
+        ctx.cleanup_frequency_seconds as i32 - pod_state.seconds_inactive as i32;
 
     if seconds_until_expired <= 0 {
         delete_pod(&name, &ctx.namespace)
@@ -72,7 +80,7 @@ async fn reconcile(
     })
 }
 
-fn error_policy(error: &IdlePodCollectorError, _ctx: Context<SpawnerState>) -> ReconcilerAction {
+fn error_policy(error: &IdlePodCollectorError, _ctx: Context<SpawnerSettings>) -> ReconcilerAction {
     tracing::warn!("Encountered error; retrying. {:?}", error);
 
     ReconcilerAction {

@@ -1,6 +1,8 @@
-use crate::logging::init_logging;
+use crate::{
+    logging::init_logging,
+    state::{SpawnerSettings, SpawnerState},
+};
 use clap::Parser;
-use dashmap::DashMap;
 use idle_pod_collector::IdlePodCollector;
 use name_generator::NameGenerator;
 use serde::Deserialize;
@@ -14,6 +16,7 @@ mod logging;
 mod name_generator;
 mod pod_state;
 mod server;
+mod state;
 
 #[allow(unused)]
 #[derive(Deserialize, Debug)]
@@ -69,32 +72,6 @@ pub struct SpawnerParams {
     cleanup_frequency_seconds: u32,
 }
 
-#[derive(Clone)]
-pub struct SpawnerState {
-    application_image: String,
-    sidecar_image: Option<String>,
-    base_url: String,
-
-    application_port: u16,
-    sidecar_port: u16,
-
-    name_generator: Arc<Mutex<NameGenerator>>,
-    key_map: Arc<DashMap<String, String>>,
-    nginx_internal_path: Option<String>,
-    namespace: String,
-    cleanup_frequency_seconds: u32,
-}
-
-impl SpawnerState {
-    pub fn url_for(&self, key: &str, name: &str) -> String {
-        if self.nginx_internal_path.is_some() {
-            format!("{}/{}/", self.base_url, key)
-        } else {
-            format!("{}/{}/", self.base_url, name)
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() -> Result<(), kube::Error> {
     let settings = SpawnerParams::parse();
@@ -104,25 +81,29 @@ async fn main() -> Result<(), kube::Error> {
         .map(|ng| NameGenerator::from_str(&ng).expect("Could not parse name generator."))
         .unwrap_or_default();
 
-    let state = SpawnerState {
+    let settings = SpawnerSettings {
         application_image: settings.application_image,
         application_port: settings.application_port,
         sidecar_image: settings.sidecar_image,
         sidecar_port: settings.sidecar_port,
         base_url: settings.base_url,
-        name_generator: Arc::new(Mutex::new(name_generator)),
-        key_map: Arc::new(DashMap::default()),
         nginx_internal_path: settings.nginx_internal_path,
         namespace: settings.namespace.clone(),
         cleanup_frequency_seconds: settings.cleanup_frequency_seconds,
     };
 
-    let pod_collector = IdlePodCollector::new(state.clone());
+    let (_pod_collector, drainer, store) = IdlePodCollector::new(settings.clone()).await;
+
+    let state = SpawnerState {
+        settings: settings,
+        name_generator: Arc::new(Mutex::new(name_generator)),
+        store,
+    };
 
     init_logging();
 
     tokio::select! {
-        _ = pod_collector => tracing::warn!("controller drained"),
+        _ = drainer => tracing::warn!("controller drained"),
         _ = serve(state) => tracing::info!("server exited"),
     }
     Ok(())

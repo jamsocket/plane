@@ -1304,7 +1304,6 @@ dependencies = [
  "axum",
  "clap",
  "convert-base",
- "dashmap",
  "futures",
  "futures-util",
  "hyper",

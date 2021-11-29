@@ -1,4 +1,4 @@
-use crate::SpawnerState;
+use crate::SpawnerSettings;
 use k8s_openapi::api::core::v1::{
     Container, ContainerPort, EnvVar, Pod, PodSpec, Service, ServicePort, ServiceSpec,
 };
@@ -19,6 +19,7 @@ const MONITOR: &str = "monitor";
 pub async fn delete_pod(pod_name: &str, namespace: &str) -> Result<(), kube::error::Error> {
     let client = Client::try_default().await?;
 
+    // TODO: don't hardcode this.
     let prefixed_pod_name = format!("spawner-{}", pod_name);
 
     let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
@@ -38,16 +39,16 @@ pub async fn create_pod(
     pod_name: &str,
     pod_url: &str,
     account: Option<&str>,
-    spawner_state: &SpawnerState,
+    settings: &SpawnerSettings,
 ) -> Result<(), kube::error::Error> {
-    let SpawnerState {
+    let SpawnerSettings {
         application_image,
         sidecar_image,
         application_port,
         sidecar_port,
         namespace,
         ..
-    } = spawner_state;
+    } = settings;
 
     let prefixed_pod_name = format!("spawner-{}", pod_name);
 
