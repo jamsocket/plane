@@ -5,6 +5,7 @@ on:
     branches: [ master ]
     tags: [ 'v*.*.*' ]
     paths:
+      - '.github/workflows/docker-publish-sidecar.yml'
       - 'sidecar/**'
   pull_request:
     branches: [ master ]
