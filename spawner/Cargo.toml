@@ -1,23 +1,23 @@
 [package]
 name = "spawner"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]
-kube = { version = "0.64.0", features = ["runtime", "derive"] }
+kube = { version = "0.65.0", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
-tokio = { version = "1.13.0", features = ["macros", "rt-multi-thread"] }
-axum = "0.3.2"
+tokio = { version = "1.15.0", features = ["macros", "rt-multi-thread"] }
+axum = "0.4.3"
 serde_json = "1.0.68"
-tracing-subscriber = { version = "0.3.1", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.5", features = ["env-filter"] }
 tracing = "0.1.29"
 anyhow = "1.0.45"
-clap = "3.0.0-beta.5"
+clap = { version="3.0.0", features=["derive"] }
 uuid = { version = "0.8.2", features = ["v4"] }
-tiny_id = "0.1.2"
+tiny_id = "0.1.4"
 serde = { version = "1.0.130", features = ["derive"] }
-sha2 = "0.9.8"
+sha2 = "0.10.1"
 convert-base = "1.1.2"
-hyper = { version = "0.14.14", features = ["http2"] }
-futures-util = "0.3.18"
-futures = "0.3.18"
+hyper = { version = "0.14.16", features = ["http2"] }
+futures-util = "0.3.19"
+futures = "0.3.19"
