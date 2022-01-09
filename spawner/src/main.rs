@@ -4,16 +4,13 @@ use crate::{
 };
 use clap::Parser;
 use idle_pod_collector::IdlePodCollector;
-use name_generator::NameGenerator;
 use serde::Deserialize;
 use server::serve;
-use std::sync::{Arc, Mutex};
 
-mod hashutil;
 mod idle_pod_collector;
 mod kubernetes;
 mod logging;
-mod name_generator;
+mod pod_id;
 mod pod_state;
 mod server;
 mod state;
@@ -51,18 +48,6 @@ pub struct SpawnerParams {
     #[clap(long)]
     base_url: String,
 
-    /// Prefix used as the prefix for the X-Accel-Redirect header for the
-    /// /nginx_redirect endpoint. If set, the key (rather than the name)
-    /// is used when constructing URLs.
-    #[clap(long)]
-    nginx_internal_path: Option<String>,
-
-    /// The scheme used for key generation when nodes are initialized without
-    /// a key. Defaults to UUID, other options look like "short:alphanum:5"
-    /// (see documentation).
-    #[clap(long)]
-    name_generator: Option<String>,
-
     /// The namespace within which pods will be spawned.
     #[clap(long, default_value = "spawner")]
     namespace: String,
@@ -76,18 +61,12 @@ pub struct SpawnerParams {
 async fn main() -> Result<(), kube::Error> {
     let settings = SpawnerParams::parse();
 
-    let name_generator = settings
-        .name_generator
-        .map(|ng| NameGenerator::from_str(&ng).expect("Could not parse name generator."))
-        .unwrap_or_default();
-
     let settings = SpawnerSettings {
         application_image: settings.application_image,
         application_port: settings.application_port,
         sidecar_image: settings.sidecar_image,
         sidecar_port: settings.sidecar_port,
         base_url: settings.base_url,
-        nginx_internal_path: settings.nginx_internal_path,
         namespace: settings.namespace.clone(),
         cleanup_frequency_seconds: settings.cleanup_frequency_seconds,
     };
@@ -96,7 +75,6 @@ async fn main() -> Result<(), kube::Error> {
 
     let state = SpawnerState {
         settings: settings,
-        name_generator: Arc::new(Mutex::new(name_generator)),
         store,
     };
 

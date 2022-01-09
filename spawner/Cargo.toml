@@ -14,9 +14,7 @@ tracing = "0.1.29"
 anyhow = "1.0.45"
 clap = { version="3.0.0", features=["derive"] }
 uuid = { version = "0.8.2", features = ["v4"] }
-tiny_id = "0.1.4"
 serde = { version = "1.0.130", features = ["derive"] }
-sha2 = "0.10.1"
 convert-base = "1.1.2"
 hyper = { version = "0.14.16", features = ["http2"] }
 futures-util = "0.3.19"

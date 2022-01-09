@@ -1,4 +1,4 @@
-use crate::SpawnerSettings;
+use crate::{pod_id::PodId, SpawnerSettings};
 use k8s_openapi::api::core::v1::{
     Container, ContainerPort, EnvVar, Pod, PodSpec, Service, ServicePort, ServiceSpec,
 };
@@ -11,7 +11,6 @@ const TCP: &str = "TCP";
 const LABEL_RUN: &str = "run";
 const LABEL_ACCOUNT: &str = "account";
 const ENV_SPAWNER_POD_NAME: &str = "SPAWNER_POD_NAME";
-const ENV_SPAWNER_POD_KEY: &str = "SPAWNER_POD_KEY";
 const ENV_SPAWNER_POD_URL: &str = "SPAWNER_POD_URL";
 const APPLICATION: &str = "app";
 const MONITOR: &str = "monitor";
@@ -35,12 +34,9 @@ pub async fn delete_pod(pod_name: &str, namespace: &str) -> Result<(), kube::err
 }
 
 pub async fn create_pod(
-    key: &str,
-    pod_name: &str,
-    pod_url: &str,
     account: Option<&str>,
     settings: &SpawnerSettings,
-) -> Result<(), kube::error::Error> {
+) -> Result<PodId, kube::error::Error> {
     let SpawnerSettings {
         application_image,
         sidecar_image,
@@ -50,9 +46,8 @@ pub async fn create_pod(
         ..
     } = settings;
 
-    // TODO: don't hard-code this.
-    let prefixed_pod_name = format!("spawner-{}", pod_name);
-
+    let pod_id = PodId::new();
+    let pod_url = settings.url_for(&pod_id);
     let client = Client::try_default().await?;
 
     let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
@@ -72,12 +67,7 @@ pub async fn create_pod(
         env: Some(vec![
             EnvVar {
                 name: ENV_SPAWNER_POD_NAME.to_string(),
-                value: Some(pod_name.to_string()),
-                ..EnvVar::default()
-            },
-            EnvVar {
-                name: ENV_SPAWNER_POD_KEY.to_string(),
-                value: Some(key.to_string()),
+                value: Some(pod_id.name()),
                 ..EnvVar::default()
             },
             EnvVar {
@@ -105,10 +95,10 @@ pub async fn create_pod(
         &PostParams::default(),
         &Pod {
             metadata: ObjectMeta {
-                name: Some(prefixed_pod_name.clone()),
+                name: Some(pod_id.prefixed_name()),
                 labels: Some(
                     vec![
-                        (LABEL_RUN.to_string(), prefixed_pod_name.clone()),
+                        (LABEL_RUN.to_string(), pod_id.prefixed_name()),
                         (
                             LABEL_ACCOUNT.to_string(),
                             account.to_owned().unwrap_or_default().to_string(),
@@ -151,13 +141,13 @@ pub async fn create_pod(
             &PostParams::default(),
             &Service {
                 metadata: ObjectMeta {
-                    name: Some(prefixed_pod_name.clone()),
+                    name: Some(pod_id.prefixed_name()),
                     ..ObjectMeta::default()
                 },
 
                 spec: Some(ServiceSpec {
                     selector: Some(
-                        vec![(LABEL_RUN.to_string(), prefixed_pod_name.clone())]
+                        vec![(LABEL_RUN.to_string(), pod_id.prefixed_name())]
                             .into_iter()
                             .collect(),
                     ),
@@ -172,5 +162,5 @@ pub async fn create_pod(
         )
         .await?;
 
-    Ok(())
+    Ok(pod_id)
 }
