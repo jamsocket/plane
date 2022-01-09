@@ -11,7 +11,7 @@ use kube::{
 };
 use std::{fmt::Display, future::Future, pin::Pin, time::Duration};
 
-use crate::{kubernetes::delete_pod, pod_state::get_pod_state, SpawnerSettings};
+use crate::{kubernetes::delete_pod, pod_id::PodId, pod_state::get_pod_state, SpawnerSettings};
 
 #[derive(Debug)]
 enum IdlePodCollectorError {
@@ -61,8 +61,8 @@ async fn reconcile(
     tracing::info!("reconcile called for pod: {}", pod.name());
     let ctx = ctx.get_ref();
 
-    let name = pod.name();
-    let pod_state = get_pod_state(&name, &ctx.namespace, ctx.application_port)
+    let pod_id = PodId::from_name(&pod.name());
+    let pod_state = get_pod_state(&pod_id, &ctx.namespace, ctx.sidecar_port)
         .await
         .map_err(|_| IdlePodCollectorError::ErrorCheckingStatus)?;
 
@@ -70,7 +70,7 @@ async fn reconcile(
         ctx.cleanup_frequency_seconds as i32 - pod_state.seconds_inactive as i32;
 
     if seconds_until_expired <= 0 {
-        delete_pod(&name, &ctx.namespace)
+        delete_pod(&pod_id, &ctx.namespace)
             .await
             .map_err(|_| IdlePodCollectorError::ErrorDeletingPod)?;
     }

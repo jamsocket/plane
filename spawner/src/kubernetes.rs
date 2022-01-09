@@ -15,19 +15,15 @@ const ENV_SPAWNER_POD_URL: &str = "SPAWNER_POD_URL";
 const APPLICATION: &str = "app";
 const MONITOR: &str = "monitor";
 
-pub async fn delete_pod(pod_name: &str, namespace: &str) -> Result<(), kube::error::Error> {
+pub async fn delete_pod(pod_id: &PodId, namespace: &str) -> Result<(), kube::error::Error> {
     let client = Client::try_default().await?;
-
-    // TODO: don't hardcode this.
-    let prefixed_pod_name = format!("spawner-{}", pod_name);
-
     let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
     let services: Api<Service> = Api::namespaced(client, namespace);
 
-    pods.delete(&prefixed_pod_name, &DeleteParams::default())
+    pods.delete(&pod_id.prefixed_name(), &DeleteParams::default())
         .await?;
     services
-        .delete(&prefixed_pod_name, &DeleteParams::default())
+        .delete(&pod_id.prefixed_name(), &DeleteParams::default())
         .await?;
 
     Ok(())
