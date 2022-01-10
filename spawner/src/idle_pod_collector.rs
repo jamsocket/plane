@@ -1,3 +1,4 @@
+use crate::{kubernetes::delete_pod, pod_id::PodId, pod_state::get_pod_state, SpawnerSettings};
 use futures::{FutureExt, StreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
@@ -11,12 +12,11 @@ use kube::{
 };
 use std::{fmt::Display, future::Future, pin::Pin, time::Duration};
 
-use crate::{kubernetes::delete_pod, pod_id::PodId, pod_state::get_pod_state, SpawnerSettings};
-
 #[derive(Debug)]
 enum IdlePodCollectorError {
     ErrorCheckingStatus,
     ErrorDeletingPod,
+    UnexpectedPodName,
 }
 
 impl std::error::Error for IdlePodCollectorError {}
@@ -61,7 +61,8 @@ async fn reconcile(
     tracing::info!("reconcile called for pod: {}", pod.name());
     let ctx = ctx.get_ref();
 
-    let pod_id = PodId::from_name(&pod.name());
+    let pod_id =
+        PodId::from_prefixed_name(&pod.name()).ok_or(IdlePodCollectorError::UnexpectedPodName)?;
     let pod_state = get_pod_state(&pod_id, &ctx.namespace, ctx.sidecar_port)
         .await
         .map_err(|_| IdlePodCollectorError::ErrorCheckingStatus)?;

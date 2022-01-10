@@ -2,6 +2,7 @@ use convert_base::Convert;
 use uuid::Uuid;
 
 const ALPHANUM: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+const PREFIX: &str = "session-";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PodId(String);
@@ -15,13 +16,16 @@ impl PodId {
         PodId(ch.collect())
     }
 
-    #[allow(unused)]
-    pub fn from_name(name: &str) -> Self {
-        PodId(name.to_string())
+    pub fn from_prefixed_name(name: &str) -> Option<Self> {
+        if let Some(name) = name.strip_prefix(PREFIX) {
+            Some(PodId(name.to_string()))
+        } else {
+            None
+        }
     }
 
     pub fn prefixed_name(&self) -> String {
-        format!("session-{}", self.0)
+        format!("{}{}", PREFIX, self.0)
     }
 
     pub fn name(&self) -> String {
