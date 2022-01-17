@@ -20,25 +20,34 @@ enum Command {
     /// Print the custom resource definition (CRD) to stdout as YAML.
     PrintCrd,
 
+    /// Print a spec for a SessionLivedBackend using the given image.
     PrintSlbe(SlbeSpec),
 
+    /// Create a spec for a SessionLivedBackend using the given image.
+    /// 
+    /// Equivalent to `spawner-cli print-slbe [options] | kubectl create -f -`
     CreateSlbe(SlbeSpec),
 }
 
 #[derive(Parser)]
 struct SlbeSpec {
+    /// The container registry ID of the docker container to run.
     #[clap(long)]
     image: String,
 
+    /// The policy for when to pull a remote container image down.
     #[clap(long)]
     image_pull_policy: Option<ImagePullPolicy>,
 
+    /// A unique identifier for the SessionLivedBackend; generated if omitted.
     #[clap(long)]
     name: Option<String>,
 
+    /// A prefix to use if generating a unique identifier.
     #[clap(long)]
     prefix: Option<String>,
 
+    /// The Kubernetes namespace to operate within.
     #[clap(long, default_value=DEFAULT_NAMESPACE)]
     namespace: String,
 }

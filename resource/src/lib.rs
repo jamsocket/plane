@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 pub const SPAWNER_GROUP: &str = "spawner.dev";
 pub const DEFAULT_PREFIX: &str = "spawner-";
+pub const APPLICATION: &str = "application";
 
 #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[kube(
@@ -101,6 +102,7 @@ impl SessionLivedBackendBuilder {
                     image: Some(self.image.to_string()),
                     image_pull_policy: self.image_pull_policy.as_ref().map(|d| d.to_string()),
                     env: Some(env),
+                    name: APPLICATION.to_string(),
                     ..Default::default()
                 }],
                 ..Default::default()

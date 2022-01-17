@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-
 use futures::StreamExt;
 use k8s_openapi::{
     api::core::v1::{Pod, Service, ServicePort, ServiceSpec},
@@ -11,8 +10,11 @@ use kube::{
     runtime::controller::{Context, Controller, ReconcilerAction},
     Client, Resource,
 };
+use logging::init_logging;
 use spawner_resource::{SessionLivedBackend, SPAWNER_GROUP};
 use tokio::time::Duration;
+
+mod logging;
 
 const LABEL_RUN: &str = "run";
 const APPLICATION: &str = "spawner-app";
@@ -67,6 +69,8 @@ async fn reconcile(
         .ok_or(Error::MissingObjectKey("metadata.name"))?
         .to_string();
 
+    tracing::info!(%name, "reconcile called");
+
     let pod_api = Api::<Pod>::namespaced(ctx.get_ref().client.clone(), &ctx.get_ref().namespace);
     let service_api =
         Api::<Service>::namespaced(ctx.get_ref().client.clone(), &ctx.get_ref().namespace);
@@ -118,33 +122,33 @@ async fn reconcile(
         .map_err(Error::KubernetesFailure)?;
 
     Ok(ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(300)),
+        requeue_after: None,
     })
 }
 
 fn error_policy(_error: &Error, _ctx: Context<ControllerContext>) -> ReconcilerAction {
     ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(60)),
+        requeue_after: Some(Duration::from_secs(10)),
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    init_logging();
+
     let client = Client::try_default().await?;
     let context = Context::new(ControllerContext {
         client: client.clone(),
-        namespace: "spawner".into(),
+        namespace: "default".into(),
         port: 8080,
     });
-    let slbes = Api::<SessionLivedBackend>::all(client.clone());
-    //let cms = Api::<ConfigMap>::all(client.clone());
+    let slbes = Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);
     Controller::new(slbes, ListParams::default())
-        //.owns(cms, ListParams::default())
         .run(reconcile, error_policy, context)
         .for_each(|res| async move {
             match res {
-                Ok(o) => println!("reconciled {:?}", o),
-                Err(e) => println!("reconcile failed: {:?}", e),
+                Ok(object) => tracing::info!(?object, "reconciled"),
+                Err(error) => tracing::error!(%error, "reconcile failed"),
             }
         })
         .await;
