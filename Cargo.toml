@@ -1,5 +1,7 @@
 [workspace]
 members = [
+    "cli",
     "sidecar",
     "spawner",
+    "resource",
 ]

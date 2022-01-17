@@ -1,88 +1,155 @@
-use crate::{
-    logging::init_logging,
-    state::{SpawnerSettings, SpawnerState},
+use std::collections::BTreeMap;
+
+use futures::StreamExt;
+use k8s_openapi::{
+    api::core::v1::{Pod, Service, ServiceSpec, ServicePort},
+    apimachinery::pkg::apis::meta::v1::OwnerReference,
 };
-use clap::Parser;
-use idle_pod_collector::IdlePodCollector;
-use serde::Deserialize;
-use server::serve;
+use kube::{
+    api::{Api, ListParams, Patch, PatchParams},
+    core::ObjectMeta,
+    runtime::controller::{Context, Controller, ReconcilerAction},
+    Client, Resource,
+};
+use spawner_resource::{SessionLivedBackend, SPAWNER_GROUP};
+use tokio::time::Duration;
 
-mod idle_pod_collector;
-mod kubernetes;
-mod logging;
-mod pod_id;
-mod pod_state;
-mod server;
-mod state;
+const LABEL_RUN: &str = "run";
+const APPLICATION: &str = "spawner-app";
+const TCP: &str = "TCP";
 
-#[allow(unused)]
-#[derive(Deserialize, Debug)]
-pub struct ConnectionState {
-    active_connections: u32,
-    seconds_inactive: u32,
-    listening: bool,
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Failure from Kubernetes: {0}")]
+    KubernetesFailure(#[source] kube::Error),
+    #[error("MissingObjectKey: {0}")]
+    MissingObjectKey(&'static str),
 }
 
-#[derive(Parser, Clone)]
-pub struct SpawnerParams {
-    /// The name of the application image to deploy.
-    #[clap(long)]
-    application_image: String,
-
-    /// The container port on which the application runs.
-    #[clap(long, default_value = "8080")]
-    application_port: u16,
-
-    /// The name of the image to deploy as a monitoring sidecar.
-    #[clap(long)]
-    sidecar_image: Option<String>,
-
-    /// The container port on which the sidecar runs. Only used if
-    /// sidecar_image is set.
-    #[clap(long, default_value = "7070")]
-    sidecar_port: u16,
-
-    /// The prefix used for public-facing URLs. To construct a full URL, it is
-    /// appended with the pod name, unless nginx_internal_path is provided, in
-    /// which case it is appended with the key.
-    #[clap(long)]
-    base_url: String,
-
-    /// The namespace within which pods will be spawned.
-    #[clap(long, default_value = "spawner")]
+struct ControllerContext {
+    client: Client,
     namespace: String,
+    port: i32,
+}
 
-    /// How frequently (in seconds) to clean up idle containers.
-    #[clap(long, default_value = "30")]
-    cleanup_frequency_seconds: u32,
+fn run_label(name: &str) -> BTreeMap<String, String> {
+    vec![(LABEL_RUN.to_string(), name.to_string())]
+        .into_iter()
+        .collect()
+}
+
+fn owner_reference(meta: &ObjectMeta) -> Result<OwnerReference, Error> {
+    Ok(OwnerReference {
+        api_version: SessionLivedBackend::api_version(&()).to_string(),
+        kind: SessionLivedBackend::kind(&()).to_string(),
+        name: meta
+            .name
+            .as_ref()
+            .ok_or(Error::MissingObjectKey(".metadata.name"))?
+            .to_string(),
+        uid: meta
+            .uid
+            .as_ref()
+            .ok_or(Error::MissingObjectKey(".metadata.uid"))?
+            .to_string(),
+        ..OwnerReference::default()
+    })
+}
+
+async fn reconcile(
+    g: SessionLivedBackend,
+    ctx: Context<ControllerContext>,
+) -> Result<ReconcilerAction, Error> {
+    let name = g
+        .metadata
+        .name
+        .as_ref()
+        .ok_or(Error::MissingObjectKey("metadata.name"))?
+        .to_string();
+
+    let pod_api = Api::<Pod>::namespaced(ctx.get_ref().client.clone(), &ctx.get_ref().namespace);
+    let service_api =
+        Api::<Service>::namespaced(ctx.get_ref().client.clone(), &ctx.get_ref().namespace);
+
+    let owner_reference = owner_reference(&g.metadata)?;
+
+    pod_api
+        .patch(
+            &name,
+            &PatchParams::apply(SPAWNER_GROUP).force(),
+            &Patch::Apply(&Pod {
+                metadata: ObjectMeta {
+                    name: Some(name.to_string()),
+                    labels: Some(run_label(&name)),
+                    owner_references: Some(vec![owner_reference.clone()]),
+                    ..ObjectMeta::default()
+                },
+                spec: Some(g.spec.template),
+                ..Pod::default()
+            }),
+        )
+        .await
+        .map_err(Error::KubernetesFailure)?;
+
+    service_api
+        .patch(
+            &name,
+            &PatchParams::apply(SPAWNER_GROUP).force(),
+            &Patch::Apply(&Service {
+                metadata: ObjectMeta {
+                    name: Some(name.to_string()),
+                    owner_references: Some(vec![owner_reference]),
+                    ..ObjectMeta::default()
+                },
+                spec: Some(ServiceSpec {
+                    selector: Some(run_label(&name)),
+                    ports: Some(vec![
+                        ServicePort {
+                            name: Some(APPLICATION.to_string()),
+                            protocol: Some(TCP.to_string()),
+                            port: ctx.get_ref().port,
+                            ..ServicePort::default()
+                        }
+                    ]),
+                    ..ServiceSpec::default()
+                }),
+                ..Service::default()
+            }),
+        )
+        .await
+        .map_err(Error::KubernetesFailure)?;
+
+    Ok(ReconcilerAction {
+        requeue_after: Some(Duration::from_secs(300)),
+    })
+}
+
+fn error_policy(_error: &Error, _ctx: Context<ControllerContext>) -> ReconcilerAction {
+    ReconcilerAction {
+        requeue_after: Some(Duration::from_secs(60)),
+    }
 }
 
 #[tokio::main]
-async fn main() -> Result<(), kube::Error> {
-    let settings = SpawnerParams::parse();
-
-    let settings = SpawnerSettings {
-        application_image: settings.application_image,
-        application_port: settings.application_port,
-        sidecar_image: settings.sidecar_image,
-        sidecar_port: settings.sidecar_port,
-        base_url: settings.base_url,
-        namespace: settings.namespace.clone(),
-        cleanup_frequency_seconds: settings.cleanup_frequency_seconds,
-    };
-
-    let (_pod_collector, drainer, store) = IdlePodCollector::new(settings.clone()).await;
-
-    let state = SpawnerState {
-        settings: settings,
-        store,
-    };
-
-    init_logging();
-
-    tokio::select! {
-        _ = drainer => tracing::warn!("controller drained"),
-        _ = serve(state) => tracing::info!("server exited"),
-    }
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::try_default().await?;
+    let context = Context::new(ControllerContext {
+        client: client.clone(),
+        namespace: "spawner".into(),
+        port: 8080,
+    });
+    let slbes = Api::<SessionLivedBackend>::all(client.clone());
+    //let cms = Api::<ConfigMap>::all(client.clone());
+    Controller::new(slbes, ListParams::default())
+        //.owns(cms, ListParams::default())
+        .run(reconcile, error_policy, context)
+        .for_each(|res| async move {
+            match res {
+                Ok(o) => println!("reconciled {:?}", o),
+                Err(e) => println!("reconcile failed: {:?}", e),
+            }
+        })
+        .await;
     Ok(())
 }
