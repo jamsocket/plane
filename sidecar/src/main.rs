@@ -23,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
     init_logging();
 
     let opts = Opts::parse();
-    let addr = SocketAddr::from(([127, 0, 0, 1], opts.serve_port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], opts.serve_port));
 
     tracing::info!(%opts.upstream, %opts.serve_port, "Proxy started.");
 
