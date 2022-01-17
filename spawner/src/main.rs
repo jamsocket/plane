@@ -1,7 +1,7 @@
 use clap::Parser;
 use futures::StreamExt;
 use k8s_openapi::{
-    api::core::v1::{Pod, Service, ServicePort, ServiceSpec},
+    api::core::v1::{Pod, Service, ServicePort, ServiceSpec, Container},
     apimachinery::pkg::apis::meta::v1::OwnerReference,
 };
 use kube::{
@@ -19,6 +19,7 @@ mod logging;
 
 const LABEL_RUN: &str = "run";
 const APPLICATION: &str = "spawner-app";
+const SIDECAR: &str = "spawner-sidecar";
 const TCP: &str = "TCP";
 
 #[derive(Parser, Debug)]
@@ -28,6 +29,9 @@ struct Opts {
 
     #[clap(long, default_value = "8080")]
     port: i32,
+
+    #[clap(long)]
+    sidecar: Option<String>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -42,6 +46,7 @@ struct ControllerContext {
     client: Client,
     namespace: String,
     port: i32,
+    sidecar: Option<String>,
 }
 
 fn run_label(name: &str) -> BTreeMap<String, String> {
@@ -84,6 +89,15 @@ async fn reconcile(
 
     let owner_reference = owner_reference(&g.metadata)?;
 
+    let mut template = g.spec.template.clone();
+    if let Some(sidecar) = &ctx.get_ref().sidecar {
+        template.containers.push(Container {
+            name: SIDECAR.to_string(),
+            image: Some(sidecar.to_string()),
+            ..Container::default()
+        });
+    }
+
     pod_api
         .patch(
             &name,
@@ -95,7 +109,7 @@ async fn reconcile(
                     owner_references: Some(vec![owner_reference.clone()]),
                     ..ObjectMeta::default()
                 },
-                spec: Some(g.spec.template),
+                spec: Some(template),
                 ..Pod::default()
             }),
         )
@@ -151,6 +165,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         client: client.clone(),
         namespace: opts.namespace,
         port: opts.port,
+        sidecar: opts.sidecar,
     });
     let slbes =
         Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);
