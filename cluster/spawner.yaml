@@ -54,7 +54,7 @@ spec:
       serviceAccountName: spawner
       containers:
       - name: spawner
-        image: ghcr.io/drifting-in-space/spawner:sha-e0b1bee
+        image: ghcr.io/drifting-in-space/spawner:sha-12c1ff5
         args: [
           "--namespace", "spawner",
         ]

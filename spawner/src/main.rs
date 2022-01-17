@@ -23,10 +23,10 @@ const TCP: &str = "TCP";
 
 #[derive(Parser, Debug)]
 struct Opts {
-    #[clap(default_value="default")]
+    #[clap(long, default_value="default")]
     namespace: String,
 
-    #[clap(default_value="8080")]
+    #[clap(long, default_value="8080")]
     port: i32,
 }
 
