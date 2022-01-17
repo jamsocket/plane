@@ -2,8 +2,8 @@ FROM rust:latest as build
 
 WORKDIR /work
 COPY . .
-RUN cargo test --release
-RUN cargo build --release
+RUN cargo test -p spawner --release
+RUN cargo build -p spawner --release
 
 FROM gcr.io/distroless/cc-debian11
 

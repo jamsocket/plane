@@ -1,1 +1,7 @@
 target
+*.Dockerfile
+README.md
+LICENSE
+.gitignore
+.dockerignore
+.github
