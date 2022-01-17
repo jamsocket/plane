@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
-use k8s_openapi::api::core::v1::{PodSpec, Container, EnvVar};
-use kube::{CustomResource, core::ObjectMeta};
+use k8s_openapi::api::core::v1::{Container, EnvVar, PodSpec};
+use kube::{core::ObjectMeta, CustomResource};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -41,7 +41,8 @@ impl ToString for ImagePullPolicy {
             ImagePullPolicy::Always => "Always",
             ImagePullPolicy::Never => "Never",
             ImagePullPolicy::IfNotPresent => "IfNotPresent",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 
@@ -57,7 +58,7 @@ impl FromStr for ImagePullPolicy {
             "Always" => Ok(ImagePullPolicy::Always),
             "Never" => Ok(ImagePullPolicy::Never),
             "IfNotPresent" => Ok(ImagePullPolicy::IfNotPresent),
-            _ => Err(BadPolicyName(s.to_string()))
+            _ => Err(BadPolicyName(s.to_string())),
         }
     }
 }
@@ -80,31 +81,30 @@ impl SessionLivedBackendBuilder {
     }
 
     pub fn with_namespace(self, namespace: Option<String>) -> Self {
-        SessionLivedBackendBuilder {
-            namespace,
-            ..self
-        }
+        SessionLivedBackendBuilder { namespace, ..self }
     }
 
     pub fn build_spec(&self) -> SessionLivedBackendSpec {
-        let env: Vec<EnvVar> = self.env.iter().map(|(name, value)| EnvVar {
-            name: name.to_string(),
-            value: Some(value.to_string()),
-            ..EnvVar::default()
-        }).collect();
+        let env: Vec<EnvVar> = self
+            .env
+            .iter()
+            .map(|(name, value)| EnvVar {
+                name: name.to_string(),
+                value: Some(value.to_string()),
+                ..EnvVar::default()
+            })
+            .collect();
 
         SessionLivedBackendSpec {
             template: PodSpec {
-                containers: vec![
-                    Container {
-                        image: Some(self.image.to_string()),
-                        image_pull_policy: self.image_pull_policy.as_ref().map(|d| d.to_string()),
-                        env: Some(env),
-                        ..Default::default()
-                    }
-                ],
+                containers: vec![Container {
+                    image: Some(self.image.to_string()),
+                    image_pull_policy: self.image_pull_policy.as_ref().map(|d| d.to_string()),
+                    env: Some(env),
+                    ..Default::default()
+                }],
                 ..Default::default()
-            }
+            },
         }
     }
 

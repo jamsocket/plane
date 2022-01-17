@@ -5,14 +5,7 @@ use serde::Serialize;
 use spawner_resource::{
     ImagePullPolicy, SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP,
 };
-// use syntect::{
-//     easy::HighlightLines,
-//     highlighting::{Style, ThemeSet},
-//     parsing::SyntaxSet,
-//     util::{as_24_bit_terminal_escaped, LinesWithEndings},
-// };
 use bat::PrettyPrinter;
-
 
 const DEFAULT_NAMESPACE: &str = "default";
 
@@ -53,7 +46,7 @@ struct SlbeSpec {
 impl SlbeSpec {
     fn as_slbe(&self) -> SessionLivedBackend {
         let builder = SessionLivedBackendBuilder::new(&self.image)
-            .with_image_pull_policy(self.image_pull_policy.clone());
+            .with_image_pull_policy(self.image_pull_policy);
 
         if let Some(name) = &self.name {
             builder.build_named(name)

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use futures::StreamExt;
 use k8s_openapi::{
-    api::core::v1::{Pod, Service, ServiceSpec, ServicePort},
+    api::core::v1::{Pod, Service, ServicePort, ServiceSpec},
     apimachinery::pkg::apis::meta::v1::OwnerReference,
 };
 use kube::{
@@ -17,7 +17,6 @@ use tokio::time::Duration;
 const LABEL_RUN: &str = "run";
 const APPLICATION: &str = "spawner-app";
 const TCP: &str = "TCP";
-
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -104,14 +103,12 @@ async fn reconcile(
                 },
                 spec: Some(ServiceSpec {
                     selector: Some(run_label(&name)),
-                    ports: Some(vec![
-                        ServicePort {
-                            name: Some(APPLICATION.to_string()),
-                            protocol: Some(TCP.to_string()),
-                            port: ctx.get_ref().port,
-                            ..ServicePort::default()
-                        }
-                    ]),
+                    ports: Some(vec![ServicePort {
+                        name: Some(APPLICATION.to_string()),
+                        protocol: Some(TCP.to_string()),
+                        port: ctx.get_ref().port,
+                        ..ServicePort::default()
+                    }]),
                     ..ServiceSpec::default()
                 }),
                 ..Service::default()
