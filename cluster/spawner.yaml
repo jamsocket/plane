@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spawner
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spawner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: spawner
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["list", "create", "delete", "watch"]
+- apiGroups: ["spawner.dev"]
+  resources: ["sessionlivedbackends"]
+  verbs: ["list", "create", "delete", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spawner
+  namespace: spawner
+subjects:
+- kind: ServiceAccount
+  name: spawner
+  namespace: default
+  apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: spawner
+  apiGroup: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spawner
+  labels:
+    app: spawner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spawner
+  template:
+    metadata:
+      labels:
+        app: spawner
+    spec:
+      serviceAccountName: spawner
+      containers:
+      - name: spawner
+        image: ghcr.io/drifting-in-space/spawner:sha-e0b1bee
+        args: [
+          "--namespace", "spawner",
+        ]
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spawner
+spec:
+  type: ClusterIP
+  selector:
+    app: spawner
+  ports:
+    - protocol: TCP
+      port: 8080

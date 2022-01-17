@@ -13,12 +13,23 @@ use kube::{
 use logging::init_logging;
 use spawner_resource::{SessionLivedBackend, SPAWNER_GROUP};
 use tokio::time::Duration;
+use clap::Parser;
 
 mod logging;
 
 const LABEL_RUN: &str = "run";
 const APPLICATION: &str = "spawner-app";
 const TCP: &str = "TCP";
+
+#[derive(Parser, Debug)]
+struct Opts {
+    #[clap(default_value="default")]
+    namespace: String,
+
+    #[clap(default_value="8080")]
+    port: i32,
+}
+
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -132,12 +143,15 @@ fn error_policy(_error: &Error, _ctx: Context<ControllerContext>) -> ReconcilerA
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logging();
+    let opts = Opts::parse();
+
+    tracing::info!(?opts, "Using options");
 
     let client = Client::try_default().await?;
     let context = Context::new(ControllerContext {
         client: client.clone(),
-        namespace: "default".into(),
-        port: 8080,
+        namespace: opts.namespace,
+        port: opts.port,
     });
     let slbes = Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);
     Controller::new(slbes, ListParams::default())
