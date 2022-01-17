@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use clap::Parser;
 use futures::StreamExt;
 use k8s_openapi::{
     api::core::v1::{Pod, Service, ServicePort, ServiceSpec},
@@ -7,13 +7,13 @@ use k8s_openapi::{
 use kube::{
     api::{Api, ListParams, Patch, PatchParams},
     core::ObjectMeta,
-    runtime::controller::{Context, Controller, ReconcilerAction},
+    runtime::controller::{self, Context, Controller, ReconcilerAction},
     Client, Resource,
 };
 use logging::init_logging;
 use spawner_resource::{SessionLivedBackend, SPAWNER_GROUP};
+use std::collections::BTreeMap;
 use tokio::time::Duration;
-use clap::Parser;
 
 mod logging;
 
@@ -23,13 +23,12 @@ const TCP: &str = "TCP";
 
 #[derive(Parser, Debug)]
 struct Opts {
-    #[clap(long, default_value="default")]
+    #[clap(long, default_value = "default")]
     namespace: String,
 
-    #[clap(long, default_value="8080")]
+    #[clap(long, default_value = "8080")]
     port: i32,
 }
-
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -153,13 +152,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         namespace: opts.namespace,
         port: opts.port,
     });
-    let slbes = Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);
+    let slbes =
+        Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);
     Controller::new(slbes, ListParams::default())
         .run(reconcile, error_policy, context)
         .for_each(|res| async move {
             match res {
-                Ok((object, _)) => tracing::info!(%object.name, "reconciled"),
-                Err(error) => tracing::error!(%error, "reconcile failed"),
+                Ok((object, _)) => tracing::info!(%object.name, "Reconciled."),
+                Err(error) => match error {
+                    controller::Error::ReconcilerFailed(error, _) => {
+                        tracing::error!(%error, "Reconcile failed.")
+                    }
+                    _ => tracing::error!(%error, "Unhandled reconcile error."),
+                },
             }
         })
         .await;

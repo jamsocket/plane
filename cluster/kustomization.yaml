@@ -1,2 +1,8 @@
 resources:
-- spawner.yaml
+- resources/spawner.yaml
+- resources/nginx.yaml
+configMapGenerator:
+- name: nginx-config
+  files:
+  - config/nginx/default.conf
+  - config/nginx/index.html
