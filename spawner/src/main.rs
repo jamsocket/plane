@@ -68,9 +68,6 @@ async fn reconcile(
         .as_ref()
         .ok_or(Error::MissingObjectKey("metadata.name"))?
         .to_string();
-
-    tracing::info!(%name, "reconcile called");
-
     let pod_api = Api::<Pod>::namespaced(ctx.get_ref().client.clone(), &ctx.get_ref().namespace);
     let service_api =
         Api::<Service>::namespaced(ctx.get_ref().client.clone(), &ctx.get_ref().namespace);
@@ -147,7 +144,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .run(reconcile, error_policy, context)
         .for_each(|res| async move {
             match res {
-                Ok(object) => tracing::info!(?object, "reconciled"),
+                Ok((object, _)) => tracing::info!(%object.name, "reconciled"),
                 Err(error) => tracing::error!(%error, "reconcile failed"),
             }
         })
