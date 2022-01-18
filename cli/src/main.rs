@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
+use bat::PrettyPrinter;
 use clap::{Parser, Subcommand};
 use kube::{api::PostParams, Api, Client, CustomResourceExt};
 use serde::Serialize;
 use spawner_resource::{
     ImagePullPolicy, SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP,
 };
-use bat::PrettyPrinter;
 
 const DEFAULT_NAMESPACE: &str = "default";
 
@@ -24,7 +24,7 @@ enum Command {
     PrintSlbe(SlbeSpec),
 
     /// Create a spec for a SessionLivedBackend using the given image.
-    /// 
+    ///
     /// Equivalent to `spawner-cli print-slbe [options] | kubectl create -f -`
     CreateSlbe(SlbeSpec),
 }

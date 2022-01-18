@@ -6,8 +6,9 @@ use logging::init_logging;
 use proxy::ProxyService;
 use std::{convert::Infallible, net::SocketAddr};
 
-mod proxy;
 mod logging;
+mod proxy;
+mod monitor;
 
 #[derive(Parser)]
 struct Opts {

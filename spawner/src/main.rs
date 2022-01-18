@@ -1,7 +1,7 @@
 use clap::Parser;
 use futures::StreamExt;
 use k8s_openapi::{
-    api::core::v1::{Pod, Service, ServicePort, ServiceSpec, Container},
+    api::core::v1::{Container, Pod, Service, ServicePort, ServiceSpec},
     apimachinery::pkg::apis::meta::v1::OwnerReference,
 };
 use kube::{
