@@ -62,7 +62,7 @@ impl ProxyService {
             let mut upgraded_response = match hyper::upgrade::on(response).await {
                 Ok(upgraded) => upgraded,
                 Err(e) => {
-                    tracing::error!(?e, "Upgrade error.");
+                    tracing::error!(?e, "Error upgrading response.");
                     return Err(anyhow!("Upgrade error."));
                 }
             };
@@ -83,7 +83,7 @@ impl ProxyService {
 
                         tracing::info!(%from_client, %from_server, ?duration, "Upgraded connection closed.");
                     }
-                    Err(e) => tracing::error!(?e, "Upgrade error."),
+                    Err(e) => tracing::error!(?e, "Error upgrading request."),
                 }
             });
 
