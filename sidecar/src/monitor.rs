@@ -80,7 +80,7 @@ impl Monitor {
     }
 
     /// Return an infinite stream of MonitorState events.
-    /// 
+    ///
     /// The first state event will be the current state, and will be immediately available.
     /// Subsequent updates will be sent whenever the state changes.
     pub fn status_stream(
@@ -88,7 +88,7 @@ impl Monitor {
     ) -> impl futures_core::Stream<Item = Result<MonitorState, BroadcastStreamRecvError>> {
         // Create a stream by taking the current state and wrapping it in a stream.
         let current_state = tokio_stream::once(Ok(self.state()));
-        
+
         // Merge subsequent updates (which will come through our broadcast channel) to the stream.
         current_state.merge(BroadcastStream::new(self.sender.subscribe()))
     }

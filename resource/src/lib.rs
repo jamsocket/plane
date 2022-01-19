@@ -15,11 +15,20 @@ pub const APPLICATION: &str = "application";
     version = "v1",
     kind = "SessionLivedBackend",
     shortname = "slbe",
+    status = "SessionLivedBackendStatus",
     namespaced
 )]
-
 pub struct SessionLivedBackendSpec {
     pub template: PodSpec,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[serde(rename_all="camelCase")]
+pub struct SessionLivedBackendStatus {
+    pub node_name: String,
+    pub ip: String,
+    pub port: u16,
+    pub url: String,
 }
 
 pub struct SessionLivedBackendBuilder {
@@ -117,6 +126,7 @@ impl SessionLivedBackendBuilder {
                 ..Default::default()
             },
             spec: self.build_spec(),
+            status: None,
         }
     }
 
@@ -128,6 +138,7 @@ impl SessionLivedBackendBuilder {
                 ..Default::default()
             },
             spec: self.build_spec(),
+            status: None,
         }
     }
 

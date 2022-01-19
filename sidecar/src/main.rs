@@ -7,8 +7,8 @@ use proxy::ProxyService;
 use std::{convert::Infallible, net::SocketAddr};
 
 mod logging;
-mod proxy;
 mod monitor;
+mod proxy;
 
 #[derive(Parser)]
 struct Opts {

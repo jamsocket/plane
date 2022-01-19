@@ -1,16 +1,16 @@
+use crate::monitor::Monitor;
 use anyhow::anyhow;
 use core::future::Future;
 use hyper::body::Bytes;
 use hyper::client::HttpConnector;
 use hyper::http::uri::{Authority, InvalidUriParts, Scheme};
 use hyper::service::Service;
-use hyper::{Body, Client, Request, Response, StatusCode, Uri, header};
+use hyper::{header, Body, Client, Request, Response, StatusCode, Uri};
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::SystemTime;
-use crate::monitor::Monitor;
 
 /// Rewrite the URI from an incoming request to point to the given upstream server.
 fn rewrite_uri(uri: &Uri, upstream: &Authority) -> Result<Uri, InvalidUriParts> {
