@@ -50,7 +50,7 @@ impl Monitor {
         let (sender, _) = channel(16);
 
         Monitor {
-            last_connection: AtomicU64::new(0),
+            last_connection: AtomicU64::new(time_now()),
             live_connections: AtomicU32::new(0),
             sender,
         }

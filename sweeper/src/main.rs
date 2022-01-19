@@ -59,16 +59,14 @@ pub async fn state_stream(base_uri: &str) -> impl Stream<Item=MonitorState> {
 }
 
 struct StateWatcher {
-    //stream: BoxStream,
     grace_period_seconds: u32,
-    handle: JoinHandle<()>,
 }
 
 impl StateWatcher {
     pub fn new(base_uri: &str, grace_period_seconds: u32, callback: Box<dyn Fn() + Send>) -> Self {
         let base_uri = base_uri.to_string();
 
-        let handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             let mut stream = state_stream(&base_uri).await;
             let mut duration: Option<Duration> = None;
 
@@ -86,17 +84,12 @@ impl StateWatcher {
                 };
 
                 let result = result.unwrap();
-                
-                if result.live_connections > 0 {
-                    tracing::info!("Session is live, not ");
-                }
-
+                tracing::info!(?result, "Got status message.");
             }
         });
 
         StateWatcher {
             grace_period_seconds: grace_period_seconds,
-            handle
         }
     }
 }
