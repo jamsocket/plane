@@ -59,6 +59,7 @@ fn owner_reference(meta: &ObjectMeta) -> Result<OwnerReference, Error> {
     Ok(OwnerReference {
         api_version: SessionLivedBackend::api_version(&()).to_string(),
         kind: SessionLivedBackend::kind(&()).to_string(),
+        controller: Some(true),
         name: meta
             .name
             .as_ref()
