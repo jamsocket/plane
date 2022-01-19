@@ -12,17 +12,23 @@ use tokio_stream::{
 
 #[derive(Clone)]
 pub struct MonitorState {
-    last_active: u64,
+    seconds_since_active: Option<u32>,
     live_connections: u32,
 }
 
 impl Into<Bytes> for MonitorState {
     fn into(self) -> Bytes {
-        format!(
-            "{{\"last_active\": {}, \"live_connections\": {}}}\n",
-            self.last_active, self.live_connections
-        )
-        .into()
+        if let Some(seconds_since_active) = self.seconds_since_active {
+            format!(
+                "{{\"seconds_since_active\": {}, \"live_connections\": {}}}\n",
+                seconds_since_active, self.live_connections
+            ).into()
+        } else {
+            format!(
+                "{{\"seconds_since_active\": null, \"live_connections\": {}}}\n",
+                self.live_connections
+            ).into()
+        }
     }
 }
 
@@ -53,10 +59,16 @@ impl Monitor {
     pub fn state(&self) -> MonitorState {
         let live_connections = self.live_connections.load(Ordering::Relaxed);
         let last_active = self.last_connection.load(Ordering::Relaxed);
+        // max() because SystemTime can theoretically decrease over short durations.
+        let seconds_since_active = if live_connections > 0 {
+            None
+        } else {
+            Some((time_now().max(last_active) - last_active) as u32)
+        };
 
         MonitorState {
             live_connections,
-            last_active,
+            seconds_since_active,
         }
     }
 

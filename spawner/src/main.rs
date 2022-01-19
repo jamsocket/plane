@@ -246,10 +246,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .run(reconcile, error_policy, context)
         .for_each(|res| async move {
             match res {
-                Ok((object, _)) => tracing::info!(%object.name, "Reconciled."),
+                Ok(_) => (),
                 Err(error) => match error {
                     controller::Error::ReconcilerFailed(error, _) => {
                         tracing::error!(%error, "Reconcile failed.")
+                    }
+                    controller::Error::ObjectNotFound(error) => {
+                        tracing::warn!(%error, "Object not found (may have been deleted).")
                     }
                     _ => tracing::error!(%error, "Unhandled reconcile error."),
                 },

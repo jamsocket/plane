@@ -1,6 +1,9 @@
+use tokio::task::JoinHandle;
+
 use clap::Parser;
 use futures::StreamExt;
-use kube::Resource;
+use hyper::{Body, Request, Uri};
+use kube::ResourceExt;
 use kube::{
     api::{Api, ListParams},
     runtime::controller::{self, Context, Controller, ReconcilerAction},
@@ -8,15 +11,15 @@ use kube::{
 };
 use logging::init_logging;
 use serde::Deserialize;
-use spawner_resource::{SessionLivedBackend, SessionLivedBackendBuilder};
-use tokio::time::Duration;
-use kube::ResourceExt;
+use spawner_resource::SessionLivedBackend;
+use tokio::time::{Duration, timeout};
+use futures_util::Stream;
 
 mod logging;
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct MonitorState {
-    last_active: u64,
+    seconds_since_active: Option<u64>,
     live_connections: u32,
 }
 
@@ -35,7 +38,6 @@ struct Opts {
 struct ControllerContext {
     client: Client,
     namespace: String,
-    port: i32,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -44,7 +46,65 @@ enum Error {
     MissingObjectKey(&'static str),
 }
 
-async fn reconcile(slbe: SessionLivedBackend, ctx: Context<ControllerContext>) -> Result<ReconcilerAction, Error> {
+type BoxStream = Box<dyn Stream<Item = MonitorState>>;
+
+pub async fn state_stream(base_uri: &str) -> impl Stream<Item=MonitorState> {
+    let client = hyper::Client::new();
+    let uri = format!("{}_events", base_uri).parse::<Uri>().unwrap();
+    let request = Request::builder().uri(uri).body(Body::empty()).unwrap();
+    let result = client.request(request).await.unwrap();
+    let stream = result.into_body();
+
+    Box::new(stream.map(|d| serde_json::from_slice(&d.unwrap()).unwrap()))
+}
+
+struct StateWatcher {
+    //stream: BoxStream,
+    grace_period_seconds: u32,
+    handle: JoinHandle<()>,
+}
+
+impl StateWatcher {
+    pub fn new(base_uri: &str, grace_period_seconds: u32, callback: Box<dyn Fn() + Send>) -> Self {
+        let base_uri = base_uri.to_string();
+
+        let handle = tokio::spawn(async move {
+            let mut stream = state_stream(&base_uri).await;
+            let mut duration: Option<Duration> = None;
+
+            loop {
+                let result = if let Some(duration) = duration {
+                    match timeout(duration, stream.next()).await {
+                        Ok(result) => result,
+                        Err(_) => {
+                            callback();
+                            return
+                        }
+                    }
+                } else {
+                    stream.next().await
+                };
+
+                let result = result.unwrap();
+                
+                if result.live_connections > 0 {
+                    tracing::info!("Session is live, not ");
+                }
+
+            }
+        });
+
+        StateWatcher {
+            grace_period_seconds: grace_period_seconds,
+            handle
+        }
+    }
+}
+
+async fn reconcile(
+    slbe: SessionLivedBackend,
+    ctx: Context<ControllerContext>,
+) -> Result<ReconcilerAction, Error> {
     let name = slbe.name();
 
     tracing::info!(?name, "Saw slbe.");
@@ -53,15 +113,12 @@ async fn reconcile(slbe: SessionLivedBackend, ctx: Context<ControllerContext>) -
         status
     } else {
         tracing::info!(%name, "Ignoring slbe because it has not yet been scheduled to a node.");
-        return Ok(ReconcilerAction {requeue_after: None})
+        return Ok(ReconcilerAction {
+            requeue_after: None,
+        });
     };
 
-    tracing::info!(?status, "Status");
-
-    // let client = hyper::Client::new();
-    // let result = client.get("http://{}:{}/_events");
-
-    // let boyd = result.await.unwrap().body();
+    StateWatcher::new(&status.url, 30, Box::new(move || {}));
 
     Ok(ReconcilerAction {
         requeue_after: None,
@@ -85,7 +142,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let context = Context::new(ControllerContext {
         client: client.clone(),
         namespace: opts.namespace,
-        port: opts.port,
     });
 
     let query = ListParams {
@@ -93,18 +149,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..ListParams::default()
     };
 
-    let slbes = Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);
+    let slbes =
+        Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);
     Controller::new(slbes, query)
         .run(reconcile, error_policy, context)
         .for_each(|res| async move {
             match res {
-                Ok((object, _)) => tracing::info!(%object.name, "Reconciled."),
+                Ok((object, _)) => (),
                 Err(error) => match error {
                     controller::Error::ReconcilerFailed(error, _) => {
                         tracing::error!(%error, "Reconcile failed.")
                     }
                     controller::Error::QueueError(error) => {
                         tracing::error!(%error, "Queue error.")
+                    }
+                    controller::Error::ObjectNotFound(error) => {
+                        tracing::warn!(%error, "Object not found (may have been deleted).")
                     }
                     _ => tracing::error!(%error, "Unhandled reconcile error."),
                 },
