@@ -3,5 +3,6 @@ members = [
     "cli",
     "sidecar",
     "spawner",
+    "sweeper",
     "resource",
 ]

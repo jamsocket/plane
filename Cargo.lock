@@ -1739,6 +1739,7 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "serde",
+ "serde_json",
  "spawner-resource",
  "thiserror",
  "tokio",
@@ -1787,6 +1788,25 @@ dependencies = [
  "hyper",
  "tokio",
  "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "spawner-sweeper"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 3.0.8",
+ "futures",
+ "hyper",
+ "k8s-openapi",
+ "kube",
+ "serde",
+ "serde_json",
+ "spawner-resource",
+ "thiserror",
+ "tokio",
  "tracing",
  "tracing-subscriber",
 ]

@@ -4,6 +4,7 @@ use k8s_openapi::{
     api::core::v1::{Container, Pod, Service, ServicePort, ServiceSpec},
     apimachinery::pkg::apis::meta::v1::OwnerReference,
 };
+use kube::ResourceExt;
 use kube::{
     api::{Api, ListParams, Patch, PatchParams},
     core::ObjectMeta,
@@ -11,7 +12,8 @@ use kube::{
     Client, Resource,
 };
 use logging::init_logging;
-use spawner_resource::{SessionLivedBackend, SPAWNER_GROUP};
+use serde_json::json;
+use spawner_resource::{SessionLivedBackend, SessionLivedBackendStatus, SPAWNER_GROUP};
 use std::collections::BTreeMap;
 use tokio::time::Duration;
 
@@ -38,6 +40,7 @@ struct Opts {
 pub enum Error {
     #[error("Failure from Kubernetes: {0}")]
     KubernetesFailure(#[source] kube::Error),
+
     #[error("MissingObjectKey: {0}")]
     MissingObjectKey(&'static str),
 }
@@ -63,35 +66,45 @@ fn owner_reference(meta: &ObjectMeta) -> Result<OwnerReference, Error> {
         name: meta
             .name
             .as_ref()
-            .ok_or(Error::MissingObjectKey(".metadata.name"))?
+            .ok_or(Error::MissingObjectKey("metadata.name"))?
             .to_string(),
         uid: meta
             .uid
             .as_ref()
-            .ok_or(Error::MissingObjectKey(".metadata.uid"))?
+            .ok_or(Error::MissingObjectKey("metadata.uid"))?
             .to_string(),
         ..OwnerReference::default()
     })
 }
 
 async fn reconcile(
-    g: SessionLivedBackend,
+    slbe: SessionLivedBackend,
     ctx: Context<ControllerContext>,
 ) -> Result<ReconcilerAction, Error> {
-    let name = g
-        .metadata
-        .name
-        .as_ref()
-        .ok_or(Error::MissingObjectKey("metadata.name"))?
-        .to_string();
-    let pod_api = Api::<Pod>::namespaced(ctx.get_ref().client.clone(), &ctx.get_ref().namespace);
-    let service_api =
-        Api::<Service>::namespaced(ctx.get_ref().client.clone(), &ctx.get_ref().namespace);
+    let ControllerContext {
+        client,
+        namespace,
+        port,
+        sidecar,
+    } = ctx.get_ref();
 
-    let owner_reference = owner_reference(&g.metadata)?;
+    let name = slbe.name();
 
-    let mut template = g.spec.template.clone();
-    if let Some(sidecar) = &ctx.get_ref().sidecar {
+    if slbe.status.is_some() {
+        tracing::info!(%name, "Ignoring SessionLivedBackend because it already has status metadata.");
+        return Ok(ReconcilerAction {
+            requeue_after: None,
+        });
+    }
+
+    let pod_api = Api::<Pod>::namespaced(client.clone(), namespace);
+    let service_api = Api::<Service>::namespaced(client.clone(), &namespace);
+    let slbe_api = Api::<SessionLivedBackend>::namespaced(client.clone(), namespace);
+
+    let owner_reference = owner_reference(&slbe.metadata)?;
+
+    let mut template = slbe.spec.template.clone();
+    if let Some(sidecar) = sidecar {
         template.containers.push(Container {
             name: SIDECAR.to_string(),
             image: Some(sidecar.to_string()),
@@ -99,7 +112,7 @@ async fn reconcile(
         });
     }
 
-    pod_api
+    let pod = pod_api
         .patch(
             &name,
             &PatchParams::apply(SPAWNER_GROUP).force(),
@@ -117,7 +130,7 @@ async fn reconcile(
         .await
         .map_err(Error::KubernetesFailure)?;
 
-    service_api
+    let service = service_api
         .patch(
             &name,
             &PatchParams::apply(SPAWNER_GROUP).force(),
@@ -132,13 +145,69 @@ async fn reconcile(
                     ports: Some(vec![ServicePort {
                         name: Some(APPLICATION.to_string()),
                         protocol: Some(TCP.to_string()),
-                        port: ctx.get_ref().port,
+                        port: *port,
                         ..ServicePort::default()
                     }]),
                     ..ServiceSpec::default()
                 }),
                 ..Service::default()
             }),
+        )
+        .await
+        .map_err(Error::KubernetesFailure)?;
+
+    let node_name = if let Some(node_name) = pod
+        .spec
+        .ok_or(Error::MissingObjectKey("spec (Pod)"))?
+        .node_name
+    {
+        node_name
+    } else {
+        tracing::info!(%name, "Pod exists but not yet assigned to a node.");
+        return Ok(ReconcilerAction {
+            requeue_after: None,
+        });
+    };
+
+    let ip = service
+        .spec
+        .ok_or(Error::MissingObjectKey("spec (Service)"))?
+        .cluster_ip
+        .ok_or(Error::MissingObjectKey("spec.clusterIP (Service)"))?;
+
+    let url = format!("http://{}.{}:{}/", name, namespace, port);
+    let status = SessionLivedBackendStatus {
+        ip,
+        node_name: node_name.clone(),
+        port: *port as u16,
+        url,
+    };
+    tracing::info!(?status, "status");
+    slbe_api
+        .patch(
+            &name,
+            &PatchParams::apply(SPAWNER_GROUP).force(),
+            &Patch::Apply(&json!({
+                "apiVersion": SessionLivedBackend::api_version(&()).to_string(),
+                "kind": SessionLivedBackend::kind(&()).to_string(),
+                "metadata": {
+                    "labels": {
+                        "spawner-group": node_name
+                    }
+                },
+            })),
+        )
+        .await
+        .map_err(Error::KubernetesFailure)?;
+    slbe_api
+        .patch_status(
+            &name,
+            &PatchParams::apply(SPAWNER_GROUP).force(),
+            &Patch::Apply(&json!({
+                "apiVersion": SessionLivedBackend::api_version(&()).to_string(),
+                "kind": SessionLivedBackend::kind(&()).to_string(),
+                "status": status,
+            })),
         )
         .await
         .map_err(Error::KubernetesFailure)?;
@@ -170,7 +239,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     let slbes =
         Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);
+    let pods = Api::<Pod>::namespaced(client.clone(), &context.get_ref().namespace);
+
     Controller::new(slbes, ListParams::default())
+        .owns(pods, ListParams::default())
         .run(reconcile, error_policy, context)
         .for_each(|res| async move {
             match res {
