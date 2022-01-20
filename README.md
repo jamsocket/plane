@@ -30,5 +30,5 @@ see [Agones](https://agones.dev/site/) for that use case.
 
 ## More info & getting started
 
-See the [docs](https://github.com/drifting-in-space/spawner/blob/master/demo/README.md) directory
+See the [docs](https://github.com/drifting-in-space/spawner/blob/master/docs/README.md) directory
 for more information.
