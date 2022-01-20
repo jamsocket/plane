@@ -42,6 +42,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84450d0b4a8bd1ba4144ce8ce718fbc5d071358b1e5384bace6536b3d1f2d5b3"
 
 [[package]]
+name = "async-stream"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "171374e7e3b2504e0e5236e3b59260560f9fe94bfe9ac39ba5e4e929c5590625"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "648ed8c8d2ce5409ccd57453d9d1b214b342a0d69376a6feda1fd6cae3299308"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -200,9 +221,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.0.8"
+version = "3.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31b34190c12bd1d613deba77e1cc13e68eaf4a0d51e389dbd485b7bfe15a47c0"
+checksum = "7a30c3bf9ff12dfe5dae53f0a96e0febcd18420d1c0e7fad77796d9d5c4b5375"
 dependencies = [
  "atty",
  "bitflags",
@@ -1734,7 +1755,7 @@ name = "spawner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 3.0.8",
+ "clap 3.0.10",
  "futures",
  "k8s-openapi",
  "kube",
@@ -1754,7 +1775,7 @@ dependencies = [
  "anyhow",
  "atty",
  "bat",
- "clap 3.0.8",
+ "clap 3.0.10",
  "futures",
  "k8s-openapi",
  "kube",
@@ -1783,7 +1804,7 @@ name = "spawner-sidecar"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 3.0.8",
+ "clap 3.0.10",
  "futures-core",
  "hyper",
  "tokio",
@@ -1797,7 +1818,8 @@ name = "spawner-sweeper"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 3.0.8",
+ "async-stream",
+ "clap 3.0.10",
  "futures",
  "futures-util",
  "hyper",

@@ -57,7 +57,7 @@ spec:
         image: ghcr.io/drifting-in-space/spawner:sha-5291eb6
         args: [
           "--namespace", "spawner",
-          "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:sha-5291eb6",
+          "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:sha-f8df9e8",
           "--port", "9090",
         ]
         ports:
