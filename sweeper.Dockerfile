@@ -2,8 +2,8 @@ FROM rust:latest as build
 
 WORKDIR /work
 COPY . .
-RUN cargo test -p sweeper --release
-RUN cargo build -p sweeper --release
+RUN cargo test -p spawner-sweeper --release
+RUN cargo build -p spawner-sweeper --release
 
 FROM gcr.io/distroless/cc-debian11
 
