@@ -6,8 +6,8 @@ on:
     tags: [ 'v*.*.*' ]
     paths:
       - '.github/workflows/docker-publish-sidecar.yml'
-      - 'sidecar/**'
-      - 'sidecar.Dockerfile'
+      - 'crates/sidecar/**'
+      - 'crates/sidecar.Dockerfile'
   pull_request:
     branches: [ master ]
 
@@ -46,6 +46,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
+          context: crates
           file: sidecar.Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
