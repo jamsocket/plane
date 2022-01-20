@@ -5,19 +5,10 @@
 [![Sweeper Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml)
 
 **Spawner** is a bridge between a web application and Kubernetes. It allows a web application to
-create **session-lived** containers that serve WebSocket or HTTP connections. Spawner coordinates with
+create **session-lived backends**, which are server processes dedicated to individual (or small
+groups of) users. The processes themselves are just regular HTTP servers. Spawner coordinates with
 a reverse proxy, so that your client-side code can talk directly to these servers. *session-lived*
-means that when the remote client(s) close the connection, the container is cleaned up.
-
-**This is still a work-in-progress. It's demo-stage, and not ready for use in production just yet.** If
-you are interested in being an early adopter, though, feel free to open an issue or email me at
-[hi@driftingin.space](mailto:hi@driftingin.space).
-
-## Video Demo
-
-<a href="https://www.youtube.com/watch?v=PtJ_vsgwK90">
-  <img src="assets/video_screenshot.png" alt="Screen shot of YouTube player" style="width: 450px" />
-</a>
+means that when the remote user(s) close the connection, the container is automatically cleaned up.
 
 ## Use cases
 
@@ -36,51 +27,58 @@ see [Agones](https://agones.dev/site/) for that use case.
 
 ## How it works
 
-### Service Creation
+Spawner builds on top of Kubernetes. It provides a `SessionLivedBackend` resource type, and provides
+a number of pieces for managing the lifecycle of a session-lived backend.
 
-The Spawner process runs in a pod on your cluster and serves an HTTP API. On startup, it is passed an
-`--application-image` argument that specifies the full path of the image for your application container
-on a container registry.
+In order to give users maximimum flexibility in structuring their system, Spawner is made up of a
+number of self-contained programs, with minimal and well-defined interfaces.
 
-### Routing
+- `spawner`: a Kubernetes [controller](https://kubernetes.io/docs/concepts/architecture/controller/)
+  which watches for the creation of `SessionLivedBackend` resources and sets up `Pod` and `Service`
+  resources for each one, and (optionally) injects each `Pod` with the `sidecar` used for monitoring
+  connections.
+- `sidecar`: a WebSocket-aware HTTP proxy sidecar that also provides an event stream appropriate for
+  determining when a server becomes idle, used for terminating services.
+- `sweeper`: a service that listens to the event stream of `sidecar` event streams for all the
+  `SessionLivedBackend`-controlled `Pod`s on a given node, and terminates them when they become idle.
 
-When your web app wants to create a session-lived container, its backend sends a `POST` request to
-`http://hostname-of-spawner:8080/init`. Spawner then asks Kubernetes to create a pod and service for that
-session, and returns a `JSON` object containing a URL specific to that session-lived container, like
-`https://my-domain.com/p/JE3M/`. This URL can then be passed on to the client-side container, which can
-connect to it as a regular HTTP host. The proxy server is configured to map paths under the root,
-so that `https://my-domain.com/p/JE3M/my-file.txt` is internally routed to
-`http://hostname-of-pod/my-file.txt`.
+Additionally, the `cli` codebase contains a command-line helper for tasks like creating a
+`SessionLivedBackend` from the command-line. It is just a wrapper on the Kubernetes API, which can
+also be used to create `SessionLivedBackend`s with more control.
 
-Currently, Spawner works best with [NGINX](https://www.nginx.com/) as a reverse proxy, but other reverse
-proxies with a similar feature set should also work. If there's a particular proxy you'd like to see
-supported, feel free to open an issue.
+## Getting started
 
-### Service Destruction
+First, you should have a running Kubernetes cluster and the Kubernetes client, `kubectl`.
+The Kubernetes cluster could be a local install of [minikube](https://minikube.sigs.k8s.io/docs/start/),
+or a cloud install like [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine).
+(If you are setting up Kubernetes just to try Spawner, I recommend starting with minikube.)
 
-When Spawner detects that a container has not served a request for some (configurable) interval, it
-will shut down the pod and delete the service. It can determine whether a pod has served a request
-in one of two ways:
+Before continuing, make sure that you can run `kubectl get pods` without error (it's fine if it
+returns an empty list.)
 
-1. The pod can serve a `/status` endpoint which returns a `JSON` blob that looks like this:
+A sample cluster configuration is provided in the `cluster` folder of this repo. It uses
+[Kustomize](https://kustomize.io/), which is built in to Kubernetes. To install it, run:
 
-```json
-{
-  "active_connections": 2,
-  "seconds_inactive": 0,
-  "listening": true,
-}
-```
+    cd cluster
+    kubectl apply -k .
+    cd ../
 
-- `active_connections` is the number of active connections (e.g. WebSocket connections) to the server.
-- `seconds_inactive` is the amount of time elapsed since the last connection.
-- `listening` is true if the server is currently accepting new connections.
+This will install the following in your Kubernetes cluster:
 
-At least one of `active_connections` or `seconds_inactive` should be zero. Currently, only
-`seconds_inactive` is used; the container is shut down when it passes a threshold value. Eventually,
-the other values may be exposed through a monitoring interface.
+- A custom resource definition `SessionLivedBackend`.
+- A namespace `spawner`, within which the backends (but not control plane) will run.
+- A service account `spawner`, with the ability to manage certain Kubernetes resources.
+- A deployment `spawner`, which runs the core Kubernetes controller used to create
+  backing resources for `SessionLivedBackend`s.
+- A daemon set `sweeper`, which is used to clean up idle backends.
+- A deployment `nginx`, which is a reverse proxy that routes HTTP requests to the
+  appropriate session-lived backend container.
 
-2. The [sidecar](sidecar) process can be injected into your pod. The sidecar process shares a network
-namespace with the application container, so it can ask the OS for active TCP connections on the
-application container's port. It uses this information to serve the same `/status` interface, but
-on a different port.
+To create a session-lived backend (in this example, for a multiplayer game), you can
+use a provided demo:
+
+    kubectl create -f demo/drop-four.yaml
+
+This will create a `SessionLivedBackend`.
+
+*TODO: describe how to connect to it.*
