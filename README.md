@@ -1,14 +1,17 @@
 # Spawner
 
-[![Sidecar Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml)
 [![Spawner Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-spawner.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-spawner.yml)
+[![Sidecar Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml)
 [![Sweeper Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml)
 
 **Spawner** is a bridge between a web application and Kubernetes. It allows a web application to
 create **session-lived backends**, which are server processes dedicated to individual (or small
-groups of) users. The processes themselves are just regular HTTP servers. Spawner coordinates with
-a reverse proxy, so that your client-side code can talk directly to these servers. *session-lived*
-means that when the remote user(s) close the connection, the container is automatically cleaned up.
+groups of) users.
+
+The processes themselves are just regular HTTP servers. Spawner coordinates with
+a reverse proxy, so that your client-side code can talk directly to these servers. *Session-lived*
+means that the containers are spun up for each user, and spun down once they have no more active
+connections.
 
 ## Use cases
 
@@ -18,16 +21,18 @@ duration of a session. One area where this approach is currently common is web-b
 to run code in. It's also useful as a back-end for real-time collaboration, when the document state
 is non-trivial and needs more than just a relay server (see e.g.
 [Figma's description](https://www.figma.com/blog/rust-in-production-at-figma/) of how they run one
-process per active document.) By making it low-stakes to experiment with this architecture, my hope is
-that Spawner will help developers discover new use-cases, like loading a large dataset into system or
-GPU memory to allow real-time interactive data exploration.
+process per active document.)
+
+By making it low-stakes to experiment with this architecture, our hope is
+that Spawner will help developers discover new use-cases, like loading a large dataset into memory
+to allow low-latency interactive data exploration.
 
 Depending on your needs, it may also make sense as a back-end for games and virtual spaces, but also
 see [Agones](https://agones.dev/site/) for that use case.
 
 ## How it works
 
-Spawner builds on top of Kubernetes. It provides a `SessionLivedBackend` resource type, and provides
+Spawner is built on top of Kubernetes. It provides a `SessionLivedBackend` resource type, and provides
 a number of pieces for managing the lifecycle of a session-lived backend.
 
 In order to give users maximimum flexibility in structuring their system, Spawner is made up of a
