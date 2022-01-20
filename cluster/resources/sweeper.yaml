@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: sweeper
+  labels:
+    app: sweeper
+spec:
+  selector:
+    matchLabels:
+      app: sweeper
+  template:
+    metadata:
+      labels:
+        app: sweeper
+    spec:
+      serviceAccountName: spawner
+      containers:
+      - name: spawner
+        image: ghcr.io/drifting-in-space/sweeper:sha-76d68b0
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+        args: [
+          "--namespace", "spawner",
+          "--node-name", "$(POD_NAME)"
+        ]
