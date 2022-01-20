@@ -1,7 +1,5 @@
 [![Sidecar Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml)
-
 [![Spawner Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-spawner.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-spawner.yml)
-
 [![Sweeper Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml)
 
 **Spawner** is a bridge between a web application and Kubernetes. It allows a web application to
