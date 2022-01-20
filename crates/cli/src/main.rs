@@ -50,11 +50,21 @@ struct SlbeSpec {
     /// The Kubernetes namespace to operate within.
     #[clap(long, default_value=DEFAULT_NAMESPACE)]
     namespace: String,
+
+    #[clap(long, default_value="300")]
+    grace_period_seconds: u32,
 }
 
 impl SlbeSpec {
     fn as_slbe(&self) -> SessionLivedBackend {
+        let grace_period_seconds = if self.grace_period_seconds == 0 {
+            None
+        } else {
+            Some(self.grace_period_seconds)
+        };
+
         let builder = SessionLivedBackendBuilder::new(&self.image)
+            .with_grace_period(grace_period_seconds)
             .with_image_pull_policy(self.image_pull_policy);
 
         if let Some(name) = &self.name {

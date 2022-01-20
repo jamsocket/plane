@@ -22,6 +22,11 @@ spec:
           properties:
             spec:
               properties:
+                gracePeriodSeconds:
+                  format: uint32
+                  minimum: 0.0
+                  nullable: true
+                  type: integer
                 template:
                   description: PodSpec is a description of a pod.
                   properties:

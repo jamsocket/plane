@@ -183,7 +183,12 @@ async fn reconcile(
         let client = ctx.get_ref().client.clone();
         let namespace = ctx.get_ref().namespace.clone();
 
-        match wait_to_kill_slbe(&status.url, 30).await {
+        match wait_to_kill_slbe(
+            &status.url,
+            slbe.spec.grace_period_seconds.unwrap_or_default(),
+        )
+        .await
+        {
             Result::Ok(()) => (),
             Result::Err(e) => {
                 tracing::error!(?e, "Encountered error testing liveness of SessionLivedBackend, so shutting it down.")

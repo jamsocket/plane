@@ -18,8 +18,10 @@ pub const APPLICATION: &str = "application";
     status = "SessionLivedBackendStatus",
     namespaced
 )]
+#[serde(rename_all="camelCase")]
 pub struct SessionLivedBackendSpec {
     pub template: PodSpec,
+    pub grace_period_seconds: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
@@ -36,6 +38,7 @@ pub struct SessionLivedBackendBuilder {
     env: HashMap<String, String>,
     image_pull_policy: Option<ImagePullPolicy>,
     namespace: Option<String>,
+    grace_period_seconds: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -80,6 +83,7 @@ impl SessionLivedBackendBuilder {
             env: HashMap::default(),
             image_pull_policy: None,
             namespace: None,
+            grace_period_seconds: None,
         }
     }
 
@@ -94,6 +98,10 @@ impl SessionLivedBackendBuilder {
         SessionLivedBackendBuilder { namespace, ..self }
     }
 
+    pub fn with_grace_period(self, grace_period_seconds: Option<u32>) -> Self {
+        SessionLivedBackendBuilder {grace_period_seconds, ..self}
+    }
+
     pub fn build_spec(&self) -> SessionLivedBackendSpec {
         let env: Vec<EnvVar> = self
             .env
@@ -106,6 +114,7 @@ impl SessionLivedBackendBuilder {
             .collect();
 
         SessionLivedBackendSpec {
+            grace_period_seconds: self.grace_period_seconds,
             template: PodSpec {
                 containers: vec![Container {
                     image: Some(self.image.to_string()),

@@ -9,4 +9,5 @@ spec:
       - env: []
         image: "ghcr.io/drifting-in-space/demo-image-drop-four:sha-6f41b09"
         name: application
+  gracePeriodSeconds: 300
 
