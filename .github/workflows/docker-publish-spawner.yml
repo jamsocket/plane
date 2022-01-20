@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/docker-publish-spawner.yml'
       - 'crates/spawner/**'
-      - 'crates/spawner.Dockerfile'
+      - 'containers/spawner.Dockerfile'
   pull_request:
     branches: [ master ]
 

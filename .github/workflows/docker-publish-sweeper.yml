@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/docker-publish-sweeper.yml'
       - 'crates/sweeper/**'
-      - 'crates/sweeper.Dockerfile'
+      - 'containers/sweeper.Dockerfile'
   pull_request:
     branches: [ master ]
 
