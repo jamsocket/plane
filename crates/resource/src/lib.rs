@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub const SPAWNER_GROUP: &str = "spawner.dev";
 pub const DEFAULT_PREFIX: &str = "spawner-";
 pub const APPLICATION: &str = "application";
+pub const DEFAULT_HTTP_PORT: u16 = 8080;
 
 #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[kube(
@@ -22,6 +23,7 @@ pub const APPLICATION: &str = "application";
 pub struct SessionLivedBackendSpec {
     pub template: PodSpec,
     pub grace_period_seconds: Option<u32>,
+    pub http_port: u16,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
@@ -39,6 +41,7 @@ pub struct SessionLivedBackendBuilder {
     image_pull_policy: Option<ImagePullPolicy>,
     namespace: Option<String>,
     grace_period_seconds: Option<u32>,
+    http_port: u16,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -84,6 +87,14 @@ impl SessionLivedBackendBuilder {
             image_pull_policy: None,
             namespace: None,
             grace_period_seconds: None,
+            http_port: DEFAULT_HTTP_PORT,
+        }
+    }
+
+    pub fn with_port(self, http_port: u16) -> Self {
+        SessionLivedBackendBuilder {
+            http_port,
+            ..self
         }
     }
 
@@ -114,6 +125,7 @@ impl SessionLivedBackendBuilder {
             .collect();
 
         SessionLivedBackendSpec {
+            http_port: self.http_port,
             grace_period_seconds: self.grace_period_seconds,
             template: PodSpec {
                 containers: vec![Container {

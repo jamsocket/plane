@@ -6,6 +6,8 @@ use serde::Serialize;
 use spawner_resource::{
     ImagePullPolicy, SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP,
 };
+use spawner_resource::DEFAULT_HTTP_PORT;
+use const_format::formatcp;
 
 const DEFAULT_NAMESPACE: &str = "default";
 
@@ -53,6 +55,9 @@ struct SlbeSpec {
 
     #[clap(long, default_value="300")]
     grace_period_seconds: u32,
+
+    #[clap(long, default_value=&formatcp!("{}", DEFAULT_HTTP_PORT))]
+    http_port: u16
 }
 
 impl SlbeSpec {

@@ -23,14 +23,12 @@ const LABEL_RUN: &str = "run";
 const APPLICATION: &str = "spawner-app";
 const SIDECAR: &str = "spawner-sidecar";
 const TCP: &str = "TCP";
+const SIDECAR_PORT: u16 = 9090;
 
 #[derive(Parser, Debug)]
 struct Opts {
     #[clap(long, default_value = "default")]
     namespace: String,
-
-    #[clap(long, default_value = "8080")]
-    port: i32,
 
     #[clap(long)]
     sidecar: Option<String>,
@@ -48,7 +46,6 @@ pub enum Error {
 struct ControllerContext {
     client: Client,
     namespace: String,
-    port: i32,
     sidecar: Option<String>,
 }
 
@@ -84,7 +81,6 @@ async fn reconcile(
     let ControllerContext {
         client,
         namespace,
-        port,
         sidecar,
     } = ctx.get_ref();
 
@@ -97,6 +93,13 @@ async fn reconcile(
         });
     }
 
+    let in_port = slbe.spec.http_port;
+    let out_port = if sidecar.is_some() {
+        SIDECAR_PORT
+    } else {
+        slbe.spec.http_port
+    };
+
     let pod_api = Api::<Pod>::namespaced(client.clone(), namespace);
     let service_api = Api::<Service>::namespaced(client.clone(), &namespace);
     let slbe_api = Api::<SessionLivedBackend>::namespaced(client.clone(), namespace);
@@ -108,6 +111,10 @@ async fn reconcile(
         template.containers.push(Container {
             name: SIDECAR.to_string(),
             image: Some(sidecar.to_string()),
+            args: Some(vec![
+                "--upstream".to_string(), format!("http://localhost:{}", in_port),
+                "--serve-port".to_string(), format!("{}", SIDECAR_PORT),
+            ]),
             ..Container::default()
         });
     }
@@ -145,7 +152,7 @@ async fn reconcile(
                     ports: Some(vec![ServicePort {
                         name: Some(APPLICATION.to_string()),
                         protocol: Some(TCP.to_string()),
-                        port: *port,
+                        port: out_port as i32,
                         ..ServicePort::default()
                     }]),
                     ..ServiceSpec::default()
@@ -175,11 +182,11 @@ async fn reconcile(
         .cluster_ip
         .ok_or(Error::MissingObjectKey("spec.clusterIP (Service)"))?;
 
-    let url = format!("http://{}.{}:{}/", name, namespace, port);
+    let url = format!("http://{}.{}:{}/", name, namespace, out_port);
     let status = SessionLivedBackendStatus {
         ip,
         node_name: node_name.clone(),
-        port: *port as u16,
+        port: out_port,
         url,
     };
     tracing::info!(?status, "status");
@@ -234,7 +241,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let context = Context::new(ControllerContext {
         client: client.clone(),
         namespace: opts.namespace,
-        port: opts.port,
         sidecar: opts.sidecar,
     });
     let slbes =

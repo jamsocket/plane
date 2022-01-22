@@ -1,7 +1,6 @@
 use crate::monitor::Monitor;
 use anyhow::anyhow;
 use core::future::Future;
-use hyper::body::Bytes;
 use hyper::client::HttpConnector;
 use hyper::http::uri::{Authority, InvalidUriParts, Scheme};
 use hyper::service::Service;
@@ -19,9 +18,6 @@ fn rewrite_uri(uri: &Uri, upstream: &Authority) -> Result<Uri, InvalidUriParts> 
     parts.scheme = Some(Scheme::HTTP);
     Uri::from_parts(parts)
 }
-
-#[derive(Clone, Debug)]
-pub struct Event {}
 
 #[derive(Clone)]
 pub struct ProxyService {
@@ -49,12 +45,6 @@ fn clone_response(response: &Response<Body>) -> Result<Response<Body>, hyper::ht
     }
     builder = builder.status(response.status());
     builder.body(Body::empty())
-}
-
-impl From<Event> for Bytes {
-    fn from(_: Event) -> Self {
-        Bytes::from_static(b"blah\n")
-    }
 }
 
 impl ProxyService {
