@@ -260,6 +260,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     controller::Error::ObjectNotFound(error) => {
                         tracing::warn!(%error, "Object not found (may have been deleted).")
                     }
+                    controller::Error::QueueError(error) => {
+                        tracing::error!(%error, "Queue error.")
+                    }
                     _ => tracing::error!(%error, "Unhandled reconcile error."),
                 },
             }
