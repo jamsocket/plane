@@ -1,0 +1,21 @@
+[package]
+name = "spawner-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.52"
+atty = "0.2.14"
+axum = "0.4.4"
+bat = "0.19.0"
+clap = { version = "3.0.7", features = ["derive"] }
+const_format = "0.2.22"
+futures = "0.3.19"
+k8s-openapi = { version = "0.13.1", features = ["schemars", "v1_22"] }
+kube = { version = "0.66.0", features = ["runtime"] }
+serde = { version = "1.0.133", features = ["derive"] }
+serde_yaml = "0.8.23"
+spawner-resource = {path = "../resource"}
+thiserror = "1.0.30"
+tokio = { version = "1.15.0", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1.29"
