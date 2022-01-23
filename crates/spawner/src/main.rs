@@ -19,6 +19,7 @@ use tokio::time::Duration;
 
 mod logging;
 
+
 const LABEL_RUN: &str = "run";
 const APPLICATION: &str = "spawner-app";
 const SIDECAR: &str = "spawner-sidecar";
