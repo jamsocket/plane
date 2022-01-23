@@ -126,7 +126,7 @@ pub async fn wait_to_kill_slbe(base_uri: &str, grace_period_seconds: u32) -> Res
             match timeout(duration, stream.next()).await {
                 Ok(result) => result,
                 Err(_) => {
-                    tracing::info!("Timed out while waiting for activity.");
+                    tracing::info!(?base_uri, "Timed out while waiting for activity.");
                     return Ok(());
                 }
             }
@@ -137,14 +137,14 @@ pub async fn wait_to_kill_slbe(base_uri: &str, grace_period_seconds: u32) -> Res
         let result = if let Some(result) = result {
             result
         } else {
-            tracing::info!("Reached end of message stream; assuming pod is dead.");
+            tracing::info!(?base_uri, "Reached end of message stream; assuming pod is dead.");
             return Ok(());
         };
-        tracing::info!(?result, "Got status message.");
+        tracing::info!(?result, ?base_uri, "Got status message.");
 
         if let Some(seconds_since_active) = result.seconds_since_active {
             let delta = grace_period_seconds - seconds_since_active.min(grace_period_seconds);
-            tracing::info!(delta_seconds = %delta, "Using timeout.");
+            tracing::info!(delta_seconds = %delta, ?base_uri, "Using timeout.");
             duration = Some(Duration::from_secs(delta as u64));
         } else {
             duration = None;
