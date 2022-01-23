@@ -54,11 +54,10 @@ spec:
       serviceAccountName: spawner
       containers:
       - name: spawner
-        image: ghcr.io/drifting-in-space/spawner:sha-5291eb6
+        image: ghcr.io/drifting-in-space/spawner:sha-d7e7206
         args: [
           "--namespace", "spawner",
-          "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:sha-f8df9e8",
-          "--port", "9090",
+          "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:sha-d3c1267",
         ]
         ports:
         - containerPort: 9090

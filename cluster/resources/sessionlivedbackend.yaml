@@ -27,6 +27,10 @@ spec:
                   minimum: 0.0
                   nullable: true
                   type: integer
+                httpPort:
+                  format: uint16
+                  minimum: 0.0
+                  type: integer
                 template:
                   description: PodSpec is a description of a pod.
                   properties:
@@ -3922,6 +3926,7 @@ spec:
                     - containers
                   type: object
               required:
+                - httpPort
                 - template
               type: object
             status:

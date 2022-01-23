@@ -3,6 +3,7 @@ apiVersion: spawner.dev/v1
 kind: SessionLivedBackend
 metadata:
   generateName: spawner-
+  namespace: spawner
 spec:
   template:
     containers:
