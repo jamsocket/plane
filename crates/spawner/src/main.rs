@@ -113,7 +113,7 @@ async fn reconcile(
             name: SIDECAR.to_string(),
             image: Some(sidecar.to_string()),
             args: Some(vec![
-                format!("http://localhost:{}", in_port),
+                format!("localhost:{}", in_port),
                 format!("{}", SIDECAR_PORT),
             ]),
             ..Container::default()

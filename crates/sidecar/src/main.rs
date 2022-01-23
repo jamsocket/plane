@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(%opts.upstream, %opts.serve_port, "Proxy started.");
 
     let proxy = ProxyService::new(&opts.upstream)
-        .map_err(|_| anyhow!("Couldn't construct proxy to {}.", opts.upstream))?;
+        .map_err(|e| anyhow!("Couldn't construct proxy to {}. Error: {:?}", opts.upstream, e))?;
 
     let make_svc = make_service_fn(|_conn| {
         let proxy = proxy.clone();
