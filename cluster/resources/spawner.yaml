@@ -62,5 +62,3 @@ spec:
           "--namespace", "spawner",
           "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:sha-ab17eb7",
         ]
-        ports:
-        - containerPort: 9090
