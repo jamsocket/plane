@@ -14,6 +14,7 @@ spec:
       labels:
         app: spawner-api
     spec:
+      serviceAccountName: spawner
       containers:
       - name: spawner-api
         image: ghcr.io/drifting-in-space/spawner-api:sha-c9d11ee
