@@ -3,8 +3,10 @@ resources:
 - resources/nginx.yaml
 - resources/sweeper.yaml
 - resources/sessionlivedbackend.yaml
+- resources/api.yaml
 configMapGenerator:
 - name: nginx-config
   files:
   - config/nginx/default.conf
   - config/nginx/index.html
+  - config/nginx/spawner.png

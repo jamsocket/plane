@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spawner-api
+  labels:
+    app: spawner-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spawner-api
+  template:
+    metadata:
+      labels:
+        app: spawner-api
+    spec:
+      containers:
+      - name: spawner-api
+        image: ghcr.io/drifting-in-space/spawner-api:sha-c9d11ee
+        args: [
+          "--namespace", "spawner",
+        ]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spawner-api
+spec:
+  type: ClusterIP
+  selector:
+    app: spawner-api
+  ports:
+    - protocol: TCP
+      port: 8080

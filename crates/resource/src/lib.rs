@@ -9,7 +9,7 @@ pub const SPAWNER_GROUP: &str = "spawner.dev";
 pub const DEFAULT_PREFIX: &str = "spawner-";
 pub const APPLICATION: &str = "application";
 pub const DEFAULT_HTTP_PORT: u16 = 8080;
-pub const DEFAULT_GRACE_SECONDS: u32 = 60 * 5;
+pub const DEFAULT_GRACE_SECONDS: u32 = 30;
 
 #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[kube(
