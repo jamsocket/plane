@@ -16,7 +16,7 @@ pub const DEFAULT_GRACE_SECONDS: u32 = 30;
     group = "spawner.dev",
     version = "v1",
     kind = "SessionLivedBackend",
-    shortname = "slib",
+    shortname = "slab",
     status = "SessionLivedBackendStatus",
     namespaced
 )]
