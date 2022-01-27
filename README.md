@@ -28,6 +28,10 @@ to allow low-latency interactive data exploration.
 Depending on your needs, it may also make sense as a back-end for games and virtual spaces, but also
 see [Agones](https://agones.dev/site/) for that use case.
 
+## Architecture
+
+![Spawner architecture diagram](docs/diagram.png)
+
 ## More info & getting started
 
 See the [docs](https://github.com/drifting-in-space/spawner/blob/master/docs/README.md) directory
