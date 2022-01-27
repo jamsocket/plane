@@ -11,6 +11,10 @@ The server processes can be any server that speaks HTTP, including WebSocket ser
 you an API for spinning these servers up when a new user connects, and automatically terminates
 them when the user disconnects.
 
+Spawner isn't production-ready quite yet, but if you're interested in using it in production, we'd love
+to hear about your use case and help you try it out. Feel free to open an issue on GitHub or contact
+us at [hi@driftingin.space](mailto:hi@driftingin.space).
+
 ## Use cases
 
 Spawner is intended for cases where a web app needs a dedicated, stateful back-end to talk to for the
