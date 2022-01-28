@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use k8s_openapi::api::core::v1::{Container, EnvVar, PodSpec};
+use k8s_openapi::api::core::v1::{Container, EnvVar, LocalObjectReference, PodSpec};
 use kube::{core::ObjectMeta, CustomResource};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,7 @@ pub const DEFAULT_GRACE_SECONDS: u32 = 30;
     status = "SessionLivedBackendStatus",
     namespaced
 )]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct SessionLivedBackendSpec {
     pub template: PodSpec,
     pub grace_period_seconds: Option<u32>,
@@ -28,7 +28,7 @@ pub struct SessionLivedBackendSpec {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct SessionLivedBackendStatus {
     pub node_name: String,
     pub ip: String,
@@ -38,6 +38,7 @@ pub struct SessionLivedBackendStatus {
 
 pub struct SessionLivedBackendBuilder {
     image: String,
+    image_pull_secret: Option<String>,
     env: HashMap<String, String>,
     image_pull_policy: Option<ImagePullPolicy>,
     namespace: Option<String>,
@@ -86,6 +87,7 @@ impl SessionLivedBackendBuilder {
             image: image.to_string(),
             env: HashMap::default(),
             image_pull_policy: None,
+            image_pull_secret: None,
             namespace: None,
             grace_period_seconds: Some(DEFAULT_GRACE_SECONDS),
             http_port: DEFAULT_HTTP_PORT,
@@ -93,10 +95,7 @@ impl SessionLivedBackendBuilder {
     }
 
     pub fn with_port(self, http_port: u16) -> Self {
-        SessionLivedBackendBuilder {
-            http_port,
-            ..self
-        }
+        SessionLivedBackendBuilder { http_port, ..self }
     }
 
     pub fn with_image_pull_policy(self, image_pull_policy: Option<ImagePullPolicy>) -> Self {
@@ -111,7 +110,17 @@ impl SessionLivedBackendBuilder {
     }
 
     pub fn with_grace_period(self, grace_period_seconds: Option<u32>) -> Self {
-        SessionLivedBackendBuilder {grace_period_seconds, ..self}
+        SessionLivedBackendBuilder {
+            grace_period_seconds,
+            ..self
+        }
+    }
+
+    pub fn with_image_pull_secret(self, image_pull_secret: Option<String>) -> Self {
+        SessionLivedBackendBuilder {
+            image_pull_secret,
+            ..self
+        }
     }
 
     pub fn build_spec(&self) -> SessionLivedBackendSpec {
@@ -136,6 +145,11 @@ impl SessionLivedBackendBuilder {
                     name: APPLICATION.to_string(),
                     ..Default::default()
                 }],
+                image_pull_secrets: self.image_pull_secret.as_ref().map(|d| {
+                    vec![LocalObjectReference {
+                        name: Some(d.to_string()),
+                    }]
+                }),
                 ..Default::default()
             },
         }

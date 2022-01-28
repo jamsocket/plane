@@ -41,6 +41,12 @@ struct SlbeSpec {
     #[clap(long)]
     image_pull_policy: Option<ImagePullPolicy>,
 
+    /// The name of a Kubernetes secret (type kubernetes.io/dockerconfigjson) for loading the container image.
+    /// 
+    /// See: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    #[clap(long)]
+    image_pull_secret: Option<String>,
+
     /// A unique identifier for the SessionLivedBackend; generated if omitted.
     #[clap(long)]
     name: Option<String>,
@@ -70,6 +76,7 @@ impl SlbeSpec {
 
         let builder = SessionLivedBackendBuilder::new(&self.image)
             .with_grace_period(grace_period_seconds)
+            .with_image_pull_secret(self.image_pull_secret.clone())
             .with_image_pull_policy(self.image_pull_policy);
 
         if let Some(name) = &self.name {
