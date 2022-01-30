@@ -78,7 +78,7 @@ async fn init_handler(
     Json(payload): Json<InitPayload>,
     Extension(settings): Extension<Arc<Settings>>,
 ) -> Result<Json<InitResult>, StatusCode> {
-    let slbe =
+    let slab =
         SessionLivedBackendBuilder::new(&payload.image).build_prefixed(&settings.service_prefix);
 
     // TODO: use pool?
@@ -94,7 +94,7 @@ async fn init_handler(
                 field_manager: Some(SPAWNER_GROUP.to_string()),
                 ..PostParams::default()
             },
-            &slbe,
+            &slab,
         )
         .await
         .map_err(|error| {

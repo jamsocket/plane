@@ -23,16 +23,16 @@ enum Command {
     PrintCrd,
 
     /// Print a spec for a SessionLivedBackend using the given image.
-    PrintSlbe(SlbeSpec),
+    PrintSlab(SlabSpec),
 
     /// Create a spec for a SessionLivedBackend using the given image.
     ///
-    /// Equivalent to `spawner-cli print-slbe [options] | kubectl create -f -`
-    CreateSlbe(SlbeSpec),
+    /// Equivalent to `spawner-cli print-slab [options] | kubectl create -f -`
+    CreateSlab(SlabSpec),
 }
 
 #[derive(Parser)]
-struct SlbeSpec {
+struct SlabSpec {
     /// The container registry ID of the docker container to run.
     #[clap(long)]
     image: String,
@@ -66,8 +66,8 @@ struct SlbeSpec {
     http_port: u16
 }
 
-impl SlbeSpec {
-    fn as_slbe(&self) -> SessionLivedBackend {
+impl SlabSpec {
+    fn as_slab(&self) -> SessionLivedBackend {
         let grace_period_seconds = if self.grace_period_seconds == 0 {
             None
         } else {
@@ -112,13 +112,13 @@ async fn main() -> anyhow::Result<()> {
         Command::PrintCrd => {
             pretty_print_yaml(&SessionLivedBackend::crd())?;
         }
-        Command::PrintSlbe(spec) => {
-            pretty_print_yaml(&spec.as_slbe())?;
+        Command::PrintSlab(spec) => {
+            pretty_print_yaml(&spec.as_slab())?;
         }
-        Command::CreateSlbe(spec) => {
+        Command::CreateSlab(spec) => {
             let client = Client::try_default().await?;
             let api = Api::<SessionLivedBackend>::namespaced(client, &spec.namespace);
-            let slbe = spec.as_slbe();
+            let slab = spec.as_slab();
 
             let result = api
                 .create(
@@ -126,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
                         field_manager: Some(SPAWNER_GROUP.to_string()),
                         ..PostParams::default()
                     },
-                    &slbe,
+                    &slab,
                 )
                 .await?;
 

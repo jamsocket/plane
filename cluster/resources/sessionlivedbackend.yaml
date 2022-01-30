@@ -10,7 +10,7 @@ spec:
     kind: SessionLivedBackend
     plural: sessionlivedbackends
     shortNames:
-      - slbe
+      - slab
     singular: sessionlivedbackend
   scope: Namespaced
   versions:

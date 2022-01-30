@@ -115,7 +115,7 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
     Ok(Box::pin(stream))
 }
 
-pub async fn wait_to_kill_slbe(base_uri: &str, grace_period_seconds: u32) -> Result<(), Error> {
+pub async fn wait_to_kill_slab(base_uri: &str, grace_period_seconds: u32) -> Result<(), Error> {
     let base_uri = base_uri.to_string();
 
     let mut stream = state_stream(&base_uri).await?;
@@ -153,14 +153,14 @@ pub async fn wait_to_kill_slbe(base_uri: &str, grace_period_seconds: u32) -> Res
 }
 
 async fn reconcile(
-    slbe: SessionLivedBackend,
+    slab: SessionLivedBackend,
     ctx: Context<ControllerContext>,
 ) -> Result<ReconcilerAction, Error> {
-    let name = slbe.name();
+    let name = slab.name();
 
-    tracing::info!(?name, "Saw slbe.");
+    tracing::info!(?name, "Saw SessionLivedBackend.");
 
-    let status = if let Some(status) = slbe.status {
+    let status = if let Some(status) = slab.status {
         status
     } else {
         tracing::info!(%name, "Ignoring SessionLivedBackend because it has not yet been scheduled to a node.");
@@ -183,9 +183,9 @@ async fn reconcile(
         let client = ctx.get_ref().client.clone();
         let namespace = ctx.get_ref().namespace.clone();
 
-        match wait_to_kill_slbe(
+        match wait_to_kill_slab(
             &status.url,
-            slbe.spec.grace_period_seconds.unwrap_or_default(),
+            slab.spec.grace_period_seconds.unwrap_or_default(),
         )
         .await
         {
@@ -195,9 +195,9 @@ async fn reconcile(
             }
         }
 
-        let slbes = Api::<SessionLivedBackend>::namespaced(client, &namespace);
+        let slabs = Api::<SessionLivedBackend>::namespaced(client, &namespace);
 
-        match slbes.delete(&name, &DeleteParams::default()).await {
+        match slabs.delete(&name, &DeleteParams::default()).await {
             Result::Ok(_) => {
                 tracing::info!(%name, "SessionLivedBackend deleted.");
             }
@@ -237,9 +237,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..ListParams::default()
     };
 
-    let slbes =
+    let slabs =
         Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);
-    Controller::new(slbes, query)
+    Controller::new(slabs, query)
         .run(reconcile, error_policy, context)
         .for_each(|res| async move {
             match res {

@@ -76,7 +76,7 @@ fn owner_reference(meta: &ObjectMeta) -> Result<OwnerReference, Error> {
 }
 
 async fn reconcile(
-    slbe: SessionLivedBackend,
+    slab: SessionLivedBackend,
     ctx: Context<ControllerContext>,
 ) -> Result<ReconcilerAction, Error> {
     let ControllerContext {
@@ -85,29 +85,29 @@ async fn reconcile(
         sidecar,
     } = ctx.get_ref();
 
-    let name = slbe.name();
+    let name = slab.name();
 
-    if slbe.status.is_some() {
+    if slab.status.is_some() {
         tracing::info!(%name, "Ignoring SessionLivedBackend because it already has status metadata.");
         return Ok(ReconcilerAction {
             requeue_after: None,
         });
     }
 
-    let in_port = slbe.spec.http_port;
+    let in_port = slab.spec.http_port;
     let out_port = if sidecar.is_some() {
         SIDECAR_PORT
     } else {
-        slbe.spec.http_port
+        slab.spec.http_port
     };
 
     let pod_api = Api::<Pod>::namespaced(client.clone(), namespace);
     let service_api = Api::<Service>::namespaced(client.clone(), &namespace);
-    let slbe_api = Api::<SessionLivedBackend>::namespaced(client.clone(), namespace);
+    let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), namespace);
 
-    let owner_reference = owner_reference(&slbe.metadata)?;
+    let owner_reference = owner_reference(&slab.metadata)?;
 
-    let mut template = slbe.spec.template.clone();
+    let mut template = slab.spec.template.clone();
     if let Some(sidecar) = sidecar {
         template.containers.push(Container {
             name: SIDECAR.to_string(),
@@ -191,7 +191,7 @@ async fn reconcile(
         url,
     };
     tracing::info!(?status, "status");
-    slbe_api
+    slab_api
         .patch(
             &name,
             &PatchParams::apply(SPAWNER_GROUP).force(),
@@ -207,7 +207,7 @@ async fn reconcile(
         )
         .await
         .map_err(Error::KubernetesFailure)?;
-    slbe_api
+    slab_api
         .patch_status(
             &name,
             &PatchParams::apply(SPAWNER_GROUP).force(),
@@ -244,11 +244,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         namespace: opts.namespace,
         sidecar: opts.sidecar,
     });
-    let slbes =
+    let slabs =
         Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);
     let pods = Api::<Pod>::namespaced(client.clone(), &context.get_ref().namespace);
 
-    Controller::new(slbes, ListParams::default())
+    Controller::new(slabs, ListParams::default())
         .owns(pods, ListParams::default())
         .run(reconcile, error_policy, context)
         .for_each(|res| async move {
