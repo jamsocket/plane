@@ -19,7 +19,6 @@ use tokio::time::Duration;
 
 mod logging;
 
-
 const LABEL_RUN: &str = "run";
 const APPLICATION: &str = "spawner-app";
 const SIDECAR: &str = "spawner-sidecar";
@@ -32,7 +31,7 @@ struct Opts {
     namespace: String,
 
     #[clap(long)]
-    sidecar: Option<String>,
+    sidecar: String,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -47,7 +46,7 @@ pub enum Error {
 struct ControllerContext {
     client: Client,
     namespace: String,
-    sidecar: Option<String>,
+    sidecar: String,
 }
 
 fn run_label(name: &str) -> BTreeMap<String, String> {
@@ -95,30 +94,25 @@ async fn reconcile(
     }
 
     let in_port = slab.spec.http_port;
-    let out_port = if sidecar.is_some() {
-        SIDECAR_PORT
-    } else {
-        slab.spec.http_port
-    };
-
+    let out_port = SIDECAR_PORT;
     let pod_api = Api::<Pod>::namespaced(client.clone(), namespace);
     let service_api = Api::<Service>::namespaced(client.clone(), &namespace);
     let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), namespace);
 
     let owner_reference = owner_reference(&slab.metadata)?;
 
+    let mut args = vec![format!("--serve-port={}", out_port)];
+    if let Some(port) = in_port {
+        args.push(format!("--upstream-port={}", port))
+    };
+
     let mut template = slab.spec.template.clone();
-    if let Some(sidecar) = sidecar {
-        template.containers.push(Container {
-            name: SIDECAR.to_string(),
-            image: Some(sidecar.to_string()),
-            args: Some(vec![
-                format!("localhost:{}", in_port),
-                format!("{}", SIDECAR_PORT),
-            ]),
-            ..Container::default()
-        });
-    }
+    template.containers.push(Container {
+        name: SIDECAR.to_string(),
+        image: Some(sidecar.to_string()),
+        args: Some(args),
+        ..Container::default()
+    });
 
     let pod = pod_api
         .patch(

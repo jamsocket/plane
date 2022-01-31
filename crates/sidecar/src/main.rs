@@ -14,9 +14,10 @@ mod proxy;
 
 #[derive(Parser)]
 struct Opts {
+    #[clap(long)]
     upstream_port: Option<u16>,
 
-    #[clap(default_value = "9090")]
+    #[clap(long, default_value = "9090")]
     serve_port: u16,
 }
 

@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 pub const SPAWNER_GROUP: &str = "spawner.dev";
 pub const DEFAULT_PREFIX: &str = "spawner-";
 pub const APPLICATION: &str = "application";
-pub const DEFAULT_HTTP_PORT: u16 = 8080;
 pub const DEFAULT_GRACE_SECONDS: u32 = 30;
 
 #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
@@ -24,7 +23,7 @@ pub const DEFAULT_GRACE_SECONDS: u32 = 30;
 pub struct SessionLivedBackendSpec {
     pub template: PodSpec,
     pub grace_period_seconds: Option<u32>,
-    pub http_port: u16,
+    pub http_port: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
@@ -43,7 +42,7 @@ pub struct SessionLivedBackendBuilder {
     image_pull_policy: Option<ImagePullPolicy>,
     namespace: Option<String>,
     grace_period_seconds: Option<u32>,
-    http_port: u16,
+    http_port: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -90,11 +89,11 @@ impl SessionLivedBackendBuilder {
             image_pull_secret: None,
             namespace: None,
             grace_period_seconds: Some(DEFAULT_GRACE_SECONDS),
-            http_port: DEFAULT_HTTP_PORT,
+            http_port: None,
         }
     }
 
-    pub fn with_port(self, http_port: u16) -> Self {
+    pub fn with_port(self, http_port: Option<u16>) -> Self {
         SessionLivedBackendBuilder { http_port, ..self }
     }
 
