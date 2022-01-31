@@ -18,16 +18,18 @@ pub async fn wait_for_ready_port(port: Option<u16>) -> anyhow::Result<u16> {
         if let Some(port) = port {
             // Port is provided, only wait for a certain port.
             if listening_ports.contains(&port) {
-                return Ok(port)
+                return Ok(port);
             }
         } else {
             if listening_ports.len() == 0 {
                 continue;
             } else if listening_ports.len() == 1 {
                 let port = listening_ports.first().unwrap();
-                return Ok(*port)
+                return Ok(*port);
             } else {
-                return Err(anyhow!("Found listeners on multiple ports, not sure which to choose."));
+                return Err(anyhow!(
+                    "Found listeners on multiple ports, not sure which to choose."
+                ));
             }
         }
 
@@ -36,6 +38,21 @@ pub async fn wait_for_ready_port(port: Option<u16>) -> anyhow::Result<u16> {
 }
 
 pub async fn get_listen_ports() -> anyhow::Result<Vec<u16>> {
+    let mut result = Vec::new();
+    result.extend(
+        get_listen_ports_for_socket_id(SocketId::new_v4())
+            .await?
+            .into_iter(),
+    );
+    result.extend(
+        get_listen_ports_for_socket_id(SocketId::new_v6())
+            .await?
+            .into_iter(),
+    );
+    Ok(result)
+}
+
+pub async fn get_listen_ports_for_socket_id(socket_id: SocketId) -> anyhow::Result<Vec<u16>> {
     let mut socket = TokioSocket::new(NETLINK_SOCK_DIAG)
         .map_err(|e| anyhow!("Couldn't open netlink socket. {:?}", e))?;
 
@@ -49,7 +66,7 @@ pub async fn get_listen_ports() -> anyhow::Result<Vec<u16>> {
             protocol: IPPROTO_TCP.into(),
             extensions: ExtensionFlags::empty(),
             states: StateFlags::LISTEN,
-            socket_id: SocketId::new_v4(),
+            socket_id,
         })
         .into(),
     };
