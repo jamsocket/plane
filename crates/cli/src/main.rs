@@ -40,7 +40,7 @@ struct SlabSpec {
     image_pull_policy: Option<ImagePullPolicy>,
 
     /// The name of a Kubernetes secret (type kubernetes.io/dockerconfigjson) for loading the container image.
-    /// 
+    ///
     /// See: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
     #[clap(long)]
     image_pull_secret: Option<String>,
@@ -57,11 +57,11 @@ struct SlabSpec {
     #[clap(long, default_value=DEFAULT_NAMESPACE)]
     namespace: String,
 
-    #[clap(long, default_value="300")]
+    #[clap(long, default_value = "300")]
     grace_period_seconds: u32,
 
     #[clap(long)]
-    http_port: Option<u16>
+    http_port: Option<u16>,
 }
 
 impl SlabSpec {

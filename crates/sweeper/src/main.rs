@@ -137,7 +137,10 @@ pub async fn wait_to_kill_slab(base_uri: &str, grace_period_seconds: u32) -> Res
         let result = if let Some(result) = result {
             result
         } else {
-            tracing::info!(?base_uri, "Reached end of message stream; assuming pod is dead.");
+            tracing::info!(
+                ?base_uri,
+                "Reached end of message stream; assuming pod is dead."
+            );
             return Ok(());
         };
         tracing::info!(?result, ?base_uri, "Got status message.");

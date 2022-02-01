@@ -85,19 +85,25 @@ impl ProxyService {
                         self.monitor.open_connection();
                         let started = SystemTime::now();
 
-                        let (from_client, from_server) = tokio::io::copy_bidirectional(
+                        match tokio::io::copy_bidirectional(
                             &mut upgraded_response,
                             &mut upgraded_request,
                         )
                         .await
-                        .unwrap();
+                        {
+                            Ok((from_client, from_server)) => {
+                                let duration = SystemTime::now()
+                                    .duration_since(started)
+                                    .unwrap_or_default()
+                                    .as_secs();
 
-                        let duration = SystemTime::now()
-                            .duration_since(started)
-                            .unwrap_or_default()
-                            .as_secs();
+                                tracing::info!(%from_client, %from_server, ?duration, "Upgraded connection closed.");
+                            }
+                            Err(error) => {
+                                tracing::error!(?error, "IO error upgrading connection.");
+                            }
+                        }
 
-                        tracing::info!(%from_client, %from_server, ?duration, "Upgraded connection closed.");
                         self.monitor.close_connection();
                     }
                     Err(e) => tracing::error!(?e, "Error upgrading request."),

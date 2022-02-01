@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::anyhow;
 use netlink_packet_sock_diag::{
     constants::*,
@@ -9,6 +7,7 @@ use netlink_packet_sock_diag::{
 use netlink_sys::{
     protocols::NETLINK_SOCK_DIAG, AsyncSocket, AsyncSocketExt, SocketAddr, TokioSocket,
 };
+use std::time::Duration;
 
 pub async fn wait_for_ready_port(port: Option<u16>) -> anyhow::Result<u16> {
     loop {
@@ -21,15 +20,14 @@ pub async fn wait_for_ready_port(port: Option<u16>) -> anyhow::Result<u16> {
                 return Ok(port);
             }
         } else {
-            if listening_ports.len() == 0 {
-                continue;
-            } else if listening_ports.len() == 1 {
-                let port = listening_ports.first().unwrap();
-                return Ok(*port);
-            } else {
+            if listening_ports.len() > 1 {
                 return Err(anyhow!(
                     "Found listeners on multiple ports, not sure which to choose."
                 ));
+            } else if let Some(port) = listening_ports.first() {
+                return Ok(*port);
+            } else {
+                continue;
             }
         }
 
@@ -39,16 +37,10 @@ pub async fn wait_for_ready_port(port: Option<u16>) -> anyhow::Result<u16> {
 
 pub async fn get_listen_ports() -> anyhow::Result<Vec<u16>> {
     let mut result = Vec::new();
-    result.extend(
-        get_listen_ports_for_socket_id(false)
-            .await?
-            .into_iter(),
-    );
-    result.extend(
-        get_listen_ports_for_socket_id(true)
-            .await?
-            .into_iter(),
-    );
+    // Collect IPV4 ports.
+    result.extend(get_listen_ports_for_socket_id(false).await?.into_iter());
+    // Collect IPV6 ports.
+    result.extend(get_listen_ports_for_socket_id(true).await?.into_iter());
     Ok(result)
 }
 
@@ -56,11 +48,7 @@ pub async fn get_listen_ports_for_socket_id(ipv6: bool) -> anyhow::Result<Vec<u1
     let mut socket = TokioSocket::new(NETLINK_SOCK_DIAG)
         .map_err(|e| anyhow!("Couldn't open netlink socket. {:?}", e))?;
 
-    let family = if ipv6 {
-        AF_INET6
-    } else {
-        AF_INET
-    };
+    let family = if ipv6 { AF_INET6 } else { AF_INET };
 
     let mut packet = NetlinkMessage {
         header: NetlinkHeader {

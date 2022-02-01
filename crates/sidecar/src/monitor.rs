@@ -1,9 +1,8 @@
+use hyper::body::Bytes;
 use std::{
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
-
-use hyper::body::Bytes;
 use tokio::sync::broadcast::{channel, Sender};
 use tokio_stream::{
     wrappers::{errors::BroadcastStreamRecvError, BroadcastStream},
@@ -22,12 +21,14 @@ impl Into<Bytes> for MonitorState {
             format!(
                 "{{\"seconds_since_active\": {}, \"live_connections\": {}}}\n",
                 seconds_since_active, self.live_connections
-            ).into()
+            )
+            .into()
         } else {
             format!(
                 "{{\"seconds_since_active\": null, \"live_connections\": {}}}\n",
                 self.live_connections
-            ).into()
+            )
+            .into()
         }
     }
 }
