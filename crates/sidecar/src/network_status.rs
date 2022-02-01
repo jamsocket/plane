@@ -40,21 +40,27 @@ pub async fn wait_for_ready_port(port: Option<u16>) -> anyhow::Result<u16> {
 pub async fn get_listen_ports() -> anyhow::Result<Vec<u16>> {
     let mut result = Vec::new();
     result.extend(
-        get_listen_ports_for_socket_id(SocketId::new_v4())
+        get_listen_ports_for_socket_id(false)
             .await?
             .into_iter(),
     );
     result.extend(
-        get_listen_ports_for_socket_id(SocketId::new_v6())
+        get_listen_ports_for_socket_id(true)
             .await?
             .into_iter(),
     );
     Ok(result)
 }
 
-pub async fn get_listen_ports_for_socket_id(socket_id: SocketId) -> anyhow::Result<Vec<u16>> {
+pub async fn get_listen_ports_for_socket_id(ipv6: bool) -> anyhow::Result<Vec<u16>> {
     let mut socket = TokioSocket::new(NETLINK_SOCK_DIAG)
         .map_err(|e| anyhow!("Couldn't open netlink socket. {:?}", e))?;
+
+    let family = if ipv6 {
+        AF_INET6
+    } else {
+        AF_INET
+    };
 
     let mut packet = NetlinkMessage {
         header: NetlinkHeader {
@@ -62,11 +68,11 @@ pub async fn get_listen_ports_for_socket_id(socket_id: SocketId) -> anyhow::Resu
             ..Default::default()
         },
         payload: SockDiagMessage::InetRequest(InetRequest {
-            family: AF_INET,
+            family,
             protocol: IPPROTO_TCP.into(),
             extensions: ExtensionFlags::empty(),
             states: StateFlags::LISTEN,
-            socket_id,
+            socket_id: SocketId::new_v4(),
         })
         .into(),
     };
