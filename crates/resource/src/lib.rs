@@ -1,13 +1,19 @@
+pub use builder::SessionLivedBackendBuilder;
 use k8s_openapi::{
-    api::core::v1::{Container, Pod, PodSpec, Service, ServiceSpec, ServicePort},
-    apimachinery::pkg::apis::meta::v1::{OwnerReference, Time},
+    api::core::v1::{Container, Event, Pod, PodSpec, Service, ServicePort, ServiceSpec},
+    apimachinery::pkg::apis::meta::v1::{MicroTime, OwnerReference},
+    chrono::Utc,
 };
-use kube::{CustomResource, core::ObjectMeta, ResourceExt};
-use kube::Resource;
+use kube::{api::{PostParams, PatchParams, Patch}, Api, Client, Resource};
+use kube::{core::ObjectMeta, CustomResource, ResourceExt};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, str::FromStr};
-pub use builder::SessionLivedBackendBuilder;
+use serde_json::json;
+use std::{
+    collections::BTreeMap,
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
 mod builder;
 
@@ -34,20 +40,60 @@ pub struct SessionLivedBackendSpec {
     pub http_port: Option<u16>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, Copy)]
+pub enum SessionLivedBackendState {
+    /// The `SessionLivedBackend` object exists.
+    Submitted,
+
+    /// The pod and service backing a `SessionLivedBackend` exist.
+    Constructed,
+
+    /// The pod that backs a `SessionLivedBackend` has been assigned to a node.
+    Scheduled,
+
+    /// The pod that backs a `SessionLivedBackend` is running.
+    Running,
+
+    /// The pod that backs a `SessionLivedBackend` is accepting new connections.
+    Ready,
+}
+
+impl Default for SessionLivedBackendState {
+    fn default() -> Self {
+        SessionLivedBackendState::Submitted
+    }
+}
+
+impl Display for SessionLivedBackendState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self, f)
+    }
+}
+
+impl SessionLivedBackendState {
+    pub fn message(&self) -> String {
+        match self {
+            SessionLivedBackendState::Submitted => {
+                "SessionLivedBackend object created.".to_string()
+            }
+            SessionLivedBackendState::Constructed => {
+                "Backing resources created by Spawner.".to_string()
+            }
+            SessionLivedBackendState::Scheduled => {
+                "Backing pod was scheduled by Kubernetes.".to_string()
+            }
+            SessionLivedBackendState::Running => "Pod was observed running.".to_string(),
+            SessionLivedBackendState::Ready => {
+                "Pod was observed listening on TCP port.".to_string()
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionLivedBackendStatus {
-    /// When the backend was started. Set by Spawner.
-    pub started_time: Option<Time>,
-
-    /// When the backend was scheduled. Set by Spawner.
-    pub scheduled_time: Option<Time>,
-
-    /// When the backend started running the application container. Set by Sweeper.
-    pub initializing_time: Option<Time>,
-
-    /// When the backend started listening for connections. Set by Sweeper.
-    pub ready_time: Option<Time>,
+    pub state: SessionLivedBackendState,
 
     pub node_name: Option<String>,
     pub ip: Option<String>,
@@ -94,20 +140,33 @@ impl FromStr for ImagePullPolicy {
 pub enum Error {
     #[error("MissingObjectKey: {0}")]
     MissingObjectKey(&'static str),
+
+    #[error("Failure from Kubernetes: {0}")]
+    KubernetesFailure(#[source] kube::Error),
 }
 
 impl SessionLivedBackend {
     /// Return true if the SessionLivedBackend has been assigned to a node.
-    /// 
+    ///
     /// This is important to the lifecycle handoff between Spawner and Sweeper.
     /// Before a node is scheduled, Spawner manages its status; after a node is
     /// scheduled, Sweeper manages its status.
     pub fn is_scheduled(&self) -> bool {
+        match self.state() {
+            SessionLivedBackendState::Submitted => false,
+            SessionLivedBackendState::Constructed => false,
+            SessionLivedBackendState::Scheduled => true,
+            SessionLivedBackendState::Running => true,
+            SessionLivedBackendState::Ready => true,
+        }
+    }
+
+    pub fn state(&self) -> SessionLivedBackendState {
         if let Some(status) = &self.status {
-            status.scheduled_time.is_some()
+            status.state
         } else {
-            false
-        }        
+            SessionLivedBackendState::Submitted
+        }
     }
 
     fn metadata_reference(&self) -> Result<OwnerReference, Error> {
@@ -185,5 +244,64 @@ impl SessionLivedBackend {
             }),
             ..Service::default()
         })
+    }
+
+    async fn log_state_change(
+        &self,
+        events_api: &Api<Event>,
+        new_state: SessionLivedBackendState,
+    ) -> Result<(), Error> {
+        tracing::info!(name=%self.name(), %new_state, "SessionLivedBackend state change.");
+
+        events_api
+            .create(
+                &PostParams::default(),
+                &Event {
+                    involved_object: self.object_ref(&()),
+                    action: Some(new_state.to_string()),
+                    message: Some(new_state.message()),
+                    reason: Some(new_state.to_string()),
+                    type_: Some("Normal".to_string()),
+                    event_time: Some(MicroTime(Utc::now())),
+                    reporting_component: Some("spawner.dev/sessionlivedbackend".to_string()),
+                    reporting_instance: Some(self.name()),
+                    metadata: ObjectMeta {
+                        namespace: self.namespace(),
+                        generate_name: Some(format!("{}-", self.name())),
+                        ..Default::default()
+                    },
+
+                    ..Default::default()
+                },
+            )
+            .await
+            .map_err(Error::KubernetesFailure)?;
+
+        Ok(())
+    }
+
+    pub async fn update_status(
+        &self,
+        client: Client,
+        new_status: SessionLivedBackendStatus,
+    ) -> Result<(), Error> {
+        let namespace = self
+            .namespace()
+            .expect("SessionLivedBackend is a namespaced resource, but didn't have a namespace.");
+        let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), &namespace);
+        let event_api = Api::<Event>::namespaced(client.clone(), &namespace);
+
+        slab_api
+            .patch_status(
+                &self.name(),
+                &PatchParams::default(),
+                &Patch::Merge(json!({ "status": new_status })),
+            )
+            .await
+            .map_err(Error::KubernetesFailure)?;
+        
+        self.log_state_change(&event_api, new_status.state).await?;
+
+        Ok(())
     }
 }

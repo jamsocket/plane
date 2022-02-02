@@ -4058,11 +4058,6 @@ spec:
             status:
               nullable: true
               properties:
-                initializingTime:
-                  description: When the backend started running the application container. Set by Sweeper.
-                  format: date-time
-                  nullable: true
-                  type: string
                 ip:
                   nullable: true
                   type: string
@@ -4074,24 +4069,19 @@ spec:
                   minimum: 0.0
                   nullable: true
                   type: integer
-                readyTime:
-                  description: When the backend started listening for connections. Set by Sweeper.
-                  format: date-time
-                  nullable: true
-                  type: string
-                scheduledTime:
-                  description: When the backend was scheduled. Set by Spawner.
-                  format: date-time
-                  nullable: true
-                  type: string
-                startedTime:
-                  description: When the backend was started. Set by Spawner.
-                  format: date-time
-                  nullable: true
+                state:
+                  enum:
+                    - Submitted
+                    - Constructed
+                    - Scheduled
+                    - Running
+                    - Ready
                   type: string
                 url:
                   nullable: true
                   type: string
+              required:
+                - state
               type: object
           required:
             - spec

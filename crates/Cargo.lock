@@ -1930,7 +1930,6 @@ name = "spawner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "clap 3.0.13",
  "futures",
  "k8s-openapi",
@@ -1995,6 +1994,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

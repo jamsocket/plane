@@ -1,21 +1,17 @@
 use std::fmt::Debug;
 
-use chrono::Utc;
 use clap::Parser;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{Pod, Service};
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
+use kube::api::PostParams;
 use kube::ResourceExt;
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams},
+    api::{Api, ListParams},
     runtime::controller::{self, Context, Controller, ReconcilerAction},
-    Client, Resource,
+    Client,
 };
 use logging::init_logging;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use serde_json::json;
-use spawner_resource::{SessionLivedBackend, SPAWNER_GROUP};
+use spawner_resource::{SessionLivedBackend, SessionLivedBackendState, SessionLivedBackendStatus};
 use tokio::time::Duration;
 
 const SIDECAR_PORT: u16 = 9090;
@@ -38,12 +34,16 @@ pub enum Error {
 
     #[error("MissingObjectKey: {0}")]
     MissingObjectKey(&'static str),
+
+    #[error("Serialization error")]
+    SerializationError,
 }
 
 impl From<spawner_resource::Error> for Error {
     fn from(error: spawner_resource::Error) -> Self {
         match error {
             spawner_resource::Error::MissingObjectKey(k) => Error::MissingObjectKey(k),
+            spawner_resource::Error::KubernetesFailure(e) => Error::KubernetesFailure(e),
         }
     }
 }
@@ -62,35 +62,8 @@ fn get_node_name(pod: &Pod) -> Option<String> {
     pod.spec.as_ref()?.node_name.clone()
 }
 
-async fn patch<T: Resource + Clone + Serialize + DeserializeOwned + Debug, K: Serialize + Debug>(
-    api: &Api<T>,
-    name: &str,
-    patch: K,
-) -> Result<T, Error> {
-    api.patch(
-        name,
-        &PatchParams::apply(SPAWNER_GROUP).force(),
-        &Patch::Apply(patch),
-    )
-    .await
-    .map_err(Error::KubernetesFailure)
-}
-
-async fn patch_status<
-    T: Resource + Clone + Serialize + DeserializeOwned + Debug,
-    K: Serialize + Debug,
->(
-    api: &Api<T>,
-    name: &str,
-    patch: K,
-) -> Result<T, Error> {
-    api.patch_status(
-        name,
-        &PatchParams::apply(SPAWNER_GROUP).force(),
-        &Patch::Apply(patch),
-    )
-    .await
-    .map_err(Error::KubernetesFailure)
+fn get_pod_phase(pod: &Pod) -> Option<String> {
+    pod.status.as_ref()?.phase.clone()
 }
 
 async fn reconcile(
@@ -104,74 +77,78 @@ async fn reconcile(
     } = ctx.get_ref();
 
     let name = slab.name();
-
-    if slab.is_scheduled() {
-        tracing::info!(%name, "Ignoring SessionLivedBackend because it is already scheduled. Sweeper will take over lifecycle management.");
-        return Ok(ReconcilerAction {
-            requeue_after: None,
-        });
-    }
-
     let pod_api = Api::<Pod>::namespaced(client.clone(), namespace);
     let service_api = Api::<Service>::namespaced(client.clone(), &namespace);
-    let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), namespace);
 
-    let pod = patch(&pod_api, &name, slab.pod(sidecar)?).await?;
-    let service = patch(&service_api, &name, slab.service()?).await?;
+    match slab.state() {
+        SessionLivedBackendState::Submitted => {
+            // The session-lived backend object has been created, but we havne't acted on it yet.
+            // We will construct its backing resources.
 
-    let node_name = get_node_name(&pod);
-    let ip = get_cluster_ip(&service);
-    let url = format!("http://{}.{}:{}/", name, namespace, SIDECAR_PORT);
+            // Construct pod to back session-lived backend.
+            pod_api
+                .create(&PostParams::default(), &slab.pod(sidecar)?)
+                .await
+                .map_err(Error::KubernetesFailure)?;
 
-    if let Some(node_name) = node_name {
-        // The pod has been scheduled.
-        
-        patch_status(
-            &slab_api,
-            &name,
-            json!({
-                "apiVersion": SessionLivedBackend::api_version(&()).to_string(),
-                "kind": SessionLivedBackend::kind(&()).to_string(),
-                "status": {
-                    "nodeName": node_name,
-                    "ip": ip,
-                    "url": url,
-                    "port": SIDECAR_PORT,
-                    "scheduledTime": Time(Utc::now()),
-                },
-            }),
-        )
-        .await?;
+            // Construct service to back session-lived backend.
+            service_api
+                .create(&PostParams::default(), &slab.service()?)
+                .await
+                .map_err(Error::KubernetesFailure)?;
 
-        patch(
-            &slab_api,
-            &name,
-            json!({
-                "apiVersion": SessionLivedBackend::api_version(&()).to_string(),
-                "kind": SessionLivedBackend::kind(&()).to_string(),
-                "metadata": {
-                    "labels": {
-                        "spawner-group": node_name
-                    }
-                },
-            }),
-        )
-        .await?;
-    } else {
-        // The pod exists but has not been scheduled.
+            // Update the status of the session-lived backend.
+            let status = SessionLivedBackendStatus {
+                state: SessionLivedBackendState::Constructed,
+                ..Default::default()
+            };
 
-        patch_status(
-            &slab_api,
-            &name,
-            json!({
-                "apiVersion": SessionLivedBackend::api_version(&()).to_string(),
-                "kind": SessionLivedBackend::kind(&()).to_string(),
-                "status": {
-                    "startedTime": Time(Utc::now()),
-                },
-            }),
-        )
-        .await?;
+            slab.update_status(client.clone(), status).await?;
+        }
+
+        SessionLivedBackendState::Constructed => {
+            // The backing resources already exist. We will see if the pod has been scheduled.
+
+            let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
+            let service = service_api
+                .get(&name)
+                .await
+                .map_err(Error::KubernetesFailure)?;
+
+            if let Some(node_name) = get_node_name(&pod) {
+                let ip = get_cluster_ip(&service);
+                let url = format!("http://{}.{}:{}/", name, namespace, SIDECAR_PORT);
+
+                let status = SessionLivedBackendStatus {
+                    state: SessionLivedBackendState::Scheduled,
+                    node_name: Some(node_name),
+                    ip,
+                    url: Some(url),
+                    ..Default::default()
+                };
+                slab.update_status(client.clone(), status).await?;
+            }
+        }
+
+        SessionLivedBackendState::Scheduled => {
+            let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
+
+            if let Some(phase) = get_pod_phase(&pod) {
+                tracing::info!(?phase, "Saw pod in phase.");
+
+                if phase == "Running" {
+                    let status = SessionLivedBackendStatus {
+                        state: SessionLivedBackendState::Running,
+                        ..Default::default()
+                    };
+                    slab.update_status(client.clone(), status).await?;
+                }
+            }
+        }
+
+        // Once a SessionLivedBackend is in the `Running` state or later,
+        // it becomes the responsibility of the Sweeper rather than the Spawner.
+        _ => (),
     }
 
     Ok(ReconcilerAction {
