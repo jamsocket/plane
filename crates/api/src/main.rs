@@ -1,10 +1,22 @@
 use crate::logging::init_logging;
-use axum::{extract::Extension, http::StatusCode, routing::post, AddExtensionLayer, Json, Router};
+use axum::{
+    extract::{Extension, Path},
+    http::StatusCode,
+    response::{sse::Event as AxumSseEvent, Sse},
+    routing::{get, post},
+    AddExtensionLayer, BoxError, Json, Router,
+};
 use clap::Parser;
-use kube::{api::PostParams, Api, Client, ResourceExt};
+use futures::{Stream, StreamExt, TryStreamExt};
+use k8s_openapi::{api::core::v1::Event as KubeEventResource, serde_json::json};
+use kube::{
+    api::{ListParams, PostParams},
+    runtime::watcher::{watcher, Error as KubeWatcherError, Event as KubeWatcherEvent},
+    Api, Client, ResourceExt,
+};
 use serde::{Deserialize, Serialize};
 use spawner_resource::{SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP};
-use std::{net::SocketAddr, sync::Arc};
+use std::{future::ready, net::SocketAddr, sync::Arc};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
@@ -50,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/init", post(init_handler))
+        .route("/:backend_id/status", get(status_handler))
         .layer(AddExtensionLayer::new(Arc::new(settings)))
         .layer(trace_layer);
 
@@ -60,6 +73,69 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     Ok(())
+}
+
+fn get_event_stream(
+    client: Client,
+    resource_name: &str,
+    namespace: &str,
+) -> impl Stream<Item = Result<KubeWatcherEvent<KubeEventResource>, KubeWatcherError>> {
+    let api = Api::<KubeEventResource>::namespaced(client, &namespace);
+
+    let list_params = ListParams {
+        field_selector: Some(format!("involvedObject.name={}", resource_name)),
+        ..ListParams::default()
+    };
+
+    watcher(api, list_params)
+}
+
+fn convert_stream<T>(stream: T) -> impl Stream<Item = Result<AxumSseEvent, BoxError>>
+where
+    T: Stream<Item = Result<KubeWatcherEvent<KubeEventResource>, KubeWatcherError>>,
+{
+    stream.filter_map(|event| {
+        match event {
+            Ok(event) => match event {
+                KubeWatcherEvent::Applied(event) => {
+                    if let Some(state) = event.action {
+                        ready(Some(
+                            AxumSseEvent::default()
+                                .json_data(json! ({
+                                    "state": state,
+                                    "time": event.event_time,
+                                }))
+                                .map_err(|e| e.into()),
+                        ))
+                    } else {
+                        ready(None)
+                    }
+                },
+                _ => ready(None)
+            },
+            Err(err) => ready(Some(Err(err.into())))
+        }
+    })
+}
+
+async fn status_handler(
+    Path((backend_id,)): Path<(String,)>,
+    Extension(settings): Extension<Arc<Settings>>,
+) -> Result<Sse<impl Stream<Item = Result<AxumSseEvent, BoxError>>>, StatusCode> {
+    let client = Client::try_default().await.map_err(|error| {
+        tracing::error!(%error, "Error getting client");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let events = get_event_stream(
+        client,
+        &format!("{}{}", settings.service_prefix, backend_id),
+        &settings.namespace,
+    );
+
+    let sse_events: _ = convert_stream(events).into_stream();
+
+    Ok(Sse::new(sse_events))
 }
 
 #[derive(Deserialize)]
@@ -80,7 +156,6 @@ async fn init_handler(
     let slab =
         SessionLivedBackendBuilder::new(&payload.image).build_prefixed(&settings.service_prefix);
 
-    // TODO: use pool?
     let client = Client::try_default().await.map_err(|error| {
         tracing::error!(%error, "Error getting client");
         StatusCode::INTERNAL_SERVER_ERROR
