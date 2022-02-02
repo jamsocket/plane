@@ -51,6 +51,12 @@ struct ControllerContext {
 pub enum Error {
     #[error("Invalid URL field in SessionLivedBackend. {0}")]
     InvalidUrl(String),
+
+    #[error("Saw a SessionLivedBackend with no status.")]
+    ExpectedStatus,
+
+    #[error("Saw a SessionLivedBackend with a status but no URL.")]
+    ExpectedUrl,
 }
 
 type MonitorStateStream = Pin<Box<dyn Stream<Item = MonitorState> + Send>>;
@@ -160,17 +166,9 @@ async fn reconcile(
     ctx: Context<ControllerContext>,
 ) -> Result<ReconcilerAction, Error> {
     let name = slab.name();
-
     tracing::info!(?name, "Saw SessionLivedBackend.");
 
-    let status = if let Some(status) = slab.status {
-        status
-    } else {
-        tracing::info!(%name, "Ignoring SessionLivedBackend because it has not yet been scheduled to a node.");
-        return Ok(ReconcilerAction {
-            requeue_after: None,
-        });
-    };
+    let url = slab.status.ok_or(Error::ExpectedStatus)?.url.ok_or(Error::ExpectedUrl)?;
 
     let active_listeners = &ctx.get_ref().active_listeners;
     if active_listeners.read().await.contains(&name) {
@@ -187,7 +185,7 @@ async fn reconcile(
         let namespace = ctx.get_ref().namespace.clone();
 
         match wait_to_kill_slab(
-            &status.url,
+            &url,
             slab.spec.grace_period_seconds.unwrap_or_default(),
         )
         .await

@@ -1,14 +1,22 @@
-use std::{collections::HashMap, str::FromStr};
-
-use k8s_openapi::api::core::v1::{Container, EnvVar, LocalObjectReference, PodSpec};
-use kube::{core::ObjectMeta, CustomResource};
+use k8s_openapi::{
+    api::core::v1::{Container, Pod, PodSpec, Service, ServiceSpec, ServicePort},
+    apimachinery::pkg::apis::meta::v1::{OwnerReference, Time},
+};
+use kube::{CustomResource, core::ObjectMeta, ResourceExt};
+use kube::Resource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::{collections::BTreeMap, str::FromStr};
+pub use builder::SessionLivedBackendBuilder;
+
+mod builder;
 
 pub const SPAWNER_GROUP: &str = "spawner.dev";
-pub const DEFAULT_PREFIX: &str = "spawner-";
-pub const APPLICATION: &str = "application";
-pub const DEFAULT_GRACE_SECONDS: u32 = 30;
+const LABEL_RUN: &str = "run";
+const SIDECAR_PORT: u16 = 9090;
+const SIDECAR: &str = "spawner-sidecar";
+const APPLICATION: &str = "spawner-app";
+const TCP: &str = "TCP";
 
 #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[kube(
@@ -29,20 +37,22 @@ pub struct SessionLivedBackendSpec {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionLivedBackendStatus {
-    pub node_name: String,
-    pub ip: String,
-    pub port: u16,
-    pub url: String,
-}
+    /// When the backend was started. Set by Spawner.
+    pub started_time: Option<Time>,
 
-pub struct SessionLivedBackendBuilder {
-    image: String,
-    image_pull_secret: Option<String>,
-    env: HashMap<String, String>,
-    image_pull_policy: Option<ImagePullPolicy>,
-    namespace: Option<String>,
-    grace_period_seconds: Option<u32>,
-    http_port: Option<u16>,
+    /// When the backend was scheduled. Set by Spawner.
+    pub scheduled_time: Option<Time>,
+
+    /// When the backend started running the application container. Set by Sweeper.
+    pub initializing_time: Option<Time>,
+
+    /// When the backend started listening for connections. Set by Sweeper.
+    pub ready_time: Option<Time>,
+
+    pub node_name: Option<String>,
+    pub ip: Option<String>,
+    pub port: Option<u16>,
+    pub url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -80,104 +90,100 @@ impl FromStr for ImagePullPolicy {
     }
 }
 
-impl SessionLivedBackendBuilder {
-    pub fn new(image: &str) -> Self {
-        SessionLivedBackendBuilder {
-            image: image.to_string(),
-            env: HashMap::default(),
-            image_pull_policy: None,
-            image_pull_secret: None,
-            namespace: None,
-            grace_period_seconds: Some(DEFAULT_GRACE_SECONDS),
-            http_port: None,
-        }
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("MissingObjectKey: {0}")]
+    MissingObjectKey(&'static str),
+}
+
+impl SessionLivedBackend {
+    /// Return true if the SessionLivedBackend has been assigned to a node.
+    /// 
+    /// This is important to the lifecycle handoff between Spawner and Sweeper.
+    /// Before a node is scheduled, Spawner manages its status; after a node is
+    /// scheduled, Sweeper manages its status.
+    pub fn is_scheduled(&self) -> bool {
+        if let Some(status) = &self.status {
+            status.scheduled_time.is_some()
+        } else {
+            false
+        }        
     }
 
-    pub fn with_port(self, http_port: Option<u16>) -> Self {
-        SessionLivedBackendBuilder { http_port, ..self }
+    fn metadata_reference(&self) -> Result<OwnerReference, Error> {
+        let meta = &self.metadata;
+
+        Ok(OwnerReference {
+            api_version: SessionLivedBackend::api_version(&()).to_string(),
+            kind: SessionLivedBackend::kind(&()).to_string(),
+            controller: Some(true),
+            name: meta
+                .name
+                .as_ref()
+                .ok_or(Error::MissingObjectKey("metadata.name"))?
+                .to_string(),
+            uid: meta
+                .uid
+                .as_ref()
+                .ok_or(Error::MissingObjectKey("metadata.uid"))?
+                .to_string(),
+            ..OwnerReference::default()
+        })
     }
 
-    pub fn with_image_pull_policy(self, image_pull_policy: Option<ImagePullPolicy>) -> Self {
-        SessionLivedBackendBuilder {
-            image_pull_policy,
-            ..self
-        }
+    fn run_label(&self) -> BTreeMap<String, String> {
+        vec![(LABEL_RUN.to_string(), self.name())]
+            .into_iter()
+            .collect()
     }
 
-    pub fn with_namespace(self, namespace: Option<String>) -> Self {
-        SessionLivedBackendBuilder { namespace, ..self }
-    }
+    pub fn pod(&self, sidecar_image: &str) -> Result<Pod, Error> {
+        let name = self.name();
+        let mut args = vec![format!("--serve-port={}", SIDECAR_PORT)];
+        if let Some(port) = self.spec.http_port {
+            args.push(format!("--upstream-port={}", port))
+        };
 
-    pub fn with_grace_period(self, grace_period_seconds: Option<u32>) -> Self {
-        SessionLivedBackendBuilder {
-            grace_period_seconds,
-            ..self
-        }
-    }
+        let mut template = self.spec.template.clone();
+        template.containers.push(Container {
+            name: SIDECAR.to_string(),
+            image: Some(sidecar_image.to_string()),
+            args: Some(args),
+            ..Container::default()
+        });
 
-    pub fn with_image_pull_secret(self, image_pull_secret: Option<String>) -> Self {
-        SessionLivedBackendBuilder {
-            image_pull_secret,
-            ..self
-        }
-    }
-
-    pub fn build_spec(&self) -> SessionLivedBackendSpec {
-        let env: Vec<EnvVar> = self
-            .env
-            .iter()
-            .map(|(name, value)| EnvVar {
-                name: name.to_string(),
-                value: Some(value.to_string()),
-                ..EnvVar::default()
-            })
-            .collect();
-
-        SessionLivedBackendSpec {
-            http_port: self.http_port,
-            grace_period_seconds: self.grace_period_seconds,
-            template: PodSpec {
-                containers: vec![Container {
-                    image: Some(self.image.to_string()),
-                    image_pull_policy: self.image_pull_policy.as_ref().map(|d| d.to_string()),
-                    env: Some(env),
-                    name: APPLICATION.to_string(),
-                    ..Default::default()
-                }],
-                image_pull_secrets: self.image_pull_secret.as_ref().map(|d| {
-                    vec![LocalObjectReference {
-                        name: Some(d.to_string()),
-                    }]
-                }),
-                ..Default::default()
-            },
-        }
-    }
-
-    pub fn build_prefixed(&self, prefix: &str) -> SessionLivedBackend {
-        SessionLivedBackend {
+        Ok(Pod {
             metadata: ObjectMeta {
-                generate_name: Some(prefix.to_string()),
-                ..Default::default()
+                name: Some(name),
+                labels: Some(self.run_label()),
+                owner_references: Some(vec![self.metadata_reference()?]),
+                ..ObjectMeta::default()
             },
-            spec: self.build_spec(),
-            status: None,
-        }
+            spec: Some(template),
+            ..Pod::default()
+        })
     }
 
-    pub fn build_named(&self, name: &str) -> SessionLivedBackend {
-        SessionLivedBackend {
+    pub fn service(&self) -> Result<Service, Error> {
+        let name = self.name();
+
+        Ok(Service {
             metadata: ObjectMeta {
                 name: Some(name.to_string()),
-                namespace: self.namespace.clone(),
-                ..Default::default()
+                owner_references: Some(vec![self.metadata_reference()?]),
+                ..ObjectMeta::default()
             },
-            spec: self.build_spec(),
-            status: None,
-        }
-    }
-
-    pub fn build(&self) -> SessionLivedBackend {
-        self.build_prefixed(DEFAULT_PREFIX)
+            spec: Some(ServiceSpec {
+                selector: Some(self.run_label()),
+                ports: Some(vec![ServicePort {
+                    name: Some(APPLICATION.to_string()),
+                    protocol: Some(TCP.to_string()),
+                    port: SIDECAR_PORT as i32,
+                    ..ServicePort::default()
+                }]),
+                ..ServiceSpec::default()
+            }),
+            ..Service::default()
+        })
     }
 }

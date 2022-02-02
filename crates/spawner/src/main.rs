@@ -1,29 +1,26 @@
+use std::fmt::Debug;
+
+use chrono::Utc;
 use clap::Parser;
 use futures::StreamExt;
-use k8s_openapi::{
-    api::core::v1::{Container, Pod, Service, ServicePort, ServiceSpec},
-    apimachinery::pkg::apis::meta::v1::OwnerReference,
-};
+use k8s_openapi::api::core::v1::{Pod, Service};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use kube::ResourceExt;
 use kube::{
     api::{Api, ListParams, Patch, PatchParams},
-    core::ObjectMeta,
     runtime::controller::{self, Context, Controller, ReconcilerAction},
     Client, Resource,
 };
 use logging::init_logging;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use serde_json::json;
-use spawner_resource::{SessionLivedBackend, SessionLivedBackendStatus, SPAWNER_GROUP};
-use std::collections::BTreeMap;
+use spawner_resource::{SessionLivedBackend, SPAWNER_GROUP};
 use tokio::time::Duration;
 
-mod logging;
-
-const LABEL_RUN: &str = "run";
-const APPLICATION: &str = "spawner-app";
-const SIDECAR: &str = "spawner-sidecar";
-const TCP: &str = "TCP";
 const SIDECAR_PORT: u16 = 9090;
+
+mod logging;
 
 #[derive(Parser, Debug)]
 struct Opts {
@@ -43,35 +40,57 @@ pub enum Error {
     MissingObjectKey(&'static str),
 }
 
+impl From<spawner_resource::Error> for Error {
+    fn from(error: spawner_resource::Error) -> Self {
+        match error {
+            spawner_resource::Error::MissingObjectKey(k) => Error::MissingObjectKey(k),
+        }
+    }
+}
+
 struct ControllerContext {
     client: Client,
     namespace: String,
     sidecar: String,
 }
 
-fn run_label(name: &str) -> BTreeMap<String, String> {
-    vec![(LABEL_RUN.to_string(), name.to_string())]
-        .into_iter()
-        .collect()
+fn get_cluster_ip(service: &Service) -> Option<String> {
+    service.spec.as_ref()?.cluster_ip.clone()
 }
 
-fn owner_reference(meta: &ObjectMeta) -> Result<OwnerReference, Error> {
-    Ok(OwnerReference {
-        api_version: SessionLivedBackend::api_version(&()).to_string(),
-        kind: SessionLivedBackend::kind(&()).to_string(),
-        controller: Some(true),
-        name: meta
-            .name
-            .as_ref()
-            .ok_or(Error::MissingObjectKey("metadata.name"))?
-            .to_string(),
-        uid: meta
-            .uid
-            .as_ref()
-            .ok_or(Error::MissingObjectKey("metadata.uid"))?
-            .to_string(),
-        ..OwnerReference::default()
-    })
+fn get_node_name(pod: &Pod) -> Option<String> {
+    pod.spec.as_ref()?.node_name.clone()
+}
+
+async fn patch<T: Resource + Clone + Serialize + DeserializeOwned + Debug, K: Serialize + Debug>(
+    api: &Api<T>,
+    name: &str,
+    patch: K,
+) -> Result<T, Error> {
+    api.patch(
+        name,
+        &PatchParams::apply(SPAWNER_GROUP).force(),
+        &Patch::Apply(patch),
+    )
+    .await
+    .map_err(Error::KubernetesFailure)
+}
+
+async fn patch_status<
+    T: Resource + Clone + Serialize + DeserializeOwned + Debug,
+    K: Serialize + Debug,
+>(
+    api: &Api<T>,
+    name: &str,
+    patch: K,
+) -> Result<T, Error> {
+    api.patch_status(
+        name,
+        &PatchParams::apply(SPAWNER_GROUP).force(),
+        &Patch::Apply(patch),
+    )
+    .await
+    .map_err(Error::KubernetesFailure)
 }
 
 async fn reconcile(
@@ -86,110 +105,48 @@ async fn reconcile(
 
     let name = slab.name();
 
-    if slab.status.is_some() {
-        tracing::info!(%name, "Ignoring SessionLivedBackend because it already has status metadata.");
+    if slab.is_scheduled() {
+        tracing::info!(%name, "Ignoring SessionLivedBackend because it is already scheduled. Sweeper will take over lifecycle management.");
         return Ok(ReconcilerAction {
             requeue_after: None,
         });
     }
 
-    let in_port = slab.spec.http_port;
-    let out_port = SIDECAR_PORT;
     let pod_api = Api::<Pod>::namespaced(client.clone(), namespace);
     let service_api = Api::<Service>::namespaced(client.clone(), &namespace);
     let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), namespace);
 
-    let owner_reference = owner_reference(&slab.metadata)?;
+    let pod = patch(&pod_api, &name, slab.pod(sidecar)?).await?;
+    let service = patch(&service_api, &name, slab.service()?).await?;
 
-    let mut args = vec![format!("--serve-port={}", out_port)];
-    if let Some(port) = in_port {
-        args.push(format!("--upstream-port={}", port))
-    };
+    let node_name = get_node_name(&pod);
+    let ip = get_cluster_ip(&service);
+    let url = format!("http://{}.{}:{}/", name, namespace, SIDECAR_PORT);
 
-    let mut template = slab.spec.template.clone();
-    template.containers.push(Container {
-        name: SIDECAR.to_string(),
-        image: Some(sidecar.to_string()),
-        args: Some(args),
-        ..Container::default()
-    });
-
-    let pod = pod_api
-        .patch(
+    if let Some(node_name) = node_name {
+        // The pod has been scheduled.
+        
+        patch_status(
+            &slab_api,
             &name,
-            &PatchParams::apply(SPAWNER_GROUP).force(),
-            &Patch::Apply(&Pod {
-                metadata: ObjectMeta {
-                    name: Some(name.to_string()),
-                    labels: Some(run_label(&name)),
-                    owner_references: Some(vec![owner_reference.clone()]),
-                    ..ObjectMeta::default()
+            json!({
+                "apiVersion": SessionLivedBackend::api_version(&()).to_string(),
+                "kind": SessionLivedBackend::kind(&()).to_string(),
+                "status": {
+                    "node_name": node_name,
+                    "ip": ip,
+                    "url": url,
+                    "port": SIDECAR_PORT,
+                    "scheduled_time": Time(Utc::now()),
                 },
-                spec: Some(template),
-                ..Pod::default()
             }),
         )
-        .await
-        .map_err(Error::KubernetesFailure)?;
+        .await?;
 
-    let service = service_api
-        .patch(
+        patch(
+            &slab_api,
             &name,
-            &PatchParams::apply(SPAWNER_GROUP).force(),
-            &Patch::Apply(&Service {
-                metadata: ObjectMeta {
-                    name: Some(name.to_string()),
-                    owner_references: Some(vec![owner_reference]),
-                    ..ObjectMeta::default()
-                },
-                spec: Some(ServiceSpec {
-                    selector: Some(run_label(&name)),
-                    ports: Some(vec![ServicePort {
-                        name: Some(APPLICATION.to_string()),
-                        protocol: Some(TCP.to_string()),
-                        port: out_port as i32,
-                        ..ServicePort::default()
-                    }]),
-                    ..ServiceSpec::default()
-                }),
-                ..Service::default()
-            }),
-        )
-        .await
-        .map_err(Error::KubernetesFailure)?;
-
-    let node_name = if let Some(node_name) = pod
-        .spec
-        .ok_or(Error::MissingObjectKey("spec (Pod)"))?
-        .node_name
-    {
-        node_name
-    } else {
-        tracing::info!(%name, "Pod exists but not yet assigned to a node.");
-        return Ok(ReconcilerAction {
-            requeue_after: None,
-        });
-    };
-
-    let ip = service
-        .spec
-        .ok_or(Error::MissingObjectKey("spec (Service)"))?
-        .cluster_ip
-        .ok_or(Error::MissingObjectKey("spec.clusterIP (Service)"))?;
-
-    let url = format!("http://{}.{}:{}/", name, namespace, out_port);
-    let status = SessionLivedBackendStatus {
-        ip,
-        node_name: node_name.clone(),
-        port: out_port,
-        url,
-    };
-    tracing::info!(?status, "status");
-    slab_api
-        .patch(
-            &name,
-            &PatchParams::apply(SPAWNER_GROUP).force(),
-            &Patch::Apply(&json!({
+            json!({
                 "apiVersion": SessionLivedBackend::api_version(&()).to_string(),
                 "kind": SessionLivedBackend::kind(&()).to_string(),
                 "metadata": {
@@ -197,22 +154,25 @@ async fn reconcile(
                         "spawner-group": node_name
                     }
                 },
-            })),
+            }),
         )
-        .await
-        .map_err(Error::KubernetesFailure)?;
-    slab_api
-        .patch_status(
+        .await?;
+    } else {
+        // The pod exists but has not been scheduled.
+
+        patch_status(
+            &slab_api,
             &name,
-            &PatchParams::apply(SPAWNER_GROUP).force(),
-            &Patch::Apply(&json!({
+            json!({
                 "apiVersion": SessionLivedBackend::api_version(&()).to_string(),
                 "kind": SessionLivedBackend::kind(&()).to_string(),
-                "status": status,
-            })),
+                "status": {
+                    "started_time": Time(Utc::now()),
+                },
+            }),
         )
-        .await
-        .map_err(Error::KubernetesFailure)?;
+        .await?;
+    }
 
     Ok(ReconcilerAction {
         requeue_after: None,
