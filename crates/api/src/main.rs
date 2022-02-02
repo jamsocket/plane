@@ -1,4 +1,4 @@
-use crate::logging::init_logging;
+use crate::{event_stream::event_stream, logging::init_logging};
 use axum::{
     extract::{Extension, Path},
     http::StatusCode,
@@ -10,21 +10,20 @@ use clap::Parser;
 use futures::{Stream, StreamExt, TryStreamExt};
 use k8s_openapi::{api::core::v1::Event as KubeEventResource, serde_json::json};
 use kube::{
-    api::{ListParams, PostParams},
-    runtime::watcher::{watcher, Error as KubeWatcherError, Event as KubeWatcherEvent},
-    Api, Client, ResourceExt,
+    api::PostParams, runtime::watcher::Error as KubeWatcherError, Api, Client, ResourceExt,
 };
 use serde::{Deserialize, Serialize};
 use spawner_resource::{SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP};
-use std::{future::ready, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
+mod event_stream;
 mod logging;
 
 #[derive(Parser)]
 struct Opts {
-    #[clap(long, default_value="spawner")]
+    #[clap(long, default_value = "spawner")]
     namespace: String,
 
     #[clap(long, default_value = "8080")]
@@ -60,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/init", post(init_handler))
-        .route("/:backend_id/status", get(status_handler))
+        .route("/backend/:backend_id/status", get(status_handler))
         .layer(AddExtensionLayer::new(Arc::new(settings)))
         .layer(trace_layer);
 
@@ -73,44 +72,19 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_event_stream(
-    client: Client,
-    resource_name: &str,
-    namespace: &str,
-) -> impl Stream<Item = Result<KubeWatcherEvent<KubeEventResource>, KubeWatcherError>> {
-    let api = Api::<KubeEventResource>::namespaced(client, &namespace);
-
-    let list_params = ListParams {
-        field_selector: Some(format!("involvedObject.name={}", resource_name)),
-        ..ListParams::default()
-    };
-
-    watcher(api, list_params)
-}
-
 fn convert_stream<T>(stream: T) -> impl Stream<Item = Result<AxumSseEvent, BoxError>>
 where
-    T: Stream<Item = Result<KubeWatcherEvent<KubeEventResource>, KubeWatcherError>>,
+    T: Stream<Item = Result<KubeEventResource, KubeWatcherError>>,
 {
-    stream.filter_map(|event| match event {
-        Ok(event) => match event {
-            KubeWatcherEvent::Applied(event) => {
-                if let Some(state) = event.action {
-                    ready(Some(
-                        AxumSseEvent::default()
-                            .json_data(json! ({
-                                "state": state,
-                                "time": event.event_time,
-                            }))
-                            .map_err(|e| e.into()),
-                    ))
-                } else {
-                    ready(None)
-                }
-            }
-            _ => ready(None),
-        },
-        Err(err) => ready(Some(Err(err.into()))),
+    stream.map(|event| {
+        let event: KubeEventResource = event.map_err(Box::new)?;
+
+        Ok(AxumSseEvent::default()
+            .json_data(json! ({
+                "state": event.action,
+                "time": event.event_time,
+            }))
+            .map_err(Box::new)?)
     })
 }
 
@@ -124,18 +98,9 @@ async fn status_handler(
     })?;
 
     let name = format!("{}{}", settings.service_prefix, backend_id);
-    let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), &settings.namespace);
-    let slab = slab_api
-        .get(&name)
+    let events = event_stream(client, &name, &settings.namespace)
         .await
-        .map_err(|_| {
-            tracing::warn!(%name, "Not found");
-            StatusCode::NOT_FOUND
-        })?;
-
-    tracing::info!(status=%slab.state(), "Tracking status for SessionLivedBackend.");
-
-    let events = get_event_stream(client, &name, &settings.namespace);
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let sse_events: _ = convert_stream(events).into_stream();
 
     Ok(Sse::new(sse_events))

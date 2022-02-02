@@ -1959,6 +1959,7 @@ dependencies = [
  "spawner-resource",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "tower-http",
  "tracing",
  "tracing-subscriber",

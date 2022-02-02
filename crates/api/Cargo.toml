@@ -16,6 +16,7 @@ serde_yaml = "0.8.23"
 spawner-resource = {path = "../resource"}
 thiserror = "1.0.30"
 tokio = { version = "1.16.1", features = ["macros", "rt-multi-thread"] }
+tokio-stream = "0.1.8"
 tower-http = "0.2.1"
 tracing = "0.1.29"
 tracing-subscriber = { version = "0.3.7", features = ["env-filter", "json"] }
