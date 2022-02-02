@@ -133,11 +133,11 @@ async fn reconcile(
                 "apiVersion": SessionLivedBackend::api_version(&()).to_string(),
                 "kind": SessionLivedBackend::kind(&()).to_string(),
                 "status": {
-                    "node_name": node_name,
+                    "nodeName": node_name,
                     "ip": ip,
                     "url": url,
                     "port": SIDECAR_PORT,
-                    "scheduled_time": Time(Utc::now()),
+                    "scheduledTime": Time(Utc::now()),
                 },
             }),
         )
@@ -167,7 +167,7 @@ async fn reconcile(
                 "apiVersion": SessionLivedBackend::api_version(&()).to_string(),
                 "kind": SessionLivedBackend::kind(&()).to_string(),
                 "status": {
-                    "started_time": Time(Utc::now()),
+                    "startedTime": Time(Utc::now()),
                 },
             }),
         )
