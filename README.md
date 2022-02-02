@@ -26,7 +26,7 @@ is non-trivial and needs more than just a relay server (see e.g.
 process per active document.)
 
 By making it low-stakes to experiment with this architecture, our hope is
-that Spawner will help developers discover new use-cases, like loading a large dataset into memory
+that Spawner will help developers find new use-cases, like loading a large dataset into memory
 to allow low-latency interactive data exploration.
 
 Depending on your needs, it may also make sense as a back-end for games and virtual spaces, but also
