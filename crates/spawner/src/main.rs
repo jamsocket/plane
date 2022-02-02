@@ -20,10 +20,10 @@ mod logging;
 
 #[derive(Parser, Debug)]
 struct Opts {
-    #[clap(long, default_value = "default")]
+    #[clap(long, default_value = "spawner")]
     namespace: String,
 
-    #[clap(long)]
+    #[clap(long, default_value = "ghcr.io/drifting-in-space/spawner-sidecar:latest")]
     sidecar: String,
 }
 
