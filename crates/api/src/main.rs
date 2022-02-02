@@ -20,13 +20,11 @@ use std::{future::ready, net::SocketAddr, sync::Arc};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
-const DEFAULT_NAMESPACE: &str = "default";
-
 mod logging;
 
 #[derive(Parser)]
 struct Opts {
-    #[clap(long, default_value=DEFAULT_NAMESPACE)]
+    #[clap(long, default_value="spawner")]
     namespace: String,
 
     #[clap(long, default_value = "8080")]
@@ -94,27 +92,25 @@ fn convert_stream<T>(stream: T) -> impl Stream<Item = Result<AxumSseEvent, BoxEr
 where
     T: Stream<Item = Result<KubeWatcherEvent<KubeEventResource>, KubeWatcherError>>,
 {
-    stream.filter_map(|event| {
-        match event {
-            Ok(event) => match event {
-                KubeWatcherEvent::Applied(event) => {
-                    if let Some(state) = event.action {
-                        ready(Some(
-                            AxumSseEvent::default()
-                                .json_data(json! ({
-                                    "state": state,
-                                    "time": event.event_time,
-                                }))
-                                .map_err(|e| e.into()),
-                        ))
-                    } else {
-                        ready(None)
-                    }
-                },
-                _ => ready(None)
-            },
-            Err(err) => ready(Some(Err(err.into())))
-        }
+    stream.filter_map(|event| match event {
+        Ok(event) => match event {
+            KubeWatcherEvent::Applied(event) => {
+                if let Some(state) = event.action {
+                    ready(Some(
+                        AxumSseEvent::default()
+                            .json_data(json! ({
+                                "state": state,
+                                "time": event.event_time,
+                            }))
+                            .map_err(|e| e.into()),
+                    ))
+                } else {
+                    ready(None)
+                }
+            }
+            _ => ready(None),
+        },
+        Err(err) => ready(Some(Err(err.into()))),
     })
 }
 
@@ -127,12 +123,19 @@ async fn status_handler(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let events = get_event_stream(
-        client,
-        &format!("{}{}", settings.service_prefix, backend_id),
-        &settings.namespace,
-    );
+    let name = format!("{}{}", settings.service_prefix, backend_id);
+    let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), &settings.namespace);
+    let slab = slab_api
+        .get(&name)
+        .await
+        .map_err(|_| {
+            tracing::warn!(%name, "Not found");
+            StatusCode::NOT_FOUND
+        })?;
 
+    tracing::info!(status=%slab.state(), "Tracking status for SessionLivedBackend.");
+
+    let events = get_event_stream(client, &name, &settings.namespace);
     let sse_events: _ = convert_stream(events).into_stream();
 
     Ok(Sse::new(sse_events))
