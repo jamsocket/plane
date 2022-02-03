@@ -1,0 +1,28 @@
+apiVersion: skaffold/v2beta26
+kind: Config
+metadata:
+  name: spawner
+build:
+  local:
+    push: false
+  artifacts:
+  - image: ghcr.io/drifting-in-space/spawner
+    context: crates
+    docker:
+      dockerfile: containers/spawner.Dockerfile
+  - image: ghcr.io/drifting-in-space/spawner-api
+    context: crates
+    docker:
+      dockerfile: containers/api.Dockerfile
+  - image: ghcr.io/drifting-in-space/spawner-sweeper
+    context: crates
+    docker:
+      dockerfile: containers/sweeper.Dockerfile
+  - image: ghcr.io/drifting-in-space/sweeper-sidecar
+    context: crates
+    docker:
+      dockerfile: containers/sidecar.Dockerfile
+deploy:
+  kustomize:
+    paths:
+    - cluster
