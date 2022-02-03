@@ -52,5 +52,5 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=ghcr.io/drifting-in-space/spawner-sidecar:latest
-          cache-to: type=inline
+          cache-from: type=registry,ref=ghcr.io/drifting-in-space/spawner-buildcache:latest
+          cache-to: type=registry,ref=ghcr.io/drifting-in-space/spawner-buildcache:latest
