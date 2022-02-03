@@ -8,7 +8,7 @@ on:
       - '.github/workflows/docker-publish-sidecar.yml'
       - 'crates/sidecar/**'
       - 'crates/resource/**'
-      - 'containers/sidecar.Dockerfile'
+      - 'crates/containers/sidecar.Dockerfile'
   pull_request:
     branches: [ master ]
 

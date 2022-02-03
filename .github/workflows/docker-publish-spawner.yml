@@ -8,7 +8,7 @@ on:
       - '.github/workflows/docker-publish-spawner.yml'
       - 'crates/spawner/**'
       - 'crates/resource/**'
-      - 'containers/spawner.Dockerfile'
+      - 'crates/containers/spawner.Dockerfile'
   pull_request:
     branches: [ master ]
 

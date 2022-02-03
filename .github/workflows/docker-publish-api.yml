@@ -8,7 +8,7 @@ on:
       - '.github/workflows/docker-publish-api.yml'
       - 'crates/api/**'
       - 'crates/resource/**'
-      - 'containers/api.Dockerfile'
+      - 'crates/containers/api.Dockerfile'
   pull_request:
     branches: [ master ]
 
