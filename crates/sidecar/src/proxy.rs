@@ -19,6 +19,7 @@ fn rewrite_uri(uri: &Uri, upstream: &Authority) -> Result<Uri, InvalidUriParts> 
     Uri::from_parts(parts)
 }
 
+
 #[derive(Clone)]
 pub struct ProxyService {
     pub client: Arc<Client<HttpConnector, Body>>,
