@@ -1,5 +1,5 @@
 resources:
-- resources/spawner.yaml
+#- resources/spawner.yaml
 - resources/nginx.yaml
 - resources/sweeper.yaml
 - resources/sessionlivedbackend.yaml
@@ -9,4 +9,5 @@ configMapGenerator:
   files:
   - config/nginx/default.conf
   - config/nginx/index.html
+  - config/nginx/awaiting.html
   - config/nginx/spawner.png

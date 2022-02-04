@@ -86,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/init", post(init_handler))
         .route("/backend/:backend_id/status", get(status_handler))
-        .route("/ready/:backend_id", get(ready_handler))
+        .route("/backend/:backend_id/ready", get(ready_handler))
         .layer(AddExtensionLayer::new(Arc::new(settings)))
         .layer(trace_layer);
 

@@ -24,11 +24,7 @@ spec:
             mountPath: /etc/nginx/conf.d/default.conf
             subPath: default.conf
           - name: nginx-config
-            mountPath: /usr/share/nginx/html/index.html
-            subPath: index.html
-          - name: nginx-config
-            mountPath: /usr/share/nginx/html/spawner.png
-            subPath: spawner.png
+            mountPath: /usr/share/nginx/html/
       volumes:
         - name: nginx-config
           configMap:

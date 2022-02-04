@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Spawner: Pod is Starting</title>
+
+        <script>
+            let statusUrl = document.location.pathname.replace(/ready$/, "status");
+
+            let eventSource = new EventSource(statusUrl);
+            eventSource.onmessage = (msg) => {
+                let data = JSON.parse(msg.data);
+                if (data.state == "Running") {
+                    location.reload();
+                }
+                console.log("Message", data);
+            }
+        </script>
+    </head>
+
+    <body>
+        <p>Waiting for backend to spawn. You should be redirected when it does.</p>
+    </body>
+</html>
