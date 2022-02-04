@@ -1,10 +1,16 @@
 pub use builder::SessionLivedBackendBuilder;
 use k8s_openapi::{
-    api::core::v1::{Container, Event, Pod, PodSpec, Service, ServicePort, ServiceSpec},
+    api::core::v1::{
+        Container, Event, LocalObjectReference, Pod, PodSpec, Service, ServicePort, ServiceSpec,
+        Volume,
+    },
     apimachinery::pkg::apis::meta::v1::{MicroTime, OwnerReference},
     chrono::Utc,
 };
-use kube::{api::{PostParams, PatchParams, Patch}, Api, Client, Resource};
+use kube::{
+    api::{Patch, PatchParams, PostParams},
+    Api, Client, Resource,
+};
 use kube::{core::ObjectMeta, CustomResource, ResourceExt};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -35,9 +41,28 @@ const TCP: &str = "TCP";
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SessionLivedBackendSpec {
-    pub template: PodSpec,
+    pub template: BackendPodSpec,
     pub grace_period_seconds: Option<u32>,
     pub http_port: Option<u16>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct BackendPodSpec {
+    containers: Vec<Container>,
+    image_pull_secrets: Option<Vec<LocalObjectReference>>,
+    volumes: Option<Vec<Volume>>,
+}
+
+impl Into<PodSpec> for BackendPodSpec {
+    fn into(self) -> PodSpec {
+        PodSpec {
+            containers: self.containers,
+            image_pull_secrets: self.image_pull_secrets,
+            volumes: self.volumes,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, Copy)]
@@ -203,7 +228,7 @@ impl SessionLivedBackend {
             args.push(format!("--upstream-port={}", port))
         };
 
-        let mut template = self.spec.template.clone();
+        let mut template: PodSpec = self.spec.template.clone().into();
         template.containers.push(Container {
             name: SIDECAR.to_string(),
             image: Some(sidecar_image.to_string()),
@@ -299,7 +324,7 @@ impl SessionLivedBackend {
             )
             .await
             .map_err(Error::KubernetesFailure)?;
-        
+
         self.log_state_change(&event_api, new_status.state).await?;
 
         Ok(())

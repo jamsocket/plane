@@ -17,7 +17,7 @@ spec:
       serviceAccountName: spawner
       containers:
       - name: spawner-api
-        image: ghcr.io/drifting-in-space/spawner-api:sha-45e1007
+        image: ghcr.io/drifting-in-space/spawner-api:latest
         args: [
           "--namespace", "spawner",
         ]

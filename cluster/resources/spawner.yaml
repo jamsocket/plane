@@ -14,8 +14,8 @@ metadata:
   name: spawner
 rules:
 - apiGroups: [""]
-  resources: ["pods", "services"]
-  verbs: ["list", "create", "delete", "watch", "patch"]
+  resources: ["pods", "services", "events"]
+  verbs: ["list", "get", "create", "delete", "watch", "patch"]
 - apiGroups: ["spawner.dev"]
   resources: ["sessionlivedbackends"]
   verbs: ["list", "create", "delete", "watch", "patch"]
@@ -57,8 +57,8 @@ spec:
       serviceAccountName: spawner
       containers:
       - name: spawner
-        image: ghcr.io/drifting-in-space/spawner:sha-03be7fb
+        image: ghcr.io/drifting-in-space/spawner:latest
         args: [
           "--namespace", "spawner",
-          "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:sha-03be7fb",
+          "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:latest",
         ]

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-k8s-openapi = { version = "0.14.0", features = ["schemars"] }
+k8s-openapi = { version = "0.14.0", features = ["schemars", "v1_23"] }
 kube = { version = "0.67.0", features = ["derive"] }
 schemars = "0.8.8"
 serde = { version = "1.0.133", features = ["derive"] }
@@ -12,6 +12,3 @@ serde_json = "1.0.75"
 serde_yaml = "0.8.23"
 thiserror = "1.0.30"
 tracing = "0.1.29"
-
-[dev-dependencies]
-k8s-openapi = { version = "0.14.0", features = ["v1_23"] }
