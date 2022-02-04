@@ -1,8 +1,6 @@
 # Spawner
 
-[![Spawner Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-spawner.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-spawner.yml)
-[![Sidecar Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml)
-[![Sweeper Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml)
+[![Build](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish.yml)
 
 **Spawner** allows web applications to create **session-lived backends**, which are server processes
 dedicated to individual (or small groups of) users.
