@@ -200,7 +200,7 @@ jobs:
           build-args: "BASE=${{ needs.build-base.outputs.tag }}"
 
 
-  build-api:
+  build-sweeper:
     runs-on: ubuntu-latest
     needs: build-base
 
