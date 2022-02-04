@@ -1,5 +1,5 @@
 resources:
-#- resources/spawner.yaml
+- resources/spawner.yaml
 - resources/nginx.yaml
 - resources/sweeper.yaml
 - resources/sessionlivedbackend.yaml
