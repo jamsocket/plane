@@ -57,6 +57,7 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/drifting-in-space/spawner-base:latest,mode=max
   
   build-api:
+    runs-on: ubuntu-latest
     needs: build-base
 
     permissions:
@@ -94,5 +95,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=drifting-in-space/spawner-api:latest
           cache-to: type=inline
-          build-args:
-          - "BASE=${{ needs.build-base.outputs.tag }}"
+          build-args: "BASE=${{ needs.build-base.outputs.tag }}"
