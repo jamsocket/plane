@@ -14,6 +14,7 @@ use serde::Deserialize;
 use spawner_resource::SessionLivedBackend;
 use std::collections::HashSet;
 use std::pin::Pin;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 
@@ -162,13 +163,20 @@ pub async fn wait_to_kill_slab(base_uri: &str, grace_period_seconds: u32) -> Res
 }
 
 async fn reconcile(
-    slab: SessionLivedBackend,
+    slab: Arc<SessionLivedBackend>,
     ctx: Context<ControllerContext>,
 ) -> Result<ReconcilerAction, Error> {
     let name = slab.name();
     tracing::info!(?name, "Saw SessionLivedBackend.");
 
-    let url = slab.status.ok_or(Error::ExpectedStatus)?.url.ok_or(Error::ExpectedUrl)?;
+    let url = slab
+        .status
+        .as_ref()
+        .ok_or(Error::ExpectedStatus)?
+        .url
+        .as_ref()
+        .ok_or(Error::ExpectedUrl)?
+        .clone();
 
     let active_listeners = &ctx.get_ref().active_listeners;
     if active_listeners.read().await.contains(&name) {
@@ -184,12 +192,7 @@ async fn reconcile(
         let client = ctx.get_ref().client.clone();
         let namespace = ctx.get_ref().namespace.clone();
 
-        match wait_to_kill_slab(
-            &url,
-            slab.spec.grace_period_seconds.unwrap_or_default(),
-        )
-        .await
-        {
+        match wait_to_kill_slab(&url, slab.spec.grace_period_seconds.unwrap_or_default()).await {
             Result::Ok(()) => (),
             Result::Err(e) => {
                 tracing::error!(?e, "Encountered error testing liveness of SessionLivedBackend, so shutting it down.")

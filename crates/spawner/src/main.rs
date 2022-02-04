@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use clap::Parser;
 use futures::StreamExt;
@@ -67,7 +68,7 @@ fn get_pod_phase(pod: &Pod) -> Option<String> {
 }
 
 async fn reconcile(
-    slab: SessionLivedBackend,
+    slab: Arc<SessionLivedBackend>,
     ctx: Context<ControllerContext>,
 ) -> Result<ReconcilerAction, Error> {
     let ControllerContext {

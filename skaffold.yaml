@@ -9,32 +9,32 @@ build:
   - image: spawner_base
     context: crates
     docker:
-      dockerfile: containers/base.Dockerfile
+      dockerfile: _containers/base.Dockerfile
   - image: ghcr.io/drifting-in-space/spawner
     context: crates
     docker:
-      dockerfile: containers/spawner.Dockerfile
+      dockerfile: _containers/spawner.Dockerfile
     requires:
     - image: spawner_base
       alias: BASE
   - image: ghcr.io/drifting-in-space/spawner-api
     context: crates
     docker:
-      dockerfile: containers/api.Dockerfile
+      dockerfile: _containers/api.Dockerfile
     requires:
     - image: spawner_base
       alias: BASE
   - image: ghcr.io/drifting-in-space/spawner-sweeper
     context: crates
     docker:
-      dockerfile: containers/sweeper.Dockerfile
+      dockerfile: _containers/sweeper.Dockerfile
     requires:
     - image: spawner_base
       alias: BASE
   - image: ghcr.io/drifting-in-space/spawner-sidecar
     context: crates
     docker:
-      dockerfile: containers/sidecar.Dockerfile
+      dockerfile: _containers/sidecar.Dockerfile
     requires:
     - image: spawner_base
       alias: BASE

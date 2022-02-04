@@ -9,9 +9,9 @@ use k8s_openapi::{
 };
 use kube::{
     api::{Patch, PatchParams, PostParams},
-    Api, Client, Resource,
+    Api, Client, Resource, CustomResource,
 };
-use kube::{core::ObjectMeta, CustomResource, ResourceExt};
+use kube::{core::ObjectMeta, ResourceExt};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;

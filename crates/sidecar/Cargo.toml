@@ -5,12 +5,12 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.52"
-clap = { version = "3.0.13", features = ["derive"] }
+clap = { version = "3.0.14", features = ["derive"] }
 futures-core = "0.3.19"
 hyper = { version="0.14.16", features=["full"] }
 netlink-packet-sock-diag = "0.3.0"
 netlink-sys = { version = "0.8.1", features = ["tokio_socket"] }
-tokio = { version = "1.15.0", features = ["full"] }
+tokio = { version = "1.16.1", features = ["macros", "rt-multi-thread", "time"] }
 tokio-stream = { version="0.1.8", features=["sync"] }
-tracing = "0.1.29"
+tracing = "0.1.30"
 tracing-subscriber = { version = "0.3.6", features = ["env-filter"] }
