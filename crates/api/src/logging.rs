@@ -1,6 +1,6 @@
 use tracing_subscriber::EnvFilter;
 
-const LOG_MODULES: &[&str] = &["spawner", "spawner_api"];
+const LOG_MODULES: &[&str] = &["spawner", "spawner_api", "tower_http"];
 
 pub fn init_logging() {
     let mut env_filter = EnvFilter::default();

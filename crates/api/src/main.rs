@@ -118,17 +118,18 @@ async fn ready_handler(
                 return Response::builder()
                     .status(StatusCode::FOUND)
                     .header(
-                        HeaderName::from_static("Location"),
+                        HeaderName::from_static("location"),
                         HeaderValue::from_str(&url)
                             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
                     )
                     .body(Body::empty())
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
             } else {
-                return Err(StatusCode::NOT_FOUND);
+                return Err(StatusCode::CONFLICT);
             }
         }
-        Err(_) => {
+        Err(error) => {
+            tracing::warn!(?error, "Error when looking up SessionLivedBackend.");
             return Err(StatusCode::NOT_FOUND);
         }
     }

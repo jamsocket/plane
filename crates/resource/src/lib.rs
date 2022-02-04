@@ -191,7 +191,7 @@ impl SessionLivedBackend {
             SessionLivedBackendState::Submitted => false,
             SessionLivedBackendState::Constructed => false,
             SessionLivedBackendState::Scheduled => false,
-            SessionLivedBackendState::Running => false,
+            SessionLivedBackendState::Running => true,
             SessionLivedBackendState::Ready => true,
         }
     }
