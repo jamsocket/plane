@@ -1,7 +1,8 @@
 use crate::{event_stream::event_stream, logging::init_logging};
 use axum::{
+    body::Body,
     extract::{Extension, Path},
-    http::StatusCode,
+    http::{header::HeaderName, HeaderValue, Response, StatusCode},
     response::{sse::Event as AxumSseEvent, Sse},
     routing::{get, post},
     AddExtensionLayer, BoxError, Json, Router,
@@ -42,6 +43,31 @@ struct Settings {
     service_prefix: String,
 }
 
+impl Settings {
+    async fn get_client(&self) -> Result<Client, StatusCode> {
+        Client::try_default().await.map_err(|error| {
+            tracing::error!(%error, "Error getting client");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
+    }
+
+    fn backend_to_slab_name(&self, backend_id: &str) -> String {
+        format!("{}{}", self.service_prefix, backend_id)
+    }
+
+    fn backend_to_url(&self, backend_id: &str) -> Option<String> {
+        self.url_template
+            .as_ref()
+            .map(|d| d.replace("{}", &backend_id))
+    }
+
+    fn slab_name_to_backend(&self, slab_name: &str) -> Option<String> {
+        slab_name
+            .strip_prefix(&self.service_prefix)
+            .map(|t| t.to_string())
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_logging();
@@ -60,6 +86,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/init", post(init_handler))
         .route("/backend/:backend_id/status", get(status_handler))
+        .route("/ready/:backend_id", get(ready_handler))
         .layer(AddExtensionLayer::new(Arc::new(settings)))
         .layer(trace_layer);
 
@@ -70,6 +97,41 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     Ok(())
+}
+
+async fn ready_handler(
+    Path((backend_id,)): Path<(String,)>,
+    Extension(settings): Extension<Arc<Settings>>,
+) -> Result<Response<Body>, StatusCode> {
+    let client = settings.get_client().await?;
+    let name = settings.backend_to_slab_name(&backend_id);
+
+    let api = Api::<SessionLivedBackend>::namespaced(client, &settings.namespace);
+
+    let slab = api.get(&name).await;
+
+    match slab {
+        Ok(slab) => {
+            if slab.is_ready() {
+                let url = settings.backend_to_url(&backend_id).ok_or(StatusCode::OK)?;
+
+                return Response::builder()
+                    .status(StatusCode::FOUND)
+                    .header(
+                        HeaderName::from_static("Location"),
+                        HeaderValue::from_str(&url)
+                            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+                    )
+                    .body(Body::empty())
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
+            } else {
+                return Err(StatusCode::NOT_FOUND);
+            }
+        }
+        Err(_) => {
+            return Err(StatusCode::NOT_FOUND);
+        }
+    }
 }
 
 fn convert_stream<T>(stream: T) -> impl Stream<Item = Result<AxumSseEvent, BoxError>>
@@ -92,10 +154,7 @@ async fn status_handler(
     Path((backend_id,)): Path<(String,)>,
     Extension(settings): Extension<Arc<Settings>>,
 ) -> Result<Sse<impl Stream<Item = Result<AxumSseEvent, BoxError>>>, StatusCode> {
-    let client = Client::try_default().await.map_err(|error| {
-        tracing::error!(%error, "Error getting client");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let client = settings.get_client().await?;
 
     let name = format!("{}{}", settings.service_prefix, backend_id);
     let events = event_stream(client, &name, &settings.namespace)
@@ -145,17 +204,14 @@ async fn init_handler(
         })?;
 
     let prefixed_name = result.name();
-    let name = if let Some(name) = prefixed_name.strip_prefix(&settings.service_prefix) {
-        name.to_string()
-    } else {
-        tracing::warn!("Couldn't strip prefix from name.");
-        return Err(StatusCode::EXPECTATION_FAILED);
-    };
+    let name = settings
+        .slab_name_to_backend(&prefixed_name)
+        .ok_or_else(|| {
+            tracing::warn!("Couldn't strip prefix from name.");
+            StatusCode::EXPECTATION_FAILED
+        })?;
 
-    let url = settings
-        .url_template
-        .as_ref()
-        .map(|d| d.replace("{}", &name));
+    let url = settings.backend_to_url(&name);
 
     tracing::info!(?url, %name, "Created SessionLivedBackend.");
 

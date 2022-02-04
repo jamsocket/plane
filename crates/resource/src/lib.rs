@@ -186,6 +186,16 @@ impl SessionLivedBackend {
         }
     }
 
+    pub fn is_ready(&self) -> bool {
+        match self.state() {
+            SessionLivedBackendState::Submitted => false,
+            SessionLivedBackendState::Constructed => false,
+            SessionLivedBackendState::Scheduled => false,
+            SessionLivedBackendState::Running => false,
+            SessionLivedBackendState::Ready => true,
+        }
+    }
+
     pub fn state(&self) -> SessionLivedBackendState {
         if let Some(status) = &self.status {
             status.state
