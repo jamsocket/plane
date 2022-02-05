@@ -15,7 +15,7 @@ use kube::{
 };
 use serde::{Deserialize, Serialize};
 use spawner_resource::{SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP};
-use std::{net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
@@ -70,8 +70,14 @@ impl Settings {
     }
 
     fn get_init_result(&self, backend_id: &str) -> InitResult {
-        let ready_url = self.ready_url_template.as_ref().map(|d| d.replace("{}", &backend_id));
-        let status_url = self.status_url_template.as_ref().map(|d| d.replace("{}", &backend_id));
+        let ready_url = self
+            .ready_url_template
+            .as_ref()
+            .map(|d| d.replace("{}", &backend_id));
+        let status_url = self
+            .status_url_template
+            .as_ref()
+            .map(|d| d.replace("{}", &backend_id));
 
         InitResult {
             url: self.backend_to_url(backend_id),
@@ -191,6 +197,9 @@ async fn status_handler(
 #[derive(Deserialize)]
 struct InitPayload {
     image: String,
+
+    #[serde(default)]
+    env: HashMap<String, String>,
 }
 
 #[derive(Serialize)]
@@ -205,8 +214,9 @@ async fn init_handler(
     Json(payload): Json<InitPayload>,
     Extension(settings): Extension<Arc<Settings>>,
 ) -> Result<Json<InitResult>, StatusCode> {
-    let slab =
-        SessionLivedBackendBuilder::new(&payload.image).build_prefixed(&settings.service_prefix);
+    let slab = SessionLivedBackendBuilder::new(&payload.image)
+        .with_env(payload.env)
+        .build_prefixed(&settings.service_prefix);
 
     let client = Client::try_default().await.map_err(|error| {
         tracing::error!(%error, "Error getting client");

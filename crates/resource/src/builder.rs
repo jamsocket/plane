@@ -1,4 +1,4 @@
-use crate::{ImagePullPolicy, SessionLivedBackend, SessionLivedBackendSpec, BackendPodSpec};
+use crate::{BackendPodSpec, ImagePullPolicy, SessionLivedBackend, SessionLivedBackendSpec};
 use k8s_openapi::api::core::v1::{Container, EnvVar, LocalObjectReference};
 use kube::core::ObjectMeta;
 use std::collections::HashMap;
@@ -28,6 +28,10 @@ impl SessionLivedBackendBuilder {
             grace_period_seconds: Some(DEFAULT_GRACE_SECONDS),
             http_port: None,
         }
+    }
+
+    pub fn with_env(self, env: HashMap<String, String>) -> Self {
+        SessionLivedBackendBuilder { env, ..self }
     }
 
     pub fn with_port(self, http_port: Option<u16>) -> Self {
