@@ -32,7 +32,7 @@ see [Agones](https://agones.dev/site/) for that use case.
 
 ## Architecture
 
-![Spawner architecture diagram](docs/diagram.png)
+![Spawner architecture diagram](docs/diagram.svg)
 
 ## More info & getting started
 
