@@ -33,6 +33,12 @@ struct Opts {
     #[clap(long)]
     url_template: Option<String>,
 
+    #[clap(long)]
+    status_url_template: Option<String>,
+
+    #[clap(long)]
+    ready_url_template: Option<String>,
+
     #[clap(long, default_value = "spawner-")]
     service_prefix: String,
 }
@@ -40,6 +46,8 @@ struct Opts {
 struct Settings {
     namespace: String,
     url_template: Option<String>,
+    status_url_template: Option<String>,
+    ready_url_template: Option<String>,
     service_prefix: String,
 }
 
@@ -61,6 +69,18 @@ impl Settings {
             .map(|d| d.replace("{}", &backend_id))
     }
 
+    fn get_init_result(&self, backend_id: &str) -> InitResult {
+        let ready_url = self.ready_url_template.as_ref().map(|d| d.replace("{}", &backend_id));
+        let status_url = self.status_url_template.as_ref().map(|d| d.replace("{}", &backend_id));
+
+        InitResult {
+            url: self.backend_to_url(backend_id),
+            name: backend_id.to_string(),
+            ready_url,
+            status_url,
+        }
+    }
+
     fn slab_name_to_backend(&self, slab_name: &str) -> Option<String> {
         slab_name
             .strip_prefix(&self.service_prefix)
@@ -77,6 +97,8 @@ async fn main() -> anyhow::Result<()> {
         namespace: opts.namespace,
         url_template: opts.url_template,
         service_prefix: opts.service_prefix,
+        ready_url_template: opts.ready_url_template,
+        status_url_template: opts.status_url_template,
     };
 
     let trace_layer = TraceLayer::new_for_http()
@@ -175,6 +197,8 @@ struct InitPayload {
 struct InitResult {
     url: Option<String>,
     name: String,
+    ready_url: Option<String>,
+    status_url: Option<String>,
 }
 
 async fn init_handler(
@@ -216,5 +240,5 @@ async fn init_handler(
 
     tracing::info!(?url, %name, "Created SessionLivedBackend.");
 
-    Ok(Json(InitResult { url, name }))
+    Ok(Json(settings.get_init_result(&name)))
 }
