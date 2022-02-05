@@ -39,13 +39,13 @@ system. Spawner provides the `SessionLivedBackend` [custom resource](https://kub
 representing a single instance of an application backend, and a series of components which act together
 to own the lifecycle of that backend:
 
-- *API* provides a JSON over HTTP API for creating and checking the status of `SessionLivedBackend` instances.
-- *Controller* watches for the creation of `SessionLivedBackend` objects and creates the backing compute and
+- **API** provides a JSON over HTTP API for creating and checking the status of `SessionLivedBackend` instances.
+- **Controller** watches for the creation of `SessionLivedBackend` objects and creates the backing compute and
   network resources needed to provide the backend and enable an external user to connect to it.
-- *Sidecar* is a lightweight HTTP proxy that runs next to the application container you provide. It keeps
+- **Sidecar** is a lightweight HTTP proxy that runs next to the application container you provide. It keeps
   a count of active WebSocket connections, and a timestamp of the last HTTP request, which it reports to a
   Sweeper.
-- *Sweeper* runs on each node of the cluster and opens a connection to the sidecar of every application backend
+- **Sweeper** runs on each node of the cluster and opens a connection to the sidecar of every application backend
   running on that node. When it detects that a backend is idle, it marks that backend for termination so that its
   resources can be used for another backend.
 
