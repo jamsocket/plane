@@ -26,6 +26,12 @@ struct Opts {
 
     #[clap(long, default_value = "ghcr.io/drifting-in-space/spawner-sidecar:latest")]
     sidecar: String,
+
+    /// The name of a Kubernetes secret (type kubernetes.io/dockerconfigjson) for loading the container image.
+    ///
+    /// See: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    #[clap(long)]
+    image_pull_secret: Option<String>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -53,6 +59,7 @@ struct ControllerContext {
     client: Client,
     namespace: String,
     sidecar: String,
+    image_pull_secret: Option<String>,
 }
 
 fn get_cluster_ip(service: &Service) -> Option<String> {
@@ -75,6 +82,7 @@ async fn reconcile(
         client,
         namespace,
         sidecar,
+        image_pull_secret,
     } = ctx.get_ref();
 
     let name = slab.name();
@@ -88,7 +96,7 @@ async fn reconcile(
 
             // Construct pod to back session-lived backend.
             pod_api
-                .create(&PostParams::default(), &slab.pod(sidecar)?)
+                .create(&PostParams::default(), &slab.pod(sidecar, image_pull_secret)?)
                 .await
                 .map_err(Error::KubernetesFailure)?;
 
@@ -175,6 +183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         client: client.clone(),
         namespace: opts.namespace,
         sidecar: opts.sidecar,
+        image_pull_secret: opts.image_pull_secret,
     });
     let slabs =
         Api::<SessionLivedBackend>::namespaced(client.clone(), &context.get_ref().namespace);

@@ -9,7 +9,7 @@ use k8s_openapi::{
 };
 use kube::{
     api::{Patch, PatchParams, PostParams},
-    Api, Client, Resource, CustomResource,
+    Api, Client, CustomResource, Resource,
 };
 use kube::{core::ObjectMeta, ResourceExt};
 use schemars::JsonSchema;
@@ -231,7 +231,11 @@ impl SessionLivedBackend {
             .collect()
     }
 
-    pub fn pod(&self, sidecar_image: &str) -> Result<Pod, Error> {
+    pub fn pod(
+        &self,
+        sidecar_image: &str,
+        image_pull_secret: &Option<String>,
+    ) -> Result<Pod, Error> {
         let name = self.name();
         let mut args = vec![format!("--serve-port={}", SIDECAR_PORT)];
         if let Some(port) = self.spec.http_port {
@@ -245,6 +249,22 @@ impl SessionLivedBackend {
             args: Some(args),
             ..Container::default()
         });
+
+        if let Some(image_pull_secret) = image_pull_secret {
+            let secret_ref = LocalObjectReference {
+                name: Some(image_pull_secret.to_string()),
+            };
+
+            template.image_pull_secrets = match template.image_pull_secrets {
+                Some(mut v) => {
+                    v.push(secret_ref);
+                    Some(v)
+                }
+                None => {
+                    Some(vec![secret_ref])
+                }
+            }
+        }
 
         Ok(Pod {
             metadata: ObjectMeta {
