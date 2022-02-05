@@ -237,7 +237,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let query = ListParams {
-        label_selector: opts.node_name.map(|name| format!("spawner-group={}", name)),
+        label_selector: opts.node_name.map(|name| format!("spawnerGroup={}", name)),
         ..ListParams::default()
     };
 

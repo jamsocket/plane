@@ -117,7 +117,6 @@ async fn reconcile(
 
         SessionLivedBackendState::Constructed => {
             // The backing resources already exist. We will see if the pod has been scheduled.
-
             let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
             let service = service_api
                 .get(&name)
@@ -127,6 +126,8 @@ async fn reconcile(
             if let Some(node_name) = get_node_name(&pod) {
                 let ip = get_cluster_ip(&service);
                 let url = format!("http://{}.{}:{}/", name, namespace, SIDECAR_PORT);
+
+                slab.set_spawner_group(client.clone(), &node_name).await?;
 
                 let status = SessionLivedBackendStatus {
                     state: SessionLivedBackendState::Scheduled,

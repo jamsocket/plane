@@ -120,9 +120,16 @@ impl SessionLivedBackendState {
 pub struct SessionLivedBackendStatus {
     pub state: SessionLivedBackendState,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ip: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
 
@@ -328,6 +335,34 @@ impl SessionLivedBackend {
 
                     ..Default::default()
                 },
+            )
+            .await
+            .map_err(Error::KubernetesFailure)?;
+
+        Ok(())
+    }
+
+    pub async fn set_spawner_group(
+        &self,
+        client: Client,
+        spawner_group: &str
+    ) -> Result<(), Error> {
+        let namespace = self
+            .namespace()
+            .expect("SessionLivedBackend is a namespaced resource, but didn't have a namespace.");
+        let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), &namespace);
+        
+        slab_api
+            .patch(
+                &self.name(),
+                &PatchParams::default(),
+                &Patch::Merge(json!({
+                    "metadata": {
+                        "labels": {
+                            "spawnerGroup": spawner_group
+                        }
+                    }
+                })),
             )
             .await
             .map_err(Error::KubernetesFailure)?;
