@@ -250,7 +250,7 @@ impl SessionLivedBackend {
         };
 
         let mut template: PodSpec = self.spec.template.clone().into();
-        template.containers.push(Container {
+        template.containers.insert(0, Container {
             name: SIDECAR.to_string(),
             image: Some(sidecar_image.to_string()),
             args: Some(args),
