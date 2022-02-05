@@ -12,7 +12,6 @@ use std::time::Duration;
 pub async fn wait_for_ready_port(port: Option<u16>) -> anyhow::Result<u16> {
     loop {
         let listening_ports = get_listen_ports().await?;
-        tracing::info!(?listening_ports, ?port, "Queried for listening TCP ports.");
 
         if let Some(port) = port {
             // Port is provided, only wait for a certain port.
@@ -101,7 +100,6 @@ pub async fn get_listen_ports_for_socket_id(ipv6: bool) -> anyhow::Result<Vec<u1
                     }
                 }
                 NetlinkPayload::Done => {
-                    tracing::info!("Got Done packet");
                     break;
                 }
                 NetlinkPayload::Error(e) => {
