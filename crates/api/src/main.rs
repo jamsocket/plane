@@ -196,8 +196,13 @@ async fn status_handler(
 
 #[derive(Deserialize)]
 struct InitPayload {
+    /// The container image used to create the container.
     image: String,
 
+    /// HTTP port to expose on the container.
+    http_port: Option<u16>,
+
+    /// Environment variables to expose on the container.
     #[serde(default)]
     env: HashMap<String, String>,
 }
@@ -216,6 +221,7 @@ async fn init_handler(
 ) -> Result<Json<InitResult>, StatusCode> {
     let slab = SessionLivedBackendBuilder::new(&payload.image)
         .with_env(payload.env)
+        .with_port(payload.http_port)
         .build_prefixed(&settings.service_prefix);
 
     let client = Client::try_default().await.map_err(|error| {
