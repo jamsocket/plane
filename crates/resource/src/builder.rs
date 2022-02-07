@@ -3,7 +3,7 @@ use k8s_openapi::api::core::v1::{Container, EnvVar, LocalObjectReference};
 use kube::core::ObjectMeta;
 use std::collections::HashMap;
 
-pub const DEFAULT_GRACE_SECONDS: u32 = 30;
+pub const DEFAULT_GRACE_SECONDS: u32 = 300;
 pub const APPLICATION: &str = "application";
 pub const DEFAULT_PREFIX: &str = "spawner-";
 
