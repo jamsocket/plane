@@ -2,7 +2,6 @@ use clap::Parser;
 use futures::StreamExt;
 use futures_util::Stream;
 use hyper::{Body, Request, Uri};
-use kube::api::DeleteParams;
 use kube::ResourceExt;
 use kube::{
     api::{Api, ListParams},
@@ -11,7 +10,7 @@ use kube::{
 };
 use logging::init_logging;
 use serde::Deserialize;
-use spawner_resource::SessionLivedBackend;
+use spawner_resource::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -126,46 +125,6 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
     Ok(Box::pin(stream))
 }
 
-pub async fn wait_to_kill_slab(base_uri: &str, grace_period_seconds: u32) -> Result<(), Error> {
-    let base_uri = base_uri.to_string();
-
-    let mut stream = state_stream(&base_uri).await?;
-    let mut duration: Option<Duration> = None;
-
-    loop {
-        let result = if let Some(duration) = duration {
-            match timeout(duration, stream.next()).await {
-                Ok(result) => result,
-                Err(_) => {
-                    tracing::info!(?base_uri, "Timed out while waiting for activity.");
-                    return Ok(());
-                }
-            }
-        } else {
-            stream.next().await
-        };
-
-        let result = if let Some(result) = result {
-            result
-        } else {
-            tracing::info!(
-                ?base_uri,
-                "Reached end of message stream; assuming pod is dead."
-            );
-            return Ok(());
-        };
-        tracing::info!(?result, ?base_uri, "Got status message.");
-
-        if let Some(seconds_since_active) = result.seconds_since_active {
-            let delta = grace_period_seconds - seconds_since_active.min(grace_period_seconds);
-            tracing::info!(delta_seconds = %delta, ?base_uri, "Using timeout.");
-            duration = Some(Duration::from_secs(delta as u64));
-        } else {
-            duration = None;
-        }
-    }
-}
-
 async fn reconcile(
     slab: Arc<SessionLivedBackend>,
     ctx: Context<ControllerContext>,
@@ -191,26 +150,82 @@ async fn reconcile(
     }
 
     active_listeners.write().await.insert(name.clone());
+    let mut stream = state_stream(&url).await?;
 
     tokio::spawn(async move {
         let client = ctx.get_ref().client.clone();
-        let namespace = ctx.get_ref().namespace.clone();
+        let grace_period_seconds = slab.spec.grace_period_seconds.unwrap_or_default();
+        let mut ready = false;
+        let mut duration: Option<Duration> = None;
 
-        match wait_to_kill_slab(&url, slab.spec.grace_period_seconds.unwrap_or_default()).await {
-            Result::Ok(()) => (),
-            Result::Err(e) => {
-                tracing::error!(?e, "Encountered error testing liveness of SessionLivedBackend, so shutting it down.")
+        loop {
+            let result = if let Some(duration) = duration {
+                match timeout(duration, stream.next()).await {
+                    Ok(result) => result,
+                    Err(_) => {
+                        tracing::info!(?url, "Timed out while waiting for activity.");
+                        break;
+                    }
+                }
+            } else {
+                stream.next().await
+            };
+
+            let result = if let Some(result) = result {
+                result
+            } else {
+                tracing::info!(?url, "Reached end of message stream; assuming pod is dead.");
+                break;
+            };
+            tracing::info!(?result, ?url, "Got status message.");
+
+            if result.ready & !ready {
+                let _ = slab
+                    .log_event(client.clone(), SessionLivedBackendEvent::Ready)
+                    .await;
+                if let Err(error) = slab
+                    .update_status(
+                        client.clone(),
+                        SessionLivedBackendStatus {
+                            ready: Some(true),
+                            ..SessionLivedBackendStatus::default()
+                        },
+                    )
+                    .await
+                {
+                    tracing::error!(%name, ?error, "Unexpected error marking SessionLivedBackend as ready.");
+                } else {
+                    ready = true;
+                }
+            }
+
+            if let Some(seconds_since_active) = result.seconds_since_active {
+                let delta = grace_period_seconds - seconds_since_active.min(grace_period_seconds);
+                tracing::info!(delta_seconds = %delta, ?url, "Using timeout.");
+                duration = Some(Duration::from_secs(delta as u64));
+            } else {
+                duration = None;
             }
         }
 
-        let slabs = Api::<SessionLivedBackend>::namespaced(client, &namespace);
-
-        match slabs.delete(&name, &DeleteParams::default()).await {
-            Result::Ok(_) => {
-                tracing::info!(%name, "SessionLivedBackend deleted.");
-            }
-            Result::Err(error) => {
-                tracing::error!(%name, ?error, "Unexpected error deleting SessionLivedBackend.");
+        loop {
+            let _ = slab
+                .log_event(client.clone(), SessionLivedBackendEvent::Swept)
+                .await;
+            if let Err(error) = slab
+                .update_status(
+                    client.clone(),
+                    SessionLivedBackendStatus {
+                        swept: Some(true),
+                        ..SessionLivedBackendStatus::default()
+                    },
+                )
+                .await
+            {
+                tracing::error!(%name, ?error, "Unexpected error marking SessionLivedBackend as swept.");
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            } else {
+                break;
             }
         }
     });

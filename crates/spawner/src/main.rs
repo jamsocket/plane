@@ -4,7 +4,7 @@ use std::sync::Arc;
 use clap::Parser;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{Pod, Service};
-use kube::api::PostParams;
+use kube::api::{PostParams, DeleteParams};
 use kube::ResourceExt;
 use kube::{
     api::{Api, ListParams},
@@ -91,6 +91,7 @@ async fn reconcile(
     let name = slab.name();
     let pod_api = Api::<Pod>::namespaced(client.clone(), namespace);
     let service_api = Api::<Service>::namespaced(client.clone(), &namespace);
+    let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), &namespace);
 
     if !slab.is_submitted() {
         pod_api
@@ -154,6 +155,18 @@ async fn reconcile(
                 slab.update_status(client.clone(), status).await?;
                 slab.log_event(client.clone(), SessionLivedBackendEvent::Running)
                     .await?;
+            }
+        }
+    }
+
+    if slab.is_swept() {
+        match slab_api.delete(&name, &DeleteParams::default()).await {
+            Result::Ok(_) => {
+                tracing::info!(%name, "SessionLivedBackend deleted.");
+            }
+            Result::Err(error) => {
+                tracing::error!(%name, ?error, "Unexpected error deleting SessionLivedBackend.");
+                return Err(Error::KubernetesFailure(error))
             }
         }
     }

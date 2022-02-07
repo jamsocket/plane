@@ -81,6 +81,9 @@ pub enum SessionLivedBackendEvent {
 
     /// The pod that backs a `SessionLivedBackend` is accepting new connections.
     Ready,
+
+    /// The `SessionLivedBackend` has been marked as swept, meaning that it can be deleted.
+    Swept,
 }
 
 impl Default for SessionLivedBackendEvent {
@@ -111,6 +114,9 @@ impl SessionLivedBackendEvent {
             SessionLivedBackendEvent::Ready => {
                 "Pod was observed listening on TCP port.".to_string()
             }
+            SessionLivedBackendEvent::Swept => {
+                "SessionLivedBackend was found idle and swept.".to_string()
+            }
         }
     }
 }
@@ -118,17 +124,28 @@ impl SessionLivedBackendEvent {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionLivedBackendStatus {
+    /// Set to `true` by `spawner` once the backing resources (pod and service) have been created.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub submitted: Option<bool>,
 
+    /// Set to `true` by `spawner` once the backing pod has been assigned to a node.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scheduled: Option<bool>,
 
+    /// Set to `true` by `spawner` once the backing pod is observed in the `Running` state.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub running: Option<bool>,
 
+    /// Set to `true` by `sweeper` once the `sidecar` proxy issues an event with `ready`
+    /// set to `true`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ready: Option<bool>,
+
+    /// Set to `true` by `sweeper` once the pod is observed to be inactive (per `sidecar`
+    /// events) for at least its grace period. This marks the `SessionLivedBackend` for
+    /// deletion by `spawner`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub swept: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
@@ -213,6 +230,13 @@ impl SessionLivedBackend {
         self.status
             .as_ref()
             .map(|d| d.ready.unwrap_or_default())
+            .unwrap_or_default()
+    }
+
+    pub fn is_swept(&self) -> bool {
+        self.status
+            .as_ref()
+            .map(|d| d.swept.unwrap_or_default())
             .unwrap_or_default()
     }
 
