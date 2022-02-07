@@ -21,6 +21,7 @@ mod logging;
 
 const RETRY_PAUSE_SECS: u64 = 1;
 const MAX_RETRIES: u32 = 8;
+const SSE_PREFIX: &[u8] = b"data: ";
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct MonitorState {
@@ -103,6 +104,12 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
             while let Some(value) = stream.next().await {
                 match value {
                     Ok(value) => {
+                        let prefix = &value[..SSE_PREFIX.len()];
+                        if prefix != SSE_PREFIX {
+                            tracing::warn!(?prefix, "Expected prefix of '{:?}'.", SSE_PREFIX);
+                            continue 'retry_loop;
+                        }
+                        let value = &value[SSE_PREFIX.len()..];
                         if let Ok(value) = serde_json::from_slice(&value) {
                             yield value;
                         } else {
