@@ -1816,19 +1816,29 @@ spec:
                   minimum: 0.0
                   nullable: true
                   type: integer
-                state:
-                  enum:
-                    - Submitted
-                    - Constructed
-                    - Scheduled
-                    - Running
-                    - Ready
-                  type: string
+                ready:
+                  description: "Set to `true` by `sweeper` once the `sidecar` proxy issues an event with `ready` set to `true`."
+                  nullable: true
+                  type: boolean
+                running:
+                  description: "Set to `true` by `spawner` once the backing pod is observed in the `Running` state."
+                  nullable: true
+                  type: boolean
+                scheduled:
+                  description: "Set to `true` by `spawner` once the backing pod has been assigned to a node."
+                  nullable: true
+                  type: boolean
+                submitted:
+                  description: "Set to `true` by `spawner` once the backing resources (pod and service) have been created."
+                  nullable: true
+                  type: boolean
+                swept:
+                  description: "Set to `true` by `sweeper` once the pod is observed to be inactive (per `sidecar` events) for at least its grace period. This marks the `SessionLivedBackend` for deletion by `spawner`."
+                  nullable: true
+                  type: boolean
                 url:
                   nullable: true
                   type: string
-              required:
-                - state
               type: object
           required:
             - spec
