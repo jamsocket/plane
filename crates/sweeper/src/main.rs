@@ -80,7 +80,7 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
                 tracing::warn!(?retry, "Hit max retries.");
                 break;
             } else if retry > 0 {
-                tracing::info!(%RETRY_PAUSE_MILIS, "Sleeping.");
+                tracing::info!(?uri, %RETRY_PAUSE_MILIS, "Sleeping.");
                 tokio::time::sleep(Duration::from_millis(RETRY_PAUSE_MILIS)).await;
             }
 
@@ -97,6 +97,7 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
                     continue 'retry_loop;
                 }
             };
+            retry = 0; // reset retries on successful connection.
 
             let mut stream = result.into_body();
 
