@@ -125,7 +125,6 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
                     }
                 }
             }
-            break; // Stream ran out but didn't fail.
         }
     };
 
