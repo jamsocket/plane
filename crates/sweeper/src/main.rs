@@ -19,8 +19,8 @@ use tokio::time::{timeout, Duration};
 
 mod logging;
 
-const RETRY_PAUSE_SECS: u64 = 1;
-const MAX_RETRIES: u32 = 8;
+const RETRY_PAUSE_MILIS: u64 = 100;
+const MAX_RETRIES: u32 = 100;
 const SSE_PREFIX: &[u8] = b"data: ";
 
 #[derive(Clone, Deserialize, Debug)]
@@ -80,9 +80,8 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
                 tracing::warn!(?retry, "Hit max retries.");
                 break;
             } else if retry > 0 {
-                let duration_secs = RETRY_PAUSE_SECS * (2u64).pow(retry);
-                tracing::info!(%duration_secs, "Sleeping.");
-                tokio::time::sleep(Duration::from_secs(duration_secs)).await;
+                tracing::info!(%RETRY_PAUSE_MILIS, "Sleeping.");
+                tokio::time::sleep(Duration::from_millis(RETRY_PAUSE_MILIS)).await;
             }
 
             let request = Request::builder()
