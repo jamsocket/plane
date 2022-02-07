@@ -137,6 +137,13 @@ async fn reconcile(
     let name = slab.name();
     tracing::info!(?name, "Saw SessionLivedBackend.");
 
+    if !slab.is_running() {
+        tracing::info!(?name, "Not attempting to connect (not running yet).");
+        return Ok(ReconcilerAction {
+            requeue_after: None,
+        });
+    }
+
     let url = slab
         .status
         .as_ref()
