@@ -1,5 +1,7 @@
 use crate::monitor::Monitor;
+use crate::network_status::wait_for_ready_port;
 use anyhow::anyhow;
+use hyper::body::Bytes;
 use core::future::Future;
 use hyper::client::HttpConnector;
 use hyper::http::uri::{Authority, InvalidUriParts, Scheme};
@@ -48,11 +50,29 @@ fn clone_response(response: &Response<Body>) -> Result<Response<Body>, hyper::ht
 }
 
 impl ProxyService {
-    pub fn new(upstream: &str) -> anyhow::Result<Self> {
+    pub fn new(upstream_port: u16) -> anyhow::Result<Self> {
+        let monitor = Arc::new(Monitor::new());
+
+        {
+            let monitor = monitor.clone();
+
+            tokio::spawn(async move {
+                let result = wait_for_ready_port(upstream_port, false).await;
+                if let Err(error) = result {
+                    tracing::error!(?error, "Error waiting for ready port.");
+                } else {
+                    monitor.set_ready();
+                }                
+            });
+        }
+
         Ok(ProxyService {
             client: Arc::new(Client::new()),
-            upstream: Arc::new(Authority::from_str(upstream)?),
-            monitor: Arc::new(Monitor::new()),
+            upstream: Arc::new(Authority::from_str(&format!(
+                "localhost:{}",
+                upstream_port
+            ))?),
+            monitor: monitor,
         })
     }
 
@@ -63,6 +83,13 @@ impl ProxyService {
         Ok(Response::builder()
             .header(header::CONTENT_TYPE, "text/event-stream")
             .body(body)?)
+    }
+
+    async fn handle_event(self) -> anyhow::Result<Response<Body>> {
+        let state: Bytes = self.monitor.state().into();
+
+        Ok(Response::builder()
+            .body(Body::from(state))?)
     }
 
     async fn handle_upgrade(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
@@ -120,7 +147,13 @@ impl ProxyService {
         *req.uri_mut() = rewrite_uri(req.uri(), &self.upstream)?;
 
         if req.uri().path() == "/_events" {
-            return self.handle_event_stream().await;
+            let accept = req.headers().get("accept").map(|d| d.to_str().ok()).flatten().unwrap_or_default();
+            let mut accept_parts = accept.split(',');
+            if accept_parts.any(|g| g == "text/event-stream") {
+                return self.handle_event_stream().await;
+            } else {
+                return self.handle_event().await;
+            }
         }
         self.monitor.bump();
 

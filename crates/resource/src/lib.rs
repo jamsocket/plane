@@ -65,8 +65,8 @@ impl Into<PodSpec> for BackendPodSpec {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, Copy)]
-pub enum SessionLivedBackendState {
+#[derive(Debug)]
+pub enum SessionLivedBackendEvent {
     /// The `SessionLivedBackend` object exists.
     Submitted,
 
@@ -83,32 +83,32 @@ pub enum SessionLivedBackendState {
     Ready,
 }
 
-impl Default for SessionLivedBackendState {
+impl Default for SessionLivedBackendEvent {
     fn default() -> Self {
-        SessionLivedBackendState::Submitted
+        SessionLivedBackendEvent::Submitted
     }
 }
 
-impl Display for SessionLivedBackendState {
+impl Display for SessionLivedBackendEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&self, f)
     }
 }
 
-impl SessionLivedBackendState {
+impl SessionLivedBackendEvent {
     pub fn message(&self) -> String {
         match self {
-            SessionLivedBackendState::Submitted => {
+            SessionLivedBackendEvent::Submitted => {
                 "SessionLivedBackend object created.".to_string()
             }
-            SessionLivedBackendState::Constructed => {
+            SessionLivedBackendEvent::Constructed => {
                 "Backing resources created by Spawner.".to_string()
             }
-            SessionLivedBackendState::Scheduled => {
+            SessionLivedBackendEvent::Scheduled => {
                 "Backing pod was scheduled by Kubernetes.".to_string()
             }
-            SessionLivedBackendState::Running => "Pod was observed running.".to_string(),
-            SessionLivedBackendState::Ready => {
+            SessionLivedBackendEvent::Running => "Pod was observed running.".to_string(),
+            SessionLivedBackendEvent::Ready => {
                 "Pod was observed listening on TCP port.".to_string()
             }
         }
@@ -118,7 +118,17 @@ impl SessionLivedBackendState {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionLivedBackendStatus {
-    pub state: SessionLivedBackendState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub submitted: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scheduled: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub running: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ready: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
@@ -178,37 +188,32 @@ pub enum Error {
 }
 
 impl SessionLivedBackend {
-    /// Return true if the SessionLivedBackend has been assigned to a node.
-    ///
-    /// This is important to the lifecycle handoff between Spawner and Sweeper.
-    /// Before a node is scheduled, Spawner manages its status; after a node is
-    /// scheduled, Sweeper manages its status.
+    pub fn is_submitted(&self) -> bool {
+        self.status
+            .as_ref()
+            .map(|d| d.submitted.unwrap_or_default())
+            .unwrap_or_default()
+    }
+
     pub fn is_scheduled(&self) -> bool {
-        match self.state() {
-            SessionLivedBackendState::Submitted => false,
-            SessionLivedBackendState::Constructed => false,
-            SessionLivedBackendState::Scheduled => true,
-            SessionLivedBackendState::Running => true,
-            SessionLivedBackendState::Ready => true,
-        }
+        self.status
+            .as_ref()
+            .map(|d| d.scheduled.unwrap_or_default())
+            .unwrap_or_default()
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.status
+            .as_ref()
+            .map(|d| d.running.unwrap_or_default())
+            .unwrap_or_default()
     }
 
     pub fn is_ready(&self) -> bool {
-        match self.state() {
-            SessionLivedBackendState::Submitted => false,
-            SessionLivedBackendState::Constructed => false,
-            SessionLivedBackendState::Scheduled => false,
-            SessionLivedBackendState::Running => true,
-            SessionLivedBackendState::Ready => true,
-        }
-    }
-
-    pub fn state(&self) -> SessionLivedBackendState {
-        if let Some(status) = &self.status {
-            status.state
-        } else {
-            SessionLivedBackendState::Submitted
-        }
+        self.status
+            .as_ref()
+            .map(|d| d.ready.unwrap_or_default())
+            .unwrap_or_default()
     }
 
     fn metadata_reference(&self) -> Result<OwnerReference, Error> {
@@ -250,12 +255,15 @@ impl SessionLivedBackend {
         };
 
         let mut template: PodSpec = self.spec.template.clone().into();
-        template.containers.insert(0, Container {
-            name: SIDECAR.to_string(),
-            image: Some(sidecar_image.to_string()),
-            args: Some(args),
-            ..Container::default()
-        });
+        template.containers.insert(
+            0,
+            Container {
+                name: SIDECAR.to_string(),
+                image: Some(sidecar_image.to_string()),
+                args: Some(args),
+                ..Container::default()
+            },
+        );
 
         if let Some(image_pull_secret) = image_pull_secret {
             let secret_ref = LocalObjectReference {
@@ -267,9 +275,7 @@ impl SessionLivedBackend {
                     v.push(secret_ref);
                     Some(v)
                 }
-                None => {
-                    Some(vec![secret_ref])
-                }
+                None => Some(vec![secret_ref]),
             }
         }
 
@@ -308,14 +314,18 @@ impl SessionLivedBackend {
         })
     }
 
-    async fn log_state_change(
+    pub async fn log_event(
         &self,
-        events_api: &Api<Event>,
-        new_state: SessionLivedBackendState,
+        client: Client,
+        new_state: SessionLivedBackendEvent,
     ) -> Result<(), Error> {
         tracing::info!(name=%self.name(), %new_state, "SessionLivedBackend state change.");
+        let namespace = self
+            .namespace()
+            .expect("SessionLivedBackend is a namespaced resource, but didn't have a namespace.");
+        let event_api = Api::<Event>::namespaced(client.clone(), &namespace);
 
-        events_api
+        event_api
             .create(
                 &PostParams::default(),
                 &Event {
@@ -345,13 +355,13 @@ impl SessionLivedBackend {
     pub async fn set_spawner_group(
         &self,
         client: Client,
-        spawner_group: &str
+        spawner_group: &str,
     ) -> Result<(), Error> {
         let namespace = self
             .namespace()
             .expect("SessionLivedBackend is a namespaced resource, but didn't have a namespace.");
         let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), &namespace);
-        
+
         slab_api
             .patch(
                 &self.name(),
@@ -379,7 +389,6 @@ impl SessionLivedBackend {
             .namespace()
             .expect("SessionLivedBackend is a namespaced resource, but didn't have a namespace.");
         let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), &namespace);
-        let event_api = Api::<Event>::namespaced(client.clone(), &namespace);
 
         slab_api
             .patch_status(
@@ -389,8 +398,6 @@ impl SessionLivedBackend {
             )
             .await
             .map_err(Error::KubernetesFailure)?;
-
-        self.log_state_change(&event_api, new_status.state).await?;
 
         Ok(())
     }

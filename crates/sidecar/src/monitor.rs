@@ -1,6 +1,6 @@
 use hyper::body::Bytes;
 use std::{
-    sync::atomic::{AtomicU32, AtomicU64, Ordering},
+    sync::atomic::{AtomicU32, AtomicU64, Ordering, AtomicBool},
     time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::broadcast::{channel, Sender};
@@ -10,25 +10,24 @@ use tokio_stream::{
 };
 
 #[derive(Clone)]
-pub struct MonitorState {
-    seconds_since_active: Option<u32>,
-    live_connections: u32,
+pub enum MonitorState {
+    NotReady,
+    LiveConnections(u32),
+    Inactive(u32),
 }
 
 impl Into<Bytes> for MonitorState {
     fn into(self) -> Bytes {
-        if let Some(seconds_since_active) = self.seconds_since_active {
-            format!(
-                "{{\"seconds_since_active\": {}, \"live_connections\": {}}}\n",
-                seconds_since_active, self.live_connections
-            )
-            .into()
-        } else {
-            format!(
-                "{{\"seconds_since_active\": null, \"live_connections\": {}}}\n",
-                self.live_connections
-            )
-            .into()
+        match self {
+            MonitorState::NotReady => {
+                format!("data: {{\"ready\": false}}\n\n").into()
+            },
+            MonitorState::LiveConnections(connections) => {
+                format!("data: {{\"ready\": true, \"live_connections\": {}}}\n\n", connections).into()
+            },
+            MonitorState::Inactive(seconds_since_active) => {
+                format!("data: {{\"ready\": true, \"seconds_since_active\": {}}}\n\n", seconds_since_active).into()
+            },
         }
     }
 }
@@ -37,6 +36,7 @@ pub struct Monitor {
     last_connection: AtomicU64,
     live_connections: AtomicU32,
     sender: Sender<MonitorState>,
+    ready: AtomicBool,
 }
 
 fn time_now() -> u64 {
@@ -54,22 +54,29 @@ impl Monitor {
             last_connection: AtomicU64::new(time_now()),
             live_connections: AtomicU32::new(0),
             sender,
+            ready: AtomicBool::new(false),
         }
     }
 
+    pub fn set_ready(&self) {
+        self.ready.store(true, Ordering::Relaxed);
+        self.bump();
+    }
+
     pub fn state(&self) -> MonitorState {
+        if !self.ready.load(Ordering::Relaxed) {
+            return MonitorState::NotReady
+        }
+
         let live_connections = self.live_connections.load(Ordering::Relaxed);
         let last_active = self.last_connection.load(Ordering::Relaxed);
-        // max() because SystemTime can theoretically decrease over short durations.
-        let seconds_since_active = if live_connections > 0 {
-            None
+        
+        if live_connections > 0 {
+            MonitorState::LiveConnections(live_connections)
         } else {
-            Some((time_now().max(last_active) - last_active) as u32)
-        };
-
-        MonitorState {
-            live_connections,
-            seconds_since_active,
+            // max() because SystemTime can theoretically decrease over short durations.
+            let seconds_since_active = time_now().max(last_active) - last_active;
+            MonitorState::Inactive(seconds_since_active as u32)
         }
     }
 

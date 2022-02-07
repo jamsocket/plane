@@ -25,9 +25,13 @@ const MAX_RETRIES: u32 = 8;
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct MonitorState {
-    seconds_since_active: Option<u32>,
     #[allow(unused)]
-    live_connections: u32,
+    ready: bool,
+
+    seconds_since_active: Option<u32>,
+
+    #[allow(unused)]
+    live_connections: Option<u32>,
 }
 
 #[derive(Parser, Debug)]

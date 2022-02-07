@@ -1,4 +1,3 @@
-use crate::network_status::wait_for_ready_port;
 use anyhow::anyhow;
 use clap::Parser;
 use hyper::service::make_service_fn;
@@ -14,9 +13,12 @@ mod proxy;
 
 #[derive(Parser)]
 struct Opts {
-    #[clap(long)]
-    upstream_port: Option<u16>,
+    /// Port on localhost to proxy requests to. If not provided, the first TCP port
+    /// listened on is used.
+    #[clap(long, default_value = "8080")]
+    upstream_port: u16,
 
+    /// The port that this proxy server listens on.
     #[clap(long, default_value = "9090")]
     serve_port: u16,
 }
@@ -26,14 +28,11 @@ async fn main() -> anyhow::Result<()> {
     init_logging();
 
     let opts = Opts::parse();
-    let port = wait_for_ready_port(opts.upstream_port).await?;
     let addr = SocketAddr::from(([0, 0, 0, 0], opts.serve_port));
+    tracing::info!(%opts.upstream_port, %opts.serve_port, "Proxy started.");
 
-    let upstream = format!("localhost:{}", port);
-    tracing::info!(%upstream, %opts.serve_port, "Proxy started.");
-
-    let proxy = ProxyService::new(&upstream)
-        .map_err(|e| anyhow!("Couldn't construct proxy to {}. Error: {:?}", upstream, e))?;
+    let proxy = ProxyService::new(opts.upstream_port)
+        .map_err(|e| anyhow!("Couldn't construct proxy to {}. Error: {:?}", opts.upstream_port, e))?;
 
     let make_svc = make_service_fn(|_conn| {
         let proxy = proxy.clone();

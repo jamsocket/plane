@@ -7,47 +7,43 @@ use netlink_packet_sock_diag::{
 use netlink_sys::{
     protocols::NETLINK_SOCK_DIAG, AsyncSocket, AsyncSocketExt, SocketAddr, TokioSocket,
 };
-use std::time::Duration;
+use std::{time::Duration, net::{IpAddr, Ipv4Addr, Ipv6Addr}};
 
-pub async fn wait_for_ready_port(port: Option<u16>) -> anyhow::Result<u16> {
+pub async fn wait_for_ready_port(port: u16, ipv6: bool) -> anyhow::Result<()> {
     loop {
-        let listening_ports = get_listen_ports().await?;
+        let ready = check_for_ready_port(port, ipv6).await?;
 
-        if let Some(port) = port {
-            // Port is provided, only wait for a certain port.
-            if listening_ports.contains(&port) {
-                return Ok(port);
-            }
-        } else {
-            if listening_ports.len() > 1 {
-                return Err(anyhow!(
-                    "Found listeners on multiple ports, not sure which to choose."
-                ));
-            } else if let Some(port) = listening_ports.first() {
-                return Ok(*port);
-            } else {
-                continue;
-            }
+        if ready {
+            return Ok(())
         }
 
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
 }
 
-pub async fn get_listen_ports() -> anyhow::Result<Vec<u16>> {
-    let mut result = Vec::new();
-    // Collect IPV4 ports.
-    result.extend(get_listen_ports_for_socket_id(false).await?.into_iter());
-    // Collect IPV6 ports.
-    result.extend(get_listen_ports_for_socket_id(true).await?.into_iter());
-    Ok(result)
-}
-
-pub async fn get_listen_ports_for_socket_id(ipv6: bool) -> anyhow::Result<Vec<u16>> {
+pub async fn check_for_ready_port(port: u16, ipv6: bool) -> anyhow::Result<bool> {
     let mut socket = TokioSocket::new(NETLINK_SOCK_DIAG)
         .map_err(|e| anyhow!("Couldn't open netlink socket. {:?}", e))?;
 
-    let family = if ipv6 { AF_INET6 } else { AF_INET };
+    let socket_id = if ipv6 {
+        SocketId {
+            source_port: port,
+            source_address: IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+            ..SocketId::new_v6()
+        }
+    } else {
+        SocketId {
+            source_port: port,
+            source_address: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            ..SocketId::new_v4()
+        }
+    };
+
+    let family = if ipv6 {
+        AF_INET6
+    } else {
+        AF_INET
+    };
 
     let mut packet = NetlinkMessage {
         header: NetlinkHeader {
@@ -59,7 +55,7 @@ pub async fn get_listen_ports_for_socket_id(ipv6: bool) -> anyhow::Result<Vec<u1
             protocol: IPPROTO_TCP.into(),
             extensions: ExtensionFlags::empty(),
             states: StateFlags::LISTEN,
-            socket_id: SocketId::new_v4(),
+            socket_id,
         })
         .into(),
     };
@@ -80,8 +76,6 @@ pub async fn get_listen_ports_for_socket_id(ipv6: bool) -> anyhow::Result<Vec<u1
         .await
         .map_err(|e| anyhow!("Error sending netlink packet. {:?}", e))?;
 
-    let mut listening_ports: Vec<u16> = Vec::new();
-
     if let Ok((buffer, _)) = socket.recv_from_full().await {
         let mut offset = 0;
         loop {
@@ -92,12 +86,9 @@ pub async fn get_listen_ports_for_socket_id(ipv6: bool) -> anyhow::Result<Vec<u1
 
             match rx_packet.payload {
                 NetlinkPayload::Noop | NetlinkPayload::Ack(_) => {}
-                NetlinkPayload::InnerMessage(SockDiagMessage::InetResponse(response)) => {
-                    let socket_id = response.header.socket_id;
-                    if !socket_id.source_address.is_loopback() {
-                        // Ignore loopback listeners.
-                        listening_ports.push(socket_id.source_port);
-                    }
+                NetlinkPayload::InnerMessage(SockDiagMessage::InetResponse(_response)) => {
+                    // todo: check response
+                    return Ok(true)
                 }
                 NetlinkPayload::Done => {
                     break;
@@ -123,5 +114,5 @@ pub async fn get_listen_ports_for_socket_id(ipv6: bool) -> anyhow::Result<Vec<u1
         }
     }
 
-    Ok(listening_ports)
+    Ok(false)
 }
