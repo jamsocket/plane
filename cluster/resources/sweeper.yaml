@@ -16,7 +16,7 @@ spec:
       serviceAccountName: spawner
       containers:
       - name: spawner
-        image: ghcr.io/drifting-in-space/sweeper:latest
+        image: ghcr.io/drifting-in-space/spawner-sweeper:latest
         env:
           - name: POD_NAME
             valueFrom:

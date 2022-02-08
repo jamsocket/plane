@@ -6,39 +6,24 @@ build:
   local:
     push: false
   artifacts:
-  - image: spawner_base
+  - image: ghcr.io/drifting-in-space/spawner-controller
     context: crates
     docker:
-      dockerfile: _containers/base.Dockerfile
-  - image: ghcr.io/drifting-in-space/spawner
-    context: crates
-    docker:
-      dockerfile: _containers/spawner.Dockerfile
-    requires:
-    - image: spawner_base
-      alias: BASE
+      dockerfile: _containers/controller.Dockerfile
   - image: ghcr.io/drifting-in-space/spawner-api
     context: crates
     docker:
       dockerfile: _containers/api.Dockerfile
-    requires:
-    - image: spawner_base
-      alias: BASE
   - image: ghcr.io/drifting-in-space/spawner-sweeper
     context: crates
     docker:
       dockerfile: _containers/sweeper.Dockerfile
-    requires:
-    - image: spawner_base
-      alias: BASE
   - image: ghcr.io/drifting-in-space/spawner-sidecar
     context: crates
     docker:
       dockerfile: _containers/sidecar.Dockerfile
-    requires:
-    - image: spawner_base
-      alias: BASE
 deploy:
+  kubeContext: minikube
   kustomize:
     paths:
     - cluster

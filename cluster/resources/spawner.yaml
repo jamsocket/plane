@@ -57,7 +57,7 @@ spec:
       serviceAccountName: spawner
       containers:
       - name: spawner
-        image: ghcr.io/drifting-in-space/spawner:latest
+        image: ghcr.io/drifting-in-space/spawner-controller:latest
         args: [
           "--namespace", "spawner",
           "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:latest",
