@@ -1,9 +1,0 @@
-[workspace]
-members = [
-    "api",
-    "cli",
-    "sidecar",
-    "spawner",
-    "sweeper",
-    "resource",
-]
