@@ -14,7 +14,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: drifting-in-space/sweeper
+  IMAGE_NAME: drifting-in-space/spawner-sweeper
 
 jobs:
   build:
