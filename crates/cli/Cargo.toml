@@ -8,12 +8,11 @@ anyhow = "1.0.52"
 atty = "0.2.14"
 bat = "0.19.0"
 clap = { version = "3.0.14", features = ["derive"] }
-const_format = "0.2.22"
 futures = "0.3.19"
 k8s-openapi = { version = "0.14.0", features = ["schemars", "v1_23"] }
-kube = { version = "0.68.0", features = ["runtime", "derive"] }
+kube = "0.68.0"
 serde = { version = "1.0.133", features = ["derive"] }
 serde_yaml = "0.8.23"
 spawner-resource = {path = "../resource"}
 thiserror = "1.0.30"
-tokio = { version = "1.16.1", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.16.1", features = ["macros", "rt-multi-thread"] }

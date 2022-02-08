@@ -9,11 +9,12 @@ use axum::{
 };
 use clap::Parser;
 use futures::{Stream, StreamExt, TryStreamExt};
-use k8s_openapi::{api::core::v1::Event as KubeEventResource, serde_json::json};
+use k8s_openapi::api::core::v1::Event as KubeEventResource;
 use kube::{
     api::PostParams, runtime::watcher::Error as KubeWatcherError, Api, Client, ResourceExt,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use spawner_resource::{SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
