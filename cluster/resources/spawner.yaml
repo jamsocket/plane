@@ -18,7 +18,7 @@ rules:
   verbs: ["list", "get", "create", "delete", "watch", "patch"]
 - apiGroups: ["spawner.dev"]
   resources: ["sessionlivedbackends"]
-  verbs: ["list", "create", "delete", "watch", "patch"]
+  verbs: ["list", "create", "delete", "watch", "patch", "get"]
 - apiGroups: ["spawner.dev"]
   resources: ["sessionlivedbackends/status"]
   verbs: ["list", "create", "delete", "watch", "patch"]

@@ -142,7 +142,7 @@ async fn ready_handler(
     match slab {
         Ok(slab) => {
             if slab.is_ready() {
-                let url = settings.backend_to_url(&backend_id).ok_or(StatusCode::OK)?;
+                let url = settings.backend_to_url(&backend_id).ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
                 return Response::builder()
                     .status(StatusCode::FOUND)

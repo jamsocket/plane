@@ -1,7 +1,6 @@
 use crate::monitor::Monitor;
 use crate::network_status::wait_for_ready_port;
 use anyhow::anyhow;
-use hyper::body::Bytes;
 use core::future::Future;
 use hyper::client::HttpConnector;
 use hyper::http::uri::{Authority, InvalidUriParts, Scheme};
@@ -85,13 +84,6 @@ impl ProxyService {
             .body(body)?)
     }
 
-    async fn handle_event(self) -> anyhow::Result<Response<Body>> {
-        let state: Bytes = self.monitor.state().into();
-
-        Ok(Response::builder()
-            .body(Body::from(state))?)
-    }
-
     async fn handle_upgrade(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
         let response = self.client.request(clone_request(&req)?).await?;
 
@@ -147,13 +139,7 @@ impl ProxyService {
         *req.uri_mut() = rewrite_uri(req.uri(), &self.upstream)?;
 
         if req.uri().path() == "/_events" {
-            let accept = req.headers().get("accept").map(|d| d.to_str().ok()).flatten().unwrap_or_default();
-            let mut accept_parts = accept.split(',');
-            if accept_parts.any(|g| g == "text/event-stream") {
-                return self.handle_event_stream().await;
-            } else {
-                return self.handle_event().await;
-            }
+            return self.handle_event_stream().await;
         }
         self.monitor.bump();
 
