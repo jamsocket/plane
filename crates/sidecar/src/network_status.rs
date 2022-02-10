@@ -9,9 +9,15 @@ use netlink_sys::{
 };
 use std::{time::Duration, net::{IpAddr, Ipv4Addr, Ipv6Addr}};
 
-pub async fn wait_for_ready_port(port: u16, ipv6: bool) -> anyhow::Result<()> {
+pub async fn wait_for_ready_port(port: u16) -> anyhow::Result<()> {
     loop {
-        let ready = check_for_ready_port(port, ipv6).await?;
+        let ready = check_for_ready_port(port, false).await?;
+        
+        if ready {
+            return Ok(())
+        }
+
+        let ready = check_for_ready_port(port, true).await?;
 
         if ready {
             return Ok(())

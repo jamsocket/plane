@@ -5,3 +5,4 @@ LICENSE
 .gitignore
 .dockerignore
 .github
+_containers
