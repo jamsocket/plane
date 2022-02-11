@@ -143,7 +143,6 @@ async fn reconcile(
         }
     } else if !slab.is_running() {
         let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
-
         if let Some(phase) = get_pod_phase(&pod) {
             tracing::info!(?phase, "Saw pod in phase.");
 
