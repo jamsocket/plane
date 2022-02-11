@@ -151,6 +151,7 @@ async fn reconcile(
                     running: Some(true),
                     ..Default::default()
                 };
+                
                 slab.update_status(client.clone(), status).await?;
                 slab.log_event(client.clone(), SessionLivedBackendEvent::Running)
                     .await?;

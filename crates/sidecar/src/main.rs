@@ -40,7 +40,6 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let server = Server::bind(&addr).serve(make_svc);
-
     server.await?;
 
     Ok(())

@@ -136,7 +136,6 @@ async fn ready_handler(
     let name = settings.backend_to_slab_name(&backend_id);
 
     let api = Api::<SessionLivedBackend>::namespaced(client, &settings.namespace);
-
     let slab = api.get(&name).await;
 
     match slab {
