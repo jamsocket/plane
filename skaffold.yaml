@@ -8,28 +8,20 @@ build:
   artifacts:
   - image: ghcr.io/drifting-in-space/spawner-controller
     context: crates
-    docker:
-      dockerfile: _containers/controller.Dockerfile
-      cacheFrom:
-      - ghcr.io/drifting-in-space/spawner-controller:latest
+    custom:
+      buildCommand: _containers/build.sh _containers/controller.Dockerfile
   - image: ghcr.io/drifting-in-space/spawner-api
     context: crates
-    docker:
-      dockerfile: _containers/api.Dockerfile
-      cacheFrom:
-      - ghcr.io/drifting-in-space/spawner-api:latest
-  - image: ghcr.io/drifting-in-space/spawner-sweeper
-    context: crates
-    docker:
-      dockerfile: _containers/sweeper.Dockerfile
-      cacheFrom:
-        - ghcr.io/drifting-in-space/spawner-sweeper:latest
+    custom:
+      buildCommand: _containers/build.sh _containers/api.Dockerfile
   - image: ghcr.io/drifting-in-space/spawner-sidecar
     context: crates
-    docker:
-      dockerfile: _containers/sidecar.Dockerfile
-      cacheFrom:
-        - ghcr.io/drifting-in-space/spawner-sidecar:latest
+    custom:
+      buildCommand: _containers/build.sh _containers/sidecar.Dockerfile
+  - image: ghcr.io/drifting-in-space/spawner-sweeper
+    context: crates
+    custom:
+      buildCommand: _containers/build.sh _containers/sweeper.Dockerfile
 deploy:
   kubeContext: minikube
   kustomize:
