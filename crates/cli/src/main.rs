@@ -54,14 +54,14 @@ struct SlabSpec {
     prefix: Option<String>,
 
     /// The Kubernetes namespace to operate within.
-    #[clap(long, default_value=DEFAULT_NAMESPACE)]
+    #[clap(short, long, default_value=DEFAULT_NAMESPACE)]
     namespace: String,
 
     #[clap(long, default_value = "300")]
     grace_period_seconds: u32,
 
-    #[clap(long)]
-    http_port: Option<u16>,
+    #[clap(short, long)]
+    port: Option<u16>,
 }
 
 impl SlabSpec {
