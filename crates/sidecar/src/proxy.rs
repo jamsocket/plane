@@ -56,11 +56,13 @@ impl ProxyService {
             let monitor = monitor.clone();
 
             tokio::spawn(async move {
+                tracing::info!(?upstream_port, "Waiting for port to become ready.");
                 let result = wait_for_ready_port(upstream_port).await;
                 if let Err(error) = result {
                     tracing::error!(?error, "Error waiting for ready port.");
                 } else {
                     monitor.set_ready();
+                    tracing::info!(?upstream_port, "Port is ready.");
                 }                
             });
         }
