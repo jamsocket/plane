@@ -74,7 +74,7 @@ impl SlabSpec {
 
         let builder = SessionLivedBackendBuilder::new(&self.image)
             .with_grace_period(grace_period_seconds)
-            .with_port(self.http_port)
+            .with_port(self.port)
             .with_image_pull_secret(self.image_pull_secret.clone())
             .with_image_pull_policy(self.image_pull_policy);
 
