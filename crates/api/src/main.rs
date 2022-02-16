@@ -195,16 +195,20 @@ async fn status_handler(
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
 struct InitPayload {
     /// The container image used to create the container.
     image: String,
 
     /// HTTP port to expose on the container.
-    http_port: Option<u16>,
+    port: Option<u16>,
 
     /// Environment variables to expose on the container.
     #[serde(default)]
     env: HashMap<String, String>,
+
+    /// Duration of time (in seconds) before the pod is shut down.
+    grace_period_seconds: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -221,7 +225,8 @@ async fn init_handler(
 ) -> Result<Json<InitResult>, StatusCode> {
     let slab = SessionLivedBackendBuilder::new(&payload.image)
         .with_env(payload.env)
-        .with_port(payload.http_port)
+        .with_port(payload.port)
+        .with_grace_period(payload.grace_period_seconds)
         .build_prefixed(&settings.service_prefix);
 
     let client = Client::try_default().await.map_err(|error| {
