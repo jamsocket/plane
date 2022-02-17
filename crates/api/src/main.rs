@@ -8,6 +8,7 @@ use axum::{
     AddExtensionLayer, BoxError, Json, Router,
 };
 use clap::Parser;
+use dis_spawner_resource::{SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP};
 use futures::{Stream, StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Event as KubeEventResource;
 use kube::{
@@ -15,7 +16,6 @@ use kube::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use spawner_resource::{SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
@@ -141,7 +141,9 @@ async fn ready_handler(
     match slab {
         Ok(slab) => {
             if slab.is_ready() {
-                let url = settings.backend_to_url(&backend_id).ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+                let url = settings
+                    .backend_to_url(&backend_id)
+                    .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
                 return Response::builder()
                     .status(StatusCode::FOUND)
@@ -195,7 +197,7 @@ async fn status_handler(
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 struct InitPayload {
     /// The container image used to create the container.
     image: String,
