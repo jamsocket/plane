@@ -55,4 +55,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=ghcr.io/drifting-in-space/spawner-sidecar-base:latest
-          cache-to: type=registry,ref=ghcr.io/drifting-in-space/spawner-sidecar-base:latest,mode=max
+          cache-to: ${{ (github.event_name != 'pull_request') && 'type=registry,ref=ghcr.io/drifting-in-space/spawner-api-base:latest,mode=max' || '' }}
