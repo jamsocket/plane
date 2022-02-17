@@ -1,7 +1,11 @@
 [package]
-name = "spawner-cli"
+name = "dis-spawner-cli"
 version = "0.1.0"
 edition = "2021"
+
+[[bin]]
+name = "spawner"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.52"
@@ -13,6 +17,6 @@ k8s-openapi = { version = "0.14.0", features = ["schemars", "v1_23"] }
 kube = "0.68.0"
 serde = { version = "1.0.133", features = ["derive"] }
 serde_yaml = "0.8.23"
-spawner-resource = {path = "../resource"}
+dis-spawner-resource = {path = "../resource"}
 thiserror = "1.0.30"
 tokio = { version = "1.16.1", features = ["macros", "rt-multi-thread"] }

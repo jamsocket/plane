@@ -1,20 +1,24 @@
 [package]
-name = "spawner-sweeper"
+name = "dis-spawner-sweeper"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "spawner-sweeper"
+path = "src/main.rs"
+
 [dependencies]
-clap = { version = "3.0.14", features = ["derive"] }
+clap = { version = "3.1.0", features = ["derive"] }
 futures = "0.3.19"
 k8s-openapi = { version = "0.14.0", features = ["schemars", "v1_23"] }
-kube = { version = "0.68.0", features = ["runtime"] }
+kube = { version = "0.69.1", features = ["runtime"] }
 serde = { version = "1.0.133", features = ["derive"] }
-serde_json = "1.0.75"
-spawner-resource = {path = "../resource"}
+serde_json = "1.0.79"
+dis-spawner-resource = {path = "../resource"}
 thiserror = "1.0.30"
-tokio = { version = "1.16.1", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread", "time"] }
 tracing = "0.1.30"
 tracing-subscriber = { version = "0.3.6", features = ["env-filter"] }
-hyper = { version="0.14.16", features=["full"] }
+hyper = { version="0.14.17", features=["full"] }
 futures-util = "0.3.19"
 async-stream = "0.3.2"

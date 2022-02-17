@@ -14,6 +14,7 @@ set -x
 /usr/bin/docker buildx build \
     --builder skaffold-builder \
     --cache-from type=registry,ref=${BASE}:latest \
+    --cache-to type=registry,ref=${BASE}:latest,mode=max \
     --file $1 \
     --tag $IMAGE \
     --load .

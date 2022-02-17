@@ -11,43 +11,29 @@ build:
     custom:
       buildCommand: _containers/build.sh _containers/controller.Dockerfile
       dependencies:
-        paths:
-          - "controller"
-          - "resource"
-        ignore:
-          - "controller/target"
-          - "resource/target"
+        dockerfile:
+          path: "_containers/controller.Dockerfile"
   - image: ghcr.io/drifting-in-space/spawner-api
     context: crates
     custom:
       buildCommand: _containers/build.sh _containers/api.Dockerfile
       dependencies:
-        paths:
-          - "api"
-          - "resource"
-        ignore:
-          - "api/target"
-          - "resource/target"
+        dockerfile:
+          path: "_containers/api.Dockerfile"
   - image: ghcr.io/drifting-in-space/spawner-sidecar
     context: crates
     custom:
       buildCommand: _containers/build.sh _containers/sidecar.Dockerfile
       dependencies:
-        paths:
-          - "sidecar"
-        ignore:
-          - "sidecar/target"
+        dockerfile:
+          path: "_containers/sidecar.Dockerfile"
   - image: ghcr.io/drifting-in-space/spawner-sweeper
     context: crates
     custom:
       buildCommand: _containers/build.sh _containers/sweeper.Dockerfile
       dependencies:
-        paths:
-          - "sweeper"
-          - "resource"
-        ignore:
-          - "sweeper/target"
-          - "resource/target"
+        dockerfile:
+          path: "_containers/sweeper.Dockerfile"
 deploy:
   kubeContext: minikube
   kustomize:

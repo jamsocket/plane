@@ -10,7 +10,7 @@ use kube::{
 };
 use logging::init_logging;
 use serde::Deserialize;
-use spawner_resource::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
+use dis_spawner_resource::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -135,7 +135,7 @@ async fn reconcile(
     slab: Arc<SessionLivedBackend>,
     ctx: Context<ControllerContext>,
 ) -> Result<ReconcilerAction, Error> {
-    let name = slab.name();
+    let name = slab.as_ref().name();
     tracing::info!(?name, "Saw SessionLivedBackend.");
 
     if !slab.is_running() {

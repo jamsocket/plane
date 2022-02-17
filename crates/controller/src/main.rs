@@ -1,10 +1,10 @@
-use std::fmt::Debug;
-use std::sync::Arc;
-
 use clap::Parser;
+use dis_spawner_resource::{
+    SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus,
+};
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{Pod, Service};
-use kube::api::{PostParams, DeleteParams};
+use kube::api::{DeleteParams, PostParams};
 use kube::ResourceExt;
 use kube::{
     api::{Api, ListParams},
@@ -12,7 +12,8 @@ use kube::{
     Client,
 };
 use logging::init_logging;
-use spawner_resource::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
+use std::fmt::Debug;
+use std::sync::Arc;
 use tokio::time::Duration;
 
 const SIDECAR_PORT: u16 = 9090;
@@ -49,11 +50,11 @@ pub enum Error {
     SerializationError,
 }
 
-impl From<spawner_resource::Error> for Error {
-    fn from(error: spawner_resource::Error) -> Self {
+impl From<dis_spawner_resource::Error> for Error {
+    fn from(error: dis_spawner_resource::Error) -> Self {
         match error {
-            spawner_resource::Error::MissingObjectKey(k) => Error::MissingObjectKey(k),
-            spawner_resource::Error::KubernetesFailure(e) => Error::KubernetesFailure(e),
+            dis_spawner_resource::Error::MissingObjectKey(k) => Error::MissingObjectKey(k),
+            dis_spawner_resource::Error::KubernetesFailure(e) => Error::KubernetesFailure(e),
         }
     }
 }
@@ -151,7 +152,7 @@ async fn reconcile(
                     running: Some(true),
                     ..Default::default()
                 };
-                
+
                 slab.update_status(client.clone(), status).await?;
                 slab.log_event(client.clone(), SessionLivedBackendEvent::Running)
                     .await?;
@@ -166,7 +167,7 @@ async fn reconcile(
             }
             Result::Err(error) => {
                 tracing::error!(%name, ?error, "Unexpected error deleting SessionLivedBackend.");
-                return Err(Error::KubernetesFailure(error))
+                return Err(Error::KubernetesFailure(error));
             }
         }
     }

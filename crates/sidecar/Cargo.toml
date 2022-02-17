@@ -1,16 +1,20 @@
 [package]
-name = "spawner-sidecar"
+name = "dis-spawner-sidecar"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "spawner-sidecar"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.52"
-clap = { version = "3.0.14", features = ["derive"] }
+clap = { version = "3.1.0", features = ["derive"] }
 futures-core = "0.3.19"
-hyper = { version="0.14.16", features=["full"] }
-netlink-packet-sock-diag = "0.3.0"
+hyper = { version="0.14.17", features=["full"] }
+netlink-packet-sock-diag = "0.4.0"
 netlink-sys = { version = "0.8.1", features = ["tokio_socket"] }
-tokio = { version = "1.16.1", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread", "time"] }
 tokio-stream = { version="0.1.8", features=["sync"] }
 tracing = "0.1.30"
 tracing-subscriber = { version = "0.3.6", features = ["env-filter"] }
