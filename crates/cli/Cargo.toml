@@ -17,6 +17,6 @@ k8s-openapi = { version = "0.14.0", features = ["schemars", "v1_23"] }
 kube = { version = "0.69.1", features = ["runtime"] }
 serde = { version = "1.0.133", features = ["derive"] }
 serde_yaml = "0.8.23"
-dis-spawner = {version = "0.1.0", path = "../core"}
+dis-spawner = "0.1.0"
 thiserror = "1.0.30"
 tokio = { version = "1.16.1", features = ["macros", "rt-multi-thread"] }

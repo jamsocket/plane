@@ -472,6 +472,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "dis-spawner"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07aff997d82a267a7e554aa6c04f7d8aeb28a603c61e74b527fca57aae18d8f2"
+dependencies = [
+ "futures",
+ "k8s-openapi",
+ "kube",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "dis-spawner-api"
 version = "0.1.0"
 dependencies = [
@@ -479,7 +497,7 @@ dependencies = [
  "atty",
  "axum",
  "clap 3.1.0",
- "dis-spawner",
+ "dis-spawner 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "k8s-openapi",
  "kube",
@@ -502,7 +520,7 @@ dependencies = [
  "atty",
  "bat",
  "clap 3.1.0",
- "dis-spawner",
+ "dis-spawner 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "k8s-openapi",
  "kube",
@@ -517,7 +535,7 @@ name = "dis-spawner-controller"
 version = "0.1.0"
 dependencies = [
  "clap 3.1.0",
- "dis-spawner",
+ "dis-spawner 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "k8s-openapi",
  "kube",
@@ -551,7 +569,7 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "clap 3.1.0",
- "dis-spawner",
+ "dis-spawner 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "futures-util",
  "hyper",
