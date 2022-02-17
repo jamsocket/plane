@@ -6,6 +6,11 @@ edition = "2021"
 [[bin]]
 name = "spawner-api"
 path = "src/main.rs"
+homepage = "https://spawner.dev"
+description = "HTTP interface to Spawner."
+repository = "https://github.com/drifting-in-space/spawner"
+license = "MIT"
+readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.52"

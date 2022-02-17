@@ -1,0 +1,1 @@
+API server for [Spawner](https://github.com/drifting-in-space/spawner), see there for documentation.
