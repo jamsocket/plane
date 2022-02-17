@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/docker-publish-sidecar.yml'
       - 'crates/sidecar/**'
-      - 'containers/sidecar.Dockerfile'
+      - '_containers/sidecar.Dockerfile'
   pull_request:
     branches: [ master ]
 

@@ -8,7 +8,7 @@ on:
       - '.github/workflows/docker-publish-sweeper.yml'
       - 'crates/sweeper/**'
       - 'crates/resource/**'
-      - 'containers/sweeper.Dockerfile'
+      - '_containers/sweeper.Dockerfile'
   pull_request:
     branches: [ master ]
 
