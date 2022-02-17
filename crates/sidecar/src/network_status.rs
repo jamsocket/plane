@@ -57,7 +57,7 @@ pub async fn check_for_ready_port(port: u16, ipv6: bool) -> anyhow::Result<bool>
         },
         payload: SockDiagMessage::InetRequest(InetRequest {
             family,
-            protocol: IPPROTO_TCP.into(),
+            protocol: IPPROTO_TCP,
             extensions: ExtensionFlags::empty(),
             states: StateFlags::LISTEN,
             socket_id,
