@@ -1,7 +1,8 @@
 FROM lukemathwalker/cargo-chef:latest-rust-1.58 AS chef
 
 # Prepare chef plan (snapshot dependencies for pre-build).
-COPY sidecar /app
+FROM chef as plan
+COPY . /app
 WORKDIR /app
 RUN cargo chef prepare --recipe-path recipe.json
 
@@ -12,7 +13,7 @@ COPY --from=plan /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 
 # Build package.
-COPY sidecar /app
+COPY . /app
 RUN cargo build --release
 
 # Copy binary into image.
