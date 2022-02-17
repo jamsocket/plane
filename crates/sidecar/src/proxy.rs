@@ -63,7 +63,7 @@ impl ProxyService {
                 } else {
                     monitor.set_ready();
                     tracing::info!(?upstream_port, "Port is ready.");
-                }                
+                }
             });
         }
 

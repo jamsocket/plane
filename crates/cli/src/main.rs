@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
 use bat::PrettyPrinter;
 use clap::{Parser, Subcommand};
-use kube::{api::PostParams, Api, Client, CustomResourceExt};
-use serde::Serialize;
 use dis_spawner::{
     ImagePullPolicy, SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP,
 };
+use kube::{api::PostParams, Api, Client, CustomResourceExt};
+use serde::Serialize;
 
 const DEFAULT_NAMESPACE: &str = "default";
 

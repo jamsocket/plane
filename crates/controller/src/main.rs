@@ -1,7 +1,5 @@
 use clap::Parser;
-use dis_spawner::{
-    SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus,
-};
+use dis_spawner::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{Pod, Service};
 use kube::api::{DeleteParams, PostParams};

@@ -1,4 +1,5 @@
 use clap::Parser;
+use dis_spawner::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
 use futures::StreamExt;
 use futures_util::Stream;
 use hyper::{Body, Request, Uri};
@@ -10,7 +11,6 @@ use kube::{
 };
 use logging::init_logging;
 use serde::Deserialize;
-use dis_spawner::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -190,7 +190,7 @@ async fn reconcile(
                 tracing::info!(?url, "Reached end of message stream; assuming pod is dead.");
                 break;
             };
-            
+
             tracing::info!(?result, ?url, "Got status message.");
 
             if result.ready & !ready {

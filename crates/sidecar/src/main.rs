@@ -31,8 +31,13 @@ async fn main() -> anyhow::Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], opts.serve_port));
     tracing::info!(%opts.upstream_port, %opts.serve_port, "Proxy started.");
 
-    let proxy = ProxyService::new(opts.upstream_port)
-        .map_err(|e| anyhow!("Couldn't construct proxy to {}. Error: {:?}", opts.upstream_port, e))?;
+    let proxy = ProxyService::new(opts.upstream_port).map_err(|e| {
+        anyhow!(
+            "Couldn't construct proxy to {}. Error: {:?}",
+            opts.upstream_port,
+            e
+        )
+    })?;
 
     let make_svc = make_service_fn(|_conn| {
         let proxy = proxy.clone();

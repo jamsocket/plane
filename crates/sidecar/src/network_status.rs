@@ -7,20 +7,23 @@ use netlink_packet_sock_diag::{
 use netlink_sys::{
     protocols::NETLINK_SOCK_DIAG, AsyncSocket, AsyncSocketExt, SocketAddr, TokioSocket,
 };
-use std::{time::Duration, net::{IpAddr, Ipv4Addr, Ipv6Addr}};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    time::Duration,
+};
 
 pub async fn wait_for_ready_port(port: u16) -> anyhow::Result<()> {
     loop {
         let ready = check_for_ready_port(port, false).await?;
-        
+
         if ready {
-            return Ok(())
+            return Ok(());
         }
 
         let ready = check_for_ready_port(port, true).await?;
 
         if ready {
-            return Ok(())
+            return Ok(());
         }
 
         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -45,11 +48,7 @@ pub async fn check_for_ready_port(port: u16, ipv6: bool) -> anyhow::Result<bool>
         }
     };
 
-    let family = if ipv6 {
-        AF_INET6
-    } else {
-        AF_INET
-    };
+    let family = if ipv6 { AF_INET6 } else { AF_INET };
 
     let mut packet = NetlinkMessage {
         header: NetlinkHeader {
@@ -94,7 +93,7 @@ pub async fn check_for_ready_port(port: u16, ipv6: bool) -> anyhow::Result<bool>
                 NetlinkPayload::Noop | NetlinkPayload::Ack(_) => {}
                 NetlinkPayload::InnerMessage(SockDiagMessage::InetResponse(_response)) => {
                     // todo: check response
-                    return Ok(true)
+                    return Ok(true);
                 }
                 NetlinkPayload::Done => {
                     break;

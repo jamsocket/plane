@@ -1,6 +1,6 @@
 use hyper::body::Bytes;
 use std::{
-    sync::atomic::{AtomicU32, AtomicU64, Ordering, AtomicBool},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::broadcast::{channel, Sender};
@@ -19,15 +19,17 @@ pub enum MonitorState {
 impl Into<Bytes> for MonitorState {
     fn into(self) -> Bytes {
         match self {
-            MonitorState::NotReady => {
-                format!("data: {{\"ready\": false}}\n\n").into()
-            },
-            MonitorState::LiveConnections(connections) => {
-                format!("data: {{\"ready\": true, \"live_connections\": {}}}\n\n", connections).into()
-            },
-            MonitorState::Inactive(seconds_since_active) => {
-                format!("data: {{\"ready\": true, \"seconds_since_active\": {}}}\n\n", seconds_since_active).into()
-            },
+            MonitorState::NotReady => format!("data: {{\"ready\": false}}\n\n").into(),
+            MonitorState::LiveConnections(connections) => format!(
+                "data: {{\"ready\": true, \"live_connections\": {}}}\n\n",
+                connections
+            )
+            .into(),
+            MonitorState::Inactive(seconds_since_active) => format!(
+                "data: {{\"ready\": true, \"seconds_since_active\": {}}}\n\n",
+                seconds_since_active
+            )
+            .into(),
         }
     }
 }
@@ -65,12 +67,12 @@ impl Monitor {
 
     pub fn state(&self) -> MonitorState {
         if !self.ready.load(Ordering::Relaxed) {
-            return MonitorState::NotReady
+            return MonitorState::NotReady;
         }
 
         let live_connections = self.live_connections.load(Ordering::Relaxed);
         let last_active = self.last_connection.load(Ordering::Relaxed);
-        
+
         if live_connections > 0 {
             MonitorState::LiveConnections(live_connections)
         } else {
