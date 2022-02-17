@@ -2,14 +2,14 @@ FROM lukemathwalker/cargo-chef:latest-rust-1.58 AS chef
 
 # Prepare chef plan (snapshot dependencies for pre-build).
 FROM chef as plan
-COPY resource /app/resource
+COPY core /app/core
 COPY api /app/api
 WORKDIR /app/api
 RUN cargo chef prepare --recipe-path recipe.json
 
 # Execute chef plan (pre-build dependencies).
 FROM chef AS build
-COPY resource /app/resource
+COPY core /app/core
 WORKDIR /app/api
 COPY --from=plan /app/api/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
