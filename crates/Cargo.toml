@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+    "api",
+    "cli",
+    "controller",
+    "core",
+    "sidecar",
+    "sweeper"
+]

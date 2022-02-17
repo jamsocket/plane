@@ -1,5 +1,5 @@
 use clap::Parser;
-use dis_spawner_resource::{
+use dis_spawner::{
     SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus,
 };
 use futures::StreamExt;
@@ -50,11 +50,11 @@ pub enum Error {
     SerializationError,
 }
 
-impl From<dis_spawner_resource::Error> for Error {
-    fn from(error: dis_spawner_resource::Error) -> Self {
+impl From<dis_spawner::Error> for Error {
+    fn from(error: dis_spawner::Error) -> Self {
         match error {
-            dis_spawner_resource::Error::MissingObjectKey(k) => Error::MissingObjectKey(k),
-            dis_spawner_resource::Error::KubernetesFailure(e) => Error::KubernetesFailure(e),
+            dis_spawner::Error::MissingObjectKey(k) => Error::MissingObjectKey(k),
+            dis_spawner::Error::KubernetesFailure(e) => Error::KubernetesFailure(e),
         }
     }
 }

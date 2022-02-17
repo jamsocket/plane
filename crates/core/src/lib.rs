@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 pub use builder::SessionLivedBackendBuilder;
 use k8s_openapi::{
     api::core::v1::{
@@ -22,6 +24,7 @@ use std::{
 };
 
 mod builder;
+pub mod event_stream;
 
 pub const SPAWNER_GROUP: &str = "spawner.dev";
 const LABEL_RUN: &str = "run";

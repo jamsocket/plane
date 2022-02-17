@@ -10,7 +10,7 @@ use kube::{
 };
 use logging::init_logging;
 use serde::Deserialize;
-use dis_spawner_resource::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
+use dis_spawner::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::Arc;

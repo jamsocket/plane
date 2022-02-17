@@ -3,7 +3,7 @@ use bat::PrettyPrinter;
 use clap::{Parser, Subcommand};
 use kube::{api::PostParams, Api, Client, CustomResourceExt};
 use serde::Serialize;
-use dis_spawner_resource::{
+use dis_spawner::{
     ImagePullPolicy, SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP,
 };
 
