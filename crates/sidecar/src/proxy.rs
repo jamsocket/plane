@@ -73,7 +73,7 @@ impl ProxyService {
                 "localhost:{}",
                 upstream_port
             ))?),
-            monitor: monitor,
+            monitor,
         })
     }
 
@@ -157,11 +157,11 @@ impl ProxyService {
     }
 }
 
+type ProxyServiceFuture = Pin<Box<dyn Future<Output = Result<Response<Body>, anyhow::Error>> + Send + 'static>>;
 impl Service<Request<Body>> for ProxyService {
     type Response = Response<Body>;
     type Error = anyhow::Error;
-    type Future =
-        Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+    type Future = ProxyServiceFuture;
 
     fn poll_ready(
         &mut self,

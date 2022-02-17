@@ -16,20 +16,16 @@ pub enum MonitorState {
     Inactive(u32),
 }
 
-impl Into<Bytes> for MonitorState {
-    fn into(self) -> Bytes {
-        match self {
-            MonitorState::NotReady => format!("data: {{\"ready\": false}}\n\n").into(),
-            MonitorState::LiveConnections(connections) => format!(
-                "data: {{\"ready\": true, \"live_connections\": {}}}\n\n",
-                connections
-            )
-            .into(),
-            MonitorState::Inactive(seconds_since_active) => format!(
-                "data: {{\"ready\": true, \"seconds_since_active\": {}}}\n\n",
-                seconds_since_active
-            )
-            .into(),
+impl From<MonitorState> for Bytes {
+    fn from(monitor_state: MonitorState) -> Bytes {
+        match monitor_state {
+            MonitorState::NotReady => "data: {\"ready\": false}\n\n".into(),
+            MonitorState::LiveConnections(connections) => {
+                format!("data: {{\"ready\": true, \"live_connections\": {}}}\n\n", connections).into()
+            },
+            MonitorState::Inactive(seconds_since_active) => {
+                format!("data: {{\"ready\": true, \"seconds_since_active\": {}}}\n\n", seconds_since_active).into()
+            },
         }
     }
 }
