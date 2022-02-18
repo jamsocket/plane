@@ -5,6 +5,10 @@
 [![Sidecar Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml)
 [![Sweeper Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml)
 
+[![crates.io](https://img.shields.io/crates/v/dis-spawner.svg)](https://crates.io/crates/dis-spawner)
+[![crates.io](https://img.shields.io/crates/v/dis-spawner-api.svg)](https://crates.io/crates/dis-spawner-api)
+
+
 **Spawner** allows web applications to create [**session-lived backends**](https://driftingin.space/posts/session-lived-application-backends),
 which are server processes dedicated to individual (or small groups of) users.
 
@@ -35,7 +39,7 @@ see [Agones](https://agones.dev/site/) for that use case.
 
 ## Architecture
 
-![Spawner architecture diagram](docs/diagram.svg)
+![Spawner architecture diagram](https://github.com/drifting-in-space/spawner/raw/master/docs/diagram.svg)
 
 Spawner is built on top of [Kubernetes](https://kubernetes.io/), an open-source container orchestration
 system. Spawner provides the `SessionLivedBackend` [custom resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/),
