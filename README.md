@@ -1,13 +1,12 @@
 # Spawner
 
-[![API Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-api.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-api.yml)
-[![Controller Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-controller.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-controller.yml)
-[![Sidecar Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml)
-[![Sweeper Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml)
-
-[![crates.io](https://img.shields.io/crates/v/dis-spawner.svg)](https://crates.io/crates/dis-spawner)
-[![crates.io](https://img.shields.io/crates/v/dis-spawner-api.svg)](https://crates.io/crates/dis-spawner-api)
-
+| Component | Pipeline | Image | Crate | Version |
+| ---       | ---   | ---     | ---      | ---   |
+| [`core`](https://github.com/drifting-in-space/spawner/tree/master/crates/core) | | | [`dis-spawner`](https://crates.io/crates/dis-spawner) | [![crates.io](https://img.shields.io/crates/v/dis-spawner.svg)](https://crates.io/crates/dis-spawner) |
+| [`controller`](https://github.com/drifting-in-space/spawner/tree/master/crates/controller) | [![Controller Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-controller.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-controller.yml) | [`spawner-controller`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-controller) | | |
+| [`sidecar`](https://github.com/drifting-in-space/spawner/tree/master/crates/sidecar) | [![Sidecar Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml) | [`spawner-sidecar`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-sidecar) | | |
+| [`sweeper`](https://github.com/drifting-in-space/spawner/tree/master/crates/sweeper) | [![Sweeper Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml) | [`spawner-sweeper`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-sweeper) | | |
+| [`api`](https://github.com/drifting-in-space/spawner/tree/master/crates/api) | [![API Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-api.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-api.yml) | [`spawner-api`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-api) | [`dis-spawner-api`](https://crates.io/crates/dis-spawner-api) | [![crates.io](https://img.shields.io/crates/v/dis-spawner-api.svg)](https://crates.io/crates/dis-spawner-api) |
 
 **Spawner** allows web applications to create [**session-lived backends**](https://driftingin.space/posts/session-lived-application-backends),
 which are server processes dedicated to individual (or small groups of) users.
@@ -17,8 +16,8 @@ an API for spinning these servers up when a new user connects, and automatically
 them when the user disconnects.
 
 Spawner is still new and evolving. If you're interested in using it, we'd love
-to hear about your use case and help you get started. Feel free to open an issue on GitHub or contact
-[Paul](https://github.com/paulgb) at [paul@driftingin.space](mailto:hi@driftingin.space).
+to hear about your use case and help you get started. Feel free to [open an issue on GitHub](https://github.com/drifting-in-space/spawner/issues)
+or contact [Paul](https://github.com/paulgb) at [paul@driftingin.space](mailto:paul@driftingin.space).
 
 ## Use cases
 
