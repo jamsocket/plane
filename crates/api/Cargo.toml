@@ -2,6 +2,11 @@
 name = "dis-spawner-api"
 version = "0.1.0"
 edition = "2021"
+homepage = "https://spawner.dev"
+description = "HTTP API for Spawner, a server for session-lived backends."
+repository = "https://github.com/drifting-in-space/spawner"
+license = "MIT"
+readme = "README.md"
 
 [[bin]]
 name = "spawner-api"
