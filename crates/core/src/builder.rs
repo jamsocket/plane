@@ -13,7 +13,7 @@ pub struct SessionLivedBackendBuilder {
     env: HashMap<String, String>,
     image_pull_policy: Option<ImagePullPolicy>,
     namespace: Option<String>,
-    grace_period_seconds: Option<u32>,
+    grace_period_seconds: u32,
     http_port: Option<u16>,
 }
 
@@ -25,7 +25,7 @@ impl SessionLivedBackendBuilder {
             image_pull_policy: None,
             image_pull_secret: None,
             namespace: None,
-            grace_period_seconds: Some(DEFAULT_GRACE_SECONDS),
+            grace_period_seconds: DEFAULT_GRACE_SECONDS,
             http_port: None,
         }
     }
@@ -51,7 +51,7 @@ impl SessionLivedBackendBuilder {
 
     pub fn with_grace_period(self, grace_period_seconds: Option<u32>) -> Self {
         SessionLivedBackendBuilder {
-            grace_period_seconds,
+            grace_period_seconds: grace_period_seconds.unwrap_or(DEFAULT_GRACE_SECONDS),
             ..self
         }
     }
@@ -76,7 +76,7 @@ impl SessionLivedBackendBuilder {
 
         SessionLivedBackendSpec {
             http_port: self.http_port,
-            grace_period_seconds: self.grace_period_seconds,
+            grace_period_seconds: Some(self.grace_period_seconds),
             template: BackendPodSpec {
                 containers: vec![Container {
                     image: Some(self.image.to_string()),
