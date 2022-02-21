@@ -1,6 +1,6 @@
 [package]
 name = "dis-spawner-api"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 homepage = "https://spawner.dev"
 description = "HTTP API for Spawner, a server for session-lived backends."
@@ -28,7 +28,7 @@ kube = { version = "0.69.1", features = ["runtime"] }
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0.78"
 serde_yaml = "0.8.23"
-dis-spawner = "0.1.0"
+dis-spawner = "0.1.1"
 thiserror = "1.0.30"
 tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread"] }
 tokio-stream = "0.1.8"
