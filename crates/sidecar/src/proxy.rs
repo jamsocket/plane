@@ -157,7 +157,8 @@ impl ProxyService {
     }
 }
 
-type ProxyServiceFuture = Pin<Box<dyn Future<Output = Result<Response<Body>, anyhow::Error>> + Send + 'static>>;
+type ProxyServiceFuture =
+    Pin<Box<dyn Future<Output = Result<Response<Body>, anyhow::Error>> + Send + 'static>>;
 impl Service<Request<Body>> for ProxyService {
     type Response = Response<Body>;
     type Error = anyhow::Error;

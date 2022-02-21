@@ -17,7 +17,11 @@ fn list_params_for_resource(resource_name: &str) -> ListParams {
     }
 }
 
-pub async fn past_events(client: Client, resource_name: &str, namespace: &str) -> Result<Vec<KubeEventResource>, KubeError> {
+pub async fn past_events(
+    client: Client,
+    resource_name: &str,
+    namespace: &str,
+) -> Result<Vec<KubeEventResource>, KubeError> {
     let api = Api::<KubeEventResource>::namespaced(client, &namespace);
 
     let list_params = list_params_for_resource(resource_name);
