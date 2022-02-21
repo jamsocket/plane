@@ -7,6 +7,24 @@ use kube::{
 };
 use tokio_stream::StreamExt;
 
+fn list_params_for_resource(resource_name: &str) -> ListParams {
+    ListParams {
+        field_selector: Some(format!(
+            "involvedObject.name={},involvedObject.kind=SessionLivedBackend",
+            resource_name
+        )),
+        ..ListParams::default()
+    }
+}
+
+pub async fn past_events(client: Client, resource_name: &str, namespace: &str) -> Result<Vec<KubeEventResource>, KubeError> {
+    let api = Api::<KubeEventResource>::namespaced(client, &namespace);
+
+    let list_params = list_params_for_resource(resource_name);
+
+    Ok(api.list(&list_params).await?.items)
+}
+
 pub async fn event_stream(
     client: Client,
     resource_name: &str,
@@ -14,13 +32,7 @@ pub async fn event_stream(
 ) -> Result<impl Stream<Item = Result<KubeEventResource, KubeWatcherError>>, KubeError> {
     let api = Api::<KubeEventResource>::namespaced(client, &namespace);
 
-    let list_params = ListParams {
-        field_selector: Some(format!(
-            "involvedObject.name={},involvedObject.kind=SessionLivedBackend",
-            resource_name
-        )),
-        ..ListParams::default()
-    };
+    let list_params = list_params_for_resource(resource_name);
 
     let event_stream = watcher(api.clone(), list_params.clone()).filter_map(|event| match event {
         Ok(event) => match event {

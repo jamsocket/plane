@@ -8,3 +8,6 @@ members = [
     "sidecar",
     "sweeper"
 ]
+
+[patch.crates-io]
+dis-spawner = {path = "./core"}

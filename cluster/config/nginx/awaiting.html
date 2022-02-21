@@ -4,7 +4,7 @@
         <title>Spawner: Pod is Starting</title>
 
         <script>
-            let statusUrl = document.location.pathname.replace(/ready$/, "status");
+            let statusUrl = document.location.pathname.replace(/ready$/, "status/stream");
 
             let eventSource = new EventSource(statusUrl);
             eventSource.onmessage = (msg) => {

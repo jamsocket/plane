@@ -7,7 +7,8 @@ use axum::{
     BoxError, Json, Router,
 };
 use dis_spawner::{
-    event_stream::event_stream, SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP,
+    event_stream::{event_stream, past_events},
+    SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP,
 };
 use futures::{Stream, TryStreamExt};
 use k8s_openapi::api::core::v1::Event as KubeEventResource;
@@ -15,7 +16,7 @@ use kube::{
     api::PostParams, runtime::watcher::Error as KubeWatcherError, Api, Client, ResourceExt,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::{collections::HashMap, sync::Arc};
 use tokio_stream::StreamExt;
 
@@ -28,8 +29,9 @@ pub async fn get_client() -> Result<Client, StatusCode> {
 
 pub fn backend_routes() -> Router {
     Router::new()
-        .route("/backend/:backend_id/status", get(status_handler))
-        .route("/backend/:backend_id/ready", get(ready_handler))
+        .route("/:backend_id/status/stream", get(status_handler))
+        .route("/:backend_id/status", get(last_status_handler))
+        .route("/:backend_id/ready", get(ready_handler))
 }
 
 async fn ready_handler(
@@ -69,6 +71,13 @@ async fn ready_handler(
     }
 }
 
+fn event_to_json(event: &KubeEventResource) -> Value {
+    json!({
+        "state": event.action,
+        "time": event.event_time,
+    })
+}
+
 fn convert_stream<T>(stream: T) -> impl Stream<Item = Result<AxumSseEvent, BoxError>>
 where
     T: Stream<Item = Result<KubeEventResource, KubeWatcherError>>,
@@ -77,12 +86,26 @@ where
         let event: KubeEventResource = event.map_err(Box::new)?;
 
         Ok(AxumSseEvent::default()
-            .json_data(json! ({
-                "state": event.action,
-                "time": event.event_time,
-            }))
+            .json_data(event_to_json(&event))
             .map_err(Box::new)?)
     })
+}
+
+async fn last_status_handler(
+    Path((backend_id,)): Path<(String,)>,
+    Extension(settings): Extension<Arc<ApiSettings>>,
+) -> Result<Json<Value>, StatusCode> {
+    let client = settings.get_client().await?;
+
+    let resource_name = settings.backend_to_slab_name(&backend_id);
+    let mut events = past_events(client, &resource_name, &settings.namespace)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    events.sort_by_key(|d| d.event_time.clone());
+    let last_event = events.last().ok_or(StatusCode::NO_CONTENT)?;
+
+    Ok(Json(event_to_json(last_event)))
 }
 
 async fn status_handler(
