@@ -138,22 +138,22 @@ impl ApiSettings {
         })
     }
 
-    fn backend_to_slab_name(&self, backend_id: &str) -> String {
+    pub fn backend_to_slab_name(&self, backend_id: &str) -> String {
         format!("{}{}", self.service_prefix, backend_id)
     }
 
-    fn backend_to_url(&self, backend_id: &str) -> Option<String> {
+    pub fn backend_to_url(&self, backend_id: &str) -> Option<String> {
         self.url_template
             .as_ref()
             .map(|d| d.replace("{}", &backend_id))
     }
 
-    fn api_path(&self, backend_id: &str, path: &str) -> Option<String> {
+    pub fn api_path(&self, backend_id: &str, path: &str) -> Option<String> {
         let base = self.api_url_template.as_ref()?.replace("{}", backend_id);
         Some(format!("{}{}", base, path))
     }
 
-    fn get_init_result(&self, backend_id: &str) -> InitResult {
+    pub fn get_init_result(&self, backend_id: &str) -> InitResult {
         let ready_url = self.api_path(&backend_id, "/ready");
         let status_url = self.api_path(&backend_id, "/status");
 
@@ -165,7 +165,7 @@ impl ApiSettings {
         }
     }
 
-    fn slab_name_to_backend(&self, slab_name: &str) -> Option<String> {
+    pub fn slab_name_to_backend(&self, slab_name: &str) -> Option<String> {
         slab_name
             .strip_prefix(&self.service_prefix)
             .map(|t| t.to_string())
