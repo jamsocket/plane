@@ -126,7 +126,7 @@ async fn status_handler(
 pub struct ApiSettings {
     pub namespace: String,
     pub url_template: Option<String>,
-    pub api_url_template: Option<String>,
+    pub api_server_base: Option<String>,
     pub service_prefix: String,
 }
 
@@ -148,16 +148,17 @@ impl ApiSettings {
             .map(|d| d.replace("{}", &backend_id))
     }
 
-    pub fn api_path(&self, backend_id: &str, path: &str) -> Option<String> {
-        let base = self.api_url_template.as_ref()?.replace("{}", backend_id);
-        Some(format!("{}{}", base, path))
+    pub fn backend_api_path(&self, backend_id: &str, path: &str) -> Option<String> {
+        let api_server_base = self.api_server_base.as_ref()?;
+
+        Some(format!("{}/backend/{}/{}", api_server_base, backend_id, path))
     }
 
-    pub fn get_init_result(&self, backend_id: &str) -> InitResult {
-        let ready_url = self.api_path(&backend_id, "/ready");
-        let status_url = self.api_path(&backend_id, "/status");
+    pub fn get_init_result(&self, backend_id: &str) -> SpawnResult {
+        let ready_url = self.backend_api_path(&backend_id, "ready");
+        let status_url = self.backend_api_path(&backend_id, "status");
 
-        InitResult {
+        SpawnResult {
             url: self.backend_to_url(backend_id),
             name: backend_id.to_string(),
             ready_url,
@@ -173,7 +174,7 @@ impl ApiSettings {
 }
 
 #[derive(Serialize)]
-pub struct InitResult {
+pub struct SpawnResult {
     url: Option<String>,
     name: String,
     ready_url: Option<String>,
@@ -200,7 +201,7 @@ pub struct InitPayload {
 pub async fn init_handler(
     Json(payload): Json<InitPayload>,
     Extension(settings): Extension<Arc<ApiSettings>>,
-) -> Result<Json<InitResult>, StatusCode> {
+) -> Result<Json<SpawnResult>, StatusCode> {
     let slab = SessionLivedBackendBuilder::new(&payload.image)
         .with_env(payload.env)
         .with_port(payload.port)
