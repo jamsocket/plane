@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/docker-publish-controller.yml'
       - 'crates/controller/**'
-      - 'crates/resource/**'
+      - 'crates/core/**'
       - '_containers/controller.Dockerfile'
   pull_request:
     branches: [ master ]
