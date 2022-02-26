@@ -270,6 +270,12 @@ impl SessionLivedBackend {
             .collect()
     }
 
+    fn labels(&self) -> BTreeMap<String, String> {
+        let mut labels = self.metadata.labels.clone().unwrap_or_default();
+        labels.append(&mut self.run_label());
+        labels
+    }
+
     pub fn pod(
         &self,
         sidecar_image: &str,
@@ -309,7 +315,7 @@ impl SessionLivedBackend {
         Ok(Pod {
             metadata: ObjectMeta {
                 name: Some(name),
-                labels: Some(self.run_label()),
+                labels: Some(self.labels()),
                 owner_references: Some(vec![self.metadata_reference()?]),
                 ..ObjectMeta::default()
             },
@@ -325,6 +331,7 @@ impl SessionLivedBackend {
             metadata: ObjectMeta {
                 name: Some(name.to_string()),
                 owner_references: Some(vec![self.metadata_reference()?]),
+                labels: Some(self.labels()),
                 ..ObjectMeta::default()
             },
             spec: Some(ServiceSpec {

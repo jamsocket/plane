@@ -1,6 +1,6 @@
 [package]
 name = "dis-spawner"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 homepage = "https://spawner.dev"
 description = "Session-lived containers for advanced browser-based applications."
