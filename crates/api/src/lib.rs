@@ -175,10 +175,10 @@ impl ApiSettings {
 
 #[derive(Serialize)]
 pub struct SpawnResult {
-    url: Option<String>,
-    name: String,
-    ready_url: Option<String>,
-    status_url: Option<String>,
+    pub url: Option<String>,
+    pub name: String,
+    pub ready_url: Option<String>,
+    pub status_url: Option<String>,
 }
 
 #[derive(Deserialize)]
