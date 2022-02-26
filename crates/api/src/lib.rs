@@ -174,6 +174,7 @@ impl ApiSettings {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct SpawnResult {
     pub url: Option<String>,
     pub name: String,
@@ -183,7 +184,7 @@ pub struct SpawnResult {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct InitPayload {
+pub struct SpawnPayload {
     /// The container image used to create the container.
     image: String,
 
@@ -198,8 +199,8 @@ pub struct InitPayload {
     grace_period_seconds: Option<u32>,
 }
 
-pub async fn init_handler(
-    Json(payload): Json<InitPayload>,
+pub async fn spawn_handler(
+    Json(payload): Json<SpawnPayload>,
     Extension(settings): Extension<Arc<ApiSettings>>,
 ) -> Result<Json<SpawnResult>, StatusCode> {
     let slab = SessionLivedBackendBuilder::new(&payload.image)

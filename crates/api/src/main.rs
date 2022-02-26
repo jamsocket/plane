@@ -1,7 +1,7 @@
 use crate::logging::init_logging;
 use axum::{routing::post, AddExtensionLayer, Router};
 use clap::Parser;
-use dis_spawner_api::{backend_routes, init_handler, ApiSettings};
+use dis_spawner_api::{backend_routes, spawn_handler, ApiSettings};
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
         .on_response(DefaultOnResponse::new().level(Level::INFO));
 
     let app = Router::new()
-        .route("/init", post(init_handler))
+        .route("/spawn", post(spawn_handler))
         .nest("/backend", backend_routes())
         .layer(AddExtensionLayer::new(Arc::new(settings)))
         .layer(trace_layer);
