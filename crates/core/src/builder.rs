@@ -1,7 +1,7 @@
 use crate::{BackendPodSpec, ImagePullPolicy, SessionLivedBackend, SessionLivedBackendSpec};
 use k8s_openapi::api::core::v1::{Container, EnvVar, LocalObjectReference};
 use kube::core::ObjectMeta;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 pub const DEFAULT_GRACE_SECONDS: u32 = 300;
 pub const APPLICATION: &str = "application";
@@ -15,6 +15,7 @@ pub struct SessionLivedBackendBuilder {
     namespace: Option<String>,
     grace_period_seconds: u32,
     http_port: Option<u16>,
+    labels: Option<BTreeMap<String, String>>,
 }
 
 impl SessionLivedBackendBuilder {
@@ -27,7 +28,12 @@ impl SessionLivedBackendBuilder {
             namespace: None,
             grace_period_seconds: DEFAULT_GRACE_SECONDS,
             http_port: None,
+            labels: None,
         }
+    }
+
+    pub fn with_labels(self, labels: Option<BTreeMap<String, String>>) -> Self {
+        SessionLivedBackendBuilder { labels, ..self }
     }
 
     pub fn with_env(self, env: HashMap<String, String>) -> Self {
@@ -99,6 +105,7 @@ impl SessionLivedBackendBuilder {
         SessionLivedBackend {
             metadata: ObjectMeta {
                 generate_name: Some(prefix.to_string()),
+                labels: self.labels.clone(),
                 ..Default::default()
             },
             spec: self.build_spec(),
@@ -111,6 +118,7 @@ impl SessionLivedBackendBuilder {
             metadata: ObjectMeta {
                 name: Some(name.to_string()),
                 namespace: self.namespace.clone(),
+                labels: self.labels.clone(),
                 ..Default::default()
             },
             spec: self.build_spec(),
