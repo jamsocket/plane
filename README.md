@@ -11,6 +11,8 @@
 
 # Spawner
 
+**[Watch a 3-minute demo](https://www.youtube.com/watch?v=aGsxxcQRKa4) of installing and using Spawner.**
+
 **Spawner** allows web applications to create [**session-lived backends**](https://driftingin.space/posts/session-lived-application-backends),
 which are server processes dedicated to individual (or small groups of) users.
 
