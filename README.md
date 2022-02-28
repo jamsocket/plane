@@ -1,4 +1,5 @@
-# Spawner
+## Quick Links
+
 
 | Component | Pipeline | Image | Crate | Version |
 | ---       | ---   | ---     | ---      | ---   |
@@ -7,6 +8,8 @@
 | [`sidecar`](https://github.com/drifting-in-space/spawner/tree/master/crates/sidecar) | [![Sidecar Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml) | [`spawner-sidecar`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-sidecar) | | |
 | [`sweeper`](https://github.com/drifting-in-space/spawner/tree/master/crates/sweeper) | [![Sweeper Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml) | [`spawner-sweeper`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-sweeper) | | |
 | [`api`](https://github.com/drifting-in-space/spawner/tree/master/crates/api) | [![API Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-api.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-api.yml) | [`spawner-api`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-api) | [`dis-spawner-api`](https://crates.io/crates/dis-spawner-api) | [![crates.io](https://img.shields.io/crates/v/dis-spawner-api.svg)](https://crates.io/crates/dis-spawner-api) |
+
+# Spawner
 
 **Spawner** allows web applications to create [**session-lived backends**](https://driftingin.space/posts/session-lived-application-backends),
 which are server processes dedicated to individual (or small groups of) users.
