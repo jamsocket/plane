@@ -3,8 +3,8 @@
 pub use builder::SessionLivedBackendBuilder;
 use k8s_openapi::{
     api::core::v1::{
-        Container, Event, LocalObjectReference, Pod, PodSpec, Service, ServicePort, ServiceSpec,
-        Volume,
+        Container, EnvVar, Event, LocalObjectReference, Pod, PodSpec, Service, ServicePort,
+        ServiceSpec, Volume,
     },
     apimachinery::pkg::apis::meta::v1::{MicroTime, OwnerReference},
     chrono::Utc,
@@ -27,6 +27,7 @@ mod builder;
 pub mod event_stream;
 
 pub const SPAWNER_GROUP: &str = "spawner.dev";
+const DEFAULT_PORT: u16 = 8080;
 const LABEL_RUN: &str = "run";
 const SIDECAR_PORT: u16 = 9090;
 const SIDECAR: &str = "spawner-sidecar";
@@ -282,10 +283,11 @@ impl SessionLivedBackend {
         image_pull_secret: &Option<String>,
     ) -> Result<Pod, Error> {
         let name = self.name();
-        let mut args = vec![format!("--serve-port={}", SIDECAR_PORT)];
-        if let Some(port) = self.spec.http_port {
-            args.push(format!("--upstream-port={}", port))
-        };
+        let http_port = self.spec.http_port.unwrap_or(DEFAULT_PORT);
+        let args = vec![
+            format!("--serve-port={}", SIDECAR_PORT),
+            format!("--upstream-port={}", http_port),
+        ];
 
         let mut template: PodSpec = self.spec.template.clone().into();
         template.containers.insert(
@@ -297,6 +299,20 @@ impl SessionLivedBackend {
                 ..Container::default()
             },
         );
+
+        let port_env = EnvVar {
+            name: "PORT".to_string(),
+            value: Some(http_port.to_string()),
+            ..EnvVar::default()
+        };
+        template.containers[1].env = match &template.containers[1].env {
+            Some(env) => {
+                let mut env = env.clone();
+                env.push(port_env);
+                Some(env)
+            }
+            None => Some(vec![port_env]),
+        };
 
         if let Some(image_pull_secret) = image_pull_secret {
             let secret_ref = LocalObjectReference {
