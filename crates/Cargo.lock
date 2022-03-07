@@ -528,7 +528,7 @@ version = "0.1.0"
 dependencies = [
  "clap 3.1.5",
  "dis-spawner",
- "dis-spawner-tracing",
+ "dis-spawner-tracing 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "k8s-openapi",
  "kube",
@@ -546,7 +546,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap 3.1.5",
- "dis-spawner-tracing",
+ "dis-spawner-tracing 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-core",
  "hyper",
  "netlink-packet-sock-diag",
@@ -564,7 +564,7 @@ dependencies = [
  "async-stream",
  "clap 3.1.5",
  "dis-spawner",
- "dis-spawner-tracing",
+ "dis-spawner-tracing 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "futures-util",
  "hyper",
@@ -581,6 +581,22 @@ dependencies = [
 [[package]]
 name = "dis-spawner-tracing"
 version = "0.1.0"
+dependencies = [
+ "hyper",
+ "hyper-tls",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-stackdriver",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "dis-spawner-tracing"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e436b88e8f70ade7ff1dcdab4f9709775cfd4ea9c4c68bd1ced47b4c6e639a2"
 dependencies = [
  "hyper",
  "hyper-tls",
