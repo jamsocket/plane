@@ -19,4 +19,4 @@ thiserror = "1.0.30"
 tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread", "time"] }
 tracing = "0.1.30"
 tracing-subscriber = { version = "0.3.6", features = ["env-filter"] }
-dis-spawner-tracing = {path = "../tracing"}
+dis-spawner-tracing = "0.1.0"
