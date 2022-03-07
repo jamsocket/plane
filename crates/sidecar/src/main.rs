@@ -2,11 +2,10 @@ use anyhow::anyhow;
 use clap::Parser;
 use hyper::service::make_service_fn;
 use hyper::Server;
-use logging::init_logging;
+use dis_spawner_tracing::init_logging;
 use proxy::ProxyService;
 use std::{convert::Infallible, net::SocketAddr};
 
-mod logging;
 mod monitor;
 mod network_status;
 mod proxy;

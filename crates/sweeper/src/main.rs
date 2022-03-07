@@ -9,15 +9,13 @@ use kube::{
     runtime::controller::{self, Context, Controller, ReconcilerAction},
     Client,
 };
-use logging::init_logging;
+use dis_spawner_tracing::init_logging;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
-
-mod logging;
 
 const RETRY_PAUSE_MILIS: u64 = 100;
 const MAX_RETRIES: u32 = 100;

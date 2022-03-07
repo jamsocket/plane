@@ -1,5 +1,6 @@
 use clap::Parser;
 use dis_spawner::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
+use dis_spawner_tracing::init_logging;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{Pod, Service};
 use kube::api::{DeleteParams, PostParams};
@@ -9,14 +10,11 @@ use kube::{
     runtime::controller::{self, Context, Controller, ReconcilerAction},
     Client,
 };
-use logging::init_logging;
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::time::Duration;
 
 const SIDECAR_PORT: u16 = 9090;
-
-mod logging;
 
 #[derive(Parser, Debug)]
 struct Opts {

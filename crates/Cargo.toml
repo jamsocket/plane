@@ -6,7 +6,8 @@ members = [
     "controller",
     "core",
     "sidecar",
-    "sweeper"
+    "sweeper",
+    "tracing"
 ]
 
 [patch.crates-io]
