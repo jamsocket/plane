@@ -141,7 +141,7 @@ async fn reconcile(
     } else if !slab.is_running() {
         let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
         if let Some(phase) = get_pod_phase(&pod) {
-            tracing::info!(?phase, "Saw pod in phase.");
+            tracing::debug!(?phase, "Saw pod in phase.");
 
             if phase == "Running" {
                 let status = SessionLivedBackendStatus {
@@ -184,7 +184,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logging();
     let opts = Opts::parse();
 
-    tracing::info!(?opts, "Using options");
+    tracing::debug!(?opts, "Using options");
 
     let client = Client::try_default().await?;
     let context = Context::new(ControllerContext {

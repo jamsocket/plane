@@ -58,6 +58,11 @@ spec:
       containers:
       - name: spawner
         image: ghcr.io/drifting-in-space/spawner-controller:latest
+        env:
+        - name: TRACE_STACKDRIVER
+          value: "1"
+        - name: RUST_LOG
+          value: "info"
         args: [
           "--namespace", "spawner",
           "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:latest",

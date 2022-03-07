@@ -134,10 +134,10 @@ async fn reconcile(
     ctx: Context<ControllerContext>,
 ) -> Result<ReconcilerAction, Error> {
     let name = slab.as_ref().name();
-    tracing::info!(?name, "Saw SessionLivedBackend.");
+    tracing::debug!(?name, "Saw SessionLivedBackend.");
 
     if !slab.is_running() {
-        tracing::info!(?name, "Not attempting to connect (not running yet).");
+        tracing::debug!(?name, "Not attempting to connect (not running yet).");
         return Ok(ReconcilerAction {
             requeue_after: None,
         });
@@ -154,7 +154,7 @@ async fn reconcile(
 
     let active_listeners = &ctx.get_ref().active_listeners;
     if active_listeners.read().await.contains(&name) {
-        tracing::info!(%name, "Already listening to this SessionLivedBackend, ignoring.");
+        tracing::debug!(%name, "Already listening to this SessionLivedBackend, ignoring.");
         return Ok(ReconcilerAction {
             requeue_after: None,
         });
@@ -174,7 +174,7 @@ async fn reconcile(
                 match timeout(duration, stream.next()).await {
                     Ok(result) => result,
                     Err(_) => {
-                        tracing::info!(?url, "Timed out while waiting for activity.");
+                        tracing::info!(?url, "Timed out without activity.");
                         break;
                     }
                 }
@@ -189,7 +189,7 @@ async fn reconcile(
                 break;
             };
 
-            tracing::info!(?result, ?url, "Got status message.");
+            tracing::debug!(?result, ?url, "Got status message.");
 
             if result.ready & !ready {
                 let _ = slab
@@ -213,7 +213,7 @@ async fn reconcile(
 
             if let Some(seconds_since_active) = result.seconds_since_active {
                 let delta = grace_period_seconds - seconds_since_active.min(grace_period_seconds);
-                tracing::info!(delta_seconds = %delta, ?url, "Using timeout.");
+                tracing::debug!(delta_seconds = %delta, ?url, "Using timeout.");
                 duration = Some(Duration::from_secs(delta as u64));
             } else {
                 duration = None;
@@ -258,7 +258,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logging();
     let opts = Opts::parse();
 
-    tracing::info!(?opts, "Using options");
+    tracing::debug!(?opts, "Using options");
 
     let client = Client::try_default().await?;
     let context = Context::new(ControllerContext {

@@ -22,6 +22,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
+          - name: TRACE_STACKDRIVER
+            value: "1"
+          - name: RUST_LOG
+            value: "info"
         args: [
           "--namespace", "spawner",
           "--node-name", "$(POD_NAME)"
