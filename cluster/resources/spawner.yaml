@@ -63,8 +63,6 @@ spec:
           value: "1"
         - name: RUST_LOG
           value: "info"
-        - name: TRACE_SLACK_URL
-          value: "https://hooks.slack.com/services/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"
         args: [
           "--namespace", "spawner",
           "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:latest",
