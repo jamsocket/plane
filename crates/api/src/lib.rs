@@ -151,7 +151,10 @@ impl ApiSettings {
     pub fn backend_api_path(&self, backend_id: &str, path: &str) -> Option<String> {
         let api_server_base = self.api_server_base.as_ref()?;
 
-        Some(format!("{}/backend/{}/{}", api_server_base, backend_id, path))
+        Some(format!(
+            "{}/backend/{}/{}",
+            api_server_base, backend_id, path
+        ))
     }
 
     pub fn get_init_result(&self, backend_id: &str) -> SpawnResult {
