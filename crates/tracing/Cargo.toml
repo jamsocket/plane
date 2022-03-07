@@ -2,6 +2,11 @@
 name = "dis-spawner-tracing"
 version = "0.1.0"
 edition = "2021"
+homepage = "https://spawner.dev"
+description = "Tracing utilities for Spawner, a server for session-lived backends."
+repository = "https://github.com/drifting-in-space/spawner"
+license = "MIT"
+readme = "README.md"
 
 [dependencies]
 tracing = "0.1.29"
