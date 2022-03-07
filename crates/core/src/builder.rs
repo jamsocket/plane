@@ -1,7 +1,7 @@
 use crate::{BackendPodSpec, ImagePullPolicy, SessionLivedBackend, SessionLivedBackendSpec};
 use k8s_openapi::api::core::v1::{Container, EnvVar, LocalObjectReference};
 use kube::core::ObjectMeta;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 
 pub const DEFAULT_GRACE_SECONDS: u32 = 300;
 pub const APPLICATION: &str = "application";
