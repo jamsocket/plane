@@ -78,7 +78,7 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
                 tracing::warn!(?retry, "Hit max retries.");
                 break;
             } else if retry > 0 {
-                tracing::info!(?uri, %RETRY_PAUSE_MILIS, "Sleeping.");
+                tracing::debug!(?uri, %RETRY_PAUSE_MILIS, "Sleeping.");
                 tokio::time::sleep(Duration::from_millis(RETRY_PAUSE_MILIS)).await;
             }
 
