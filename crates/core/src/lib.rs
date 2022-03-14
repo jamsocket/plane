@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub use builder::SessionLivedBackendBuilder;
+pub use image_pull_policy::ImagePullPolicy;
 use k8s_openapi::{
     api::core::v1::{
         Container, EnvVar, Event, LocalObjectReference, Pod, PodSpec, Service, ServicePort,
@@ -17,24 +18,38 @@ use kube::{core::ObjectMeta, ResourceExt};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{
-    collections::BTreeMap,
-    fmt::{Debug, Display},
-    str::FromStr,
-};
+pub use state::SessionLivedBackendState;
+use std::{collections::BTreeMap, fmt::Debug};
 
 mod builder;
 pub mod event_stream;
+mod image_pull_policy;
+mod state;
 
+/// A unique string used to avoid namespace clashes with other vendors.
 pub const SPAWNER_GROUP: &str = "spawner.dev";
-const DEFAULT_PORT: u16 = 8080;
-const LABEL_RUN: &str = "run";
-const SIDECAR_PORT: u16 = 9090;
-const SIDECAR: &str = "spawner-sidecar";
-const APPLICATION: &str = "spawner-app";
-const TCP: &str = "TCP";
 
-#[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
+/// Default port on which to expect application containers to listen for HTTP connections on.
+const DEFAULT_PORT: u16 = 8080;
+
+/// Port that the sidecar listens on.
+const SIDECAR_PORT: u16 = 9090;
+
+/// Name of the label used by a backend's Service to locate the backend's Pod.
+const LABEL_RUN: &str = "run";
+
+/// Name used for the sidecar container to differentiate it within a pod.
+const SIDECAR: &str = "spawner-sidecar";
+
+/// Name used for the application container to differentiate it within a pod.
+const APPLICATION: &str = "spawner-app";
+
+/// Describes a session-lived backend, consisting of a pod template, and optional
+/// overrides for the HTTP port and grace period parameters.
+///
+/// The pod spec should not include the Spawner sidecar container; it is
+/// inserted only when the backend is about to be run.
+#[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema, Default)]
 #[kube(
     group = "spawner.dev",
     version = "v1",
@@ -45,16 +60,31 @@ const TCP: &str = "TCP";
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SessionLivedBackendSpec {
+    /// Describes the container run by the backend.
     pub template: BackendPodSpec,
+
+    /// The period of time (in seconds) after a backend's last connection to wait before
+    /// shutting down the backend.
+    ///
+    /// If another connection is made during the grace period, the countdown is reset.
     pub grace_period_seconds: Option<u32>,
+
+    /// The port of the application container on which we listen for an HTTP connection.
     pub http_port: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct BackendPodSpec {
+    /// Containers to run. If multiple containers are given, the first is assumed to be
+    /// the application container.
     containers: Vec<Container>,
+
+    /// A reference to the Kubernetes secret containing image registry access credentials,
+    /// if needed by the image registry.
     image_pull_secrets: Option<Vec<LocalObjectReference>>,
+
+    /// Volumes to be attached to the pod associated with this backend.
     volumes: Option<Vec<Volume>>,
 }
 
@@ -69,68 +99,17 @@ impl Into<PodSpec> for BackendPodSpec {
     }
 }
 
-#[derive(Debug)]
-pub enum SessionLivedBackendEvent {
-    /// The `SessionLivedBackend` object exists.
-    Submitted,
-
-    /// The pod and service backing a `SessionLivedBackend` exist.
-    Constructed,
-
-    /// The pod that backs a `SessionLivedBackend` has been assigned to a node.
-    Scheduled,
-
-    /// The pod that backs a `SessionLivedBackend` is running.
-    Running,
-
-    /// The pod that backs a `SessionLivedBackend` is accepting new connections.
-    Ready,
-
-    /// The `SessionLivedBackend` has been marked as swept, meaning that it can be deleted.
-    Swept,
-}
-
-impl Default for SessionLivedBackendEvent {
-    fn default() -> Self {
-        SessionLivedBackendEvent::Submitted
-    }
-}
-
-impl Display for SessionLivedBackendEvent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self, f)
-    }
-}
-
-impl SessionLivedBackendEvent {
-    pub fn message(&self) -> String {
-        match self {
-            SessionLivedBackendEvent::Submitted => {
-                "SessionLivedBackend object created.".to_string()
-            }
-            SessionLivedBackendEvent::Constructed => {
-                "Backing resources created by Spawner.".to_string()
-            }
-            SessionLivedBackendEvent::Scheduled => {
-                "Backing pod was scheduled by Kubernetes.".to_string()
-            }
-            SessionLivedBackendEvent::Running => "Pod was observed running.".to_string(),
-            SessionLivedBackendEvent::Ready => {
-                "Pod was observed listening on TCP port.".to_string()
-            }
-            SessionLivedBackendEvent::Swept => {
-                "SessionLivedBackend was found idle and swept.".to_string()
-            }
-        }
-    }
-}
-
+/// Status flags associated with a backend.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionLivedBackendStatus {
     /// Set to `true` by `spawner` once the backing resources (pod and service) have been created.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub submitted: Option<bool>,
+
+    /// Set to `true` by `spawner` once the backing pod object exists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub constructed: Option<bool>,
 
     /// Set to `true` by `spawner` once the backing pod has been assigned to a node.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -151,50 +130,56 @@ pub struct SessionLivedBackendStatus {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub swept: Option<bool>,
 
+    /// The name of the Kubernetes cluster node that this backend has been assigned to.
+    ///
+    /// This is initially None until a backend has been assigned to a node. Once it has,
+    /// this never changes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
 
+    /// IP of the service associated with this backend.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ip: Option<String>,
 
+    /// Port of the service associated with this backend.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
 
+    /// In-cluster URL associated with this backend.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
-pub enum ImagePullPolicy {
-    Always,
-    Never,
-    IfNotPresent,
-}
-
-impl ToString for ImagePullPolicy {
-    fn to_string(&self) -> String {
-        match self {
-            ImagePullPolicy::Always => "Always",
-            ImagePullPolicy::Never => "Never",
-            ImagePullPolicy::IfNotPresent => "IfNotPresent",
-        }
-        .to_string()
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-#[error("Unknown ImagePullPolicy: {0}.")]
-pub struct BadPolicyName(String);
-
-impl FromStr for ImagePullPolicy {
-    type Err = BadPolicyName;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Always" => Ok(ImagePullPolicy::Always),
-            "Never" => Ok(ImagePullPolicy::Never),
-            "IfNotPresent" => Ok(ImagePullPolicy::IfNotPresent),
-            _ => Err(BadPolicyName(s.to_string())),
+impl SessionLivedBackendStatus {
+    pub fn patch_state(
+        state: SessionLivedBackendState,
+        base_status: SessionLivedBackendStatus,
+    ) -> SessionLivedBackendStatus {
+        match state {
+            SessionLivedBackendState::Submitted => SessionLivedBackendStatus {
+                submitted: Some(true),
+                ..base_status
+            },
+            SessionLivedBackendState::Constructed => SessionLivedBackendStatus {
+                constructed: Some(true),
+                ..base_status
+            },
+            SessionLivedBackendState::Scheduled => SessionLivedBackendStatus {
+                scheduled: Some(true),
+                ..base_status
+            },
+            SessionLivedBackendState::Running => SessionLivedBackendStatus {
+                running: Some(true),
+                ..base_status
+            },
+            SessionLivedBackendState::Ready => SessionLivedBackendStatus {
+                ready: Some(true),
+                ..base_status
+            },
+            SessionLivedBackendState::Swept => SessionLivedBackendStatus {
+                swept: Some(true),
+                ..base_status
+            },
         }
     }
 }
@@ -209,39 +194,21 @@ pub enum Error {
 }
 
 impl SessionLivedBackend {
-    pub fn is_submitted(&self) -> bool {
-        self.status
-            .as_ref()
-            .map(|d| d.submitted.unwrap_or_default())
-            .unwrap_or_default()
-    }
-
-    pub fn is_scheduled(&self) -> bool {
-        self.status
-            .as_ref()
-            .map(|d| d.scheduled.unwrap_or_default())
-            .unwrap_or_default()
-    }
-
-    pub fn is_running(&self) -> bool {
-        self.status
-            .as_ref()
-            .map(|d| d.running.unwrap_or_default())
-            .unwrap_or_default()
-    }
-
-    pub fn is_ready(&self) -> bool {
-        self.status
-            .as_ref()
-            .map(|d| d.ready.unwrap_or_default())
-            .unwrap_or_default()
-    }
-
-    pub fn is_swept(&self) -> bool {
-        self.status
-            .as_ref()
-            .map(|d| d.swept.unwrap_or_default())
-            .unwrap_or_default()
+    pub fn state(&self) -> SessionLivedBackendState {
+        if let Some(status) = &self.status {
+            if status.swept == Some(true) {
+                return SessionLivedBackendState::Swept;
+            } else if status.ready == Some(true) {
+                return SessionLivedBackendState::Ready;
+            } else if status.running == Some(true) {
+                return SessionLivedBackendState::Running;
+            } else if status.scheduled == Some(true) {
+                return SessionLivedBackendState::Scheduled;
+            } else if status.constructed == Some(true) {
+                return SessionLivedBackendState::Constructed;
+            }
+        }
+        SessionLivedBackendState::Submitted
     }
 
     fn metadata_reference(&self) -> Result<OwnerReference, Error> {
@@ -290,8 +257,24 @@ impl SessionLivedBackend {
         ];
 
         let mut template: PodSpec = self.spec.template.clone().into();
-        template.containers.insert(
-            0,
+        let port_env = EnvVar {
+            name: "PORT".to_string(),
+            value: Some(http_port.to_string()),
+            ..EnvVar::default()
+        };
+
+        let first_container = template.containers.first_mut().ok_or(Error::MissingObjectKey("template.containers[0]"))?;
+
+        match &mut first_container.env {
+            Some(env) => {
+                env.push(port_env);
+            }
+            None => {
+                first_container.env = Some(vec![port_env])
+            }
+        };
+
+        template.containers.push(
             Container {
                 name: SIDECAR.to_string(),
                 image: Some(sidecar_image.to_string()),
@@ -299,20 +282,6 @@ impl SessionLivedBackend {
                 ..Container::default()
             },
         );
-
-        let port_env = EnvVar {
-            name: "PORT".to_string(),
-            value: Some(http_port.to_string()),
-            ..EnvVar::default()
-        };
-        template.containers[1].env = match &template.containers[1].env {
-            Some(env) => {
-                let mut env = env.clone();
-                env.push(port_env);
-                Some(env)
-            }
-            None => Some(vec![port_env]),
-        };
 
         if let Some(image_pull_secret) = image_pull_secret {
             let secret_ref = LocalObjectReference {
@@ -354,7 +323,7 @@ impl SessionLivedBackend {
                 selector: Some(self.run_label()),
                 ports: Some(vec![ServicePort {
                     name: Some(APPLICATION.to_string()),
-                    protocol: Some(TCP.to_string()),
+                    protocol: Some("TCP".to_string()),
                     port: SIDECAR_PORT as i32,
                     ..ServicePort::default()
                 }]),
@@ -362,44 +331,6 @@ impl SessionLivedBackend {
             }),
             ..Service::default()
         })
-    }
-
-    pub async fn log_event(
-        &self,
-        client: Client,
-        new_state: SessionLivedBackendEvent,
-    ) -> Result<(), Error> {
-        tracing::info!(name=%self.name(), %new_state, "SessionLivedBackend state change.");
-        let namespace = self
-            .namespace()
-            .expect("SessionLivedBackend is a namespaced resource, but didn't have a namespace.");
-        let event_api = Api::<Event>::namespaced(client.clone(), &namespace);
-
-        event_api
-            .create(
-                &PostParams::default(),
-                &Event {
-                    involved_object: self.object_ref(&()),
-                    action: Some(new_state.to_string()),
-                    message: Some(new_state.message()),
-                    reason: Some(new_state.to_string()),
-                    type_: Some("Normal".to_string()),
-                    event_time: Some(MicroTime(Utc::now())),
-                    reporting_component: Some("spawner.dev/sessionlivedbackend".to_string()),
-                    reporting_instance: Some(self.name()),
-                    metadata: ObjectMeta {
-                        namespace: self.namespace(),
-                        generate_name: Some(format!("{}-", self.name())),
-                        ..Default::default()
-                    },
-
-                    ..Default::default()
-                },
-            )
-            .await
-            .map_err(Error::KubernetesFailure)?;
-
-        Ok(())
     }
 
     pub async fn set_spawner_group(
@@ -430,15 +361,39 @@ impl SessionLivedBackend {
         Ok(())
     }
 
-    pub async fn update_status(
+    pub fn log_event(&self, state: SessionLivedBackendState) -> Event {
+        Event {
+            involved_object: self.object_ref(&()),
+            action: Some(state.to_string()),
+            message: Some(state.message()),
+            reason: Some(state.to_string()),
+            type_: Some("Normal".to_string()),
+            event_time: Some(MicroTime(Utc::now())),
+            reporting_component: Some(format!("{}/sessionlivedbackend", SPAWNER_GROUP)),
+            reporting_instance: Some(self.name()),
+            metadata: ObjectMeta {
+                namespace: self.namespace(),
+                generate_name: Some(format!("{}-", self.name())),
+                ..Default::default()
+            },
+
+            ..Default::default()
+        }
+    }
+
+    pub async fn update_state(
         &self,
         client: Client,
-        new_status: SessionLivedBackendStatus,
+        new_state: SessionLivedBackendState,
+        patch_status: SessionLivedBackendStatus,
     ) -> Result<(), Error> {
         let namespace = self
             .namespace()
             .expect("SessionLivedBackend is a namespaced resource, but didn't have a namespace.");
         let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), &namespace);
+        let event_api = Api::<Event>::namespaced(client.clone(), &namespace);
+
+        let new_status = SessionLivedBackendStatus::patch_state(new_state, patch_status);
 
         slab_api
             .patch_status(
@@ -449,6 +404,314 @@ impl SessionLivedBackend {
             .await
             .map_err(Error::KubernetesFailure)?;
 
+        event_api
+            .create(&PostParams::default(), &self.log_event(new_state))
+            .await
+            .map_err(Error::KubernetesFailure)?;
+
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_session_lived_backend_status() {
+        let mut backend = SessionLivedBackend {
+            spec: SessionLivedBackendSpec::default(),
+            metadata: ObjectMeta::default(),
+            status: None,
+        };
+        assert_eq!(SessionLivedBackendState::Submitted, backend.state());
+
+        backend.status = Some(SessionLivedBackendStatus::default());
+        assert_eq!(SessionLivedBackendState::Submitted, backend.state());
+
+        backend.status.as_mut().unwrap().constructed = Some(true);
+        assert_eq!(SessionLivedBackendState::Constructed, backend.state());
+
+        backend.status.as_mut().unwrap().scheduled = Some(true);
+        assert_eq!(SessionLivedBackendState::Scheduled, backend.state());
+
+        backend.status.as_mut().unwrap().running = Some(true);
+        assert_eq!(SessionLivedBackendState::Running, backend.state());
+
+        backend.status.as_mut().unwrap().ready = Some(true);
+        assert_eq!(SessionLivedBackendState::Ready, backend.state());
+    }
+
+    #[test]
+    fn test_labels() {
+        let backend = SessionLivedBackend {
+            spec: SessionLivedBackendSpec::default(),
+            metadata: ObjectMeta {
+                name: Some("slab1".to_string()),
+                namespace: Some("spawner".to_string()),
+                labels: Some(
+                    vec![("foo".to_string(), "bar".to_string())]
+                        .into_iter()
+                        .collect(),
+                ),
+                ..ObjectMeta::default()
+            },
+            status: None,
+        };
+
+        let result: Vec<(String, String)> = backend.run_label().into_iter().collect();
+        assert_eq!(vec![("run".to_string(), "slab1".to_string())], result);
+
+        let result: Vec<(String, String)> = backend.labels().into_iter().collect();
+        assert_eq!(
+            vec![
+                ("foo".to_string(), "bar".to_string()),
+                ("run".to_string(), "slab1".to_string())
+            ],
+            result
+        );
+    }
+
+    #[test]
+    fn test_metadata_reference() {
+        let backend = SessionLivedBackend {
+            spec: SessionLivedBackendSpec::default(),
+            metadata: ObjectMeta {
+                name: Some("slab1".to_string()),
+                uid: Some("blah".to_string()),
+                ..ObjectMeta::default()
+            },
+            status: None,
+        };
+
+        let reference = backend.metadata_reference().unwrap();
+
+        assert_eq!(
+            OwnerReference {
+                api_version: "spawner.dev/v1".to_string(),
+                block_owner_deletion: None,
+                controller: Some(true),
+                kind: "SessionLivedBackend".to_string(),
+                name: "slab1".to_string(),
+                uid: "blah".to_string()
+            },
+            reference
+        );
+    }
+
+    #[test]
+    fn test_event() {
+        let backend = SessionLivedBackend {
+            spec: SessionLivedBackendSpec::default(),
+            metadata: ObjectMeta {
+                namespace: Some("blah".to_string()),
+                name: Some("slab1".to_string()),
+                ..ObjectMeta::default()
+            },
+            status: None,
+        };
+
+        let event = backend.log_event(SessionLivedBackendState::Running);
+        let event_time = event.event_time.clone();
+
+        assert_eq!(
+            Event {
+                action: Some("Running".to_string()),
+                event_time,
+                involved_object: backend.object_ref(&()),
+                message: Some("Pod was observed running.".to_string()),
+                metadata: ObjectMeta {
+                    generate_name: Some("slab1-".to_string()),
+                    namespace: Some("blah".to_string()),
+                    ..ObjectMeta::default()
+                },
+                reason: Some("Running".to_string()),
+                reporting_component: Some("spawner.dev/sessionlivedbackend".to_string()),
+                reporting_instance: Some("slab1".to_string()),
+                type_: Some("Normal".to_string()),
+                ..Event::default()
+            },
+            event
+        );
+    }
+
+    #[test]
+    fn test_patch_state() {
+        assert_eq!(
+            SessionLivedBackendStatus {
+                submitted: Some(true),
+                ..SessionLivedBackendStatus::default()
+            },
+            SessionLivedBackendStatus::patch_state(
+                SessionLivedBackendState::Submitted,
+                SessionLivedBackendStatus::default()
+            )
+        );
+
+        assert_eq!(
+            SessionLivedBackendStatus {
+                constructed: Some(true),
+                ..SessionLivedBackendStatus::default()
+            },
+            SessionLivedBackendStatus::patch_state(
+                SessionLivedBackendState::Constructed,
+                SessionLivedBackendStatus::default()
+            )
+        );
+
+        assert_eq!(
+            SessionLivedBackendStatus {
+                scheduled: Some(true),
+                ip: Some("1.1.1.1".to_string()),
+                url: Some("url".to_string()),
+                port: Some(8080),
+                node_name: Some("node1".to_string()),
+                ..SessionLivedBackendStatus::default()
+            },
+            SessionLivedBackendStatus::patch_state(
+                SessionLivedBackendState::Scheduled,
+                SessionLivedBackendStatus {
+                    ip: Some("1.1.1.1".to_string()),
+                    url: Some("url".to_string()),
+                    port: Some(8080),
+                    node_name: Some("node1".to_string()),
+                    ..SessionLivedBackendStatus::default()
+                }
+            )
+        );
+
+        assert_eq!(
+            SessionLivedBackendStatus {
+                running: Some(true),
+                ..SessionLivedBackendStatus::default()
+            },
+            SessionLivedBackendStatus::patch_state(
+                SessionLivedBackendState::Running,
+                SessionLivedBackendStatus::default()
+            )
+        );
+
+        assert_eq!(
+            SessionLivedBackendStatus {
+                ready: Some(true),
+                ..SessionLivedBackendStatus::default()
+            },
+            SessionLivedBackendStatus::patch_state(
+                SessionLivedBackendState::Ready,
+                SessionLivedBackendStatus::default()
+            )
+        );
+    }
+
+    #[test]
+    fn test_pod_and_service() {
+        let backend = SessionLivedBackend {
+            spec: SessionLivedBackendSpec {
+                template: BackendPodSpec {
+                    containers: vec![Container {
+                        name: "foo".to_string(),
+                        env: Some(vec![EnvVar {
+                            name: "FOO".to_string(),
+                            value: Some("BAR".to_string()),
+                            ..Default::default()
+                        }]),
+                        ..Default::default()
+                    }],
+                    ..BackendPodSpec::default()
+                },
+                grace_period_seconds: Some(400),
+                http_port: Some(4040),
+            },
+            metadata: ObjectMeta {
+                name: Some("slab1".to_string()),
+                namespace: Some("ns1".to_string()),
+                uid: Some("uid1".to_string()),
+                ..ObjectMeta::default()
+            },
+            status: None,
+        };
+
+        assert_eq!(
+            Pod {
+                metadata: ObjectMeta {
+                    name: Some("slab1".to_string()),
+                    owner_references: Some(vec![backend.metadata_reference().unwrap()]),
+                    labels: Some(
+                        vec![("run".to_string(), "slab1".to_string())]
+                            .into_iter()
+                            .collect()
+                    ),
+                    ..ObjectMeta::default()
+                },
+                spec: Some(PodSpec {
+                    containers: vec![
+                        Container {
+                            name: "foo".to_string(),
+                            env: Some(vec![
+                                EnvVar {
+                                    name: "FOO".to_string(),
+                                    value: Some("BAR".to_string()),
+                                    ..Default::default()
+                                },
+                                EnvVar {
+                                    name: "PORT".to_string(),
+                                    value: Some("4040".to_string()),
+                                    ..Default::default()
+                                },
+                            ]),
+                            ..Default::default()
+                        },
+                        Container {
+                            name: "spawner-sidecar".to_string(),
+                            image: Some("sidecar-image".to_string()),
+                            args: Some(vec![
+                                "--serve-port=9090".to_string(),
+                                "--upstream-port=4040".to_string()
+                            ]),
+                            ..Container::default()
+                        },
+                    ],
+                    image_pull_secrets: Some(vec![LocalObjectReference {
+                        name: Some("my-secret".to_string())
+                    }]),
+                    ..PodSpec::default()
+                }),
+                ..Default::default()
+            },
+            backend
+                .pod("sidecar-image", &Some("my-secret".to_string()))
+                .unwrap()
+        );
+
+        assert_eq!(
+            Service {
+                metadata: ObjectMeta {
+                    name: Some("slab1".to_string()),
+                    owner_references: Some(vec![backend.metadata_reference().unwrap()]),
+                    labels: Some(
+                        vec![("run".to_string(), "slab1".to_string())]
+                            .into_iter()
+                            .collect()
+                    ),
+                    ..ObjectMeta::default()
+                },
+                spec: Some(ServiceSpec {
+                    ports: Some(vec![
+                        ServicePort {
+                            name: Some("spawner-app".to_string()),
+                            port: 9090,
+                            protocol: Some("TCP".to_string()),
+                            ..ServicePort::default()
+                        }
+                    ]),
+                    selector: Some(vec![
+                        ("run".to_string(), "slab1".to_string())
+                    ].into_iter().collect()),
+                    ..ServiceSpec::default()
+                }),
+                ..Service::default()
+            },
+            backend.service().unwrap()
+        );
     }
 }

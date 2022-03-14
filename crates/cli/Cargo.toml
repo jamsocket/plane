@@ -10,7 +10,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0.52"
 atty = "0.2.14"
-bat = "0.19.0"
+bat = "0.20.0"
 clap = { version = "3.0.14", features = ["derive"] }
 futures = "0.3.19"
 k8s-openapi = { version = "0.14.0", features = ["schemars", "v1_23"] }

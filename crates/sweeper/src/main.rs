@@ -1,5 +1,6 @@
 use clap::Parser;
-use dis_spawner::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
+use dis_spawner::{SessionLivedBackend, SessionLivedBackendState, SessionLivedBackendStatus};
+use dis_spawner_tracing::init_logging;
 use futures::StreamExt;
 use futures_util::Stream;
 use hyper::{Body, Request, Uri};
@@ -9,7 +10,6 @@ use kube::{
     runtime::controller::{self, Context, Controller, ReconcilerAction},
     Client,
 };
-use dis_spawner_tracing::init_logging;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::pin::Pin;
@@ -136,7 +136,7 @@ async fn reconcile(
     let name = slab.as_ref().name();
     tracing::debug!(?name, "Saw SessionLivedBackend.");
 
-    if !slab.is_running() {
+    if slab.state() < SessionLivedBackendState::Running {
         tracing::debug!(?name, "Not attempting to connect (not running yet).");
         return Ok(ReconcilerAction {
             requeue_after: None,
@@ -192,20 +192,16 @@ async fn reconcile(
             tracing::debug!(?result, ?url, "Got status message.");
 
             if result.ready & !ready {
-                let _ = slab
-                    .log_event(client.clone(), SessionLivedBackendEvent::Ready)
-                    .await;
-                if let Err(error) = slab
-                    .update_status(
+                let result = slab
+                    .update_state(
                         client.clone(),
-                        SessionLivedBackendStatus {
-                            ready: Some(true),
-                            ..SessionLivedBackendStatus::default()
-                        },
+                        SessionLivedBackendState::Ready,
+                        SessionLivedBackendStatus::default(),
                     )
-                    .await
-                {
-                    tracing::error!(%name, ?error, "Unexpected error marking SessionLivedBackend as ready.");
+                    .await;
+
+                if let Err(error) = result {
+                    tracing::error!(%name, ?error, "Unexpected error marking SessionLivedBackend as ready.")
                 } else {
                     ready = true;
                 }
@@ -221,19 +217,15 @@ async fn reconcile(
         }
 
         loop {
-            let _ = slab
-                .log_event(client.clone(), SessionLivedBackendEvent::Swept)
-                .await;
-            if let Err(error) = slab
-                .update_status(
+            let result = slab
+                .update_state(
                     client.clone(),
-                    SessionLivedBackendStatus {
-                        swept: Some(true),
-                        ..SessionLivedBackendStatus::default()
-                    },
+                    SessionLivedBackendState::Swept,
+                    SessionLivedBackendStatus::default(),
                 )
-                .await
-            {
+                .await;
+
+            if let Err(error) = result {
                 tracing::error!(%name, ?error, "Unexpected error marking SessionLivedBackend as swept.");
                 tokio::time::sleep(Duration::from_secs(30)).await;
             } else {

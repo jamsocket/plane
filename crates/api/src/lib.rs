@@ -8,7 +8,7 @@ use axum::{
 };
 use dis_spawner::{
     event_stream::{event_stream, past_events},
-    SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP,
+    SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP, SessionLivedBackendState,
 };
 use futures::{Stream, TryStreamExt};
 use k8s_openapi::api::core::v1::Event as KubeEventResource;
@@ -46,7 +46,7 @@ async fn ready_handler(
 
     match slab {
         Ok(slab) => {
-            if slab.is_ready() {
+            if slab.state() == SessionLivedBackendState::Ready {
                 let url = settings
                     .backend_to_url(&backend_id)
                     .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;

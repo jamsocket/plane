@@ -1,5 +1,5 @@
 use clap::Parser;
-use dis_spawner::{SessionLivedBackend, SessionLivedBackendEvent, SessionLivedBackendStatus};
+use dis_spawner::{SessionLivedBackend, SessionLivedBackendState, SessionLivedBackendStatus};
 use dis_spawner_tracing::init_logging;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{Pod, Service};
@@ -90,80 +90,82 @@ async fn reconcile(
     let service_api = Api::<Service>::namespaced(client.clone(), &namespace);
     let slab_api = Api::<SessionLivedBackend>::namespaced(client.clone(), &namespace);
 
-    if !slab.is_submitted() {
-        pod_api
-            .create(
-                &PostParams::default(),
-                &slab.pod(sidecar, image_pull_secret)?,
+    match slab.state() {
+        SessionLivedBackendState::Submitted => {
+            pod_api
+                .create(
+                    &PostParams::default(),
+                    &slab.pod(sidecar, image_pull_secret)?,
+                )
+                .await
+                .map_err(Error::KubernetesFailure)?;
+
+            // Construct service to back session-lived backend.
+            service_api
+                .create(&PostParams::default(), &slab.service()?)
+                .await
+                .map_err(Error::KubernetesFailure)?;
+
+            slab.update_state(
+                client.clone(),
+                SessionLivedBackendState::Constructed,
+                SessionLivedBackendStatus::default(),
             )
-            .await
-            .map_err(Error::KubernetesFailure)?;
-
-        // Construct service to back session-lived backend.
-        service_api
-            .create(&PostParams::default(), &slab.service()?)
-            .await
-            .map_err(Error::KubernetesFailure)?;
-
-        // Update the status of the session-lived backend.
-        let status = SessionLivedBackendStatus {
-            submitted: Some(true),
-            ..Default::default()
-        };
-
-        slab.update_status(client.clone(), status).await?;
-        slab.log_event(client.clone(), SessionLivedBackendEvent::Constructed)
             .await?;
-    } else if !slab.is_scheduled() {
-        let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
-        let service = service_api
-            .get(&name)
-            .await
-            .map_err(Error::KubernetesFailure)?;
-
-        if let Some(node_name) = get_node_name(&pod) {
-            let ip = get_cluster_ip(&service);
-            let url = format!("http://{}.{}:{}/", name, namespace, SIDECAR_PORT);
-
-            slab.set_spawner_group(client.clone(), &node_name).await?;
-
-            let status = SessionLivedBackendStatus {
-                scheduled: Some(true),
-                node_name: Some(node_name),
-                ip,
-                url: Some(url),
-                ..Default::default()
-            };
-            slab.update_status(client.clone(), status).await?;
-            slab.log_event(client.clone(), SessionLivedBackendEvent::Scheduled)
-                .await?;
         }
-    } else if !slab.is_running() {
-        let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
-        if let Some(phase) = get_pod_phase(&pod) {
-            tracing::debug!(?phase, "Saw pod in phase.");
+        SessionLivedBackendState::Constructed => todo!(),
+        SessionLivedBackendState::Scheduled => {
+            let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
+            let service = service_api
+                .get(&name)
+                .await
+                .map_err(Error::KubernetesFailure)?;
 
-            if phase == "Running" {
+            if let Some(node_name) = get_node_name(&pod) {
+                let ip = get_cluster_ip(&service);
+                let url = format!("http://{}.{}:{}/", name, namespace, SIDECAR_PORT);
+
+                slab.set_spawner_group(client.clone(), &node_name).await?;
+
                 let status = SessionLivedBackendStatus {
-                    running: Some(true),
+                    node_name: Some(node_name),
+                    ip,
+                    url: Some(url),
                     ..Default::default()
                 };
-
-                slab.update_status(client.clone(), status).await?;
-                slab.log_event(client.clone(), SessionLivedBackendEvent::Running)
-                    .await?;
+                slab.update_state(
+                    client.clone(),
+                    SessionLivedBackendState::Constructed,
+                    status,
+                )
+                .await?;
             }
         }
-    }
+        SessionLivedBackendState::Running => {
+            let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
+            if let Some(phase) = get_pod_phase(&pod) {
+                tracing::debug!(?phase, "Saw pod in phase.");
 
-    if slab.is_swept() {
-        match slab_api.delete(&name, &DeleteParams::default()).await {
-            Result::Ok(_) => {
-                tracing::info!(%name, "SessionLivedBackend deleted.");
+                if phase == "Running" {
+                    slab.update_state(
+                        client.clone(),
+                        SessionLivedBackendState::Running,
+                        SessionLivedBackendStatus::default(),
+                    )
+                    .await?;
+                }
             }
-            Result::Err(error) => {
-                tracing::error!(%name, ?error, "Unexpected error deleting SessionLivedBackend.");
-                return Err(Error::KubernetesFailure(error));
+        }
+        SessionLivedBackendState::Ready => (),
+        SessionLivedBackendState::Swept => {
+            match slab_api.delete(&name, &DeleteParams::default()).await {
+                Result::Ok(_) => {
+                    tracing::info!(%name, "SessionLivedBackend deleted.");
+                }
+                Result::Err(error) => {
+                    tracing::error!(%name, ?error, "Unexpected error deleting SessionLivedBackend.");
+                    return Err(Error::KubernetesFailure(error));
+                }
             }
         }
     }
