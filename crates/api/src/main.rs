@@ -1,5 +1,5 @@
 use crate::logging::init_logging;
-use axum::{routing::post, AddExtensionLayer, Router};
+use axum::{routing::post, extract::Extension, Router};
 use clap::Parser;
 use dis_spawner_api::{backend_routes, spawn_handler, ApiSettings};
 use std::{net::SocketAddr, sync::Arc};
@@ -56,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/spawn", post(spawn_handler))
         .nest("/backend", backend_routes())
-        .layer(AddExtensionLayer::new(Arc::new(settings)))
+        .layer(Extension(Arc::new(settings)))
         .layer(trace_layer);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], opts.port));

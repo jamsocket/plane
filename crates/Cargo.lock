@@ -474,9 +474,7 @@ dependencies = [
 
 [[package]]
 name = "dis-spawner"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a99924862000748c8acce3eb45031924f3a7ee0d4657b459534f684d70a8b9f"
+version = "0.1.8"
 dependencies = [
  "futures",
  "k8s-openapi",
@@ -493,6 +491,8 @@ dependencies = [
 [[package]]
 name = "dis-spawner"
 version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06617c09084ae7d8d79c3417e747cebfd8640b0a7e94d1ccbde27e467219e3ae"
 dependencies = [
  "futures",
  "k8s-openapi",
@@ -514,7 +514,7 @@ dependencies = [
  "atty",
  "axum",
  "clap 3.1.6",
- "dis-spawner 0.1.7",
+ "dis-spawner 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "k8s-openapi",
  "kube",
@@ -537,7 +537,7 @@ dependencies = [
  "atty",
  "bat",
  "clap 3.1.6",
- "dis-spawner 0.1.7",
+ "dis-spawner 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "k8s-openapi",
  "kube",
@@ -552,7 +552,7 @@ name = "dis-spawner-controller"
 version = "0.1.0"
 dependencies = [
  "clap 3.1.6",
- "dis-spawner 0.1.7",
+ "dis-spawner 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "dis-spawner-tracing 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "k8s-openapi",
@@ -588,7 +588,7 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "clap 3.1.6",
- "dis-spawner 0.1.7",
+ "dis-spawner 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "dis-spawner-tracing 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "futures-util",
@@ -635,9 +635,9 @@ dependencies = [
 
 [[package]]
 name = "dyn-clone"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee2626afccd7561a06cf1367e2950c4718ea04565e20fb5029b6c7d8ad09abcf"
+checksum = "21e50f3adc76d6a43f5ed73b698a87d0760ca74617f60f7c3b879003536fdd28"
 
 [[package]]
 name = "either"
@@ -1382,9 +1382,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ba42135c6a5917b9db9cd7b293e5409e1c6b041e6f9825e92e55a894c63b6f8"
+checksum = "52da4364ffb0e4fe33a9841a98a3f3014fb964045ce4f7a45a398243c8d6b0c9"
 dependencies = [
  "libc",
  "log",
@@ -1513,9 +1513,9 @@ dependencies = [
 
 [[package]]
 name = "num_threads"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c539a50b93a303167eded6e8dff5220cd39447409fb659f4cd24b1f72fe4f133"
+checksum = "aba1801fb138d8e85e11d0fc70baf4fe1cdfffda7c6cd34a854905df588e5ed0"
 dependencies = [
  "libc",
 ]
@@ -1753,9 +1753,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.15"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "864d3e96a899863136fc6e99f3d7cae289dafe43bf2c5ac19b70df7210c0a145"
+checksum = "b4af2ec4714533fcdf07e886f17025ace8b997b9ce51204ee69b6da831c3da57"
 dependencies = [
  "proc-macro2",
 ]
@@ -1801,12 +1801,13 @@ dependencies = [
 
 [[package]]
 name = "redox_users"
-version = "0.4.0"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "528532f3d801c87aec9def2add9ca802fe569e44a544afe633765267840abe64"
+checksum = "7776223e2696f1aa4c6b0170e83212f47296a00424305117d013dfe86fb0fe55"
 dependencies = [
  "getrandom",
  "redox_syscall",
+ "thiserror",
 ]
 
 [[package]]
@@ -2102,9 +2103,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "syn"
-version = "1.0.87"
+version = "1.0.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e59d925cf59d8151f25a3bedf97c9c157597c9df7324d32d68991cc399ed08b"
+checksum = "ea297be220d52398dcc07ce15a209fce436d361735ac1db700cab3b6cdfb9f54"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2688,6 +2689,6 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.5.3"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50344758e2f40e3a1fcfc8f6f91aa57b5f8ebd8d27919fe6451f15aaaf9ee608"
+checksum = "7eb5728b8afd3f280a869ce1d4c554ffaed35f45c231fc41bfbd0381bef50317"
