@@ -7,7 +7,7 @@ use dis_spawner::{
 use kube::{api::PostParams, Api, Client, CustomResourceExt};
 use serde::Serialize;
 
-const DEFAULT_NAMESPACE: &str = "default";
+const DEFAULT_NAMESPACE: &str = "spawner";
 
 #[derive(Parser)]
 struct Opts {

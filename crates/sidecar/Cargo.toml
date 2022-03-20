@@ -18,4 +18,4 @@ tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread", "time"] }
 tokio-stream = { version="0.1.8", features=["sync"] }
 tracing = "0.1.30"
 tracing-subscriber = { version = "0.3.6", features = ["env-filter"] }
-dis-spawner-tracing = "0.1.0"
+dis-spawner-tracing = {version = "0.1.0", path = "../tracing"}
