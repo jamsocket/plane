@@ -31,6 +31,8 @@ jobs:
           toolchain: stable
 
       - uses: Swatinem/rust-cache@v1
+        with:
+          target-dir: crates/target
 
       - name: Build
         run: cargo build --release
