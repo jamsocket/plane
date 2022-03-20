@@ -22,4 +22,4 @@ tracing-subscriber = { version = "0.3.6", features = ["env-filter"] }
 hyper = { version="0.14.17", features=["full"] }
 futures-util = "0.3.19"
 async-stream = "0.3.2"
-dis-spawner-tracing = "0.1.0"
+dis-spawner-tracing = {version = "0.1.0", path = "../tracing"}
