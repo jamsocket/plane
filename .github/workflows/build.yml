@@ -27,11 +27,11 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          context: crates
+          working-directory: crates
           args: --release
       
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          context: crates
+          working-directory: crates
           args: --release
