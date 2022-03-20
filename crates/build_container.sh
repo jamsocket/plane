@@ -8,8 +8,7 @@ if [ $# -lt 1 ]
     exit 1
 fi
 
-#cargo test --release
-#cargo build --release
+cargo build --release
 
 TEMPDIR=$(mktemp -d)
 BINNAME="${1}"
