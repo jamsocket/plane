@@ -130,6 +130,10 @@ pub struct SessionLivedBackendStatus {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub swept: Option<bool>,
 
+    /// Set to `true` by `spawner` if the pod has failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failed: Option<bool>,
+
     /// The name of the Kubernetes cluster node that this backend has been assigned to.
     ///
     /// This is initially None until a backend has been assigned to a node. Once it has,
@@ -180,6 +184,10 @@ impl SessionLivedBackendStatus {
                 swept: Some(true),
                 ..base_status
             },
+            SessionLivedBackendState::Failed => SessionLivedBackendStatus {
+                failed: Some(true),
+                ..base_status
+            }
         }
     }
 }

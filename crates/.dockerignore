@@ -1,4 +1,4 @@
-*/target
+target
 *.Dockerfile
 README.md
 LICENSE
@@ -6,3 +6,4 @@ LICENSE
 .dockerignore
 .github
 _containers
+target

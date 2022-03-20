@@ -113,8 +113,7 @@ async fn reconcile(
             )
             .await?;
         }
-        SessionLivedBackendState::Constructed => todo!(),
-        SessionLivedBackendState::Scheduled => {
+        SessionLivedBackendState::Constructed => {
             let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
             let service = service_api
                 .get(&name)
@@ -135,13 +134,13 @@ async fn reconcile(
                 };
                 slab.update_state(
                     client.clone(),
-                    SessionLivedBackendState::Constructed,
+                    SessionLivedBackendState::Scheduled,
                     status,
                 )
                 .await?;
             }
         }
-        SessionLivedBackendState::Running => {
+        SessionLivedBackendState::Scheduled => {
             let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
             if let Some(phase) = get_pod_phase(&pod) {
                 tracing::debug!(?phase, "Saw pod in phase.");
@@ -156,7 +155,15 @@ async fn reconcile(
                 }
             }
         }
-        SessionLivedBackendState::Ready => (),
+        SessionLivedBackendState::Ready => {
+            // Nothing needs to be done; sweeper makes the next state change.
+        },
+        SessionLivedBackendState::Running => {
+            // Nothing needs to be done; sweeper makes the next state change.
+        },
+        SessionLivedBackendState::Failed => {
+            // TODO: sweep after a time interval.
+        },
         SessionLivedBackendState::Swept => {
             match slab_api.delete(&name, &DeleteParams::default()).await {
                 Result::Ok(_) => {

@@ -11,4 +11,4 @@ members = [
 ]
 
 [patch.crates-io]
-# dis-spawner = {path = "./core"}
+dis-spawner = {path = "./core"}

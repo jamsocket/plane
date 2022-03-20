@@ -20,6 +20,9 @@ pub enum SessionLivedBackendState {
 
     /// The `SessionLivedBackend` has been marked as swept, meaning that it can be deleted.
     Swept,
+
+    /// The backend failed.
+    Failed,
 }
 
 impl Default for SessionLivedBackendState {
@@ -52,6 +55,9 @@ impl SessionLivedBackendState {
             }
             SessionLivedBackendState::Swept => {
                 "SessionLivedBackend was found idle and swept.".to_string()
+            }
+            &SessionLivedBackendState::Failed => {
+                "SessionLivedBackend failed.".to_string()
             }
         }
     }
