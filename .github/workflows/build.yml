@@ -42,12 +42,12 @@ jobs:
         run: cargo test --release
         working-directory: crates
 
-      - name: Build and push Controller
-        uses: docker/build-push-action@v2
-        with:
-          context: crates/target/release
-          build-args: |
-            BINNAME=spawner-controller
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/drifting-in-space/spawner-controller
-          labels: ${{ steps.meta.outputs.labels }}
+      # - name: Build and push Controller
+      #   uses: docker/build-push-action@v2
+      #   with:
+      #     context: crates/target/release
+      #     build-args: |
+      #       BINNAME=spawner-controller
+      #     push: ${{ github.event_name != 'pull_request' }}
+      #     tags: ghcr.io/drifting-in-space/spawner-controller
+      #     labels: ${{ steps.meta.outputs.labels }}
