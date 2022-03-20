@@ -24,14 +24,12 @@ jobs:
 
       - uses: Swatinem/rust-cache@v1
 
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          working-directory: crates
-          args: --release
-      
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          working-directory: crates
-          args: --release
+    - name: Build
+      run: cargo build --release
+      with:
+        context: crates
+
+    - name: Run tests
+      run: cargo test --release
+      with:
+        context: crates
