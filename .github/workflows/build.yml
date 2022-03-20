@@ -1,5 +1,12 @@
-
-on: [push, pull_request]
+on:
+  push:
+    branches: [ master ]
+    tags: [ 'v*.*.*' ]
+    paths:
+      - '.github/workflows/build.yml'
+      - 'crates/**'
+  pull_request:
+    branches: [ master ]
 
 name: Build
 
@@ -20,9 +27,11 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build
+          context: crates
           args: --release
       
       - uses: actions-rs/cargo@v1
         with:
           command: test
+          context: crates
           args: --release
