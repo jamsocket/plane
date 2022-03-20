@@ -26,10 +26,8 @@ jobs:
 
       - name: Build
         run: cargo build --release
-        with:
-          context: crates
+        working-directory: crates
 
       - name: Run tests
         run: cargo test --release
-        with:
-          context: crates
+        working-directory: crates
