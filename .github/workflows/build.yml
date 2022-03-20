@@ -24,12 +24,12 @@ jobs:
 
       - uses: Swatinem/rust-cache@v1
 
-    - name: Build
-      run: cargo build --release
-      with:
-        context: crates
+      - name: Build
+        run: cargo build --release
+        with:
+          context: crates
 
-    - name: Run tests
-      run: cargo test --release
-      with:
-        context: crates
+      - name: Run tests
+        run: cargo test --release
+        with:
+          context: crates
