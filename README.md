@@ -1,13 +1,14 @@
 ## Quick Links
 
+[![Build](https://github.com/drifting-in-space/spawner/actions/workflows/build.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/build.yml)
 
-| Component | Pipeline | Image | Crate | Version |
-| ---       | ---   | ---     | ---      | ---   |
-| [`core`](https://github.com/drifting-in-space/spawner/tree/master/crates/core) | | | [`dis-spawner`](https://crates.io/crates/dis-spawner) | [![crates.io](https://img.shields.io/crates/v/dis-spawner.svg)](https://crates.io/crates/dis-spawner) |
-| [`controller`](https://github.com/drifting-in-space/spawner/tree/master/crates/controller) | [![Controller Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-controller.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-controller.yml) | [`spawner-controller`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-controller) | | |
-| [`sidecar`](https://github.com/drifting-in-space/spawner/tree/master/crates/sidecar) | [![Sidecar Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sidecar.yml) | [`spawner-sidecar`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-sidecar) | | |
-| [`sweeper`](https://github.com/drifting-in-space/spawner/tree/master/crates/sweeper) | [![Sweeper Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-sweeper.yml) | [`spawner-sweeper`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-sweeper) | | |
-| [`api`](https://github.com/drifting-in-space/spawner/tree/master/crates/api) | [![API Image](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-api.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/docker-publish-api.yml) | [`spawner-api`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-api) | [`dis-spawner-api`](https://crates.io/crates/dis-spawner-api) | [![crates.io](https://img.shields.io/crates/v/dis-spawner-api.svg)](https://crates.io/crates/dis-spawner-api) |
+| Component | Image | Crate | Version |
+| ---       | ---     | ---      | ---   |
+| [`core`](https://github.com/drifting-in-space/spawner/tree/master/crates/core) | | [`dis-spawner`](https://crates.io/crates/dis-spawner) | [![crates.io](https://img.shields.io/crates/v/dis-spawner.svg)](https://crates.io/crates/dis-spawner) |
+| [`controller`](https://github.com/drifting-in-space/spawner/tree/master/crates/controller) | [`spawner-controller`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-controller) | | | |
+| [`sidecar`](https://github.com/drifting-in-space/spawner/tree/master/crates/sidecar) | [`spawner-sidecar`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-sidecar) | | |
+| [`sweeper`](https://github.com/drifting-in-space/spawner/tree/master/crates/sweeper) | [`spawner-sweeper`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-sweeper) | | |
+| [`api`](https://github.com/drifting-in-space/spawner/tree/master/crates/api) | [`spawner-api`](https://github.com/drifting-in-space/spawner/pkgs/container/spawner-api) | [`dis-spawner-api`](https://crates.io/crates/dis-spawner-api) | [![crates.io](https://img.shields.io/crates/v/dis-spawner-api.svg)](https://crates.io/crates/dis-spawner-api) |
 
 # Spawner
 
