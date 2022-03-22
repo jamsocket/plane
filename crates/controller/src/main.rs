@@ -74,6 +74,31 @@ fn get_pod_phase(pod: &Pod) -> Option<String> {
     pod.status.as_ref()?.phase.clone()
 }
 
+#[derive(Debug)]
+enum ContainerState {
+    Running,
+    Terminated,
+    Failed,
+} 
+
+fn get_application_state(pod: &Pod) -> Option<ContainerState> {
+    for status in pod.status.as_ref()?.container_statuses.as_ref()? {
+        if status.name == "application" {
+            let state = status.state.as_ref()?;
+
+            tracing::info!(?state, "saw container in state");
+
+            if let Some(terminated) = state.terminated.as_ref() {
+                if terminated.reason.as_deref() == Some("Error") {
+                    return Some(ContainerState::Failed)
+                }
+            }
+        }
+    }
+
+    None
+}
+
 async fn reconcile(
     slab: Arc<SessionLivedBackend>,
     ctx: Context<ControllerContext>,
@@ -156,10 +181,25 @@ async fn reconcile(
             }
         }
         SessionLivedBackendState::Running => {
-            // Nothing needs to be done; sweeper makes the next state change.
+            let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
+            let state = get_application_state(&pod);
+
+            match state {
+                Some(ContainerState::Failed) => {
+                    slab.update_state(
+                        client.clone(),
+                        SessionLivedBackendState::Failed,
+                        SessionLivedBackendStatus::default(),
+                    )
+                    .await?;
+                },
+                _ => ()
+            }
+
+            // If there is no error, Sweeper makes the next state change (to swept.)
         }
         SessionLivedBackendState::Ready => {
-            // Nothing needs to be done; sweeper makes the next state change.
+            // Sweeper makes the next state change.
         }
         SessionLivedBackendState::Failed => {
             // TODO: sweep after a time interval.
@@ -216,8 +256,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     controller::Error::ReconcilerFailed(error, _) => {
                         tracing::error!(%error, "Reconcile failed.")
                     }
-                    controller::Error::ObjectNotFound(error) => {
-                        tracing::warn!(%error, "Object not found (may have been deleted).")
+                    controller::Error::ObjectNotFound(_error) => {
+                        // This happens when we've deleted the SessionLivedBackend.
                     }
                     controller::Error::QueueError(error) => {
                         tracing::error!(%error, "Queue error.")

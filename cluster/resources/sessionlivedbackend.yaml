@@ -21,20 +21,25 @@ spec:
           description: "Auto-generated derived type for SessionLivedBackendSpec via `CustomResource`"
           properties:
             spec:
+              description: "Describes a session-lived backend, consisting of a pod template, and optional overrides for the HTTP port and grace period parameters.\n\nThe pod spec should not include the Spawner sidecar container; it is inserted only when the backend is about to be run."
               properties:
                 gracePeriodSeconds:
+                  description: "The period of time (in seconds) after a backend's last connection to wait before shutting down the backend.\n\nIf another connection is made during the grace period, the countdown is reset."
                   format: uint32
                   minimum: 0.0
                   nullable: true
                   type: integer
                 httpPort:
+                  description: The port of the application container on which we listen for an HTTP connection.
                   format: uint16
                   minimum: 0.0
                   nullable: true
                   type: integer
                 template:
+                  description: Describes the container run by the backend.
                   properties:
                     containers:
+                      description: "Containers to run. If multiple containers are given, the first is assumed to be the application container."
                       items:
                         description: A single application container that you want to run within a pod.
                         properties:
@@ -777,6 +782,7 @@ spec:
                         type: object
                       type: array
                     imagePullSecrets:
+                      description: "A reference to the Kubernetes secret containing image registry access credentials, if needed by the image registry."
                       items:
                         description: LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
                         properties:
@@ -787,6 +793,7 @@ spec:
                       nullable: true
                       type: array
                     volumes:
+                      description: Volumes to be attached to the pod associated with this backend.
                       items:
                         description: Volume represents a named volume in a pod that may be accessed by any container in the pod.
                         properties:
@@ -1803,15 +1810,27 @@ spec:
                 - template
               type: object
             status:
+              description: Status flags associated with a backend.
               nullable: true
               properties:
+                constructed:
+                  description: "Set to `true` by `spawner` once the backing pod object exists."
+                  nullable: true
+                  type: boolean
+                failed:
+                  description: "Set to `true` by `spawner` if the pod has failed."
+                  nullable: true
+                  type: boolean
                 ip:
+                  description: IP of the service associated with this backend.
                   nullable: true
                   type: string
                 nodeName:
+                  description: "The name of the Kubernetes cluster node that this backend has been assigned to.\n\nThis is initially None until a backend has been assigned to a node. Once it has, this never changes."
                   nullable: true
                   type: string
                 port:
+                  description: Port of the service associated with this backend.
                   format: uint16
                   minimum: 0.0
                   nullable: true
@@ -1837,6 +1856,7 @@ spec:
                   nullable: true
                   type: boolean
                 url:
+                  description: In-cluster URL associated with this backend.
                   nullable: true
                   type: string
               type: object
