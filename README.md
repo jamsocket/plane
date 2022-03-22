@@ -63,5 +63,5 @@ to own the lifecycle of that backend:
 
 ## More info & getting started
 
-See the [docs](https://github.com/drifting-in-space/spawner/blob/master/docs/README.md) directory
+See the [docs](https://github.com/drifting-in-space/spawner/blob/main/docs/README.md) directory
 for more information.
