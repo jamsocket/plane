@@ -187,7 +187,7 @@ impl SessionLivedBackendStatus {
             SessionLivedBackendState::Failed => SessionLivedBackendStatus {
                 failed: Some(true),
                 ..base_status
-            }
+            },
         }
     }
 }
@@ -252,6 +252,37 @@ impl SessionLivedBackend {
         labels
     }
 
+    fn sidecar_container<I>(sidecar_image: &str, http_port: u16, env: I) -> Container
+    where
+        I: Iterator<Item = (String, String)>,
+    {
+        let args = vec![
+            format!("--serve-port={}", SIDECAR_PORT),
+            format!("--upstream-port={}", http_port),
+        ];
+
+        let env: Vec<EnvVar> = env
+            .filter_map(|(key, val)| {
+                let name = key.strip_prefix("SPAWNER_SIDECAR_")?.to_string();
+                Some(EnvVar {
+                    name,
+                    value: Some(val.clone()),
+                    ..EnvVar::default()
+                })
+            })
+            .collect();
+
+        let env = if env.is_empty() { None } else { Some(env) };
+
+        Container {
+            name: SIDECAR.to_string(),
+            image: Some(sidecar_image.to_string()),
+            args: Some(args),
+            env,
+            ..Container::default()
+        }
+    }
+
     pub fn pod(
         &self,
         sidecar_image: &str,
@@ -259,10 +290,6 @@ impl SessionLivedBackend {
     ) -> Result<Pod, Error> {
         let name = self.name();
         let http_port = self.spec.http_port.unwrap_or(DEFAULT_PORT);
-        let args = vec![
-            format!("--serve-port={}", SIDECAR_PORT),
-            format!("--upstream-port={}", http_port),
-        ];
 
         let mut template: PodSpec = self.spec.template.clone().into();
         let port_env = EnvVar {
@@ -271,25 +298,21 @@ impl SessionLivedBackend {
             ..EnvVar::default()
         };
 
-        let first_container = template.containers.first_mut().ok_or(Error::MissingObjectKey("template.containers[0]"))?;
+        let first_container = template
+            .containers
+            .first_mut()
+            .ok_or(Error::MissingObjectKey("template.containers[0]"))?;
 
         match &mut first_container.env {
             Some(env) => {
                 env.push(port_env);
             }
-            None => {
-                first_container.env = Some(vec![port_env])
-            }
+            None => first_container.env = Some(vec![port_env]),
         };
 
-        template.containers.push(
-            Container {
-                name: SIDECAR.to_string(),
-                image: Some(sidecar_image.to_string()),
-                args: Some(args),
-                ..Container::default()
-            },
-        );
+        template
+            .containers
+            .push(Self::sidecar_container(sidecar_image, http_port, std::env::vars()));
 
         if let Some(image_pull_secret) = image_pull_secret {
             let secret_ref = LocalObjectReference {
@@ -612,6 +635,41 @@ mod test {
     }
 
     #[test]
+    fn test_sidecar_env_var() {
+        let env = vec![
+            ("SPAWNER_SIDECAR_FOO".to_string(), "FOO_VAL".to_string()),
+            ("SPAWNER_SIDECAR_BAR".to_string(), "BAR_VAL".to_string()),
+        ];
+
+        let sidecar_container = SessionLivedBackend::sidecar_container("sidecar-image", 4040, env.into_iter());
+
+        assert_eq!(
+            Container {
+                name: "spawner-sidecar".to_string(),
+                image: Some("sidecar-image".to_string()),
+                args: Some(vec![
+                    "--serve-port=9090".to_string(),
+                    "--upstream-port=4040".to_string()
+                ]),
+                env: Some(vec![
+                    EnvVar {
+                        name: "FOO".to_string(),
+                        value: Some("FOO_VAL".to_string()),
+                        ..EnvVar::default()
+                    },
+                    EnvVar {
+                        name: "BAR".to_string(),
+                        value: Some("BAR_VAL".to_string()),
+                        ..EnvVar::default()
+                    },
+                ]),
+                ..Container::default()
+            },
+            sidecar_container
+        );
+    }
+
+    #[test]
     fn test_pod_and_service() {
         let backend = SessionLivedBackend {
             spec: SessionLivedBackendSpec {
@@ -704,17 +762,17 @@ mod test {
                     ..ObjectMeta::default()
                 },
                 spec: Some(ServiceSpec {
-                    ports: Some(vec![
-                        ServicePort {
-                            name: Some("spawner-app".to_string()),
-                            port: 9090,
-                            protocol: Some("TCP".to_string()),
-                            ..ServicePort::default()
-                        }
-                    ]),
-                    selector: Some(vec![
-                        ("run".to_string(), "slab1".to_string())
-                    ].into_iter().collect()),
+                    ports: Some(vec![ServicePort {
+                        name: Some("spawner-app".to_string()),
+                        port: 9090,
+                        protocol: Some("TCP".to_string()),
+                        ..ServicePort::default()
+                    }]),
+                    selector: Some(
+                        vec![("run".to_string(), "slab1".to_string())]
+                            .into_iter()
+                            .collect()
+                    ),
                     ..ServiceSpec::default()
                 }),
                 ..Service::default()

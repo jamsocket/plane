@@ -155,15 +155,15 @@ async fn reconcile(
                 }
             }
         }
-        SessionLivedBackendState::Ready => {
-            // Nothing needs to be done; sweeper makes the next state change.
-        },
         SessionLivedBackendState::Running => {
             // Nothing needs to be done; sweeper makes the next state change.
-        },
+        }
+        SessionLivedBackendState::Ready => {
+            // Nothing needs to be done; sweeper makes the next state change.
+        }
         SessionLivedBackendState::Failed => {
             // TODO: sweep after a time interval.
-        },
+        }
         SessionLivedBackendState::Swept => {
             match slab_api.delete(&name, &DeleteParams::default()).await {
                 Result::Ok(_) => {
