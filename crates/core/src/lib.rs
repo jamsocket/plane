@@ -94,6 +94,7 @@ impl Into<PodSpec> for BackendPodSpec {
             containers: self.containers,
             image_pull_secrets: self.image_pull_secrets,
             volumes: self.volumes,
+            restart_policy: Some("Never".to_string()),
             ..Default::default()
         }
     }
@@ -425,6 +426,7 @@ impl SessionLivedBackend {
         let event_api = Api::<Event>::namespaced(client.clone(), &namespace);
 
         let new_status = SessionLivedBackendStatus::patch_state(new_state, patch_status);
+        tracing::info!(name=%self.name(), state=%new_state, "Updating SLAB state.");
 
         slab_api
             .patch_status(
@@ -710,6 +712,7 @@ mod test {
                     ..ObjectMeta::default()
                 },
                 spec: Some(PodSpec {
+                    restart_policy: Some("Never".to_string()),
                     containers: vec![
                         Container {
                             name: "foo".to_string(),
