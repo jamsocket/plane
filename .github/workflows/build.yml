@@ -1,11 +1,11 @@
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
     paths:
       - '.github/workflows/build.yml'
       - 'crates/**'
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 name: Build
 
