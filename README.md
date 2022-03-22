@@ -44,7 +44,7 @@ see [Agones](https://agones.dev/site/) for that use case.
 
 ## Architecture
 
-![Spawner architecture diagram](https://github.com/drifting-in-space/spawner/raw/master/docs/diagram.svg)
+![Spawner architecture diagram](https://github.com/drifting-in-space/spawner/raw/main/docs/diagram.svg)
 
 Spawner is built on top of [Kubernetes](https://kubernetes.io/), an open-source container orchestration
 system. Spawner provides the `SessionLivedBackend` [custom resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/),
