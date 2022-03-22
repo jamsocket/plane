@@ -61,6 +61,8 @@ spec:
         env:
         - name: RUST_LOG
           value: "spawner_controller=debug,info"
+        - name: SPAWNER_SIDECAR_RUST_LOG
+          value: "spawner_controller=debug,info"
         args: [
           "--namespace", "spawner",
           "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:latest",
