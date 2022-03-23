@@ -16,15 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
-            type=raw,value=latest
-
       - name: Log into registry ${{ env.REGISTRY }}
         if: github.event_name != 'pull_request'
         uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
@@ -50,6 +41,15 @@ jobs:
         run: cargo test --release
         working-directory: crates
 
+      - name: Extract Docker metadata (controller)
+        id: meta-controller
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: ghcr.io/drifting-in-space/spawner-controller
+          tags: |
+            type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
+            type=raw,value=latest
+
       - name: Build and push Controller
         uses: docker/build-push-action@v2
         with:
@@ -58,8 +58,17 @@ jobs:
           build-args: |
             BINNAME=spawner-controller
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/drifting-in-space/spawner-controller
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-controller.outputs.tags }}
+          labels: ${{ steps.meta-controller.outputs.labels }}
+
+      - name: Extract Docker metadata (sidecar)
+        id: meta-sidecar
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: ghcr.io/drifting-in-space/spawner-sidecar
+          tags: |
+            type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
+            type=raw,value=latest
 
       - name: Build and push Sidecar
         uses: docker/build-push-action@v2
@@ -69,8 +78,17 @@ jobs:
           build-args: |
             BINNAME=spawner-sidecar
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/drifting-in-space/spawner-sidecar
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-sidecar.outputs.tags }}
+          labels: ${{ steps.meta-sidecar.outputs.labels }}
+
+      - name: Extract Docker metadata (sweeper)
+        id: meta-sweeper
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: ghcr.io/drifting-in-space/spawner-sweeper
+          tags: |
+            type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
+            type=raw,value=latest
 
       - name: Build and push Sweeper
         uses: docker/build-push-action@v2
@@ -80,8 +98,17 @@ jobs:
           build-args: |
             BINNAME=spawner-sweeper
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/drifting-in-space/spawner-sweeper
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-sweeper.outputs.tags }}
+          labels: ${{ steps.meta-sweeper.outputs.labels }}
+
+      - name: Extract Docker metadata (api)
+        id: meta-api
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: ghcr.io/drifting-in-space/spawner-api
+          tags: |
+            type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
+            type=raw,value=latest
 
       - name: Build and push API
         uses: docker/build-push-action@v2
@@ -91,5 +118,5 @@ jobs:
           build-args: |
             BINNAME=spawner-api
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/drifting-in-space/spawner-api
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
