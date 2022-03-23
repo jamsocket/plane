@@ -426,7 +426,7 @@ impl SessionLivedBackend {
         let event_api = Api::<Event>::namespaced(client.clone(), &namespace);
 
         let new_status = SessionLivedBackendStatus::patch_state(new_state, patch_status);
-        tracing::info!(name=%self.name(), state=%new_state, "Updating SLAB state.");
+        tracing::debug!(name=%self.name(), state=%new_state, "Updating SLAB state.");
 
         slab_api
             .patch_status(

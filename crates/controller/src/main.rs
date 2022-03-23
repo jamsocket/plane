@@ -87,7 +87,7 @@ fn get_application_state(pod: &Pod) -> Option<ContainerState> {
         if status.name == "application" {
             let state = status.state.as_ref()?;
 
-            tracing::info!(?state, "saw container in state");
+            tracing::debug!(?state, "saw container in state");
 
             if let Some(terminated) = state.terminated.as_ref() {
                 if terminated.reason.as_deref() == Some("Error") {
@@ -208,7 +208,7 @@ async fn reconcile(
         SessionLivedBackendState::Swept => {
             match slab_api.delete(&name, &DeleteParams::default()).await {
                 Result::Ok(_) => {
-                    tracing::info!(%name, "SessionLivedBackend deleted.");
+                    tracing::debug!(%name, "SessionLivedBackend deleted.");
                 }
                 Result::Err(error) => {
                     tracing::error!(%name, ?error, "Unexpected error deleting SessionLivedBackend.");

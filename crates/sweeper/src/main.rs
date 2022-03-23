@@ -174,7 +174,7 @@ async fn reconcile(
                 match timeout(duration, stream.next()).await {
                     Ok(result) => result,
                     Err(_) => {
-                        tracing::info!(?url, "Timed out without activity.");
+                        tracing::debug!(?url, "Timed out without activity.");
                         break;
                     }
                 }
@@ -185,7 +185,7 @@ async fn reconcile(
             let result = if let Some(result) = result {
                 result
             } else {
-                tracing::info!(?url, "Reached end of message stream; assuming pod is dead.");
+                tracing::debug!(?url, "Reached end of message stream; assuming pod is dead.");
                 break;
             };
 
