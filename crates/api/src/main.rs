@@ -60,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(trace_layer);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], opts.port));
-    tracing::info!(%addr, "Listening");
+    tracing::debug!(%addr, "Listening");
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await?;

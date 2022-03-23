@@ -62,7 +62,7 @@ impl ProxyService {
                     tracing::error!(?error, "Error waiting for ready port.");
                 } else {
                     monitor.set_ready();
-                    tracing::info!(?upstream_port, "Port is ready.");
+                    tracing::debug!(?upstream_port, "Port is ready.");
                 }
             });
         }
