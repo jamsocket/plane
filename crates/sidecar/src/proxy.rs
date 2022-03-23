@@ -56,13 +56,13 @@ impl ProxyService {
             let monitor = monitor.clone();
 
             tokio::spawn(async move {
-                tracing::info!(?upstream_port, "Waiting for port to become ready.");
+                tracing::debug!(?upstream_port, "Waiting for port to become ready.");
                 let result = wait_for_ready_port(upstream_port).await;
                 if let Err(error) = result {
                     tracing::error!(?error, "Error waiting for ready port.");
                 } else {
                     monitor.set_ready();
-                    tracing::info!(?upstream_port, "Port is ready.");
+                    tracing::debug!(?upstream_port, "Port is ready.");
                 }
             });
         }
@@ -118,7 +118,7 @@ impl ProxyService {
                                     .unwrap_or_default()
                                     .as_secs();
 
-                                tracing::info!(%from_client, %from_server, ?duration, "Upgraded connection closed.");
+                                tracing::debug!(%from_client, %from_server, ?duration, "Upgraded connection closed.");
                             }
                             Err(error) => {
                                 tracing::error!(?error, "IO error upgrading connection.");
@@ -147,12 +147,9 @@ impl ProxyService {
 
         if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
             if connection.to_str().unwrap_or_default().to_lowercase() == "upgrade" {
-                tracing::info!(?connection, "Connection header");
-
                 return self.handle_upgrade(req).await;
             }
         }
-        tracing::info!(req = %req.uri(), "Handling request");
         self.client.request(req).await.map_err(|d| d.into())
     }
 }
