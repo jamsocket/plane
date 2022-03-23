@@ -75,6 +75,7 @@ fn get_pod_phase(pod: &Pod) -> Option<String> {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 enum ContainerState {
     Running,
     Terminated,
