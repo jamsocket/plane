@@ -474,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "dis-spawner"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "futures",
  "k8s-openapi",
@@ -490,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "dis-spawner-api"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "anyhow",
  "atty",
