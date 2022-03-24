@@ -90,7 +90,7 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
             let result = match client.request(request).await {
                 Ok(result) => result,
                 Err(e) => {
-                    tracing::warn!(?e, "HTTP error.");
+                    tracing::debug!(?e, "HTTP error.");
                     retry += 1;
                     continue 'retry_loop;
                 }
