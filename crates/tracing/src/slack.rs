@@ -66,7 +66,7 @@ impl<S: Subscriber> Layer<S> for SlackLayer {
         let level = metadata.level();
         let target = metadata.target();
 
-        if *level > Level::INFO {
+        if ignore_log(*level) {
             // TODO: use tracing filter for this?
             return;
         }
@@ -84,5 +84,23 @@ impl<S: Subscriber> Layer<S> for SlackLayer {
         let message = format!("*{}* {}\n{}", level, target, fields_message);
 
         send_message(&self.endpoint_url, &message);
+    }
+}
+
+fn ignore_log(level: Level) -> bool {
+    level > Level::INFO
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_ignore_log() {
+        assert!(ignore_log(Level::DEBUG));
+        assert!(ignore_log(Level::TRACE));
+        assert!(!ignore_log(Level::ERROR));
+        assert!(!ignore_log(Level::INFO));
+        assert!(!ignore_log(Level::WARN));
     }
 }

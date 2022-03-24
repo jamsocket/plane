@@ -1,6 +1,6 @@
 [package]
 name = "dis-spawner-tracing"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 homepage = "https://spawner.dev"
 description = "Tracing utilities for Spawner, a server for session-lived backends."

@@ -9,6 +9,3 @@ members = [
     "sweeper",
     "tracing"
 ]
-
-[patch.crates-io]
-dis-spawner = {path = "./core"}
