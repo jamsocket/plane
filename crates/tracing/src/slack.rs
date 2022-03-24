@@ -66,7 +66,7 @@ impl<S: Subscriber> Layer<S> for SlackLayer {
         let level = metadata.level();
         let target = metadata.target();
 
-        if *level < Level::INFO {
+        if *level > Level::INFO {
             // TODO: use tracing filter for this?
             return;
         }
