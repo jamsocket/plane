@@ -588,7 +588,7 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "clap 3.1.6",
- "dis-spawner 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dis-spawner 0.1.9",
  "dis-spawner-tracing",
  "futures",
  "futures-util",
