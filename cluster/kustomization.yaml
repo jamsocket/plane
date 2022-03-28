@@ -1,9 +1,9 @@
 resources:
 - resources/spawner.yaml
-#- resources/nginx.yaml
+- resources/nginx.yaml
 - resources/sweeper.yaml
-#- resources/sessionlivedbackend.yaml
-#- resources/api.yaml
+- resources/sessionlivedbackend.yaml
+- resources/api.yaml
 configMapGenerator:
 - name: nginx-config
   files:
