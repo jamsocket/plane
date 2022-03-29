@@ -431,8 +431,15 @@ impl SessionLivedBackend {
             duration.num_milliseconds().to_string()
         }).unwrap_or("".to_string());
 
+        let spawn_owner: String = self.metadata.labels
+            .as_ref()
+            .map(|l| {
+                l.get("spawn-owner").unwrap_or(&"".to_string()).to_string()
+            })
+            .unwrap_or("".to_string());
+
         let new_status = SessionLivedBackendStatus::patch_state(new_state, patch_status);
-        tracing::debug!(name=%self.name(), state=%new_state, elapsed_ms=%elapsed_ms, "Updating SLAB state.");
+        tracing::debug!(name=%self.name(), state=%new_state, spawn_owner=%spawn_owner, elapsed_ms=%elapsed_ms, "Updating SLAB state.");
 
         slab_api
             .patch_status(
