@@ -60,9 +60,9 @@ spec:
         image: ghcr.io/drifting-in-space/spawner-controller:latest
         env:
         - name: RUST_LOG
-          value: "spawner_controller=debug,info"
+          value: "debug,hyper=info,tower=info"
         - name: SPAWNER_SIDECAR_RUST_LOG
-          value: "spawner_controller=debug,info"
+          value: "debug,hyper=info,tower=info"
         args: [
           "--namespace", "spawner",
           "--sidecar", "ghcr.io/drifting-in-space/spawner-sidecar:latest",

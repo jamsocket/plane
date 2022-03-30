@@ -23,7 +23,7 @@ spec:
               fieldRef:
                 fieldPath: spec.nodeName
           - name: RUST_LOG
-            value: "spawner_sweeper=debug,info"
+            value: "debug,hyper=info,tower=info"
         args: [
           "--namespace", "spawner",
           "--node-name", "$(POD_NAME)"
