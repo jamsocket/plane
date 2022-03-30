@@ -431,15 +431,15 @@ impl SessionLivedBackend {
         let event_api = Api::<Event>::namespaced(client.clone(), &namespace);
 
         let now = Utc::now();
-        let elapsed_ms = self.metadata.creation_timestamp.as_ref().map(|t| {
+        let elapsed_ms: Option<i64> = self.metadata.creation_timestamp.as_ref().map(|t| {
             let duration = now - t.0;
-            duration.num_milliseconds().to_string()
-        }).unwrap_or("".to_string());
+            duration.num_milliseconds()
+        });
 
         let spawn_owner = self.owner().unwrap_or("".to_string());
 
         let new_status = SessionLivedBackendStatus::patch_state(new_state, patch_status);
-        tracing::debug!(name=%self.name(), state=%new_state, spawn_owner=%spawn_owner, elapsed_ms=%elapsed_ms, "Updating SLAB state.");
+        tracing::debug!(name=%self.name(), state=%new_state, spawn_owner=%spawn_owner, elapsed_ms=elapsed_ms, "Updating SLAB state.");
 
         slab_api
             .patch_status(
