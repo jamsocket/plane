@@ -286,7 +286,7 @@ impl SessionLivedBackend {
 
     pub fn owner(&self) -> Option<String> {
         let labels = self.metadata.labels.as_ref()?;
-        labels.get("spawn-owner").map(|l| l.to_string())
+        labels.get("spawn-owner").cloned()
     }
 
     pub fn pod(
