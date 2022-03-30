@@ -61,12 +61,12 @@ impl Monitor {
     }
 
     pub fn set_ready(&self) {
-        self.ready.store(true, Ordering::Relaxed);
+        self.ready.store(true, Ordering::SeqCst);
         self.bump();
     }
 
     pub fn state(&self) -> MonitorState {
-        if !self.ready.load(Ordering::Relaxed) {
+        if !self.ready.load(Ordering::SeqCst) {
             return MonitorState::NotReady;
         }
 
