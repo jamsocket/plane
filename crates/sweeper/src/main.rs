@@ -88,6 +88,8 @@ pub async fn state_stream(base_uri: &str, name: &str) -> Result<MonitorStateStre
                 .body(Body::empty())
                 .expect("Request construction should never fail.");
 
+            tracing::debug!(%uri, %name, "Attempting to connect to container.");
+
             let result = match client.request(request).await {
                 Ok(result) => result,
                 Err(e) => {

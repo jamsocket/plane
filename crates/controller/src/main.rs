@@ -169,7 +169,7 @@ async fn reconcile(
         SessionLivedBackendState::Scheduled => {
             let pod = pod_api.get(&name).await.map_err(Error::KubernetesFailure)?;
             if let Some(phase) = get_pod_phase(&pod) {
-                tracing::debug!(?phase, "Saw pod in phase.");
+                tracing::debug!(%phase, %name, "Saw pod in phase.");
 
                 if phase == "Running" {
                     slab.update_state(
