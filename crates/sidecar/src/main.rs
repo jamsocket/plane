@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
 
     let opts = Opts::parse();
     let addr = SocketAddr::from(([0, 0, 0, 0], opts.serve_port));
-    tracing::debug!(%opts.upstream_port, %opts.serve_port, "Proxy started.");
+    tracing::debug!(%opts.upstream_port, %opts.serve_port, "Starting proxy.");
 
     let proxy = ProxyService::new(opts.upstream_port).map_err(|e| {
         anyhow!(
