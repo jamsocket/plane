@@ -90,10 +90,17 @@ pub async fn state_stream(base_uri: &str, name: &str) -> Result<MonitorStateStre
 
             tracing::debug!(%uri, %name, "Attempting to connect to container.");
 
-            let result = match client.request(request).await {
-                Ok(result) => result,
+            let result = match timeout(Duration::from_secs(1), client.request(request)).await {
+                Ok(result) => match result {
+                    Ok(result) => result,
+                    Err(e) => {
+                        tracing::debug!(%uri, %name, ?e, "HTTP error connecting to container.");
+                        retry += 1;
+                        continue 'retry_loop;
+                    }
+                },
                 Err(e) => {
-                    tracing::debug!(%uri, %name, ?e, "HTTP error.");
+                    tracing::debug!(%uri, %name, ?e, "Timeout connecting to container.");
                     retry += 1;
                     continue 'retry_loop;
                 }
