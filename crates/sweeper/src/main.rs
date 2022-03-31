@@ -64,7 +64,8 @@ pub enum Error {
 
 type MonitorStateStream = Pin<Box<dyn Stream<Item = MonitorState> + Send>>;
 
-pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
+pub async fn state_stream(base_uri: &str, name: &str) -> Result<MonitorStateStream, Error> {
+    let name = name.to_string();
     let client = hyper::Client::new();
     let uri = format!("{}_events", base_uri)
         .parse::<Uri>()
@@ -75,10 +76,10 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
 
         'retry_loop: loop {
             if retry > MAX_RETRIES {
-                tracing::warn!(?retry, "Hit max retries.");
+                tracing::warn!(%uri, %name, %retry, "Hit max retries.");
                 break;
             } else if retry > 0 {
-                tracing::debug!(?uri, %RETRY_PAUSE_MILIS, "Sleeping.");
+                tracing::debug!(%uri, %name, %retry, %RETRY_PAUSE_MILIS, "Sleeping.");
                 tokio::time::sleep(Duration::from_millis(RETRY_PAUSE_MILIS)).await;
             }
 
@@ -90,7 +91,7 @@ pub async fn state_stream(base_uri: &str) -> Result<MonitorStateStream, Error> {
             let result = match client.request(request).await {
                 Ok(result) => result,
                 Err(e) => {
-                    tracing::debug!(?e, "HTTP error.");
+                    tracing::debug!(%uri, %name, ?e, "HTTP error.");
                     retry += 1;
                     continue 'retry_loop;
                 }
@@ -161,7 +162,7 @@ async fn reconcile(
     }
 
     active_listeners.write().await.insert(name.clone());
-    let mut stream = state_stream(&url).await?;
+    let mut stream = state_stream(&url, &name).await?;
 
     tokio::spawn(async move {
         let client = ctx.get_ref().client.clone();
