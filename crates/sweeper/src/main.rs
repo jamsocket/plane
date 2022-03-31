@@ -135,10 +135,10 @@ async fn reconcile(
     ctx: Context<ControllerContext>,
 ) -> Result<ReconcilerAction, Error> {
     let name = slab.as_ref().name();
-    tracing::debug!(?name, "Saw SessionLivedBackend.");
+    tracing::debug!(%name, "Saw SessionLivedBackend.");
 
     if slab.state() < SessionLivedBackendState::Running {
-        tracing::debug!(?name, "Not attempting to connect (not running yet).");
+        tracing::debug!(%name, "Not attempting to connect (not running yet).");
         return Ok(ReconcilerAction {
             requeue_after: None,
         });
@@ -175,7 +175,7 @@ async fn reconcile(
                 match timeout(duration, stream.next()).await {
                     Ok(result) => result,
                     Err(_) => {
-                        tracing::debug!(?url, "Timed out without activity.");
+                        tracing::debug!(%url, %name, "Timed out without activity.");
                         break;
                     }
                 }
@@ -186,11 +186,11 @@ async fn reconcile(
             let result = if let Some(result) = result {
                 result
             } else {
-                tracing::debug!(?url, "Reached end of message stream; assuming pod is dead.");
+                tracing::debug!(%url, %name, "Reached end of message stream; assuming pod is dead.");
                 break;
             };
 
-            tracing::debug!(?result, ?url, "Got status message.");
+            tracing::debug!(?result, %url, %name, "Got status message.");
 
             if result.ready & !ready {
                 let result = slab
@@ -210,7 +210,7 @@ async fn reconcile(
 
             if let Some(seconds_since_active) = result.seconds_since_active {
                 let delta = grace_period_seconds - seconds_since_active.min(grace_period_seconds);
-                tracing::debug!(delta_seconds = %delta, ?url, "Using timeout.");
+                tracing::debug!(delta_seconds = %delta, %url, %name, "Using timeout.");
                 duration = Some(Duration::from_secs(delta as u64));
             } else {
                 duration = None;
