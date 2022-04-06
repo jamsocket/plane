@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub enum ImagePullPolicy {

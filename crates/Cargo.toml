@@ -7,5 +7,5 @@ members = [
     "core",
     "sidecar",
     "sweeper",
-    "tracing"
+    "tracing",
 ]

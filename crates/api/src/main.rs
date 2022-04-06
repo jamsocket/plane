@@ -1,7 +1,8 @@
 use crate::logging::init_logging;
-use axum::{routing::post, extract::Extension, Router};
+use dis_spawner::api::{backend_routes, spawn_handler, ApiSettings};
+use axum::{extract::Extension, routing::post, Router};
 use clap::Parser;
-use dis_spawner_api::{backend_routes, spawn_handler, ApiSettings};
+use kube::Client;
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
@@ -42,11 +43,14 @@ async fn main() -> anyhow::Result<()> {
     init_logging();
     let opts = Opts::parse();
 
+    let client = Client::try_default().await?;
+
     let settings = ApiSettings {
         namespace: opts.namespace,
         url_template: opts.url_template,
         service_prefix: opts.service_prefix,
         api_server_base: opts.api_server_base,
+        client,
     };
 
     let trace_layer = TraceLayer::new_for_http()

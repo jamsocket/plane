@@ -21,6 +21,7 @@ use serde_json::json;
 pub use state::SessionLivedBackendState;
 use std::{collections::BTreeMap, fmt::Debug};
 
+pub mod api;
 mod builder;
 pub mod event_stream;
 mod image_pull_policy;
@@ -316,9 +317,11 @@ impl SessionLivedBackend {
             None => first_container.env = Some(vec![port_env]),
         };
 
-        template
-            .containers
-            .push(Self::sidecar_container(sidecar_image, http_port, std::env::vars()));
+        template.containers.push(Self::sidecar_container(
+            sidecar_image,
+            http_port,
+            std::env::vars(),
+        ));
 
         if let Some(image_pull_secret) = image_pull_secret {
             let secret_ref = LocalObjectReference {
@@ -656,7 +659,8 @@ mod test {
             ("SPAWNER_SIDECAR_BAR".to_string(), "BAR_VAL".to_string()),
         ];
 
-        let sidecar_container = SessionLivedBackend::sidecar_container("sidecar-image", 4040, env.into_iter());
+        let sidecar_container =
+            SessionLivedBackend::sidecar_container("sidecar-image", 4040, env.into_iter());
 
         assert_eq!(
             Container {

@@ -80,7 +80,7 @@ enum ContainerState {
     Running,
     Terminated,
     Failed,
-} 
+}
 
 fn get_application_state(pod: &Pod) -> Option<ContainerState> {
     for status in pod.status.as_ref()?.container_statuses.as_ref()? {
@@ -91,7 +91,7 @@ fn get_application_state(pod: &Pod) -> Option<ContainerState> {
 
             if let Some(terminated) = state.terminated.as_ref() {
                 if terminated.reason.as_deref() == Some("Error") {
-                    return Some(ContainerState::Failed)
+                    return Some(ContainerState::Failed);
                 }
             }
         }
@@ -158,12 +158,8 @@ async fn reconcile(
                     url: Some(url),
                     ..Default::default()
                 };
-                slab.update_state(
-                    client.clone(),
-                    SessionLivedBackendState::Scheduled,
-                    status,
-                )
-                .await?;
+                slab.update_state(client.clone(), SessionLivedBackendState::Scheduled, status)
+                    .await?;
             }
         }
         SessionLivedBackendState::Scheduled => {
@@ -193,8 +189,8 @@ async fn reconcile(
                         SessionLivedBackendStatus::default(),
                     )
                     .await?;
-                },
-                _ => ()
+                }
+                _ => (),
             }
 
             // If there is no error, Sweeper makes the next state change (to swept.)
