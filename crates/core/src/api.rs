@@ -1,3 +1,7 @@
+use crate::{
+    event_stream::{event_stream, past_events},
+    SessionLivedBackend, SessionLivedBackendBuilder, SessionLivedBackendState, SPAWNER_GROUP,
+};
 use axum::{
     body::Body,
     extract::{Extension, Path},
@@ -5,10 +9,6 @@ use axum::{
     response::{sse::Event as AxumSseEvent, Sse},
     routing::get,
     BoxError, Json, Router,
-};
-use dis_spawner::{
-    event_stream::{event_stream, past_events},
-    SessionLivedBackend, SessionLivedBackendBuilder, SPAWNER_GROUP, SessionLivedBackendState,
 };
 use futures::{Stream, TryStreamExt};
 use k8s_openapi::api::core::v1::Event as KubeEventResource;
@@ -19,13 +19,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{collections::HashMap, sync::Arc};
 use tokio_stream::StreamExt;
-
-pub async fn get_client() -> Result<Client, StatusCode> {
-    Client::try_default().await.map_err(|error| {
-        tracing::error!(%error, "Error getting client");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
-}
 
 pub fn backend_routes() -> Router {
     Router::new()
@@ -38,7 +31,7 @@ async fn ready_handler(
     Path((backend_id,)): Path<(String,)>,
     Extension(settings): Extension<Arc<ApiSettings>>,
 ) -> Result<Response<Body>, StatusCode> {
-    let client = get_client().await?;
+    let client = settings.get_client();
     let name = settings.backend_to_slab_name(&backend_id);
 
     let api = Api::<SessionLivedBackend>::namespaced(client, &settings.namespace);
@@ -95,7 +88,7 @@ async fn last_status_handler(
     Path((backend_id,)): Path<(String,)>,
     Extension(settings): Extension<Arc<ApiSettings>>,
 ) -> Result<Json<Value>, StatusCode> {
-    let client = settings.get_client().await?;
+    let client = settings.get_client();
 
     let resource_name = settings.backend_to_slab_name(&backend_id);
     let mut events = past_events(client, &resource_name, &settings.namespace)
@@ -112,7 +105,7 @@ async fn status_handler(
     Path((backend_id,)): Path<(String,)>,
     Extension(settings): Extension<Arc<ApiSettings>>,
 ) -> Result<Sse<impl Stream<Item = Result<AxumSseEvent, BoxError>>>, StatusCode> {
-    let client = settings.get_client().await?;
+    let client = settings.get_client();
 
     let name = format!("{}{}", settings.service_prefix, backend_id);
     let events = event_stream(client, &name, &settings.namespace)
@@ -128,14 +121,12 @@ pub struct ApiSettings {
     pub url_template: Option<String>,
     pub api_server_base: Option<String>,
     pub service_prefix: String,
+    pub client: Client,
 }
 
 impl ApiSettings {
-    async fn get_client(&self) -> Result<Client, StatusCode> {
-        Client::try_default().await.map_err(|error| {
-            tracing::error!(%error, "Error getting client");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
+    pub fn get_client(&self) -> Client {
+        self.client.clone()
     }
 
     pub fn backend_to_slab_name(&self, backend_id: &str) -> String {
@@ -177,7 +168,7 @@ impl ApiSettings {
 }
 
 #[derive(Serialize)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct SpawnResult {
     pub url: Option<String>,
     pub name: String,

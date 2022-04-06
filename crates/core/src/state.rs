@@ -1,5 +1,4 @@
-use std::fmt::{Display, Debug};
-
+use std::fmt::{Debug, Display};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum SessionLivedBackendState {
@@ -56,9 +55,7 @@ impl SessionLivedBackendState {
             SessionLivedBackendState::Swept => {
                 "SessionLivedBackend was found idle and swept.".to_string()
             }
-            &SessionLivedBackendState::Failed => {
-                "SessionLivedBackend failed.".to_string()
-            }
+            &SessionLivedBackendState::Failed => "SessionLivedBackend failed.".to_string(),
         }
     }
 }

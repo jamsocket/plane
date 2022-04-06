@@ -1,8 +1,8 @@
 use anyhow::anyhow;
 use clap::Parser;
+use dis_spawner_tracing::init_logging;
 use hyper::service::make_service_fn;
 use hyper::Server;
-use dis_spawner_tracing::init_logging;
 use proxy::ProxyService;
 use std::{convert::Infallible, net::SocketAddr};
 

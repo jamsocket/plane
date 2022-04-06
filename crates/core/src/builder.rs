@@ -1,4 +1,7 @@
-use crate::{BackendPodSpec, SessionLivedBackend, SessionLivedBackendSpec, image_pull_policy::ImagePullPolicy};
+use crate::{
+    image_pull_policy::ImagePullPolicy, BackendPodSpec, SessionLivedBackend,
+    SessionLivedBackendSpec,
+};
 use k8s_openapi::api::core::v1::{Container, EnvVar, LocalObjectReference};
 use kube::core::ObjectMeta;
 use std::collections::{BTreeMap, HashMap};
