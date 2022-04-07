@@ -9,3 +9,6 @@ members = [
     "sweeper",
     "tracing",
 ]
+
+[patch.crates-io]
+tracing-stackdriver = {git = "https://github.com/drifting-in-space/tracing-stackdriver.git"}
