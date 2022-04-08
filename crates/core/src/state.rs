@@ -20,7 +20,7 @@ pub enum SessionLivedBackendState {
     /// The `SessionLivedBackend` has been marked as swept, meaning that it can be deleted.
     Swept,
 
-    /// The backend failed.
+    /// The backend's process exited with a non-zero code.
     Failed,
 }
 
