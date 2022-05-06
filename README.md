@@ -12,6 +12,8 @@
 
 # Spawner
 
+**Spawner is undergoing a re-architecture to remove the dependency to Kubernetes. This public repo is behind as we work out the kinks. If you're interested in trying the new Spawner, please reach out to paul@driftingin.space and I'll keep you in the loop.**
+
 **[Watch a 3-minute demo](https://www.youtube.com/watch?v=aGsxxcQRKa4) of installing and using Spawner.**
 
 **Spawner** allows web applications to create [**session-lived backends**](https://driftingin.space/posts/session-lived-application-backends),
