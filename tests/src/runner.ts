@@ -1,6 +1,6 @@
 import { ChildProcess, spawn } from "child_process"
 import { DropHandler } from "./environment";
-import { assignPort, sleep } from "./util";
+import { assignPort, KeyCertPair, sleep } from "./util";
 
 const MANIFEST_PATH = process.env.MANIFEST_PATH || "../Cargo.toml"
 const SPAWNER_PATH = "../target/debug/spawner"
@@ -20,6 +20,11 @@ export function waitForExit(proc: ChildProcess): Promise<void> {
             }
         })
     })
+}
+
+export interface ServeResult {
+    httpPort: number,
+    httpsPort?: number,
 }
 
 export class DroneRunner implements DropHandler {
@@ -51,14 +56,24 @@ export class DroneRunner implements DropHandler {
         await waitForExit(proc)
     }
 
-    async serve(): Promise<number> {
+    async serve(certs?: KeyCertPair): Promise<ServeResult> {
         const httpPort = assignPort()
+        var httpsPort
 
         var args = [
             "--proxy",
             "--db-path", this.dbPath,
             "--http-port", httpPort.toString()
         ]
+
+        if (certs !== undefined) {
+            httpsPort = assignPort()
+
+            args.push(
+                "--https-private-key", certs.privateKeyPath,
+                "--https-certificate", certs.certificatePath,
+            )
+        }
 
         let proc = spawn(SPAWNER_PATH, args, {
             stdio: 'inherit'
@@ -74,6 +89,6 @@ export class DroneRunner implements DropHandler {
         this.server = proc
         await sleep(500)
 
-        return httpPort
+        return { httpPort, httpsPort }
     }
 }

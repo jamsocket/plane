@@ -28,6 +28,14 @@ struct Opts {
     /// Port to listen for HTTP requests on.
     #[clap(long, default_value = "80")]
     http_port: u16,
+
+    /// Path to read private key from.
+    #[clap(long)]
+    https_private_key: Option<String>,
+
+    /// Path to read certificate from.
+    #[clap(long)]
+    https_certificate: Option<String>,
 }
 
 fn init_tracing() -> Result<()> {
