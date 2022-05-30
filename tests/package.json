@@ -1,9 +1,10 @@
 {
 	"scripts": {
-		"test": "ava --timeout=120s"
+		"test": "ava"
 	},
 	"devDependencies": {
 		"@types/express": "^4.17.13",
+		"@types/ws": "^8.5.3",
 		"ava": "^4.2.0"
 	},
 	"ava": {

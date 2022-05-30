@@ -4,6 +4,7 @@ import { TestEnvironment } from './util/environment'
 import { DroneRunner } from './util/runner'
 import { generateCertificates } from './util/certificates'
 import * as https from 'https'
+import { WebSocketClient } from './util/websocket'
 
 const test = anyTest as TestFn<TestEnvironment>;
 
@@ -30,7 +31,7 @@ test("Unrecognized host returns a 404", async (t) => {
 
 test("Simple request to HTTP server", async (t) => {
     let proxy = await t.context.runner.serve()
-    let dummyServerPort = await t.context.dummyServer.serve()
+    let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
     await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
 
@@ -42,7 +43,7 @@ test("Simple request to HTTP server", async (t) => {
 
 test("Host header is set appropriately", async (t) => {
     let proxy = await t.context.runner.serve()
-    let dummyServerPort = await t.context.dummyServer.serve()
+    let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
     await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
 
@@ -57,7 +58,7 @@ test("SSL provided at startup works", async (t) => {
     let certs = await generateCertificates()
 
     let proxy = await t.context.runner.serve(certs)
-    let dummyServerPort = await t.context.dummyServer.serve()
+    let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
     await t.context.db.addProxy("mydomain.test", `127.0.0.1:${dummyServerPort}`)
 
@@ -68,7 +69,21 @@ test("SSL provided at startup works", async (t) => {
     t.is(result.data, "Hello World!")
 })
 
-test.todo("WebSockets")
+test.failing("WebSockets", async (t) => {
+    let wsPort = t.context.dummyServer.serveWebSocket()
+    let proxy = await t.context.runner.serve()
+
+    await t.context.db.addProxy("mydomain.test", `127.0.0.1:${wsPort}`)
+    let client = await WebSocketClient.create(`ws://127.0.0.1:${proxy.httpPort}`, "mydomain.test")
+    
+    client.send("ok")
+    t.is("echo: ok", await client.receive())
+
+    client.send("ok2")
+    t.is("echo: ok2", await client.receive())
+
+    client.close()    
+})
 
 test.todo("Certificate rotation")
 
