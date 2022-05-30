@@ -70,6 +70,7 @@ export class DroneRunner implements DropHandler {
             httpsPort = assignPort()
 
             args.push(
+                "--https-port", httpsPort.toString(),
                 "--https-private-key", certs.privateKeyPath,
                 "--https-certificate", certs.certificatePath,
             )

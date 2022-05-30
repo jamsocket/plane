@@ -1,6 +1,6 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Parser;
-use database::DroneDatabase;
+use keys::KeyCertPathPair;
 use sqlx::{
     migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
@@ -9,8 +9,11 @@ use std::path::PathBuf;
 use tracing_subscriber::{
     prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
+use crate::database::DroneDatabase;
+use crate::proxy::{ProxyHttpsOptions, ProxyOptions};
 
 mod database;
+mod keys;
 mod proxy;
 
 #[derive(Parser)]
@@ -19,7 +22,7 @@ struct Opts {
     ///
     /// This may be a file that does not exist. In this case, it will be created.
     #[clap(long)]
-    db_path: PathBuf,
+    db_path: String,
 
     /// Run the proxy server.
     #[clap(long)]
@@ -29,13 +32,17 @@ struct Opts {
     #[clap(long, default_value = "80")]
     http_port: u16,
 
+    /// Port to listen for HTTPS requests on.
+    #[clap(long, default_value = "443")]
+    https_port: u16,
+
     /// Path to read private key from.
     #[clap(long)]
-    https_private_key: Option<String>,
+    https_private_key: Option<PathBuf>,
 
     /// Path to read certificate from.
     #[clap(long)]
-    https_certificate: Option<String>,
+    https_certificate: Option<PathBuf>,
 }
 
 fn init_tracing() -> Result<()> {
@@ -50,21 +57,44 @@ fn init_tracing() -> Result<()> {
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    init_tracing()?;
-    let opts = Opts::parse();
-
+async fn get_db(db_path: &str) -> Result<DroneDatabase> {
     let co = SqliteConnectOptions::new()
-        .filename(opts.db_path)
+        .filename(db_path)
         .create_if_missing(true);
     let pool = SqlitePoolOptions::new().connect_with(co).await?;
     migrate!("./migrations").run(&pool).await?;
 
-    let db = DroneDatabase::new(pool);
+    Ok(DroneDatabase::new(pool))
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    init_tracing()?;
+    let opts = Opts::parse();
+    let db = get_db(&opts.db_path).await?;
 
     if opts.proxy {
-        proxy::serve(db, opts.http_port).await?;
+        let https_options = if let Some(private_key_path) = opts.https_private_key {
+            let certificate_path = opts.https_certificate.ok_or_else(|| anyhow!("--https-certificate must be provided if --https-private-key is."))?;
+
+            Some(ProxyHttpsOptions {
+                port: opts.https_port,
+                key_paths: KeyCertPathPair {
+                    certificate_path, private_key_path
+                }
+            })
+        } else {
+            tracing::debug!("Skipping HTTPS because no --https-private-key was passed.");
+            None
+        };
+        
+        let serve_opts = ProxyOptions {
+            db,
+            http_port: opts.http_port,
+            https_options,
+        };
+
+        proxy::serve(serve_opts).await?;
     }
 
     Ok(())

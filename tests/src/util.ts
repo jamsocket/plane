@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import { mkdtemp, mkdtempSync } from "fs";
+import { mkdtemp, mkdtempSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -13,9 +13,14 @@ export function sleep(durationMillis: number): Promise<void> {
     return new Promise((resolve) => setInterval(resolve, durationMillis))
 }
 
-export interface KeyCertPair {
-    privateKeyPath: string,
-    certificatePath: string,
+export class KeyCertPair {
+    constructor(
+        public privateKeyPath: string,
+        public certificatePath: string) { }
+
+    getCert(): any {
+        return readFileSync(this.certificatePath)
+    }
 }
 
 export function generateCertificates(): Promise<KeyCertPair> {
@@ -35,11 +40,11 @@ export function generateCertificates(): Promise<KeyCertPair> {
         privateKeyPath,
         "-out",
         certificatePath
-    ], {stdio: 'inherit'})
+    ], { stdio: 'inherit' })
 
-    const result: KeyCertPair = {
+    const result = new KeyCertPair(
         privateKeyPath, certificatePath
-    }
+    )
 
     return new Promise((accept, reject) => {
         proc.on("exit", (code) => {

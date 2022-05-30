@@ -17,5 +17,23 @@
       }
     },
     "query": "\n            select dest_address\n            from route\n            where subdomain = ?\n        "
+  },
+  "6856049543a578e87ec31577da3c98fe399a2df22e110ca1efc81e4fe3e0e058": {
+    "describe": {
+      "columns": [
+        {
+          "name": "c",
+          "ordinal": 0,
+          "type_info": "Int"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "select count(1) as c from route"
   }
 }

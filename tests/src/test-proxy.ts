@@ -1,7 +1,9 @@
-import anyTest, { TestFn } from 'ava';
-import { TestEnvironment } from './environment';
-import { DroneRunner } from './runner';
-import { generateCertificates } from './util';
+import anyTest, { TestFn } from 'ava'
+import axios from 'axios'
+import { TestEnvironment } from './environment'
+import { DroneRunner } from './runner'
+import { generateCertificates } from './util'
+import * as https from 'https'
 
 const test = anyTest as TestFn<TestEnvironment>;
 
@@ -19,25 +21,23 @@ test.afterEach.always(async (t) => {
 
 test("Unrecognized host returns a 404", async (t) => {
     let proxy = await t.context.runner.serve()
-    
-    let result = await fetch(`http://127.0.0.1:${proxy.httpPort}/`,
-        { headers: { 'host': 'foo.bar' } })
-    
+
+    let result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
+        { headers: { 'host': 'foo.bar' }, validateStatus: () => true })
+
     t.is(result.status, 404)
 })
 
 test("Simple request to HTTP server", async (t) => {
     let proxy = await t.context.runner.serve()
     let dummyServerPort = await t.context.dummyServer.serve()
-    
+
     await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
 
-    let result = await fetch(`http://127.0.0.1:${proxy.httpPort}/`,
-        { headers: { 'host': 'foobar' } })
-
+    let result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
+        { headers: { 'host': 'foobar' }, validateStatus: () => true })
     t.is(result.status, 200)
-    let body = await result.text()
-    t.is(body, "Hello World!")
+    t.is(result.data, "Hello World!")
 })
 
 test("Host header is set appropriately", async (t) => {
@@ -46,26 +46,24 @@ test("Host header is set appropriately", async (t) => {
 
     await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
 
-    let result = await fetch(`http://127.0.0.1:${proxy.httpPort}/host`,
+    let result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/host`,
         { headers: { 'host': 'foobar' } })
 
     t.is(result.status, 200)
-    let body = await result.text()
-    t.is(body, "foobar")
+    t.is(result.data, "foobar")
 })
 
-test.failing("SSL works", async (t) => {
+test("SSL works", async (t) => {
     let certs = await generateCertificates()
 
     let proxy = await t.context.runner.serve(certs)
     let dummyServerPort = await t.context.dummyServer.serve()
 
-    await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
+    await t.context.db.addProxy("mydomain.test", `127.0.0.1:${dummyServerPort}`)
 
-    let result = await fetch(`https://127.0.0.1:${proxy.httpsPort}/`,
-        { headers: { 'host': 'foobar' } })
+    let result = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
+        { headers: { 'host': 'mydomain.test' }, httpsAgent: new https.Agent({ca: certs.getCert()}) })
 
     t.is(result.status, 200)
-    let body = await result.text()
-    t.is(body, "Hello World!")
+    t.is(result.data, "Hello World!")
 })
