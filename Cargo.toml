@@ -1,0 +1,11 @@
+[package]
+name = "spawner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.57"
+clap = { version = "3.1.18", features = ["derive"] }
+hyper = { version = "0.14.19", features = ["server", "http1", "http2", "tcp"] }
+sqlx = { version = "0.5.13", features = ["runtime-tokio-rustls", "sqlite", "migrate", "macros"] }
+tokio = { version = "1.18.2", features = ["full"] }
