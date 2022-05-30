@@ -25,7 +25,7 @@ test("proxy-unrecognized-host", async (t) => {
     t.is(result.status, 404)
 })
 
-test.failing("proxy-one-host", async (t) => {
+test("proxy-one-host", async (t) => {
     let proxyPort = await t.context.runner.serve()
     let dummyServerPort = t.context.dummyServer.serve()
 

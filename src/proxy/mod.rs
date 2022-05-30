@@ -1,14 +1,15 @@
+use crate::database::DroneDatabase;
+use anyhow::Result;
+use http::header::HeaderName;
+use hyper::Server;
+use hyper::{service::Service, Body, Request, Response, StatusCode};
 use std::{
     convert::Infallible,
     future::{ready, Future, Ready},
+    net::SocketAddr,
     pin::Pin,
-    task::Poll, net::SocketAddr,
+    task::Poll,
 };
-use anyhow::Result;
-use http::header::HeaderName;
-use hyper::{Server};
-use hyper::{service::Service, Body, Request, Response, StatusCode};
-use crate::database::DroneDatabase;
 
 pub struct MakeProxyService {
     db: DroneDatabase,
@@ -28,7 +29,7 @@ impl<T> Service<T> for MakeProxyService {
 
     fn call(&mut self, _req: T) -> Self::Future {
         ready(Ok(ProxyService {
-            db: self.db.clone()
+            db: self.db.clone(),
         }))
     }
 }
@@ -43,7 +44,11 @@ impl ProxyService {
         if let Some(host) = req.headers().get(HeaderName::from_static("host")) {
             let host = std::str::from_utf8(&host.as_bytes())?;
 
-            // self.db.get_proxy_route(subdomain)
+            if let Some(addr) = db.get_proxy_route(host).await? {
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .body(Body::empty())?);
+            }
         }
 
         Ok(Response::builder()
@@ -73,10 +78,7 @@ impl Service<Request<Body>> for ProxyService {
 }
 
 pub async fn serve(db: DroneDatabase, http_port: u16) -> Result<()> {
-    let make_proxy = MakeProxyService {db};
-
-    //let incoming = AddrIncoming::bind(format!("127.0.0.1:{}", http_port).parse()?)?;
-    //let server = Server::builder(incoming).serve(make_proxy);
+    let make_proxy = MakeProxyService { db };
     let addr = SocketAddr::from(([0, 0, 0, 0], http_port));
     let server = Server::bind(&addr).serve(make_proxy);
 
