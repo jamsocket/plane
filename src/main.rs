@@ -5,8 +5,10 @@ use sqlx::{
     migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
-use tracing_subscriber::{EnvFilter, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};
 use std::path::PathBuf;
+use tracing_subscriber::{
+    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
+};
 
 mod database;
 mod proxy;
@@ -19,20 +21,24 @@ struct Opts {
     #[clap(long)]
     db_path: PathBuf,
 
-    /// Port to listen for HTTP requests on.
+    /// Run the proxy server.
     #[clap(long)]
-    http_port: Option<u16>,
+    proxy: bool,
+
+    /// Port to listen for HTTP requests on.
+    #[clap(long, default_value = "80")]
+    http_port: u16,
 }
 
 fn init_tracing() -> Result<()> {
-    let filter_layer = EnvFilter::try_from_default_env()
-        .or_else(|_| EnvFilter::try_new("info,sqlx=warn"))?;
+    let filter_layer =
+        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info,sqlx=warn"))?;
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(filter_layer)
         .init();
-    
+
     Ok(())
 }
 
@@ -49,8 +55,8 @@ async fn main() -> Result<()> {
 
     let db = DroneDatabase::new(pool);
 
-    if let Some(http_port) = opts.http_port {
-        proxy::serve(db, http_port).await?;
+    if opts.proxy {
+        proxy::serve(db, opts.http_port).await?;
     }
 
     Ok(())

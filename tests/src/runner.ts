@@ -55,6 +55,7 @@ export class DroneRunner implements DropHandler {
         const httpPort = assignPort()
 
         var args = [
+            "--proxy",
             "--db-path", this.dbPath,
             "--http-port", httpPort.toString()
         ]

@@ -1,5 +1,7 @@
 #!/usr/bin/env zx
 
+// Use sqlx to update sqlx-data.json, which contains type information.
+
 const tempDir = (await $`mktemp -d`).stdout.trim()
 const db = `${tempDir}/data.db`
 const connString = `sqlite://${db}`
