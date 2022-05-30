@@ -3,6 +3,7 @@ import { DropHandler } from "./environment";
 import { assignPort, sleep } from "./util";
 
 const MANIFEST_PATH = process.env.MANIFEST_PATH || "../Cargo.toml"
+const SPAWNER_PATH = "../target/debug/spawner"
 
 export async function killProcAndWait(proc: ChildProcess): Promise<void> {
     proc.kill("SIGTERM")
@@ -28,7 +29,6 @@ export class DroneRunner implements DropHandler {
 
     async drop() {
         if (this.server !== undefined) {
-            console.log("Waiting for server to exit.")
             await killProcAndWait(this.server)
         }
     }
@@ -42,10 +42,7 @@ export class DroneRunner implements DropHandler {
     }
 
     async migrate() {
-        let proc = spawn("cargo", [
-            'run',
-            '--manifest-path', MANIFEST_PATH,
-            '--',
+        let proc = spawn(SPAWNER_PATH, [
             "--db-path", this.dbPath
         ], {
             stdio: 'inherit'
@@ -58,14 +55,11 @@ export class DroneRunner implements DropHandler {
         const httpPort = assignPort()
 
         var args = [
-            'run',
-            '--manifest-path', MANIFEST_PATH,
-            '--',
             "--db-path", this.dbPath,
             "--http-port", httpPort.toString()
         ]
 
-        let proc = spawn("cargo", args, {
+        let proc = spawn(SPAWNER_PATH, args, {
             stdio: 'inherit'
         })
 

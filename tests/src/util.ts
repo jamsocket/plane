@@ -1,6 +1,7 @@
 var nextPort = 10200;
 export function assignPort(): number {
-    return nextPort++
+    const port = nextPort++
+    return port
 }
 
 export function sleep(durationMillis: number): Promise<void> {

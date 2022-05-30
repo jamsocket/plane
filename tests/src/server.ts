@@ -13,6 +13,10 @@ export class DummyServer implements DropHandler {
       res.send('Hello World!')
     })
 
+    app.get('/host', (req, res) => {
+      res.send(req.hostname)
+    })
+
     const port = assignPort()
 
     return new Promise((accept, reject) => {

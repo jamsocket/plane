@@ -16,7 +16,7 @@ test.afterEach.always(async (t) => {
     await t.context.drop()
 })
 
-test("proxy-unrecognized-host", async (t) => {
+test("Unrecognized host returns a 404", async (t) => {
     let proxyPort = await t.context.runner.serve()
     
     let result = await fetch(`http://127.0.0.1:${proxyPort}/`,
@@ -25,10 +25,10 @@ test("proxy-unrecognized-host", async (t) => {
     t.is(result.status, 404)
 })
 
-test("proxy-one-host", async (t) => {
+test("Simple request to HTTP server", async (t) => {
     let proxyPort = await t.context.runner.serve()
     let dummyServerPort = await t.context.dummyServer.serve()
-
+    
     await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
 
     let result = await fetch(`http://127.0.0.1:${proxyPort}/`,
@@ -37,4 +37,18 @@ test("proxy-one-host", async (t) => {
     t.is(result.status, 200)
     let body = await result.text()
     t.is(body, "Hello World!")
+})
+
+test("Host header is set appropriately", async (t) => {
+    let proxyPort = await t.context.runner.serve()
+    let dummyServerPort = await t.context.dummyServer.serve()
+
+    await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
+
+    let result = await fetch(`http://127.0.0.1:${proxyPort}/host`,
+        { headers: { 'host': 'foobar' } })
+
+    t.is(result.status, 200)
+    let body = await result.text()
+    t.is(body, "foobar")
 })

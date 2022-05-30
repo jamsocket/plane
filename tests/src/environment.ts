@@ -44,7 +44,6 @@ export class TestEnvironment implements DropHandler {
     }
 
     async drop() {
-        console.log("Drop called.")
         await this.runner.drop()
         await this.tempdir.drop()
         await this.dummyServer.drop()
