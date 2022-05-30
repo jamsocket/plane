@@ -40,11 +40,12 @@ fn clone_response(response: &Response<Body>) -> Result<Response<Body>, hyper::ht
 pub struct MakeProxyService {
     db: DroneDatabase,
     client: Client<HttpConnector, Body>,
+    cluster: String,
 }
 
 impl MakeProxyService {
-    pub fn new(db: DroneDatabase) -> Self {
-        MakeProxyService { db, client: Client::new() }
+    pub fn new(db: DroneDatabase, cluster: String) -> Self {
+        MakeProxyService { db, client: Client::new(), cluster }
     }
 }
 
@@ -64,6 +65,7 @@ impl<T> Service<T> for MakeProxyService {
         ready(Ok(ProxyService {
             db: self.db.clone(),
             client: self.client.clone(),
+            cluster: self.cluster.clone(),
         }))
     }
 }
@@ -72,6 +74,7 @@ impl<T> Service<T> for MakeProxyService {
 pub struct ProxyService {
     db: DroneDatabase,
     client: Client<HttpConnector, Body>,
+    cluster: String,
 }
 
 #[allow(unused)]
@@ -140,18 +143,21 @@ impl ProxyService {
         if let Some(host) = req.headers().get(http::header::HOST) {
             let host = std::str::from_utf8(&host.as_bytes())?;
 
-            if let Some(addr) = self.db.get_proxy_route(host).await? {
-                *req.uri_mut() = Self::rewrite_uri(&addr, req.uri())?;
-
-                if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
-                    if connection.to_str().unwrap_or_default().to_lowercase() == UPGRADE {
-                        return self.handle_upgrade(req).await;
-                    }
-                }        
-
-                let result = self.client.request(req).await;
-                return Ok(result?);
-            }
+            // TODO: we shouldn't need to allocate a string just to strip a prefix.
+            if let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) {
+                if let Some(addr) = self.db.get_proxy_route(subdomain).await? {
+                    *req.uri_mut() = Self::rewrite_uri(&addr, req.uri())?;
+    
+                    if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
+                        if connection.to_str().unwrap_or_default().to_lowercase() == UPGRADE {
+                            return self.handle_upgrade(req).await;
+                        }
+                    }        
+    
+                    let result = self.client.request(req).await;
+                    return Ok(result?);
+                }
+            }            
 
             tracing::warn!(?host, "Unrecognized host.");
         }

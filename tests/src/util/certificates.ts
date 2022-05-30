@@ -27,6 +27,8 @@ export async function generateCertificates(): Promise<KeyCertPair> {
         "rsa:2048",
         "-subj",
         "/C=US/ST=New York/L=Brooklyn/O=Drifting in Space Corp./CN=mydomain.test",
+        "-addext",
+        "subjectAltName = DNS:*.mydomain.test",
         "-keyout",
         privateKeyPath,
         "-out",

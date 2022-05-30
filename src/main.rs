@@ -24,6 +24,10 @@ struct Opts {
     #[clap(long)]
     db_path: String,
 
+    /// The domain of the cluster that this drone serves.
+    #[clap(long)]
+    cluster_domain: String,
+
     /// Run the proxy server.
     #[clap(long)]
     proxy: bool,
@@ -92,6 +96,7 @@ async fn main() -> Result<()> {
             db,
             http_port: opts.http_port,
             https_options,
+            cluster: opts.cluster_domain,
         };
 
         proxy::serve(serve_opts).await?;

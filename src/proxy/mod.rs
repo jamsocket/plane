@@ -16,10 +16,11 @@ pub struct ProxyOptions {
     pub db: DroneDatabase,
     pub http_port: u16,
     pub https_options: Option<ProxyHttpsOptions>,
+    pub cluster: String,
 }
 
 pub async fn serve(options: ProxyOptions) -> Result<()> {
-    let make_proxy = MakeProxyService::new(options.db);
+    let make_proxy = MakeProxyService::new(options.db, options.cluster);
     
     if let Some(https_options) = options.https_options {
         let cert_key_pair = CertifiedKey::new(&https_options.key_paths)?;

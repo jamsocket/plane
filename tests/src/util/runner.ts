@@ -6,6 +6,7 @@ import { assignPort } from "./ports";
 
 const MANIFEST_PATH = process.env.MANIFEST_PATH || "../Cargo.toml"
 const SPAWNER_PATH = "../target/debug/spawner"
+const CLUSTER_DOMAIN = "mydomain.test"
 
 export async function killProcAndWait(proc: ChildProcess): Promise<void> {
     proc.kill("SIGTERM")
@@ -50,7 +51,8 @@ export class DroneRunner implements DropHandler {
 
     async migrate() {
         let proc = spawn(SPAWNER_PATH, [
-            "--db-path", this.dbPath
+            "--db-path", this.dbPath,
+            "--cluster-domain", CLUSTER_DOMAIN,
         ], {
             stdio: 'inherit'
         })
@@ -64,6 +66,7 @@ export class DroneRunner implements DropHandler {
 
         var args = [
             "--proxy",
+            "--cluster-domain", CLUSTER_DOMAIN, 
             "--db-path", this.dbPath,
             "--http-port", httpPort.toString()
         ]

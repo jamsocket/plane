@@ -36,7 +36,7 @@ test("Simple request to HTTP server", async (t) => {
     await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
 
     let result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
-        { headers: { 'host': 'foobar' }, validateStatus: () => true })
+        { headers: { 'host': 'foobar.mydomain.test' }, validateStatus: () => true })
     t.is(result.status, 200)
     t.is(result.data, "Hello World!")
 })
@@ -48,10 +48,10 @@ test("Host header is set appropriately", async (t) => {
     await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
 
     let result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/host`,
-        { headers: { 'host': 'foobar' } })
+        { headers: { 'host': 'foobar.mydomain.test' } })
 
     t.is(result.status, 200)
-    t.is(result.data, "foobar")
+    t.is(result.data, "foobar.mydomain.test")
 })
 
 test("SSL provided at startup works", async (t) => {
@@ -60,10 +60,10 @@ test("SSL provided at startup works", async (t) => {
     let proxy = await t.context.runner.serve(certs)
     let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
-    await t.context.db.addProxy("mydomain.test", `127.0.0.1:${dummyServerPort}`)
+    await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
 
     let result = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
-        { headers: { 'host': 'mydomain.test' }, httpsAgent: new https.Agent({ca: certs.getCert()}) })
+        { headers: { 'host': 'blah.mydomain.test' }, httpsAgent: new https.Agent({ca: certs.getCert()}) })
 
     t.is(result.status, 200)
     t.is(result.data, "Hello World!")
@@ -73,8 +73,8 @@ test("WebSockets", async (t) => {
     let wsPort = t.context.dummyServer.serveWebSocket()
     let proxy = await t.context.runner.serve()
 
-    await t.context.db.addProxy("mydomain.test", `127.0.0.1:${wsPort}`)
-    let client = await WebSocketClient.create(`ws://127.0.0.1:${proxy.httpPort}`, "mydomain.test")
+    await t.context.db.addProxy("abcd", `127.0.0.1:${wsPort}`)
+    let client = await WebSocketClient.create(`ws://127.0.0.1:${proxy.httpPort}`, "abcd.mydomain.test")
     
     client.send("ok")
     t.is("echo: ok", await client.receive())
