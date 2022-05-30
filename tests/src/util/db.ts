@@ -1,29 +1,24 @@
-import { Database } from 'sqlite3'
-import { sleep } from './sleep'
+import { Database, open } from 'sqlite'
+import * as sqlite3 from 'sqlite3'
 
 export class DroneDatabase {
-    db: Database
+    private constructor(private db: Database) {}
 
-    constructor(path: string) {
-        this.db = new Database(path)
+    static async create(path: string): Promise<DroneDatabase> {
+        const db = await open({
+            filename: path,
+            driver: sqlite3.Database,
+        })
+
+        return new DroneDatabase(db)
     }
 
-    addProxy(subdomain: string, address: string): Promise<void> {
-        return new Promise((accept, reject) => {
-            let callback = (error?: Error) => {
-                if (error === null) {
-                    accept()
-                } else {
-                    reject(error)
-                }
-            }
-
-            this.db.run(`
+    async addProxy(subdomain: string, address: string): Promise<void> {
+        await this.db.run(`
                 insert into route
                 (subdomain, dest_address)
                 values
                 (?, ?)
-            `, subdomain, address, callback)
-        })
+                `, subdomain, address)
     }
 }

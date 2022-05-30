@@ -90,4 +90,3 @@ test.todo("Certificate rotation")
 test.todo("Multiple subdomains")
 
 test.todo("Connection status information is recorded")
-

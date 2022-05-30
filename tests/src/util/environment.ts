@@ -23,25 +23,24 @@ export class TemporaryDirectory implements DropHandler {
 }
 
 export class TestEnvironment implements DropHandler {
-    tempdir: TemporaryDirectory
-    db: DroneDatabase
-    runner: DroneRunner
-    dummyServer: DummyServer
-
-    private constructor() {
-        this.tempdir = new TemporaryDirectory()
-        const dir = this.tempdir.dir
-
-        const dbPath = `${dir}/base.db`
-        this.db = new DroneDatabase(dbPath)
-        this.runner = new DroneRunner(dbPath)
-        this.dummyServer = new DummyServer()
+    private constructor(
+        public db: DroneDatabase,
+        public tempdir: TemporaryDirectory,
+        public runner: DroneRunner,
+        public dummyServer: DummyServer) {
     }
 
     static async create(): Promise<TestEnvironment> {
-        const env = new TestEnvironment()
-        await env.runner.migrate()
-        return env
+        const tempdir = new TemporaryDirectory()
+        const dir = tempdir.dir
+        const dbPath = `${dir}/base.db`
+
+        const runner = new DroneRunner(dbPath)
+        await runner.migrate()
+        const dummyServer = new DummyServer()
+        const db = await DroneDatabase.create(dbPath)
+
+        return new TestEnvironment(db, tempdir, runner, dummyServer)
     }
 
     async drop() {
