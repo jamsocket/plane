@@ -1,17 +1,41 @@
 use crate::database::DroneDatabase;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use http::uri::{Authority, Scheme};
 use http::Uri;
 use hyper::client::HttpConnector;
 use hyper::Client;
 use hyper::{service::Service, Body, Request, Response, StatusCode};
 use std::str::FromStr;
+use std::time::SystemTime;
 use std::{
     convert::Infallible,
     future::{ready, Future, Ready},
     pin::Pin,
     task::Poll,
 };
+
+const UPGRADE: &str = "upgrade";
+
+/// Clone a request (method and headers, not body).
+fn clone_request(request: &Request<Body>) -> Result<Request<Body>, hyper::http::Error> {
+    let mut builder = Request::builder();
+    builder = builder.uri(request.uri());
+    for (key, value) in request.headers() {
+        builder = builder.header(key, value);
+    }
+    builder = builder.method(request.method());
+    builder.body(Body::empty())
+}
+
+/// Clone a response (status and headers, not body).
+fn clone_response(response: &Response<Body>) -> Result<Response<Body>, hyper::http::Error> {
+    let mut builder = Response::builder();
+    for (key, value) in response.headers() {
+        builder = builder.header(key, value);
+    }
+    builder = builder.status(response.status());
+    builder.body(Body::empty())
+}
 
 pub struct MakeProxyService {
     db: DroneDatabase,
@@ -61,12 +85,69 @@ impl ProxyService {
         Ok(uri)
     }
 
+    async fn handle_upgrade(
+        self,
+        mut req: Request<Body>
+    ) -> anyhow::Result<Response<Body>> {
+        let response = self.client.request(clone_request(&req)?).await?;
+
+        if response.status() == StatusCode::SWITCHING_PROTOCOLS {
+            let response_clone = clone_response(&response)?;
+
+            let mut upgraded_response = match hyper::upgrade::on(response).await {
+                Ok(upgraded) => upgraded,
+                Err(e) => {
+                    tracing::error!(?e, "Error upgrading response.");
+                    return Err(anyhow!("Upgrade error."));
+                }
+            };
+
+            tokio::task::spawn(async move {
+                match hyper::upgrade::on(&mut req).await {
+                    Ok(mut upgraded_request) => {
+                        let started = SystemTime::now();
+
+                        match tokio::io::copy_bidirectional(
+                            &mut upgraded_response,
+                            &mut upgraded_request,
+                        )
+                        .await
+                        {
+                            Ok((from_client, from_server)) => {
+                                let duration = SystemTime::now()
+                                    .duration_since(started)
+                                    .unwrap_or_default()
+                                    .as_secs();
+
+                                tracing::info!(%from_client, %from_server, ?duration, "Upgraded connection closed.");
+                            }
+                            Err(error) => {
+                                tracing::error!(?error, "IO error upgrading connection.");
+                            }
+                        }
+                    }
+                    Err(e) => tracing::error!(?e, "Error upgrading request."),
+                }
+            });
+
+            Ok(response_clone)
+        } else {
+            Ok(response)
+        }
+    }
+
     async fn handle(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
         if let Some(host) = req.headers().get(http::header::HOST) {
             let host = std::str::from_utf8(&host.as_bytes())?;
 
             if let Some(addr) = self.db.get_proxy_route(host).await? {
                 *req.uri_mut() = Self::rewrite_uri(&addr, req.uri())?;
+
+                if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
+                    if connection.to_str().unwrap_or_default().to_lowercase() == UPGRADE {
+                        return self.handle_upgrade(req).await;
+                    }
+                }        
 
                 let result = self.client.request(req).await;
                 return Ok(result?);

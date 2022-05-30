@@ -69,7 +69,7 @@ test("SSL provided at startup works", async (t) => {
     t.is(result.data, "Hello World!")
 })
 
-test.failing("WebSockets", async (t) => {
+test("WebSockets", async (t) => {
     let wsPort = t.context.dummyServer.serveWebSocket()
     let proxy = await t.context.runner.serve()
 
