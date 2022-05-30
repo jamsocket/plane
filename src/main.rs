@@ -5,6 +5,7 @@ use sqlx::{
     migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
+use tracing_subscriber::{EnvFilter, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};
 use std::path::PathBuf;
 
 mod database;
@@ -23,8 +24,21 @@ struct Opts {
     http_port: Option<u16>,
 }
 
+fn init_tracing() -> Result<()> {
+    let filter_layer = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new("info,sqlx=warn"))?;
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(filter_layer)
+        .init();
+    
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    init_tracing()?;
     let opts = Opts::parse();
 
     let co = SqliteConnectOptions::new()

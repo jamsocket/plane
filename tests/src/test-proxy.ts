@@ -27,7 +27,7 @@ test("proxy-unrecognized-host", async (t) => {
 
 test("proxy-one-host", async (t) => {
     let proxyPort = await t.context.runner.serve()
-    let dummyServerPort = t.context.dummyServer.serve()
+    let dummyServerPort = await t.context.dummyServer.serve()
 
     await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
 
@@ -35,4 +35,6 @@ test("proxy-one-host", async (t) => {
         { headers: { 'host': 'foobar' } })
 
     t.is(result.status, 200)
+    let body = await result.text()
+    t.is(body, "Hello World!")
 })
