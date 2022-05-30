@@ -1,8 +1,8 @@
 import anyTest, { TestFn } from 'ava'
 import axios from 'axios'
-import { TestEnvironment } from './environment'
-import { DroneRunner } from './runner'
-import { generateCertificates } from './util'
+import { TestEnvironment } from './util/environment'
+import { DroneRunner } from './util/runner'
+import { generateCertificates } from './util/certificates'
 import * as https from 'https'
 
 const test = anyTest as TestFn<TestEnvironment>;
@@ -53,7 +53,7 @@ test("Host header is set appropriately", async (t) => {
     t.is(result.data, "foobar")
 })
 
-test("SSL works", async (t) => {
+test("SSL provided at startup works", async (t) => {
     let certs = await generateCertificates()
 
     let proxy = await t.context.runner.serve(certs)
@@ -67,3 +67,12 @@ test("SSL works", async (t) => {
     t.is(result.status, 200)
     t.is(result.data, "Hello World!")
 })
+
+test.todo("WebSockets")
+
+test.todo("Certificate rotation")
+
+test.todo("Multiple subdomains")
+
+test.todo("Connection status information is recorded")
+

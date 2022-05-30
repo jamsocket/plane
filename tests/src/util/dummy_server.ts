@@ -1,7 +1,7 @@
 import * as express from "express"
 import { Server } from "http"
 import { DropHandler } from "./environment"
-import { assignPort } from "./util"
+import { assignPort } from "./ports"
 
 export class DummyServer implements DropHandler {
   servers: Array<Server> = []

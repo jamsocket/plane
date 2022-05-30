@@ -21,6 +21,7 @@
 		"express": "^4.18.1",
 		"sqlite3": "^5.0.8",
 		"ts-node": "^10.8.0",
-		"typescript": "^4.7.2"
+		"typescript": "^4.7.2",
+		"ws": "^8.7.0"
 	}
 }

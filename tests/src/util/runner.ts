@@ -1,6 +1,8 @@
 import { ChildProcess, spawn } from "child_process"
 import { DropHandler } from "./environment";
-import { assignPort, KeyCertPair, sleep } from "./util";
+import { KeyCertPair } from "./certificates";
+import { sleep } from "./sleep";
+import { assignPort } from "./ports";
 
 const MANIFEST_PATH = process.env.MANIFEST_PATH || "../Cargo.toml"
 const SPAWNER_PATH = "../target/debug/spawner"

@@ -1,5 +1,5 @@
 import { Database } from 'sqlite3'
-import { sleep } from './util'
+import { sleep } from './sleep'
 
 export class DroneDatabase {
     db: Database

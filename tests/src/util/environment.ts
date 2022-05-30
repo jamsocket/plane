@@ -3,8 +3,8 @@ import { tmpdir } from "os"
 import { join } from "path"
 import { DroneDatabase } from "./db"
 import { DroneRunner } from "./runner"
-import { DummyServer } from "./server"
-import { sleep } from "./util"
+import { DummyServer } from "./dummy_server"
+import { sleep } from "./sleep"
 
 export interface DropHandler {
     drop(): Promise<void>
