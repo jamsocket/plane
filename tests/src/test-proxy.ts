@@ -1,48 +1,26 @@
 import anyTest, { TestFn } from 'ava';
-import { DroneDatabase } from "./db"
-import { assignPort, DroneRunner, killProcAndWait, makeTempDir, sleep, waitForExit } from "./util"
-import { runDevServer } from "./server"
-import { Server } from "http"
-import { rmSync } from "fs"
+import { TestEnvironment } from './environment';
+import { DroneRunner } from './runner';
 
-interface TestContext {
-    //server: Server,
-    db: DroneDatabase,
-    runner: DroneRunner,
-    scratchDir: string,
-}
-
-const test = anyTest as TestFn<TestContext>;
+const test = anyTest as TestFn<TestEnvironment>;
 
 test.before(async (t) => {
     await DroneRunner.build()
 })
 
 test.beforeEach(async (t) => {
-    //t.context.server = runDevServer(assignPort())
-
-    t.context.scratchDir = makeTempDir()
-    const dbPath = `${t.context.scratchDir}/base.db`
-    t.context.db = new DroneDatabase(dbPath)
-    t.context.runner = new DroneRunner(dbPath)
-
-    await t.context.runner.migrate()
+    t.context = await TestEnvironment.create()
 })
 
 test.afterEach(async (t) => {
-    //t.context.server.close()
-    rmSync(t.context.scratchDir, { recursive: true })
+    await t.context.drop()
 })
 
 test("proxy-unrecognized-host", async (t) => {
-    const proxyPort = assignPort()
-    const proc = t.context.runner.serve(proxyPort)
-    //await sleep(5000)
-
-    let result = await fetch(`http://127.0.0.1:${proxyPort}/`, { headers: { 'host': 'foo.bar' } })
+    let proxyPort = await t.context.runner.serve()
+    
+    let result = await fetch(`http://127.0.0.1:${proxyPort}/`,
+        { headers: { 'host': 'foo.bar' } })
+    
     t.is(result.status, 404)
-
-    await killProcAndWait(proc)
-
-    t.pass("okay")
 })
