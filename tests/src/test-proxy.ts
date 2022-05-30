@@ -12,7 +12,7 @@ test.beforeEach(async (t) => {
     t.context = await TestEnvironment.create()
 })
 
-test.afterEach(async (t) => {
+test.afterEach.always(async (t) => {
     await t.context.drop()
 })
 
@@ -23,4 +23,16 @@ test("proxy-unrecognized-host", async (t) => {
         { headers: { 'host': 'foo.bar' } })
     
     t.is(result.status, 404)
+})
+
+test.failing("proxy-one-host", async (t) => {
+    let proxyPort = await t.context.runner.serve()
+    let dummyServerPort = t.context.dummyServer.serve()
+
+    await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
+
+    let result = await fetch(`http://127.0.0.1:${proxyPort}/`,
+        { headers: { 'host': 'foobar' } })
+
+    t.is(result.status, 200)
 })

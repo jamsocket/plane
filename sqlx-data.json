@@ -1,0 +1,21 @@
+{
+  "db": "SQLite",
+  "018a297706319175a331d1837491faabbf40350a8e6993a1ce59991b43ef2074": {
+    "describe": {
+      "columns": [
+        {
+          "name": "dest_address",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n            select dest_address\n            from route\n            where subdomain = ?\n        "
+  }
+}

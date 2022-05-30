@@ -1,11 +1,13 @@
 use anyhow::Result;
 use clap::Parser;
+use database::DroneDatabase;
 use sqlx::{
     migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 use std::path::PathBuf;
 
+mod database;
 mod proxy;
 
 #[derive(Parser)]
@@ -29,11 +31,12 @@ async fn main() -> Result<()> {
         .filename(opts.db_path)
         .create_if_missing(true);
     let pool = SqlitePoolOptions::new().connect_with(co).await?;
-
     migrate!("./migrations").run(&pool).await?;
 
+    let db = DroneDatabase::new(pool);
+
     if let Some(http_port) = opts.http_port {
-        proxy::serve(http_port).await?;
+        proxy::serve(db, http_port).await?;
     }
 
     Ok(())

@@ -1,14 +1,30 @@
 import * as express from "express"
 import { Server } from "http"
+import { DropHandler } from "./environment"
+import { assignPort } from "./util"
 
-export function runDevServer(port: number): Server {
+export class DummyServer implements DropHandler {
+  servers: Array<Server> = []
+
+  serve(): Promise<number> {
     const app = express()
-    
+
     app.get('/', (req, res) => {
       res.send('Hello World!')
     })
-    
-    return app.listen(port, () => {
-      console.log(`Example app listening on port ${port}`)
+
+    const port = assignPort()
+
+    return new Promise((accept, reject) => {
+      this.servers.push(app.listen(port, () => {
+        accept(port)
+      }))
     })
+  }
+
+  async drop() {
+    for (const server of this.servers) {
+      await new Promise((accept, reject) => server.close(accept))
+    }
+  }
 }

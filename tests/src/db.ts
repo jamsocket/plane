@@ -7,8 +7,8 @@ export class DroneDatabase {
         this.db = new Database(path)
     }
 
-    async addProxy(subdomain: string, address: string) {
-        await this.db.run(`
+    addProxy(subdomain: string, address: string) {
+        this.db.run(`
             insert into route
             (subdomain, dest_address)
             values

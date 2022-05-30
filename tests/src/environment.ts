@@ -3,6 +3,7 @@ import { tmpdir } from "os"
 import { join } from "path"
 import { DroneDatabase } from "./db"
 import { DroneRunner } from "./runner"
+import { DummyServer } from "./server"
 
 export interface DropHandler {
     drop(): Promise<void>
@@ -24,6 +25,7 @@ export class TestEnvironment implements DropHandler {
     tempdir: TemporaryDirectory
     db: DroneDatabase
     runner: DroneRunner
+    dummyServer: DummyServer
 
     private constructor() {
         this.tempdir = new TemporaryDirectory()
@@ -32,6 +34,7 @@ export class TestEnvironment implements DropHandler {
         const dbPath = `${dir}/base.db`
         this.db = new DroneDatabase(dbPath)
         this.runner = new DroneRunner(dbPath)
+        this.dummyServer = new DummyServer()
     }
 
     static async create(): Promise<TestEnvironment> {
@@ -41,7 +44,9 @@ export class TestEnvironment implements DropHandler {
     }
 
     async drop() {
+        console.log("Drop called.")
         await this.runner.drop()
         await this.tempdir.drop()
+        await this.dummyServer.drop()
     }
 }

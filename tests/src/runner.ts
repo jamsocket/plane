@@ -1,13 +1,8 @@
 import { ChildProcess, spawn } from "child_process"
 import { DropHandler } from "./environment";
-import { sleep } from "./util";
+import { assignPort, sleep } from "./util";
 
 const MANIFEST_PATH = process.env.MANIFEST_PATH || "../Cargo.toml"
-
-var nextPort = 10200;
-export function assignPort(): number {
-    return nextPort++
-}
 
 export async function killProcAndWait(proc: ChildProcess): Promise<void> {
     proc.kill("SIGTERM")
@@ -66,12 +61,9 @@ export class DroneRunner implements DropHandler {
             'run',
             '--manifest-path', MANIFEST_PATH,
             '--',
-            "--db-path", this.dbPath
+            "--db-path", this.dbPath,
+            "--http-port", httpPort.toString()
         ]
-
-        if (httpPort !== undefined) {
-            args.push("--http-port", httpPort.toString())
-        }
 
         let proc = spawn("cargo", args, {
             stdio: 'inherit'
@@ -85,7 +77,7 @@ export class DroneRunner implements DropHandler {
         })
 
         this.server = proc
-        await sleep(100)
+        await sleep(500)
 
         return httpPort
     }

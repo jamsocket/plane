@@ -5,10 +5,14 @@ use std::{
     task::Poll, net::SocketAddr,
 };
 use anyhow::Result;
+use http::header::HeaderName;
 use hyper::{Server};
 use hyper::{service::Service, Body, Request, Response, StatusCode};
+use crate::database::DroneDatabase;
 
-pub struct MakeProxyService {}
+pub struct MakeProxyService {
+    db: DroneDatabase,
+}
 
 impl<T> Service<T> for MakeProxyService {
     type Response = ProxyService;
@@ -23,14 +27,25 @@ impl<T> Service<T> for MakeProxyService {
     }
 
     fn call(&mut self, _req: T) -> Self::Future {
-        ready(Ok(ProxyService {}))
+        ready(Ok(ProxyService {
+            db: self.db.clone()
+        }))
     }
 }
 
-pub struct ProxyService {}
+pub struct ProxyService {
+    db: DroneDatabase,
+}
 
+#[allow(unused)]
 impl ProxyService {
-    async fn handle(_req: Request<Body>) -> anyhow::Result<Response<Body>> {
+    async fn handle(db: DroneDatabase, req: Request<Body>) -> anyhow::Result<Response<Body>> {
+        if let Some(host) = req.headers().get(HeaderName::from_static("host")) {
+            let host = std::str::from_utf8(&host.as_bytes())?;
+
+            // self.db.get_proxy_route(subdomain)
+        }
+
         Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(Body::empty())?)
@@ -53,12 +68,12 @@ impl Service<Request<Body>> for ProxyService {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        Box::pin(Self::handle(req))
+        Box::pin(Self::handle(self.db.clone(), req))
     }
 }
 
-pub async fn serve(http_port: u16) -> Result<()> {
-    let make_proxy = MakeProxyService {};
+pub async fn serve(db: DroneDatabase, http_port: u16) -> Result<()> {
+    let make_proxy = MakeProxyService {db};
 
     //let incoming = AddrIncoming::bind(format!("127.0.0.1:{}", http_port).parse()?)?;
     //let server = Server::builder(incoming).serve(make_proxy);
