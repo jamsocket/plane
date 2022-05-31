@@ -1,4 +1,6 @@
-use anyhow::{Result, anyhow};
+use crate::database::DroneDatabase;
+use crate::proxy::{ProxyHttpsOptions, ProxyOptions};
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use keys::KeyCertPathPair;
 use sqlx::{
@@ -9,8 +11,6 @@ use std::path::PathBuf;
 use tracing_subscriber::{
     prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
-use crate::database::DroneDatabase;
-use crate::proxy::{ProxyHttpsOptions, ProxyOptions};
 
 mod database;
 mod keys;
@@ -79,19 +79,22 @@ async fn main() -> Result<()> {
 
     if opts.proxy {
         let https_options = if let Some(private_key_path) = opts.https_private_key {
-            let certificate_path = opts.https_certificate.ok_or_else(|| anyhow!("--https-certificate must be provided if --https-private-key is."))?;
+            let certificate_path = opts.https_certificate.ok_or_else(|| {
+                anyhow!("--https-certificate must be provided if --https-private-key is.")
+            })?;
 
             Some(ProxyHttpsOptions {
                 port: opts.https_port,
                 key_paths: KeyCertPathPair {
-                    certificate_path, private_key_path
-                }
+                    certificate_path,
+                    private_key_path,
+                },
             })
         } else {
             tracing::debug!("Skipping HTTPS because no --https-private-key was passed.");
             None
         };
-        
+
         let serve_opts = ProxyOptions {
             db,
             http_port: opts.http_port,

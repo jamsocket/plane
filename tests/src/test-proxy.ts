@@ -2,10 +2,11 @@ import anyTest, { TestFn } from 'ava'
 import axios from 'axios'
 import { TestEnvironment } from './util/environment'
 import { DroneRunner } from './util/runner'
-import { generateCertificates } from './util/certificates'
+import { generateCertificates, KeyCertPair } from './util/certificates'
 import * as https from 'https'
 import { WebSocketClient } from './util/websocket'
 import { sleep } from './util/sleep'
+import { join } from "path"
 
 const test = anyTest as TestFn<TestEnvironment>;
 
@@ -146,7 +147,27 @@ test("Connection status for WebSocket connections", async (t) => {
     t.is(lastActive4, lastActive3, "When connection is closed, last active time should not increase.")
 })
 
-test.todo("Certificate rotation")
+test.todo("Connection status properly tracks long-lived HTTP connection.")
+
+test.skip("Certificate provided after start-up", async (t) => {
+    const certdir = t.context.tempdir.path("proxy-certs")
+
+    // Start proxy BEFORE generating certificate. Proxy should start without error and
+    // wait until certificate is available.
+    const certs = new KeyCertPair(join(certdir, "proxy-cert.key"), join(certdir, "proxy-cert.pem"))
+    let proxy = await t.context.runner.serve(certs)
+
+    let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
+    await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
+
+    generateCertificates(certs)
+
+    let result = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
+        { headers: { 'host': 'blah.mydomain.test' }, httpsAgent: new https.Agent({ca: certs.getCert()}) })
+
+    t.is(result.status, 200)
+    t.is(result.data, "Hello World!")
+})
 
 test.todo("Multiple subdomains")
 

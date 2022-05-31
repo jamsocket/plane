@@ -14,10 +14,12 @@ export class KeyCertPair {
     }
 }
 
-export async function generateCertificates(): Promise<KeyCertPair> {
+export async function generateCertificates(keyCertPair?: KeyCertPair): Promise<KeyCertPair> {
     const dir = mkdtempSync(join(tmpdir(), "spawner-key-"));
-    const privateKeyPath = join(dir, "local-cert.key")
-    const certificatePath = join(dir, "local-cert.pem")
+
+    if (keyCertPair === undefined) {
+        keyCertPair = new KeyCertPair(join(dir, "local-cert.key"), join(dir, "local-cert.pem"))
+    }
 
     let proc = spawn("openssl", [
         "req",
@@ -30,13 +32,12 @@ export async function generateCertificates(): Promise<KeyCertPair> {
         "-addext",
         "subjectAltName = DNS:*.mydomain.test",
         "-keyout",
-        privateKeyPath,
+        keyCertPair.privateKeyPath,
         "-out",
-        certificatePath
+        keyCertPair.certificatePath
     ])
 
     await waitForExit(proc)
-    return new KeyCertPair(
-        privateKeyPath, certificatePath
-    )
+    
+    return keyCertPair
 }

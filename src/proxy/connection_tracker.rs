@@ -48,10 +48,7 @@ impl ConnectionTracker {
             request_events.insert(conn.key().to_string());
         }
 
-        let result = request_events
-            .iter()
-            .map(|d| d.key().clone())
-            .collect();
+        let result = request_events.iter().map(|d| d.key().clone()).collect();
         self.request_events.clear();
 
         result

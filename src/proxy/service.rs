@@ -157,7 +157,7 @@ impl ProxyService {
 
     async fn handle(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
         if let Some(host) = req.headers().get(http::header::HOST) {
-            let host = std::str::from_utf8(&host.as_bytes())?;
+            let host = std::str::from_utf8(host.as_bytes())?;
 
             // TODO: we shouldn't need to allocate a string just to strip a prefix.
             if let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) {
@@ -188,9 +188,8 @@ impl ProxyService {
     async fn warn_handle(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
         let result = self.handle(req).await;
 
-        match &result {
-            Err(error) => tracing::warn!(?error, "Error handling request."),
-            _ => (),
+        if let Err(error) = &result {
+            tracing::warn!(?error, "Error handling request.")
         }
 
         result

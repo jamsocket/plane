@@ -1,13 +1,14 @@
-use self::{service::MakeProxyService, tls::TlsAcceptor, connection_tracker::ConnectionTracker};
-use crate::{database::DroneDatabase, KeyCertPathPair, keys::CertifiedKey};
+use self::{connection_tracker::ConnectionTracker, service::MakeProxyService, tls::TlsAcceptor};
+use crate::{database::DroneDatabase, KeyCertPathPair};
 use anyhow::Result;
-use hyper::{Server, server::conn::AddrIncoming};
-use tokio::select;
+use hyper::{server::conn::AddrIncoming, Server};
+use rustls::{server::ResolvesServerCert, sign::CertifiedKey};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
+use tokio::select;
 
+mod connection_tracker;
 mod service;
 mod tls;
-mod connection_tracker;
 
 pub struct ProxyHttpsOptions {
     pub port: u16,
@@ -32,24 +33,35 @@ async fn record_connections(db: DroneDatabase, connection_tracker: ConnectionTra
     }
 }
 
+struct CertResolver {
+    cert_key_pair: Arc<CertifiedKey>,
+}
+
+impl ResolvesServerCert for CertResolver {
+    fn resolve(
+        &self,
+        _client_hello: rustls::server::ClientHello,
+    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
+        Some(self.cert_key_pair.clone())
+    }
+}
+
 async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker) -> Result<()> {
     let make_proxy = MakeProxyService::new(options.db, options.cluster, connection_tracker.clone());
-    
+
     if let Some(https_options) = options.https_options {
-        let cert_key_pair = CertifiedKey::new(&https_options.key_paths)?;
+        let cert_key_pair = Arc::new(https_options.key_paths.load_certified_key()?);
+        let resolver = Arc::new(CertResolver { cert_key_pair });
 
         let tls_cfg = {
             let cfg = rustls::ServerConfig::builder()
                 .with_safe_defaults()
                 .with_no_client_auth()
-                .with_single_cert(
-                    cert_key_pair.certificate.clone(),
-                    cert_key_pair.private_key.clone(),
-                )?;
-    
+                .with_cert_resolver(resolver);
+
             Arc::new(cfg)
         };
-    
+
         let addr = SocketAddr::from(([0, 0, 0, 0], https_options.port));
         let incoming = AddrIncoming::bind(&addr)?;
         let server = Server::builder(TlsAcceptor::new(tls_cfg, incoming)).serve(make_proxy);

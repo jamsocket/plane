@@ -17,6 +17,10 @@ export class TemporaryDirectory implements DropHandler {
         this.dir = mkdtempSync(join(tmpdir(), "spawner-test-"))
     }
 
+    path(path: string): string {
+        return join(this.dir, path)
+    }
+
     async drop() {
         rmSync(this.dir, { recursive: true })
     }

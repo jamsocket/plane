@@ -10,7 +10,7 @@
     },
     "query": "\n            update route\n            set last_active = unixepoch()\n            where backend = ?\n            "
   },
-  "8b490d9ad53688292707680225cb8f39196792378179629a5523984c85e4b176": {
+  "20b9907e634e90906cc94cd6dfaf974a0f3cdb150dd310f355352ff1237de2e2": {
     "describe": {
       "columns": [
         {
@@ -26,6 +26,6 @@
         "Right": 1
       }
     },
-    "query": "\n            select address\n            from route\n            where backend = ?\n        "
+    "query": "\n            select address\n            from route\n            where backend = ?\n            "
   }
 }
