@@ -1,11 +1,13 @@
-use self::{service::MakeProxyService, tls::TlsAcceptor};
+use self::{service::MakeProxyService, tls::TlsAcceptor, connection_tracker::ConnectionTracker};
 use crate::{database::DroneDatabase, KeyCertPathPair, keys::CertifiedKey};
 use anyhow::Result;
 use hyper::{Server, server::conn::AddrIncoming};
-use std::{net::SocketAddr, sync::Arc};
+use tokio::select;
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 mod service;
 mod tls;
+mod connection_tracker;
 
 pub struct ProxyHttpsOptions {
     pub port: u16,
@@ -19,8 +21,19 @@ pub struct ProxyOptions {
     pub cluster: String,
 }
 
-pub async fn serve(options: ProxyOptions) -> Result<()> {
-    let make_proxy = MakeProxyService::new(options.db, options.cluster);
+async fn record_connections(db: DroneDatabase, connection_tracker: ConnectionTracker) {
+    loop {
+        let backends = connection_tracker.get_and_clear_active_backends();
+        if let Err(error) = db.reset_last_active_times(&backends).await {
+            tracing::error!(?error, "Encountered database error.");
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+}
+
+async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker) -> Result<()> {
+    let make_proxy = MakeProxyService::new(options.db, options.cluster, connection_tracker.clone());
     
     if let Some(https_options) = options.https_options {
         let cert_key_pair = CertifiedKey::new(&https_options.key_paths)?;
@@ -46,6 +59,22 @@ pub async fn serve(options: ProxyOptions) -> Result<()> {
         let server = Server::bind(&addr).serve(make_proxy);
         server.await?;
     }
+
+    Ok(())
+}
+
+pub async fn serve(options: ProxyOptions) -> Result<()> {
+    let connection_tracker = ConnectionTracker::default();
+    let db = options.db.clone();
+
+    select! {
+        result = run_server(options, connection_tracker.clone()) => {
+            tracing::info!(?result, "run_server returned early.")
+        }
+        () = record_connections(db, connection_tracker) => {
+            panic!("record_connections should never terminate.")
+        }
+    };
 
     Ok(())
 }

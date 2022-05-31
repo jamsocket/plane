@@ -14,10 +14,10 @@ create table "resource" (
 -- Describes a route that the proxy should resolve.
 create table "route" (
     -- Subdomain to route.
-    "subdomain" text primary key,
+    "backend" text primary key,
 
     -- IP:port combo of the destination to proxy to.
-    "dest_address" text not null,
+    "address" text not null,
 
     -- The timestamp this route last had an active connection.
     -- The proxy may debounce this by a reasonable amount (e.g. 5 seconds)

@@ -13,12 +13,23 @@ export class DroneDatabase {
         return new DroneDatabase(db)
     }
 
-    async addProxy(subdomain: string, address: string): Promise<void> {
+    async addProxy(backend: string, address: string): Promise<void> {
         await this.db.run(`
                 insert into route
-                (subdomain, dest_address)
+                (backend, address)
                 values
                 (?, ?)
-                `, subdomain, address)
+                `, backend, address)
+    }
+
+    async getLastActiveTime(backend: string): Promise<number | null> {
+        const row = await this.db.get(`
+            select last_active
+            from route
+            where backend = ?
+            `,
+            backend)
+        
+        return row["last_active"]
     }
 }

@@ -5,6 +5,7 @@ import { DroneRunner } from './util/runner'
 import { generateCertificates } from './util/certificates'
 import * as https from 'https'
 import { WebSocketClient } from './util/websocket'
+import { sleep } from './util/sleep'
 
 const test = anyTest as TestFn<TestEnvironment>;
 
@@ -89,4 +90,36 @@ test.todo("Certificate rotation")
 
 test.todo("Multiple subdomains")
 
-test.todo("Connection status information is recorded")
+test("Connection status information is recorded", async (t) => {
+    const {runner, dummyServer, db} = t.context
+
+    let proxy = await runner.serve()
+    let dummyServerPort = await dummyServer.serveHelloWorld()
+
+    await db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
+    await sleep(1000)
+
+    t.is(await db.getLastActiveTime("foobar"), null, "Last active time should initially be null.")
+
+    await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
+        { headers: { 'host': 'foobar.mydomain.test' } })
+    
+    await sleep(1000)
+
+    const lastActive1 = await db.getLastActiveTime("foobar")
+    t.not(lastActive1, null, "After activity, last active time should not be null.")
+
+    await sleep(2000)
+
+    const lastActive2 = await db.getLastActiveTime("foobar") as number
+    t.is(lastActive1, lastActive2, "Without activiiy, last active time should not increase.")
+
+    await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
+        { headers: { 'host': 'foobar.mydomain.test' } })
+    
+    await sleep(1000)
+
+    const lastActive3 = await db.getLastActiveTime("foobar") as number
+    t.assert(lastActive3 > lastActive2, "After activity, last active time should increase.")
+
+})

@@ -26,11 +26,23 @@ impl DroneDatabase {
     }
 
     /// Get the downstream source to direct a request on an incoming subdomain to.
-    pub async fn get_proxy_route(&self, subdomain: &str) -> Result<Option<String>> {
+    pub async fn get_proxy_route(&self, backend: &str) -> Result<Option<String>> {
         Ok(sqlx::query!(r"
-            select dest_address
+            select address
             from route
-            where subdomain = ?
-        ", subdomain).fetch_optional(&self.pool).await?.map(|d| d.dest_address))
+            where backend = ?
+        ", backend).fetch_optional(&self.pool).await?.map(|d| d.address))
+    }
+
+    pub async fn reset_last_active_times(&self, backends: &[String]) -> Result<()> {
+        for backend in backends {
+            sqlx::query!(r"
+            update route
+            set last_active = unixepoch()
+            where backend = ?
+            ", backend).execute(&self.pool).await?;
+        }
+
+        Ok(())
     }
 }

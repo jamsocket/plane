@@ -1,10 +1,20 @@
 {
   "db": "SQLite",
-  "018a297706319175a331d1837491faabbf40350a8e6993a1ce59991b43ef2074": {
+  "1bc283d462bf2728c43d51529e9cf39e886fb92bf9c26277da0a5d8b364c0efc": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n            update route\n            set last_active = unixepoch()\n            where backend = ?\n            "
+  },
+  "8b490d9ad53688292707680225cb8f39196792378179629a5523984c85e4b176": {
     "describe": {
       "columns": [
         {
-          "name": "dest_address",
+          "name": "address",
           "ordinal": 0,
           "type_info": "Text"
         }
@@ -16,24 +26,6 @@
         "Right": 1
       }
     },
-    "query": "\n            select dest_address\n            from route\n            where subdomain = ?\n        "
-  },
-  "6856049543a578e87ec31577da3c98fe399a2df22e110ca1efc81e4fe3e0e058": {
-    "describe": {
-      "columns": [
-        {
-          "name": "c",
-          "ordinal": 0,
-          "type_info": "Int"
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Right": 0
-      }
-    },
-    "query": "select count(1) as c from route"
+    "query": "\n            select address\n            from route\n            where backend = ?\n        "
   }
 }

@@ -14,6 +14,8 @@ use std::{
     task::Poll,
 };
 
+use super::connection_tracker::ConnectionTracker;
+
 const UPGRADE: &str = "upgrade";
 
 /// Clone a request (method and headers, not body).
@@ -41,11 +43,12 @@ pub struct MakeProxyService {
     db: DroneDatabase,
     client: Client<HttpConnector, Body>,
     cluster: String,
+    connection_tracker: ConnectionTracker,
 }
 
 impl MakeProxyService {
-    pub fn new(db: DroneDatabase, cluster: String) -> Self {
-        MakeProxyService { db, client: Client::new(), cluster }
+    pub fn new(db: DroneDatabase, cluster: String, connection_tracker: ConnectionTracker) -> Self {
+        MakeProxyService { db, client: Client::new(), cluster, connection_tracker }
     }
 }
 
@@ -66,6 +69,7 @@ impl<T> Service<T> for MakeProxyService {
             db: self.db.clone(),
             client: self.client.clone(),
             cluster: self.cluster.clone(),
+            connection_tracker: self.connection_tracker.clone(),
         }))
     }
 }
@@ -75,6 +79,7 @@ pub struct ProxyService {
     db: DroneDatabase,
     client: Client<HttpConnector, Body>,
     cluster: String,
+    connection_tracker: ConnectionTracker,
 }
 
 #[allow(unused)]
@@ -146,6 +151,7 @@ impl ProxyService {
             // TODO: we shouldn't need to allocate a string just to strip a prefix.
             if let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) {
                 if let Some(addr) = self.db.get_proxy_route(subdomain).await? {
+                    self.connection_tracker.track_request(subdomain);
                     *req.uri_mut() = Self::rewrite_uri(&addr, req.uri())?;
     
                     if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
