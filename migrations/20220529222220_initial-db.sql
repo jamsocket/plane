@@ -8,7 +8,7 @@ create table "resource" (
     "kind" text not null,
 
     -- The backend to which this resource relates.
-    "backend" text not null
+    "backend" text not null default (unixepoch())
 );
 
 -- Describes a route that the proxy should resolve.

@@ -1,5 +1,5 @@
 use crate::database::DroneDatabase;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use http::uri::{Authority, Scheme};
 use http::Uri;
 use hyper::client::HttpConnector;
@@ -48,7 +48,12 @@ pub struct MakeProxyService {
 
 impl MakeProxyService {
     pub fn new(db: DroneDatabase, cluster: String, connection_tracker: ConnectionTracker) -> Self {
-        MakeProxyService { db, client: Client::new(), cluster, connection_tracker }
+        MakeProxyService {
+            db,
+            client: Client::new(),
+            cluster,
+            connection_tracker,
+        }
     }
 }
 
@@ -95,7 +100,8 @@ impl ProxyService {
 
     async fn handle_upgrade(
         self,
-        mut req: Request<Body>
+        mut req: Request<Body>,
+        backend: &str,
     ) -> anyhow::Result<Response<Body>> {
         let response = self.client.request(clone_request(&req)?).await?;
 
@@ -110,17 +116,22 @@ impl ProxyService {
                 }
             };
 
+            let connection_tracker = self.connection_tracker.clone();
+            let backend = backend.to_string();
             tokio::task::spawn(async move {
                 match hyper::upgrade::on(&mut req).await {
                     Ok(mut upgraded_request) => {
                         let started = SystemTime::now();
 
-                        match tokio::io::copy_bidirectional(
+                        connection_tracker.increment_connections(&backend);
+                        let result = tokio::io::copy_bidirectional(
                             &mut upgraded_response,
                             &mut upgraded_request,
                         )
-                        .await
-                        {
+                        .await;
+                        connection_tracker.decrement_connections(&backend);
+
+                        match result {
                             Ok((from_client, from_server)) => {
                                 let duration = SystemTime::now()
                                     .duration_since(started)
@@ -150,20 +161,21 @@ impl ProxyService {
 
             // TODO: we shouldn't need to allocate a string just to strip a prefix.
             if let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) {
-                if let Some(addr) = self.db.get_proxy_route(subdomain).await? {
-                    self.connection_tracker.track_request(subdomain);
+                let subdomain = subdomain.to_string();
+                if let Some(addr) = self.db.get_proxy_route(&subdomain).await? {
+                    self.connection_tracker.track_request(&subdomain);
                     *req.uri_mut() = Self::rewrite_uri(&addr, req.uri())?;
-    
+
                     if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
                         if connection.to_str().unwrap_or_default().to_lowercase() == UPGRADE {
-                            return self.handle_upgrade(req).await;
+                            return self.handle_upgrade(req, &subdomain).await;
                         }
-                    }        
-    
+                    }
+
                     let result = self.client.request(req).await;
                     return Ok(result?);
                 }
-            }            
+            }
 
             tracing::warn!(?host, "Unrecognized host.");
         }

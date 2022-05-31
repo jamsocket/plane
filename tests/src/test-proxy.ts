@@ -86,10 +86,6 @@ test("WebSockets", async (t) => {
     client.close()    
 })
 
-test.todo("Certificate rotation")
-
-test.todo("Multiple subdomains")
-
 test("Connection status information is recorded", async (t) => {
     const {runner, dummyServer, db} = t.context
 
@@ -99,27 +95,58 @@ test("Connection status information is recorded", async (t) => {
     await db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
     await sleep(1000)
 
-    t.is(await db.getLastActiveTime("foobar"), null, "Last active time should initially be null.")
+    const lastActive1 = await db.getLastActiveTime("foobar") as number
 
     await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
         { headers: { 'host': 'foobar.mydomain.test' } })
     
     await sleep(1000)
 
-    const lastActive1 = await db.getLastActiveTime("foobar")
-    t.not(lastActive1, null, "After activity, last active time should not be null.")
+    const lastActive2 = await db.getLastActiveTime("foobar") as number
+    t.assert(lastActive2 > lastActive1, "After activity, last active time should not be null.")
 
     await sleep(2000)
 
-    const lastActive2 = await db.getLastActiveTime("foobar") as number
-    t.is(lastActive1, lastActive2, "Without activiiy, last active time should not increase.")
+    const lastActive3 = await db.getLastActiveTime("foobar") as number
+    t.is(lastActive3, lastActive2, "Without activiiy, last active time should not increase.")
 
     await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
         { headers: { 'host': 'foobar.mydomain.test' } })
     
     await sleep(1000)
 
-    const lastActive3 = await db.getLastActiveTime("foobar") as number
-    t.assert(lastActive3 > lastActive2, "After activity, last active time should increase.")
-
+    const lastActive4 = await db.getLastActiveTime("foobar") as number
+    t.assert(lastActive4 > lastActive3, "After activity, last active time should increase.")
 })
+
+test("Connection status for WebSocket connections", async (t) => {
+    const {runner, dummyServer, db} = t.context
+
+    let proxy = await runner.serve()
+    let wsServerPort = await dummyServer.serveWebSocket()
+
+    await db.addProxy("abcde", `127.0.0.1:${wsServerPort}`)
+
+    const lastActive1 = await db.getLastActiveTime("abcde") as number
+
+    let client = await WebSocketClient.create(`ws://127.0.0.1:${proxy.httpPort}`, "abcde.mydomain.test")
+    await sleep(1000)
+
+    const lastActive2 = await db.getLastActiveTime("abcde") as number
+    t.assert(lastActive2 > lastActive1, "Last active time sould recognize an open WebSocket connection.")
+
+    await sleep(2000)
+    client.close()
+    const lastActive3 = await db.getLastActiveTime("abcde") as number
+    t.assert(lastActive3 > lastActive2, "Last active time should continue to increase while WebSocket connection is held open.")
+
+    await sleep(1000)
+
+    const lastActive4 = await db.getLastActiveTime("abcde") as number
+    t.is(lastActive4, lastActive3, "When connection is closed, last active time should not increase.")
+})
+
+test.todo("Certificate rotation")
+
+test.todo("Multiple subdomains")
+
