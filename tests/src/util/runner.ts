@@ -61,6 +61,20 @@ export class DroneRunner implements DropHandler {
         await waitForExit(proc)
     }
 
+    async certRefresh(certs: KeyCertPair) {
+        let proc = spawn(SPAWNER_PATH, [
+            "--nats-host", "localhost:1234",
+            "--https-private-key", certs.privateKeyPath,
+            "--https-certificate", certs.certificatePath,
+            "--cluster-domain", CLUSTER_DOMAIN,
+            "cert",
+        ], {
+            stdio: 'inherit'
+        })
+
+        await waitForExit(proc)
+    }
+
     async serve(certs?: KeyCertPair): Promise<ServeResult> {
         const httpPort = assignPort()
         var httpsPort

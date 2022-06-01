@@ -83,6 +83,7 @@ pub enum DronePlan {
         db_path: String,
     },
     DoCertificateRefresh {
+        cluster_domain: String,
         nats_config: NatsConfig,
         key_paths: KeyCertPathPair,
     },
@@ -116,6 +117,7 @@ impl From<Opts> for DronePlan {
             },
             Command::Cert => {
                 DronePlan::DoCertificateRefresh {
+                    cluster_domain: opts.cluster_domain.expect("Expected --cluster-domain when using cert command."),
                     nats_config: NatsConfig {
                         host: opts.nats_host.expect("Expected --nats-host when using cert command."),
                         token: opts.nats_token
@@ -184,11 +186,14 @@ mod test {
             "mycert.key",
             "--nats-host",
             "localhost",
+            "--cluster-domain",
+            "mydomain.test",
             "cert",
         ])
         .unwrap();
         assert_eq!(
             DronePlan::DoCertificateRefresh {
+                cluster_domain: "mydomain.test".to_string(),
                 nats_config: NatsConfig {
                     host: "localhost".to_string(),
                     token: None
