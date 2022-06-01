@@ -10,6 +10,7 @@ dashmap = "5.3.4"
 futures = "0.3.21"
 http = "0.2.7"
 hyper = { version = "0.14.19", features = ["server", "client", "http1", "http2", "tcp"] }
+notify = "5.0.0-pre.15"
 rustls = "0.20.6"
 rustls-pemfile = "1.0.0"
 sqlx = { version = "0.5.13", features = ["runtime-tokio-rustls", "sqlite", "migrate", "macros", "offline"] }

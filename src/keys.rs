@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[derive(Clone)]
 pub struct KeyCertPathPair {
     pub private_key_path: PathBuf,
     pub certificate_path: PathBuf,
@@ -22,11 +23,30 @@ impl KeyCertPathPair {
 
         Ok(CertifiedKey::new(certificate, private_key))
     }
+
+    /// Return a vector of directories that we should listen for filesystem events on.
+    /// 
+    /// If the key and certificate are in the same directory, this will be a one-element vector with just that
+    /// directory. If the key and certificate are in different directories, this will be a two-element vector
+    /// with both directories.
+    /// 
+    /// We listen to the parent directories rather than the files themselves because the files themselves
+    /// may not exist when the server is started.
+    pub fn parent_paths(&self) -> Vec<PathBuf> {
+        let key_parent_dir = self.private_key_path.parent().expect("Key file should never be filesystem root.");
+        let certificate_parent_dir = self.private_key_path.parent().expect("Key file should never be filesystem root.");
+
+        if key_parent_dir == certificate_parent_dir {
+            return vec![key_parent_dir.to_path_buf()]
+        } else {
+            return vec![key_parent_dir.to_path_buf(), certificate_parent_dir.to_path_buf()]
+        }
+    }
 }
 
 // Load public certificate from file.
 // Source: https://github.com/rustls/hyper-rustls/blob/main/examples/server.rs
-fn load_certs(filename: &Path) -> Result<Vec<Certificate>> {
+pub fn load_certs(filename: &Path) -> Result<Vec<Certificate>> {
     // Open certificate file.
     let certfile = File::open(filename)?;
     let mut reader = BufReader::new(certfile);
@@ -38,7 +58,7 @@ fn load_certs(filename: &Path) -> Result<Vec<Certificate>> {
 
 // Load private key from file.
 // Source: https://github.com/rustls/hyper-rustls/blob/main/examples/server.rs
-fn load_private_key(filename: &Path) -> Result<PrivateKey> {
+pub fn load_private_key(filename: &Path) -> Result<PrivateKey> {
     // Open keyfile.
     let keyfile = File::open(filename)?;
     let mut reader = BufReader::new(keyfile);

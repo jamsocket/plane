@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
-import { mkdtempSync, readFileSync } from "fs";
+import { mkdirSync, mkdtempSync, readFileSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 import { waitForExit } from "./runner";
 
 export class KeyCertPair {
@@ -15,11 +15,12 @@ export class KeyCertPair {
 }
 
 export async function generateCertificates(keyCertPair?: KeyCertPair): Promise<KeyCertPair> {
-    const dir = mkdtempSync(join(tmpdir(), "spawner-key-"));
-
     if (keyCertPair === undefined) {
+        const dir = mkdtempSync(join(tmpdir(), "spawner-key-"));
         keyCertPair = new KeyCertPair(join(dir, "local-cert.key"), join(dir, "local-cert.pem"))
     }
+
+    mkdirSync(dirname(keyCertPair.certificatePath), { recursive: true })
 
     let proc = spawn("openssl", [
         "req",
@@ -35,9 +36,9 @@ export async function generateCertificates(keyCertPair?: KeyCertPair): Promise<K
         keyCertPair.privateKeyPath,
         "-out",
         keyCertPair.certificatePath
-    ])
+    ], { stdio: 'inherit' })
 
     await waitForExit(proc)
-    
+
     return keyCertPair
 }

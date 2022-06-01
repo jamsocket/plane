@@ -7,6 +7,7 @@ import * as https from 'https'
 import { WebSocketClient } from './util/websocket'
 import { sleep } from './util/sleep'
 import { join } from "path"
+import { mkdirSync } from 'fs'
 
 const test = anyTest as TestFn<TestEnvironment>;
 
@@ -149,18 +150,20 @@ test("Connection status for WebSocket connections", async (t) => {
 
 test.todo("Connection status properly tracks long-lived HTTP connection.")
 
-test.skip("Certificate provided after start-up", async (t) => {
+test("Certificate provided after start-up", async (t) => {
     const certdir = t.context.tempdir.path("proxy-certs")
+    mkdirSync(certdir)
 
     // Start proxy BEFORE generating certificate. Proxy should start without error and
     // wait until certificate is available.
     const certs = new KeyCertPair(join(certdir, "proxy-cert.key"), join(certdir, "proxy-cert.pem"))
+    
     let proxy = await t.context.runner.serve(certs)
 
     let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
     await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
 
-    generateCertificates(certs)
+    await generateCertificates(certs)
 
     let result = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
         { headers: { 'host': 'blah.mydomain.test' }, httpsAgent: new https.Agent({ca: certs.getCert()}) })

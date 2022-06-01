@@ -1,11 +1,14 @@
-use self::{connection_tracker::ConnectionTracker, service::MakeProxyService, tls::TlsAcceptor};
+use self::{
+    certs::CertRefresher, connection_tracker::ConnectionTracker, service::MakeProxyService,
+    tls::TlsAcceptor,
+};
 use crate::{database::DroneDatabase, KeyCertPathPair};
 use anyhow::Result;
 use hyper::{server::conn::AddrIncoming, Server};
-use rustls::{server::ResolvesServerCert, sign::CertifiedKey};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::select;
 
+mod certs;
 mod connection_tracker;
 mod service;
 mod tls;
@@ -33,31 +36,17 @@ async fn record_connections(db: DroneDatabase, connection_tracker: ConnectionTra
     }
 }
 
-struct CertResolver {
-    cert_key_pair: Arc<CertifiedKey>,
-}
-
-impl ResolvesServerCert for CertResolver {
-    fn resolve(
-        &self,
-        _client_hello: rustls::server::ClientHello,
-    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
-        Some(self.cert_key_pair.clone())
-    }
-}
-
 async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker) -> Result<()> {
     let make_proxy = MakeProxyService::new(options.db, options.cluster, connection_tracker.clone());
 
     if let Some(https_options) = options.https_options {
-        let cert_key_pair = Arc::new(https_options.key_paths.load_certified_key()?);
-        let resolver = Arc::new(CertResolver { cert_key_pair });
+        let cert_refresher = CertRefresher::new(https_options.key_paths.clone())?;                
 
         let tls_cfg = {
             let cfg = rustls::ServerConfig::builder()
                 .with_safe_defaults()
                 .with_no_client_auth()
-                .with_cert_resolver(resolver);
+                .with_cert_resolver(Arc::new(cert_refresher.resolver()));
 
             Arc::new(cfg)
         };
@@ -84,7 +73,7 @@ pub async fn serve(options: ProxyOptions) -> Result<()> {
             tracing::info!(?result, "run_server returned early.")
         }
         () = record_connections(db, connection_tracker) => {
-            panic!("record_connections should never terminate.")
+            tracing::info!("record_connections returned early.")
         }
     };
 

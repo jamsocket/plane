@@ -104,6 +104,5 @@ async fn main() -> Result<()> {
 
         proxy::serve(serve_opts).await?;
     }
-
     Ok(())
 }
