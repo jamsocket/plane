@@ -9,7 +9,7 @@ export class KeyCertPair {
         public privateKeyPath: string,
         public certificatePath: string) { }
 
-    getCert(): any {
+    getCert(): Buffer {
         return readFileSync(this.certificatePath)
     }
 }

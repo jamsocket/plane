@@ -172,5 +172,29 @@ test("Certificate provided after start-up", async (t) => {
     t.is(result.data, "Hello World!")
 })
 
+test("Certificate changed while running", async (t) => {
+    const certs = await generateCertificates()
+
+    let proxy = await t.context.runner.serve(certs)
+
+    let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
+    await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
+    const ca1 = certs.getCert();
+
+    let result1 = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
+        { headers: { 'host': 'blah.mydomain.test' }, httpsAgent: new https.Agent({ca: ca1}) })
+    t.is(result1.status, 200)
+
+    await generateCertificates(certs)
+    const ca2 = certs.getCert();
+    t.not(ca1.toString(), ca2.toString())
+
+    let result2 = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
+        { headers: { 'host': 'blah.mydomain.test' }, httpsAgent: new https.Agent({ca: ca2}) })
+
+
+    t.is(result2.status, 200)
+})
+
 test.todo("Multiple subdomains")
 
