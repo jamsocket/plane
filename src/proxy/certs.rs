@@ -1,10 +1,14 @@
-use crate::keys::{KeyCertPathPair, load_private_key, load_certs};
+use crate::keys::{load_certs, load_private_key, KeyCertPathPair};
 use anyhow::Result;
 use notify::{
-    event::{AccessKind, AccessMode}, recommended_watcher, Event, EventKind, INotifyWatcher, RecursiveMode,
-    Watcher,
+    event::{AccessKind, AccessMode},
+    recommended_watcher, Event, EventKind, INotifyWatcher, RecursiveMode, Watcher,
 };
-use rustls::{server::ResolvesServerCert, sign::{CertifiedKey, any_supported_type}, Certificate, PrivateKey};
+use rustls::{
+    server::ResolvesServerCert,
+    sign::{any_supported_type, CertifiedKey},
+    Certificate, PrivateKey,
+};
 use std::sync::Arc;
 use tokio::sync::watch::{channel, Receiver, Sender};
 
@@ -71,10 +75,7 @@ impl CertRefresher {
         };
 
         for path in key_cert_path_pair.parent_paths() {
-            watcher.watch(
-                &path,
-                RecursiveMode::NonRecursive,
-            )?;
+            watcher.watch(&path, RecursiveMode::NonRecursive)?;
         }
 
         let resolver = CertRefresher {

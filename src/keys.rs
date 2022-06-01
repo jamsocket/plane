@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct KeyCertPathPair {
     pub private_key_path: PathBuf,
     pub certificate_path: PathBuf,
@@ -25,21 +25,30 @@ impl KeyCertPathPair {
     }
 
     /// Return a vector of directories that we should listen for filesystem events on.
-    /// 
+    ///
     /// If the key and certificate are in the same directory, this will be a one-element vector with just that
     /// directory. If the key and certificate are in different directories, this will be a two-element vector
     /// with both directories.
-    /// 
+    ///
     /// We listen to the parent directories rather than the files themselves because the files themselves
     /// may not exist when the server is started.
     pub fn parent_paths(&self) -> Vec<PathBuf> {
-        let key_parent_dir = self.private_key_path.parent().expect("Key file should never be filesystem root.");
-        let certificate_parent_dir = self.private_key_path.parent().expect("Key file should never be filesystem root.");
+        let key_parent_dir = self
+            .private_key_path
+            .parent()
+            .expect("Key file should never be filesystem root.");
+        let certificate_parent_dir = self
+            .private_key_path
+            .parent()
+            .expect("Key file should never be filesystem root.");
 
         if key_parent_dir == certificate_parent_dir {
-            return vec![key_parent_dir.to_path_buf()]
+            return vec![key_parent_dir.to_path_buf()];
         } else {
-            return vec![key_parent_dir.to_path_buf(), certificate_parent_dir.to_path_buf()]
+            return vec![
+                key_parent_dir.to_path_buf(),
+                certificate_parent_dir.to_path_buf(),
+            ];
         }
     }
 }

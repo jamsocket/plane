@@ -53,6 +53,7 @@ export class DroneRunner implements DropHandler {
         let proc = spawn(SPAWNER_PATH, [
             "--db-path", this.dbPath,
             "--cluster-domain", CLUSTER_DOMAIN,
+            "migrate",
         ], {
             stdio: 'inherit'
         })
@@ -65,10 +66,9 @@ export class DroneRunner implements DropHandler {
         var httpsPort
 
         var args = [
-            "--proxy",
             "--cluster-domain", CLUSTER_DOMAIN, 
             "--db-path", this.dbPath,
-            "--http-port", httpPort.toString()
+            "--http-port", httpPort.toString(),
         ]
 
         if (certs !== undefined) {
@@ -80,6 +80,8 @@ export class DroneRunner implements DropHandler {
                 "--https-certificate", certs.certificatePath,
             )
         }
+
+        args.push("serve", "--proxy")
 
         let proc = spawn(SPAWNER_PATH, args, {
             stdio: 'inherit'

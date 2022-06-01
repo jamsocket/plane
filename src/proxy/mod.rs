@@ -2,7 +2,7 @@ use self::{
     certs::CertRefresher, connection_tracker::ConnectionTracker, service::MakeProxyService,
     tls::TlsAcceptor,
 };
-use crate::{database::DroneDatabase, KeyCertPathPair};
+use crate::{database::DroneDatabase, get_db, KeyCertPathPair};
 use anyhow::Result;
 use hyper::{server::conn::AddrIncoming, Server};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -13,16 +13,18 @@ mod connection_tracker;
 mod service;
 mod tls;
 
+#[derive(PartialEq, Debug)]
 pub struct ProxyHttpsOptions {
     pub port: u16,
     pub key_paths: KeyCertPathPair,
 }
 
+#[derive(PartialEq, Debug)]
 pub struct ProxyOptions {
-    pub db: DroneDatabase,
+    pub db_path: String,
     pub http_port: u16,
     pub https_options: Option<ProxyHttpsOptions>,
-    pub cluster: String,
+    pub cluster_domain: String,
 }
 
 async fn record_connections(db: DroneDatabase, connection_tracker: ConnectionTracker) {
@@ -36,11 +38,15 @@ async fn record_connections(db: DroneDatabase, connection_tracker: ConnectionTra
     }
 }
 
-async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker) -> Result<()> {
-    let make_proxy = MakeProxyService::new(options.db, options.cluster, connection_tracker.clone());
+async fn run_server(
+    db: DroneDatabase,
+    options: ProxyOptions,
+    connection_tracker: ConnectionTracker,
+) -> Result<()> {
+    let make_proxy = MakeProxyService::new(db, options.cluster_domain, connection_tracker.clone());
 
     if let Some(https_options) = options.https_options {
-        let cert_refresher = CertRefresher::new(https_options.key_paths.clone())?;                
+        let cert_refresher = CertRefresher::new(https_options.key_paths.clone())?;
 
         let tls_cfg = {
             let cfg = rustls::ServerConfig::builder()
@@ -66,10 +72,10 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
 
 pub async fn serve(options: ProxyOptions) -> Result<()> {
     let connection_tracker = ConnectionTracker::default();
-    let db = options.db.clone();
+    let db = get_db(&options.db_path).await?;
 
     select! {
-        result = run_server(options, connection_tracker.clone()) => {
+        result = run_server(db.clone(), options, connection_tracker.clone()) => {
             tracing::info!(?result, "run_server returned early.")
         }
         () = record_connections(db, connection_tracker) => {

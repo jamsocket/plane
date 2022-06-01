@@ -1,13 +1,13 @@
 import anyTest, { TestFn } from 'ava'
 import axios from 'axios'
+import { mkdirSync } from 'fs'
+import * as https from 'https'
+import { join } from "path"
+import { generateCertificates, KeyCertPair } from './util/certificates'
 import { TestEnvironment } from './util/environment'
 import { DroneRunner } from './util/runner'
-import { generateCertificates, KeyCertPair } from './util/certificates'
-import * as https from 'https'
-import { WebSocketClient } from './util/websocket'
 import { sleep } from './util/sleep'
-import { join } from "path"
-import { mkdirSync } from 'fs'
+import { WebSocketClient } from './util/websocket'
 
 const test = anyTest as TestFn<TestEnvironment>;
 
