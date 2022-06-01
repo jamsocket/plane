@@ -148,8 +148,6 @@ test("Connection status for WebSocket connections", async (t) => {
     t.is(lastActive4, lastActive3, "When connection is closed, last active time should not increase.")
 })
 
-test.todo("Connection status properly tracks long-lived HTTP connection.")
-
 test("Certificate provided after start-up", async (t) => {
     const certdir = t.context.tempdir.path("proxy-certs")
     mkdirSync(certdir)
@@ -195,6 +193,8 @@ test("Certificate changed while running", async (t) => {
 
     t.is(result2.status, 200)
 })
+
+test.todo("Connection status properly tracks long-lived HTTP connection.")
 
 test.todo("Multiple subdomains")
 
