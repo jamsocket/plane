@@ -13,6 +13,7 @@ use tracing_subscriber::{
     prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
 
+mod agent;
 mod cert;
 mod cli;
 mod database;
@@ -51,7 +52,10 @@ async fn main() -> Result<()> {
     let plan = DronePlan::try_from(opts)?;
 
     match plan {
-        DronePlan::RunService { proxy_options } => {
+        DronePlan::RunService {
+            proxy_options,
+            agent_options,
+        } => {
             if let Some(proxy_options) = proxy_options {
                 serve(proxy_options).await?;
             }

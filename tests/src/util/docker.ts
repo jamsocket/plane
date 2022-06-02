@@ -21,9 +21,12 @@ export class Docker implements DropHandler {
 
   async runNats(): Promise<number> {
     const port = await getPort();
+    const imageName = "nats:latest"
+
+    await this.docker.pull(imageName)
 
     const container = await this.docker.createContainer({
-      Image: "nats:latest",
+      Image: imageName,
       HostConfig: {
         PortBindings: { ["4222/tcp"]: [{ HostPort: port.toString() }] },
       },
@@ -39,6 +42,7 @@ export class Docker implements DropHandler {
     const port = await getPort();
     const tempdir = mkdtempSync(join(tmpdir(), "spawner-pebble-config-"));
     const certs = await generateCertificates();
+    const imageName = "letsencrypt/pebble:latest";
 
     const pebbleConfig = {
       pebble: {
@@ -54,9 +58,10 @@ export class Docker implements DropHandler {
     };
 
     writeFileSync(join(tempdir, "config.json"), JSON.stringify(pebbleConfig));
+    await this.docker.pull(imageName)
 
     const container = await this.docker.createContainer({
-      Image: "letsencrypt/pebble:latest",
+      Image: imageName,
       HostConfig: {
         PortBindings: { ["443/tcp"]: [{ HostPort: port.toString() }] },
         Binds: [`${tempdir}:/etc/pebble`, `${certs.parentDir()}:/etc/auth`],

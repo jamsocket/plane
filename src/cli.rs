@@ -1,9 +1,10 @@
 use crate::{
+    agent::{AgentOptions, DockerApiTransport, DockerOptions},
     keys::KeyCertPathPair,
     proxy::{ProxyHttpsOptions, ProxyOptions},
 };
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::{net::IpAddr, path::PathBuf};
 
 #[derive(Parser)]
 pub struct Opts {
@@ -40,6 +41,21 @@ pub struct Opts {
     #[clap(long)]
     pub acme_server_url: Option<String>,
 
+    #[clap(long)]
+    pub ip: Option<IpAddr>,
+
+    #[clap(long)]
+    pub host_ip: Option<IpAddr>,
+
+    #[clap(long)]
+    pub docker_runtime: Option<String>,
+
+    #[clap(long)]
+    pub docker_socket: Option<String>,
+
+    #[clap(long)]
+    pub docker_http: Option<String>,
+
     #[clap(subcommand)]
     command: Option<Command>,
 }
@@ -57,12 +73,19 @@ enum Command {
         /// Run the proxy server.
         #[clap(long)]
         proxy: bool,
+
+        /// Run the agent.
+        #[clap(long)]
+        agent: bool,
     },
 }
 
 impl Default for Command {
     fn default() -> Self {
-        Command::Serve { proxy: true }
+        Command::Serve {
+            proxy: true,
+            agent: true,
+        }
     }
 }
 
@@ -71,6 +94,7 @@ impl Default for Command {
 pub enum DronePlan {
     RunService {
         proxy_options: Option<ProxyOptions>,
+        agent_options: Option<AgentOptions>,
     },
     DoMigration {
         db_path: String,
@@ -117,7 +141,7 @@ impl From<Opts> for DronePlan {
                     acme_server_url: opts.acme_server_url.expect("Expected --acme-server-url when using cert command."),
                 }
             },
-            Command::Serve { proxy } => {
+            Command::Serve { proxy, agent } => {
                 let proxy_options = if proxy {
                     let https_options = key_cert_pair.map(|key_cert_pair| ProxyHttpsOptions {
                         key_paths: key_cert_pair,
@@ -126,20 +150,48 @@ impl From<Opts> for DronePlan {
 
                     Some(ProxyOptions {
                         cluster_domain: opts
-                            .cluster_domain
-                            .expect("Expected --cluster-domain if --proxy is provided."),
+                            .cluster_domain.clone()
+                            .expect("Expected --cluster-domain for serving proxy."),
                         db_path: opts
                             .db_path
                             .clone()
-                            .expect("Expected --db-path when using --proxy."),
+                            .expect("Expected --db-path for serving proxy."),
                         http_port: opts.http_port,
                         https_options,
                     })
                 } else {
-                    panic!("Expected at least one of --proxy, --agent, --certloop if `serve` is provided explicitly.")
+                    None
                 };
 
-                DronePlan::RunService { proxy_options }
+                let agent_options = if agent {
+                    let docker_transport = if let Some(docker_socket) = opts.docker_socket {
+                        DockerApiTransport::Socket(docker_socket.clone())
+                    } else if let Some(docker_http) = opts.docker_http {
+                        DockerApiTransport::Http(docker_http.clone())
+                    } else {
+                        DockerApiTransport::default()
+                    };
+
+                    Some(AgentOptions {
+                        cluster_domain: opts.cluster_domain.clone().expect("Expected --cluster-domain for running agent."),
+                        db_path: opts.db_path.clone().expect("Expected --db-path for running agent."),
+                        docker_options: DockerOptions {
+                            runtime: opts.docker_runtime.clone(),
+                            transport: docker_transport,
+                        },
+                        nats_url: opts.nats_url.clone().expect("Expected --nats-url for running agent."),
+                        ip: opts.ip.clone().expect("Expected --ip for running agent."),
+                        host_ip: opts.host_ip.clone().expect("Expected --host-ip for running agent.")
+                    })
+                } else {
+                    None
+                };
+
+                if proxy_options.is_none() && agent_options.is_none() {
+                    panic!("Expected at least one of --proxy, --agent, --certloop if `serve` is provided explicitly.");
+                }
+
+                DronePlan::RunService { proxy_options, agent_options }
             }
         }
     }
@@ -147,6 +199,8 @@ impl From<Opts> for DronePlan {
 
 #[cfg(test)]
 mod test {
+    use crate::agent::{DockerApiTransport, DockerOptions};
+
     use super::*;
     use anyhow::Result;
 
@@ -206,6 +260,8 @@ mod test {
             "mydatabase",
             "--cluster-domain",
             "mycluster.test",
+            "serve",
+            "--proxy",
         ])
         .unwrap();
         assert_eq!(
@@ -215,7 +271,8 @@ mod test {
                     cluster_domain: "mycluster.test".to_string(),
                     http_port: 80,
                     https_options: None,
-                })
+                }),
+                agent_options: None,
             },
             opts
         );
@@ -278,6 +335,12 @@ mod test {
             "mycert.cert",
             "--https-private-key",
             "mycert.key",
+            "--ip",
+            "123.123.123.123",
+            "--host-ip",
+            "56.56.56.56",
+            "--nats-url",
+            "nats://foo@bar",
         ])
         .unwrap();
         assert_eq!(
@@ -293,6 +356,17 @@ mod test {
                         },
                         port: 443
                     }),
+                }),
+                agent_options: Some(AgentOptions {
+                    db_path: "mydatabase".to_string(),
+                    cluster_domain: "mycluster.test".to_string(),
+                    docker_options: DockerOptions {
+                        transport: DockerApiTransport::Socket("/var/run/docker.sock".to_string()),
+                        runtime: None,
+                    },
+                    ip: "123.123.123.123".parse().unwrap(),
+                    host_ip: "56.56.56.56".parse().unwrap(),
+                    nats_url: "nats://foo@bar".to_string(),
                 })
             },
             opts
@@ -314,6 +388,12 @@ mod test {
             "12345",
             "--https-port",
             "12398",
+            "--ip",
+            "123.123.123.123",
+            "--host-ip",
+            "56.56.56.56",
+            "--nats-url",
+            "nats://foo@bar",
         ])
         .unwrap();
         assert_eq!(
@@ -329,6 +409,17 @@ mod test {
                         },
                         port: 12398
                     }),
+                }),
+                agent_options: Some(AgentOptions {
+                    db_path: "mydatabase".to_string(),
+                    cluster_domain: "mycluster.test".to_string(),
+                    docker_options: DockerOptions {
+                        transport: DockerApiTransport::Socket("/var/run/docker.sock".to_string()),
+                        runtime: None,
+                    },
+                    ip: "123.123.123.123".parse().unwrap(),
+                    host_ip: "56.56.56.56".parse().unwrap(),
+                    nats_url: "nats://foo@bar".to_string(),
                 })
             },
             opts
