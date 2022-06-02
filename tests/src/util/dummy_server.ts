@@ -20,7 +20,7 @@ export class DummyServer implements DropHandler {
 
     const port = await getPort()
 
-    return await new Promise((accept, reject) => {
+    return await new Promise((accept) => {
       this.servers.push(app.listen(port, () => {
         accept(port)
       }))
@@ -31,7 +31,7 @@ export class DummyServer implements DropHandler {
     const port = await getPort()
     const server = new WebSocketServer({port})
 
-    server.on('connection', (ws, req) => {
+    server.on('connection', (ws) => {
         ws.on('message', (data) => {
             ws.send(`echo: ${data}`)
         })

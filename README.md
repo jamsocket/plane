@@ -48,7 +48,7 @@ over [NATS](https://nats.io/).
 
 The controller consists of:
 - The **DNS server**, used to manage routing backend-bound traffic to the right drone, as well as to handle
-  [DNS-01 ACME challenges](https://letsencrypt.org/docs/challenge-types/#dns-01-challenge).
+  [ACME challenges](https://letsencrypt.org/docs/challenge-types/#dns-01-challenge).
 - The **scheduler**, which listens for backend requests and picks an available drone to run them on.
 
 The drone consists of:

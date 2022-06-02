@@ -26,7 +26,7 @@ export async function generateCertificates(keyCertPair?: KeyCertPair): Promise<K
 
     mkdirSync(dirname(keyCertPair.certificatePath), { recursive: true })
 
-    let proc = spawn("openssl", [
+    const proc = spawn("openssl", [
         "req",
         "-x509",
         "-nodes",
@@ -52,8 +52,8 @@ export function getModulus(kind: 'rsa' | 'x509', path: string): Buffer {
 }
 
 export function validateCertificateKeyPair(keyCertPair: KeyCertPair): boolean {
-    let keyModulus = getModulus("rsa", keyCertPair.privateKeyPath)
-    let certModulus = getModulus("x509", keyCertPair.certificatePath)
+    const keyModulus = getModulus("rsa", keyCertPair.privateKeyPath)
+    const certModulus = getModulus("x509", keyCertPair.certificatePath)
 
     return keyModulus.compare(certModulus) === 0
 }

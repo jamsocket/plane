@@ -11,7 +11,7 @@ import { WebSocketClient } from './util/websocket.js'
 
 const test = anyTest as TestFn<TestEnvironment>;
 
-test.before(async (t) => {
+test.before(async () => {
     await DroneRunner.build()
 })
 
@@ -28,33 +28,33 @@ test.afterEach.always(async (t) => {
 })
 
 test("Unrecognized host returns a 404", async (t) => {
-    let proxy = await t.context.runner.serve()
+    const proxy = await t.context.runner.serve()
 
-    let result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
+    const result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
         { headers: { 'host': 'foo.bar' }, validateStatus: () => true })
 
     t.is(result.status, 404)
 })
 
 test("Simple request to HTTP server", async (t) => {
-    let proxy = await t.context.runner.serve()
-    let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
+    const proxy = await t.context.runner.serve()
+    const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
     await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
 
-    let result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
+    const result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/`,
         { headers: { 'host': 'foobar.mydomain.test' }, validateStatus: () => true })
     t.is(result.status, 200)
     t.is(result.data, "Hello World!")
 })
 
 test("Host header is set appropriately", async (t) => {
-    let proxy = await t.context.runner.serve()
-    let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
+    const proxy = await t.context.runner.serve()
+    const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
     await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
 
-    let result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/host`,
+    const result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/host`,
         { headers: { 'host': 'foobar.mydomain.test' } })
 
     t.is(result.status, 200)
@@ -62,13 +62,13 @@ test("Host header is set appropriately", async (t) => {
 })
 
 test("SSL provided at startup works", async (t) => {
-    let certs = await generateCertificates()
-    let proxy = await t.context.runner.serve(certs)
-    let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
+    const certs = await generateCertificates()
+    const proxy = await t.context.runner.serve(certs)
+    const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
     await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
 
-    let result = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
+    const result = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
         { headers: { 'host': 'blah.mydomain.test' }, httpsAgent: new https.Agent({ca: certs.getCert()}) })
 
     t.is(result.status, 200)
@@ -76,11 +76,11 @@ test("SSL provided at startup works", async (t) => {
 })
 
 test("WebSockets", async (t) => {
-    let wsPort = await t.context.dummyServer.serveWebSocket()
-    let proxy = await t.context.runner.serve()
+    const wsPort = await t.context.dummyServer.serveWebSocket()
+    const proxy = await t.context.runner.serve()
 
     await t.context.db.addProxy("abcd", `127.0.0.1:${wsPort}`)
-    let client = await WebSocketClient.create(`ws://127.0.0.1:${proxy.httpPort}`, "abcd.mydomain.test")
+    const client = await WebSocketClient.create(`ws://127.0.0.1:${proxy.httpPort}`, "abcd.mydomain.test")
     
     client.send("ok")
     t.is("echo: ok", await client.receive())
@@ -94,8 +94,8 @@ test("WebSockets", async (t) => {
 test("Connection status information is recorded", async (t) => {
     const {runner, dummyServer, db} = t.context
 
-    let proxy = await runner.serve()
-    let dummyServerPort = await dummyServer.serveHelloWorld()
+    const proxy = await runner.serve()
+    const dummyServerPort = await dummyServer.serveHelloWorld()
 
     await db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
     await sleep(1000)
@@ -127,14 +127,14 @@ test("Connection status information is recorded", async (t) => {
 test("Connection status for WebSocket connections", async (t) => {
     const {runner, dummyServer, db} = t.context
 
-    let proxy = await runner.serve()
-    let wsServerPort = await dummyServer.serveWebSocket()
+    const proxy = await runner.serve()
+    const wsServerPort = await dummyServer.serveWebSocket()
 
     await db.addProxy("abcde", `127.0.0.1:${wsServerPort}`)
 
     const lastActive1 = await db.getLastActiveTime("abcde") as number
 
-    let client = await WebSocketClient.create(`ws://127.0.0.1:${proxy.httpPort}`, "abcde.mydomain.test")
+    const client = await WebSocketClient.create(`ws://127.0.0.1:${proxy.httpPort}`, "abcde.mydomain.test")
     await sleep(1000)
 
     const lastActive2 = await db.getLastActiveTime("abcde") as number
@@ -159,14 +159,14 @@ test("Certificate provided after start-up", async (t) => {
     // wait until certificate is available.
     const certs = new KeyCertPair(join(certdir, "proxy-cert.key"), join(certdir, "proxy-cert.pem"))
     
-    let proxy = await t.context.runner.serve(certs)
+    const proxy = await t.context.runner.serve(certs)
 
-    let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
+    const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
     await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
 
     await generateCertificates(certs)
 
-    let result = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
+    const result = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
         { headers: { 'host': 'blah.mydomain.test' }, httpsAgent: new https.Agent({ca: certs.getCert()}) })
 
     t.is(result.status, 200)
@@ -176,13 +176,13 @@ test("Certificate provided after start-up", async (t) => {
 test("Certificate changed while running", async (t) => {
     const certs = await generateCertificates()
 
-    let proxy = await t.context.runner.serve(certs)
+    const proxy = await t.context.runner.serve(certs)
 
-    let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
+    const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
     await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
     const ca1 = certs.getCert();
 
-    let result1 = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
+    const result1 = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
         { headers: { 'host': 'blah.mydomain.test' }, httpsAgent: new https.Agent({ca: ca1}) })
     t.is(result1.status, 200)
 
@@ -190,7 +190,7 @@ test("Certificate changed while running", async (t) => {
     const ca2 = certs.getCert();
     t.not(ca1.toString(), ca2.toString())
 
-    let result2 = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
+    const result2 = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`,
         { headers: { 'host': 'blah.mydomain.test' }, httpsAgent: new https.Agent({ca: ca2}) })
 
 

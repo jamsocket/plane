@@ -1,6 +1,4 @@
-import { rejects } from "assert";
 import { WebSocket } from "ws";
-import { callbackToPromise } from "./promise";
 
 type AcceptRejectPair = [(st: string) => void, (er: Error) => void]
 
@@ -8,7 +6,7 @@ export class WebSocketClient {
     ws: WebSocket
     incomingQueue: Array<string> = []
     promiseQueue: Array<AcceptRejectPair> = []
-    closed: boolean = false
+    closed = false
 
     private constructor(url: string, host: string) {
         this.ws = new WebSocket(url, { headers: { host } })
@@ -18,9 +16,9 @@ export class WebSocketClient {
         const client = new WebSocketClient(url, host)
 
         client.ws.on('message', (msg) => {
-            let decodedMsg = msg.toString('utf8')
+            const decodedMsg = msg.toString('utf8')
             if (client.promiseQueue.length > 0) {
-                let [accept, _] = client.promiseQueue.shift() as AcceptRejectPair
+                const [accept,] = client.promiseQueue.shift() as AcceptRejectPair
                 accept(decodedMsg)
             } else {
                 client.incomingQueue.push(decodedMsg)
@@ -33,13 +31,13 @@ export class WebSocketClient {
             client.ws.on('close', () => {
                 client.closed = true
                 for (const acceptRejectPair of client.promiseQueue) {
-                    let [_, reject] = acceptRejectPair
+                    const [, reject] = acceptRejectPair
                     reject(new Error("WebSocket connection closed."))
                 }
-                
+
                 reject(new Error("WebSocket connection closed before opening."))
             })
-    
+
             client.ws.on('error', (err) => {
                 reject(err)
             })
@@ -48,11 +46,11 @@ export class WebSocketClient {
         return client
     }
 
-    close() {
+    close(): void {
         this.ws.close()
     }
 
-    send(data: string) {
+    send(data: string): void {
         this.ws.send(data)
     }
 
@@ -62,7 +60,7 @@ export class WebSocketClient {
         }
 
         if (this.incomingQueue.length > 0) {
-            return this.incomingQueue.shift() as string
+            return this.incomingQueue.shift()
         }
 
         return new Promise((accept, reject) => {

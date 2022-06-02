@@ -9,11 +9,6 @@ const MANIFEST_PATH = process.env.MANIFEST_PATH || "../Cargo.toml"
 const SPAWNER_PATH = "../target/debug/spawner"
 const CLUSTER_DOMAIN = "mydomain.test"
 
-export async function killProcAndWait(proc: ChildProcess): Promise<void> {
-    proc.kill("SIGTERM")
-    await waitForExit(proc)
-}
-
 export function waitForExit(proc: ChildProcess): Promise<void> {
     return new Promise((accept, reject) => {
         proc.on('exit', () => {
@@ -24,6 +19,11 @@ export function waitForExit(proc: ChildProcess): Promise<void> {
             }
         })
     })
+}
+
+export async function killProcAndWait(proc: ChildProcess): Promise<void> {
+    proc.kill("SIGTERM")
+    await waitForExit(proc)
 }
 
 export interface ServeResult {
@@ -43,7 +43,7 @@ export class DroneRunner implements DropHandler {
     }
 
     static build(): Promise<void> {
-        let proc = spawn("cargo", ['build', '--manifest-path', MANIFEST_PATH], {
+        const proc = spawn("cargo", ['build', '--manifest-path', MANIFEST_PATH], {
             stdio: 'inherit'
         })
 
@@ -51,7 +51,7 @@ export class DroneRunner implements DropHandler {
     }
 
     async migrate() {
-        let proc = spawn(SPAWNER_PATH, [
+        const proc = spawn(SPAWNER_PATH, [
             "--db-path", this.dbPath,
             "--cluster-domain", CLUSTER_DOMAIN,
             "migrate",
@@ -63,7 +63,7 @@ export class DroneRunner implements DropHandler {
     }
 
     async certRefresh(certs: KeyCertPair, natsPort: number, pebble: PebbleResult) {
-        let proc = spawn(SPAWNER_PATH, [
+        const proc = spawn(SPAWNER_PATH, [
             "--nats-url", `localhost:${natsPort}`,
             "--https-private-key", certs.privateKeyPath,
             "--https-certificate", certs.certificatePath,
@@ -81,10 +81,10 @@ export class DroneRunner implements DropHandler {
     }
 
     async serve(certs?: KeyCertPair): Promise<ServeResult> {
-        let httpPort = await getPort()
-        var httpsPort
+        const httpPort = await getPort()
+        let httpsPort
 
-        var args = [
+        const args = [
             "--cluster-domain", CLUSTER_DOMAIN, 
             "--db-path", this.dbPath,
             "--http-port", httpPort.toString(),
@@ -102,7 +102,7 @@ export class DroneRunner implements DropHandler {
 
         args.push("serve", "--proxy")
 
-        let proc = spawn(SPAWNER_PATH, args, {
+        const proc = spawn(SPAWNER_PATH, args, {
             stdio: 'inherit'
         })
 
