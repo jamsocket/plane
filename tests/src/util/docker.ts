@@ -21,9 +21,9 @@ export class Docker implements DropHandler {
 
   async runNats(): Promise<number> {
     const port = await getPort();
-    const imageName = "nats:latest"
+    const imageName = "nats:latest";
 
-    await this.docker.pull(imageName)
+    await this.docker.pull(imageName);
 
     const container = await this.docker.createContainer({
       Image: imageName,
@@ -58,7 +58,7 @@ export class Docker implements DropHandler {
     };
 
     writeFileSync(join(tempdir, "config.json"), JSON.stringify(pebbleConfig));
-    await this.docker.pull(imageName)
+    await this.docker.pull(imageName);
 
     const container = await this.docker.createContainer({
       Image: imageName,
