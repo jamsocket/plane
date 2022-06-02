@@ -1,0 +1,20 @@
+version = 1
+
+[[analyzers]]
+name = "rust"
+enabled = true
+
+  [analyzers.meta]
+  msrv = "1.30.0"
+
+[[analyzers]]
+name = "javascript"
+enabled = true
+
+[[transformers]]
+name = "prettier"
+enabled = true
+
+[[transformers]]
+name = "rustfmt"
+enabled = true
