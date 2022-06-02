@@ -60,7 +60,7 @@ impl CertRefresher {
                     if let (Some(key), Some(cert)) = (&private_key, &certificate) {
                         tracing::info!("Updating key/cert pair.");
 
-                        let private_key = match any_supported_type(&key) {
+                        let private_key = match any_supported_type(key) {
                             Err(err) => {
                                 tracing::warn!(?err, "Key error.");
                                 return;

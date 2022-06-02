@@ -1,10 +1,10 @@
 import { mkdtempSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
-import { DroneDatabase } from "./db"
-import { DroneRunner } from "./runner"
-import { DummyServer } from "./dummy_server"
-import { sleep } from "./sleep"
+import { DroneDatabase } from "./db.js"
+import { DroneRunner } from "./runner.js"
+import { DummyServer } from "./dummy_server.js"
+import { Docker } from "./docker.js"
 
 export interface DropHandler {
     drop(): Promise<void>
@@ -31,7 +31,8 @@ export class TestEnvironment implements DropHandler {
         public db: DroneDatabase,
         public tempdir: TemporaryDirectory,
         public runner: DroneRunner,
-        public dummyServer: DummyServer) {
+        public dummyServer: DummyServer,
+        public docker: Docker) {
     }
 
     static async create(): Promise<TestEnvironment> {
@@ -44,12 +45,14 @@ export class TestEnvironment implements DropHandler {
         const dummyServer = new DummyServer()
         const db = await DroneDatabase.create(dbPath)
 
-        return new TestEnvironment(db, tempdir, runner, dummyServer)
+        const docker = new Docker()
+        return new TestEnvironment(db, tempdir, runner, dummyServer, docker)
     }
 
     async drop() {
         await this.runner.drop()
         await this.tempdir.drop()
         await this.dummyServer.drop()
+        await this.docker.drop()
     }
 }

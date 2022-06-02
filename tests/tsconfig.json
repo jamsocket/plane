@@ -1,5 +1,12 @@
 {
-    "compilerOptions": {
-        "strict": true
-    }
+	"compilerOptions": {
+		"outDir": "dist",
+		"sourceMap": true,
+        "allowSyntheticDefaultImports": true,
+        "module": "ES2020",
+        "moduleResolution": "node"
+	},
+	"include": [
+		"src"
+	]
 }

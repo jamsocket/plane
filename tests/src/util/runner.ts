@@ -1,8 +1,9 @@
 import { ChildProcess, spawn } from "child_process"
-import { DropHandler } from "./environment";
-import { KeyCertPair } from "./certificates";
-import { sleep } from "./sleep";
-import { assignPort } from "./ports";
+import { DropHandler } from "./environment.js";
+import { KeyCertPair } from "./certificates.js";
+import { sleep } from "./sleep.js";
+import { PebbleResult } from "./docker.js";
+import getPort from "@ava/get-port"
 
 const MANIFEST_PATH = process.env.MANIFEST_PATH || "../Cargo.toml"
 const SPAWNER_PATH = "../target/debug/spawner"
@@ -61,22 +62,26 @@ export class DroneRunner implements DropHandler {
         await waitForExit(proc)
     }
 
-    async certRefresh(certs: KeyCertPair) {
+    async certRefresh(certs: KeyCertPair, natsPort: number, pebble: PebbleResult) {
         let proc = spawn(SPAWNER_PATH, [
-            "--nats-host", "localhost:1234",
+            "--nats-url", `localhost:${natsPort}`,
             "--https-private-key", certs.privateKeyPath,
             "--https-certificate", certs.certificatePath,
             "--cluster-domain", CLUSTER_DOMAIN,
+            "--acme-server-url", `https://localhost:${pebble.port}/dir`,
             "cert",
         ], {
-            stdio: 'inherit'
+            stdio: 'inherit',
+            env: {
+                SPAWNER_TEST_ALLOWED_CERTIFICATE: pebble.cert,
+            }
         })
 
         await waitForExit(proc)
     }
 
     async serve(certs?: KeyCertPair): Promise<ServeResult> {
-        const httpPort = assignPort()
+        let httpPort = await getPort()
         var httpsPort
 
         var args = [
@@ -86,7 +91,7 @@ export class DroneRunner implements DropHandler {
         ]
 
         if (certs !== undefined) {
-            httpsPort = assignPort()
+            httpsPort = await getPort()
 
             args.push(
                 "--https-port", httpsPort.toString(),

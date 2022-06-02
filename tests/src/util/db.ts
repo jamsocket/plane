@@ -1,15 +1,14 @@
-import { Database, open } from 'sqlite'
-import * as sqlite3 from 'sqlite3'
+import * as sqlite from 'sqlite'
+import sqlite3 from 'sqlite3'
 
 export class DroneDatabase {
-    private constructor(private db: Database) {}
+    private constructor(private db: sqlite.Database) {}
 
     static async create(path: string): Promise<DroneDatabase> {
-        const db = await open({
+        const db = await sqlite.open({
             filename: path,
             driver: sqlite3.Database,
         })
-
         return new DroneDatabase(db)
     }
 

@@ -4,15 +4,21 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+acme2 = "0.5.1"
 anyhow = "1.0.57"
 clap = { version = "3.1.18", features = ["derive"] }
 dashmap = "5.3.4"
 futures = "0.3.21"
 http = "0.2.7"
 hyper = { version = "0.14.19", features = ["server", "client", "http1", "http2", "tcp"] }
+nats = "0.20.1"
 notify = "5.0.0-pre.15"
+openssl = "0.10.40"
+reqwest = "0.11.10"
 rustls = "0.20.6"
 rustls-pemfile = "1.0.0"
+serde = { version = "1.0.137", features = ["derive"] }
+serde_json = "1.0.81"
 sqlx = { version = "0.5.13", features = ["runtime-tokio-rustls", "sqlite", "migrate", "macros", "offline"] }
 tokio = { version = "1.18.2", features = ["full"] }
 tokio-rustls = "0.23.4"

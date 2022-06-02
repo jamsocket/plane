@@ -1,14 +1,13 @@
-import * as express from "express"
+import express from "express"
 import { Server } from "http"
 import { WebSocketServer } from "ws"
 import { DropHandler } from "./environment"
-import { assignPort } from "./ports"
-import { callbackToPromise } from "./promise"
+import getPort from "@ava/get-port"
 
 export class DummyServer implements DropHandler {
   servers: Array<Server | WebSocketServer> = []
 
-  serveHelloWorld(): Promise<number> {
+  async serveHelloWorld(): Promise<number> {
     const app = express()
 
     app.get('/', (req, res) => {
@@ -19,17 +18,17 @@ export class DummyServer implements DropHandler {
       res.send(req.hostname)
     })
 
-    const port = assignPort()
+    const port = await getPort()
 
-    return new Promise((accept, reject) => {
+    return await new Promise((accept, reject) => {
       this.servers.push(app.listen(port, () => {
         accept(port)
       }))
     })
   }
 
-  serveWebSocket(): number {
-    const port = assignPort()
+  async serveWebSocket(): Promise<number> {
+    const port = await getPort()
     const server = new WebSocketServer({port})
 
     server.on('connection', (ws, req) => {

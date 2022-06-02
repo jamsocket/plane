@@ -1,5 +1,6 @@
 use crate::database::DroneDatabase;
 use anyhow::Result;
+use cert::refresh_certificate;
 use clap::Parser;
 use cli::{DronePlan, Opts};
 use keys::KeyCertPathPair;
@@ -12,9 +13,13 @@ use tracing_subscriber::{
     prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
 
+mod cert;
 mod cli;
 mod database;
 mod keys;
+mod messages;
+#[allow(unused)]
+mod nats;
 mod proxy;
 
 fn init_tracing() -> Result<()> {
@@ -54,7 +59,14 @@ async fn main() -> Result<()> {
         DronePlan::DoMigration { db_path } => {
             get_db(&db_path).await?;
         }
-        DronePlan::DoCertificateRefresh { .. } => todo!(),
+        DronePlan::DoCertificateRefresh {
+            acme_server_url,
+            cluster_domain,
+            key_paths,
+            nats_url,
+        } => {
+            refresh_certificate(&cluster_domain, &nats_url, &key_paths, &acme_server_url).await?;
+        }
     }
     Ok(())
 }

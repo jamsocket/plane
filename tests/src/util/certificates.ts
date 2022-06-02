@@ -1,13 +1,17 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import { mkdirSync, mkdtempSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
-import { waitForExit } from "./runner";
+import { waitForExit } from "./runner.js";
 
 export class KeyCertPair {
     constructor(
         public privateKeyPath: string,
         public certificatePath: string) { }
+
+    parentDir(): string {
+        return dirname(this.certificatePath)
+    }
 
     getCert(): Buffer {
         return readFileSync(this.certificatePath)
@@ -31,7 +35,7 @@ export async function generateCertificates(keyCertPair?: KeyCertPair): Promise<K
         "-subj",
         "/C=US/ST=New York/L=Brooklyn/O=Drifting in Space Corp./CN=mydomain.test",
         "-addext",
-        "subjectAltName = DNS:*.mydomain.test",
+        "subjectAltName = DNS:*.mydomain.test, DNS:localhost",
         "-keyout",
         keyCertPair.privateKeyPath,
         "-out",
@@ -41,4 +45,15 @@ export async function generateCertificates(keyCertPair?: KeyCertPair): Promise<K
     await waitForExit(proc)
 
     return keyCertPair
+}
+
+export function getModulus(kind: 'rsa' | 'x509', path: string): Buffer {
+    return execSync(`openssl ${kind} -modulus -noout -in ${path}`)
+}
+
+export function validateCertificateKeyPair(keyCertPair: KeyCertPair): boolean {
+    let keyModulus = getModulus("rsa", keyCertPair.privateKeyPath)
+    let certModulus = getModulus("x509", keyCertPair.certificatePath)
+
+    return keyModulus.compare(certModulus) === 0
 }

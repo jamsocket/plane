@@ -35,11 +35,10 @@ pub struct Opts {
 
     /// Hostname for connecting to NATS.
     #[clap(long)]
-    pub nats_host: Option<String>,
+    pub nats_url: Option<String>,
 
-    /// Authorization token for connecting to NATS.
     #[clap(long)]
-    pub nats_token: Option<String>,
+    pub acme_server_url: Option<String>,
 
     #[clap(subcommand)]
     command: Option<Command>,
@@ -67,12 +66,6 @@ impl Default for Command {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub struct NatsConfig {
-    host: String,
-    token: Option<String>,
-}
-
 #[allow(unused)]
 #[derive(PartialEq, Debug)]
 pub enum DronePlan {
@@ -84,8 +77,9 @@ pub enum DronePlan {
     },
     DoCertificateRefresh {
         cluster_domain: String,
-        nats_config: NatsConfig,
+        nats_url: String,
         key_paths: KeyCertPathPair,
+        acme_server_url: String,
     },
 }
 
@@ -118,11 +112,9 @@ impl From<Opts> for DronePlan {
             Command::Cert => {
                 DronePlan::DoCertificateRefresh {
                     cluster_domain: opts.cluster_domain.expect("Expected --cluster-domain when using cert command."),
-                    nats_config: NatsConfig {
-                        host: opts.nats_host.expect("Expected --nats-host when using cert command."),
-                        token: opts.nats_token
-                    },
-                    key_paths: key_cert_pair.expect("Expected --https-certificate and --https-private-key to point to location to write cert and key.")
+                    nats_url: opts.nats_url.expect("Expected --nats-host when using cert command."),
+                    key_paths: key_cert_pair.expect("Expected --https-certificate and --https-private-key to point to location to write cert and key."),
+                    acme_server_url: opts.acme_server_url.expect("Expected --acme-server-url when using cert command."),
                 }
             },
             Command::Serve { proxy } => {
@@ -184,24 +176,24 @@ mod test {
             "mycert.cert",
             "--https-private-key",
             "mycert.key",
-            "--nats-host",
-            "localhost",
+            "--nats-url",
+            "nats://foo@bar",
             "--cluster-domain",
             "mydomain.test",
+            "--acme-server-url",
+            "https://acme.server/dir",
             "cert",
         ])
         .unwrap();
         assert_eq!(
             DronePlan::DoCertificateRefresh {
                 cluster_domain: "mydomain.test".to_string(),
-                nats_config: NatsConfig {
-                    host: "localhost".to_string(),
-                    token: None
-                },
+                nats_url: "nats://foo@bar".to_string(),
                 key_paths: KeyCertPathPair {
                     private_key_path: PathBuf::from("mycert.key"),
                     certificate_path: PathBuf::from("mycert.cert"),
-                }
+                },
+                acme_server_url: "https://acme.server/dir".to_string(),
             },
             opts
         );

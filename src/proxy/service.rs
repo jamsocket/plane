@@ -1,3 +1,4 @@
+use super::connection_tracker::ConnectionTracker;
 use crate::database::DroneDatabase;
 use anyhow::{anyhow, Result};
 use http::uri::{Authority, Scheme};
@@ -13,8 +14,6 @@ use std::{
     pin::Pin,
     task::Poll,
 };
-
-use super::connection_tracker::ConnectionTracker;
 
 const UPGRADE: &str = "upgrade";
 
@@ -167,7 +166,12 @@ impl ProxyService {
                     *req.uri_mut() = Self::rewrite_uri(&addr, req.uri())?;
 
                     if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
-                        if connection.to_str().unwrap_or_default().to_lowercase() == UPGRADE {
+                        if connection
+                            .to_str()
+                            .unwrap_or_default()
+                            .to_lowercase()
+                            .contains(UPGRADE)
+                        {
                             return self.handle_upgrade(req, &subdomain).await;
                         }
                     }

@@ -3,11 +3,11 @@ import axios from 'axios'
 import { mkdirSync } from 'fs'
 import * as https from 'https'
 import { join } from "path"
-import { generateCertificates, KeyCertPair } from './util/certificates'
-import { TestEnvironment } from './util/environment'
-import { DroneRunner } from './util/runner'
-import { sleep } from './util/sleep'
-import { WebSocketClient } from './util/websocket'
+import { generateCertificates, KeyCertPair } from './util/certificates.js'
+import { TestEnvironment } from './util/environment.js'
+import { DroneRunner } from './util/runner.js'
+import { sleep } from './util/sleep.js'
+import { WebSocketClient } from './util/websocket.js'
 
 const test = anyTest as TestFn<TestEnvironment>;
 
@@ -20,7 +20,11 @@ test.beforeEach(async (t) => {
 })
 
 test.afterEach.always(async (t) => {
-    await t.context.drop()
+    // If something crashes during beforeEach, this is still called.
+    // t.context will still have its initial value of {}
+    if (t.context instanceof TestEnvironment) {
+        await t.context.drop()
+    }    
 })
 
 test("Unrecognized host returns a 404", async (t) => {
@@ -59,7 +63,6 @@ test("Host header is set appropriately", async (t) => {
 
 test("SSL provided at startup works", async (t) => {
     let certs = await generateCertificates()
-
     let proxy = await t.context.runner.serve(certs)
     let dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
@@ -73,7 +76,7 @@ test("SSL provided at startup works", async (t) => {
 })
 
 test("WebSockets", async (t) => {
-    let wsPort = t.context.dummyServer.serveWebSocket()
+    let wsPort = await t.context.dummyServer.serveWebSocket()
     let proxy = await t.context.runner.serve()
 
     await t.context.db.addProxy("abcd", `127.0.0.1:${wsPort}`)
