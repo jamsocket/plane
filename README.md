@@ -3,7 +3,7 @@
 **Spawner** allows web applications to create [**session-lived backends**](https://driftingin.space/posts/session-lived-application-backends),
 which are server processes dedicated to individual (or small groups of) users.
 
-*Spawner is undergoing rapid development and the API may change. The original version of Spawner was based on Kubernetes. It's available in the [original-kubernetes-based-spawner](https://github.com/drifting-in-space/spawner/tree/original-kubernetes-based-spawner) branch.*
+_Spawner is undergoing rapid development and the API may change. The original version of Spawner was based on Kubernetes. It's available in the [original-kubernetes-based-spawner](https://github.com/drifting-in-space/spawner/tree/original-kubernetes-based-spawner) branch._
 
 The server processes can be any server that speaks HTTP, including WebSocket servers. Spawner provides
 an API for spinning these servers up when a new user connects, and automatically terminates
@@ -47,11 +47,13 @@ Spawner consists of two main pieces, the **controller** and the **drone**, which
 over [NATS](https://nats.io/).
 
 The controller consists of:
+
 - The **DNS server**, used to manage routing backend-bound traffic to the right drone, as well as to handle
   [ACME challenges](https://letsencrypt.org/docs/challenge-types/#dns-01-challenge).
 - The **scheduler**, which listens for backend requests and picks an available drone to run them on.
 
 The drone consists of:
+
 - An **agent**, which receives instructions from the scheduler to run backends and coordinates with the
   Docker daemon to run them.
 - A **proxy**, which routes incoming HTTPS traffic to the appropriate backend.
