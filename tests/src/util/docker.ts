@@ -5,6 +5,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { generateCertificates } from "./certificates.js";
 import getPort from "@ava/get-port";
+import { callbackToPromise } from "./promise.js";
 
 export interface PebbleResult {
   port: number;
@@ -19,22 +20,27 @@ export class Docker implements DropHandler {
     this.docker = new Dockerode();
   }
 
+  async runContainer(createContainerOpts: Dockerode.ContainerCreateOptions): Promise<Dockerode.Container> {
+    const createImageStream = await this.docker.createImage({ fromImage: createContainerOpts.Image });
+    await callbackToPromise((accept) => this.docker.modem.followProgress(createImageStream, accept));
+
+    const container = await this.docker.createContainer(createContainerOpts)
+    await container.start()
+    this.containers.push(container);
+
+    return container
+  }
+
   async runNats(): Promise<number> {
     const port = await getPort();
     const imageName = "docker.io/nats:2.8";
 
-    let image = await this.docker.createImage({ fromImage: imageName });
-    console.log("image", image);
-
-    const container = await this.docker.createContainer({
+    await this.runContainer({
       Image: imageName,
       HostConfig: {
         PortBindings: { ["4222/tcp"]: [{ HostPort: port.toString() }] },
       },
     });
-
-    await container.start();
-    this.containers.push(container);
 
     return port;
   }
@@ -59,9 +65,8 @@ export class Docker implements DropHandler {
     };
 
     writeFileSync(join(tempdir, "config.json"), JSON.stringify(pebbleConfig));
-    await this.docker.createImage({ fromImage: imageName });
-
-    const container = await this.docker.createContainer({
+    
+    await this.runContainer({
       Image: imageName,
       HostConfig: {
         PortBindings: { ["443/tcp"]: [{ HostPort: port.toString() }] },
@@ -73,9 +78,6 @@ export class Docker implements DropHandler {
       },
       Cmd: ["/usr/bin/pebble", "-config", "/etc/pebble/config.json"],
     });
-
-    await container.start();
-    this.containers.push(container);
 
     return {
       port,
