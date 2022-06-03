@@ -24,9 +24,9 @@ export class Docker implements DropHandler {
     const imageName = "docker.io/nats:2.8";
 
     console.log("about to pull");
-    await this.docker.pull(imageName);
+    let image = await this.docker.pull(imageName);
 
-    console.log("about to run");
+    console.log("about to run", image);
     const container = await this.docker.createContainer({
       Image: imageName,
       HostConfig: {
