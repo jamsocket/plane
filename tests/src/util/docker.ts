@@ -21,7 +21,7 @@ export class Docker implements DropHandler {
 
   async runNats(): Promise<number> {
     const port = await getPort();
-    const imageName = "docker.io/nats:latest";
+    const imageName = "docker.io/nats:2.8";
 
     await this.docker.pull(imageName);
 
