@@ -20,15 +20,21 @@ export class Docker implements DropHandler {
     this.docker = new Dockerode();
   }
 
-  async runContainer(createContainerOpts: Dockerode.ContainerCreateOptions): Promise<Dockerode.Container> {
-    const createImageStream = await this.docker.createImage({ fromImage: createContainerOpts.Image });
-    await callbackToPromise((accept) => this.docker.modem.followProgress(createImageStream, accept));
+  async runContainer(
+    createContainerOpts: Dockerode.ContainerCreateOptions
+  ): Promise<Dockerode.Container> {
+    const createImageStream = await this.docker.createImage({
+      fromImage: createContainerOpts.Image,
+    });
+    await callbackToPromise((accept) =>
+      this.docker.modem.followProgress(createImageStream, accept)
+    );
 
-    const container = await this.docker.createContainer(createContainerOpts)
-    await container.start()
+    const container = await this.docker.createContainer(createContainerOpts);
+    await container.start();
     this.containers.push(container);
 
-    return container
+    return container;
   }
 
   async runNats(): Promise<number> {
@@ -65,7 +71,7 @@ export class Docker implements DropHandler {
     };
 
     writeFileSync(join(tempdir, "config.json"), JSON.stringify(pebbleConfig));
-    
+
     await this.runContainer({
       Image: imageName,
       HostConfig: {

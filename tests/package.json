@@ -1,42 +1,42 @@
 {
-	"scripts": {
-		"build": "tsc",
-		"test": "tsc && ava --timeout=30s --match='Generate certificate'"
-	},
-	"devDependencies": {
-		"@types/express": "^4.17.13",
-		"@types/ws": "^8.5.3",
-		"ava": "^4.2.0"
-	},
-	"type": "module",
-	"ava": {
-		"require": [
-			"ts-node/register/transpile-only"
-		],
-		"files": [
-			"!dist/**"
-		],
-		"typescript": {
-			"compile": false,
-			"rewritePaths": {
-				"src/": "dist/"
-			}
-		}
-	},
-	"dependencies": {
-		"@ava/get-port": "^1.0.0",
-		"@ava/typescript": "^3.0.1",
-		"@types/dockerode": "^3.3.9",
-		"@types/node": "^17.0.36",
-		"@types/sqlite3": "^3.1.8",
-		"axios": "^0.27.2",
-		"dockerode": "^3.3.1",
-		"express": "^4.18.1",
-		"nats": "^2.7.1",
-		"sqlite": "^4.1.1",
-		"sqlite3": "^5.0.8",
-		"ts-node": "^10.8.0",
-		"typescript": "^4.7.2",
-		"ws": "^8.7.0"
-	}
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && ava --timeout=30s --match='Generate certificate'"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.13",
+    "@types/ws": "^8.5.3",
+    "ava": "^4.2.0"
+  },
+  "type": "module",
+  "ava": {
+    "require": [
+      "ts-node/register/transpile-only"
+    ],
+    "files": [
+      "!dist/**"
+    ],
+    "typescript": {
+      "compile": false,
+      "rewritePaths": {
+        "src/": "dist/"
+      }
+    }
+  },
+  "dependencies": {
+    "@ava/get-port": "^1.0.0",
+    "@ava/typescript": "^3.0.1",
+    "@types/dockerode": "^3.3.9",
+    "@types/node": "^17.0.36",
+    "@types/sqlite3": "^3.1.8",
+    "axios": "^0.27.2",
+    "dockerode": "^3.3.1",
+    "express": "^4.18.1",
+    "nats": "^2.7.1",
+    "sqlite": "^4.1.1",
+    "sqlite3": "^5.0.8",
+    "ts-node": "^10.8.0",
+    "typescript": "^4.7.2",
+    "ws": "^8.7.0"
+  }
 }
