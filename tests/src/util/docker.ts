@@ -23,10 +23,8 @@ export class Docker implements DropHandler {
     const port = await getPort();
     const imageName = "docker.io/nats:2.8";
 
-    console.log("about to pull");
-    let image = await this.docker.pull(imageName);
+    await this.docker.createImage({fromImage:imageName});
 
-    console.log("about to run", image);
     const container = await this.docker.createContainer({
       Image: imageName,
       HostConfig: {
@@ -60,7 +58,7 @@ export class Docker implements DropHandler {
     };
 
     writeFileSync(join(tempdir, "config.json"), JSON.stringify(pebbleConfig));
-    await this.docker.pull(imageName);
+    await this.docker.createImage({fromImage:imageName});
 
     const container = await this.docker.createContainer({
       Image: imageName,
