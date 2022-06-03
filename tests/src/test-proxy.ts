@@ -116,7 +116,7 @@ test("Connection status information is recorded", async (t) => {
     headers: { host: "foobar.mydomain.test" },
   })
 
-  await sleep(1500)
+  await sleep(2000)
 
   const lastActive2 = (await db.getLastActiveTime("foobar")) as number
   t.assert(
@@ -160,7 +160,7 @@ test("Connection status for WebSocket connections", async (t) => {
     `ws://127.0.0.1:${proxy.httpPort}`,
     "abcde.mydomain.test"
   )
-  await sleep(1000)
+  await sleep(2000)
 
   const lastActive2 = (await db.getLastActiveTime("abcde")) as number
   t.assert(

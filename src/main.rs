@@ -19,9 +19,9 @@ mod cli;
 mod database;
 mod keys;
 mod messages;
-#[allow(unused)]
 mod nats;
 mod proxy;
+mod types;
 
 fn init_tracing() -> Result<()> {
     let filter_layer =
