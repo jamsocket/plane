@@ -4,59 +4,96 @@
 
 use anyhow::Result;
 use nats::asynk::{Connection, Message, Subscription};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Serialize, Deserialize};
 use std::marker::PhantomData;
 
-pub trait TypedSubject: Serialize + DeserializeOwned {
-    type Response: Serialize + DeserializeOwned;
+#[derive(Serialize, Deserialize)]
+pub enum NoReply {}
 
-    fn subject(&self) -> String;
+pub struct Subject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+    subject: String,
+    _ph_m: PhantomData<M>,
+    _ph_r: PhantomData<R>,
 }
 
-pub struct MessageWithResponseHandle<T>
+impl<M, R> Subject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+    pub fn new(subject: String) -> Subject<M, R> {
+        Subject {
+            subject,
+            _ph_m: PhantomData::default(),
+            _ph_r: PhantomData::default(),
+        }
+    }
+}
+
+pub struct SubscribeSubject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+    subject: String,
+    _ph_m: PhantomData<M>,
+    _ph_r: PhantomData<R>,
+}
+
+impl<M, R> SubscribeSubject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+    pub fn new(subject: String) -> SubscribeSubject<M, R> {
+        SubscribeSubject {
+            subject,
+            _ph_m: PhantomData::default(),
+            _ph_r: PhantomData::default(),
+        }
+    }
+}
+
+pub struct MessageWithResponseHandle<T, R>
 where
-    T: TypedSubject,
+    T: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
 {
     pub value: T,
     message: Message,
+    _ph: PhantomData<R>,
 }
 
-impl<T> MessageWithResponseHandle<T>
+impl<T, R> MessageWithResponseHandle<T, R>
 where
-    T: TypedSubject,
+    T: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
 {
     fn new(message: Message) -> Result<Self> {
         Ok(MessageWithResponseHandle {
             value: serde_json::from_slice(&message.data)?,
             message,
+            _ph: PhantomData::default(),
         })
     }
 
-    pub async fn respond(&self, response: &T::Response) -> Result<()> {
+    pub async fn respond(&self, response: &R) -> Result<()> {
         Ok(self.message.respond(&serde_json::to_vec(response)?).await?)
     }
 }
 
-pub struct TypedSubscription<T>
+pub struct TypedSubscription<T, R>
 where
-    T: TypedSubject,
+    T: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
 {
     subscription: Subscription,
-    _ph: PhantomData<T>,
+    _ph_t: PhantomData<T>,
+    _ph_r: PhantomData<R>,
 }
 
-impl<T> TypedSubscription<T>
+impl<T, R> TypedSubscription<T, R>
 where
-    T: TypedSubject,
+    T: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
 {
     fn new(subscription: Subscription) -> Self {
         TypedSubscription {
             subscription,
-            _ph: PhantomData::default(),
+            _ph_r: PhantomData::default(),
+            _ph_t: PhantomData::default()
         }
     }
 
-    pub async fn next(&mut self) -> Result<Option<MessageWithResponseHandle<T>>> {
+    pub async fn next(&mut self) -> Result<Option<MessageWithResponseHandle<T, R>>> {
         if let Some(message) = self.subscription.next().await {
             Ok(Some(MessageWithResponseHandle::new(message)?))
         } else {
@@ -80,34 +117,33 @@ impl TypedNats {
         TypedNats { nc }
     }
 
-    pub async fn publish<T>(&self, value: &T) -> Result<()>
-    where
-        T: TypedSubject<Response = ()>,
+    pub async fn publish<T>(&self, subject: &Subject<T, NoReply>, value: &T) -> Result<()>
+    where T: Serialize + DeserializeOwned
     {
         self.nc
-            .publish(&value.subject(), serde_json::to_vec(value)?)
+            .publish(&subject.subject, serde_json::to_vec(value)?)
             .await?;
         Ok(())
     }
 
-    pub async fn request<T>(&self, value: &T) -> Result<T::Response>
+    pub async fn request<T, R>(&self, subject: &Subject<T, R>, value: &T) -> Result<R>
     where
-        T: TypedSubject,
+        T: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned
     {
         let result = self
             .nc
-            .request(&value.subject(), serde_json::to_vec(value)?)
+            .request(&subject.subject, serde_json::to_vec(value)?)
             .await?;
 
-        let value: T::Response = serde_json::from_slice(&result.data)?;
+        let value: R = serde_json::from_slice(&result.data)?;
         Ok(value)
     }
 
-    pub async fn subscribe<T>(&self, subject: &str) -> Result<TypedSubscription<T>>
-    where
-        T: TypedSubject,
-    {
-        let subscription = self.nc.subscribe(subject).await?;
-        Ok(TypedSubscription::new(subscription))
-    }
+    // pub async fn subscribe<T>(&self, subject: &T) -> Result<TypedSubscription<T>>
+    // where
+    //     T: TypedPublishSubject
+    // {
+    //     let subscription = self.nc.subscribe(&subject.subject()).await?;
+    //     Ok(TypedSubscription::new(subscription))
+    // }
 }
