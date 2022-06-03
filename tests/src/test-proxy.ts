@@ -116,7 +116,7 @@ test("Connection status information is recorded", async (t) => {
     headers: { host: "foobar.mydomain.test" },
   })
 
-  await sleep(1000)
+  await sleep(1500)
 
   const lastActive2 = (await db.getLastActiveTime("foobar")) as number
   t.assert(
