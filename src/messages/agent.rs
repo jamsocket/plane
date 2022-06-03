@@ -1,6 +1,7 @@
-use crate::{types::DroneId, nats::{Subject, SubscribeSubject}};
+use crate::{nats::{Subject, NoReply}, types::{DroneId, BackendId}};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration, net::IpAddr};
+use std::{collections::HashMap, net::IpAddr, time::Duration};
 
 /// A request from a drone to connect to the platform.
 #[derive(Serialize, Deserialize, Debug)]
@@ -30,16 +31,13 @@ impl DroneConnectRequest {
 
 /// A message telling a drone to spawn a backend.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct SpawnMessage {
+pub struct SpawnRequest {
     /// The container image to run.
     pub image: String,
 
-    /// The drone to spawn the backend on.
-    pub drone_name: String,
-
     /// The name of the backend. This forms part of the hostname used to
     /// connect to the drone.
-    pub backend_name: String,
+    pub backend_id: BackendId,
 
     /// The timeout after which the drone is shut down if no connections are made.
     pub max_idle_time: Duration,
@@ -51,17 +49,63 @@ pub struct SpawnMessage {
     pub metadata: HashMap<String, String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub enum SpawnResult {
-
+impl SpawnRequest {
+    pub fn subject(drone_id: DroneId) -> Subject<SpawnRequest, bool> {
+        Subject::new(format!("drone.{}.spawn", drone_id.id()))
+    }
 }
 
-impl SpawnMessage {
-    pub fn subject(drone_name: &str) -> Subject<SpawnMessage, SpawnResult> {
-        Subject::new(format!("drone.{}.spawn", drone_name))
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum BackendState {
+    /// The backend has been created, and the image is being fetched.
+    Loading,
+
+    /// A failure occured while loading the image.
+    ErrorLoading,
+
+    /// The image has been fetched and is running, but is not yet listening
+    /// on a port.
+    Starting,
+
+    /// A failure occured while starting the container.
+    ErrorStarting,
+
+    /// The container is listening on the expected port.
+    Ready,
+
+    /// A timeout occurred becfore the container was ready.
+    TimedOutBeforeReady,
+
+    /// The container exited on its own initiative with a non-zero status.
+    Failed,
+
+    /// The container exited on its own initiative with a zero status.
+    Exited,
+
+    /// The container was terminated because all connections were closed.
+    Swept,
+}
+
+/// An message representing a change in the state of a backend.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BackendStateMessage {
+    /// The new state.
+    pub state: BackendState,
+
+    /// The time the state change was observed.
+    pub time: DateTime<Utc>,
+}
+
+impl BackendStateMessage {
+    /// Construct a status message using the current time as its timestamp.
+    pub fn new(state: BackendState) -> Self {
+        BackendStateMessage {
+            state,
+            time: Utc::now(),
+        }
     }
 
-    pub fn glob_subject() -> SubscribeSubject<SpawnMessage, SpawnResult> {
-        SubscribeSubject::new("drone.*.spawn".to_string())
+    pub fn subject(backend_id: BackendId) -> Subject<BackendStateMessage, NoReply> {
+        Subject::new(format!("backend.{}.status", backend_id.id()))
     }
 }

@@ -1,8 +1,12 @@
+use std::pin::Pin;
+
 use crate::database::DroneDatabase;
+use agent::run_agent;
 use anyhow::Result;
 use cert::refresh_certificate;
 use clap::Parser;
 use cli::{DronePlan, Opts};
+use futures::{future::select_all, Future};
 use keys::KeyCertPathPair;
 use proxy::serve;
 use sqlx::{
@@ -56,9 +60,18 @@ async fn main() -> Result<()> {
             proxy_options,
             agent_options,
         } => {
+            let mut futs: Vec<Pin<Box<dyn Future<Output = Result<()>>>>> = vec![];
+
             if let Some(proxy_options) = proxy_options {
-                serve(proxy_options).await?;
+                futs.push(Box::pin(serve(proxy_options)));
             }
+
+            if let Some(agent_options) = agent_options {
+                futs.push(Box::pin(run_agent(agent_options)))
+            }
+
+            let (result, _, _) = select_all(futs.into_iter()).await;
+            result?;
         }
         DronePlan::DoMigration { db_path } => {
             get_db(&db_path).await?;

@@ -28,7 +28,7 @@ test.afterEach.always(async (t) => {
 })
 
 test("Unrecognized host returns a 404", async (t) => {
-  const proxy = await t.context.runner.serve()
+  const proxy = await t.context.runner.runProxy()
 
   const result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/`, {
     headers: { host: "foo.bar" },
@@ -39,7 +39,7 @@ test("Unrecognized host returns a 404", async (t) => {
 })
 
 test("Simple request to HTTP server", async (t) => {
-  const proxy = await t.context.runner.serve()
+  const proxy = await t.context.runner.runProxy()
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
   await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
@@ -53,7 +53,7 @@ test("Simple request to HTTP server", async (t) => {
 })
 
 test("Host header is set appropriately", async (t) => {
-  const proxy = await t.context.runner.serve()
+  const proxy = await t.context.runner.runProxy()
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
   await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
@@ -68,7 +68,7 @@ test("Host header is set appropriately", async (t) => {
 
 test("SSL provided at startup works", async (t) => {
   const certs = await generateCertificates()
-  const proxy = await t.context.runner.serve(certs)
+  const proxy = await t.context.runner.runProxy(certs)
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
   await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
@@ -84,7 +84,7 @@ test("SSL provided at startup works", async (t) => {
 
 test("WebSockets", async (t) => {
   const wsPort = await t.context.dummyServer.serveWebSocket()
-  const proxy = await t.context.runner.serve()
+  const proxy = await t.context.runner.runProxy()
 
   await t.context.db.addProxy("abcd", `127.0.0.1:${wsPort}`)
   const client = await WebSocketClient.create(
@@ -104,7 +104,7 @@ test("WebSockets", async (t) => {
 test("Connection status information is recorded", async (t) => {
   const { runner, dummyServer, db } = t.context
 
-  const proxy = await runner.serve()
+  const proxy = await runner.runProxy()
   const dummyServerPort = await dummyServer.serveHelloWorld()
 
   await db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
@@ -121,7 +121,7 @@ test("Connection status information is recorded", async (t) => {
   const lastActive2 = (await db.getLastActiveTime("foobar")) as number
   t.assert(
     lastActive2 > lastActive1,
-    "After activity, last active time should not be null."
+    "After activity, last active time should have increased."
   )
 
   await sleep(2000)
@@ -149,7 +149,7 @@ test("Connection status information is recorded", async (t) => {
 test("Connection status for WebSocket connections", async (t) => {
   const { runner, dummyServer, db } = t.context
 
-  const proxy = await runner.serve()
+  const proxy = await runner.runProxy()
   const wsServerPort = await dummyServer.serveWebSocket()
 
   await db.addProxy("abcde", `127.0.0.1:${wsServerPort}`)
@@ -197,7 +197,7 @@ test("Certificate provided after start-up", async (t) => {
     join(certdir, "proxy-cert.pem")
   )
 
-  const proxy = await t.context.runner.serve(certs)
+  const proxy = await t.context.runner.runProxy(certs)
 
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
   await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
@@ -216,7 +216,7 @@ test("Certificate provided after start-up", async (t) => {
 test("Certificate changed while running", async (t) => {
   const certs = await generateCertificates()
 
-  const proxy = await t.context.runner.serve(certs)
+  const proxy = await t.context.runner.runProxy(certs)
 
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
   await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)

@@ -24,6 +24,10 @@ impl<M, R> Subject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + D
             _ph_r: PhantomData::default(),
         }
     }
+
+    pub fn as_subscribe(self) -> SubscribeSubject<M, R> {
+        SubscribeSubject { subject: self.subject, _ph_m: PhantomData::default(), _ph_r: PhantomData::default() }
+    }
 }
 
 pub struct SubscribeSubject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
@@ -41,6 +45,23 @@ impl<M, R> SubscribeSubject<M, R> where M: Serialize + DeserializeOwned, R: Seri
         }
     }
 }
+
+pub trait Subscribable<M, R>  where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+    fn subject(&self) -> &str;
+}
+
+impl<M, R> Subscribable<M, R> for &Subject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+    fn subject(&self) -> &str {
+        &self.subject
+    }
+}
+
+impl<M, R> Subscribable<M, R> for &SubscribeSubject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+    fn subject(&self) -> &str {
+        &self.subject
+    }
+}
+
 
 pub struct MessageWithResponseHandle<T, R>
 where
@@ -102,6 +123,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct TypedNats {
     nc: Connection,
 }
@@ -139,11 +161,13 @@ impl TypedNats {
         Ok(value)
     }
 
-    // pub async fn subscribe<T>(&self, subject: &T) -> Result<TypedSubscription<T>>
-    // where
-    //     T: TypedPublishSubject
-    // {
-    //     let subscription = self.nc.subscribe(&subject.subject()).await?;
-    //     Ok(TypedSubscription::new(subscription))
-    // }
+    pub async fn subscribe<P, T, R>(&self, subject: P) -> Result<TypedSubscription<T, R>>
+    where
+        P: Subscribable<T, R>,
+        T: Serialize + DeserializeOwned,
+        R: Serialize + DeserializeOwned
+    {
+        let subscription = self.nc.subscribe(subject.subject()).await?;
+        Ok(TypedSubscription::new(subscription))
+    }
 }
