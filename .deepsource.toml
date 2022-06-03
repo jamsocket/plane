@@ -1,6 +1,6 @@
 version = 1
 
-exclude_patterns = ["sqlx-data.json", "tests/package.json"]
+exclude_patterns = ["sqlx-data.json", "tests/package.json", "tests/package-lock.json"]
 
 [[analyzers]]
 name = "rust"
