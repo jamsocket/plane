@@ -19,9 +19,7 @@
           "type_info": "Text"
         }
       ],
-      "nullable": [
-        false
-      ],
+      "nullable": [false],
       "parameters": {
         "Right": 1
       }
