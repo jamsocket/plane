@@ -54,7 +54,7 @@ export class WebSocketClient {
     this.ws.send(data)
   }
 
-  async receive(): Promise<string> {
+  receive(): Promise<string> {
     if (this.closed) {
       return new Promise((_, reject) =>
         reject(new Error("WebSocket connection is already closed."))
@@ -62,7 +62,7 @@ export class WebSocketClient {
     }
 
     if (this.incomingQueue.length > 0) {
-      return this.incomingQueue.shift()
+      return Promise.resolve(this.incomingQueue.shift())
     }
 
     return new Promise((accept, reject) => {
