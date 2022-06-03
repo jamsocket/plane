@@ -1,5 +1,7 @@
 version = 1
 
+exclude_patterns = ["sqlx-data.json", "tests/package.json"]
+
 [[analyzers]]
 name = "rust"
 enabled = true
