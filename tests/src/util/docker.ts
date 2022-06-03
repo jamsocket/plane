@@ -23,7 +23,8 @@ export class Docker implements DropHandler {
     const port = await getPort();
     const imageName = "docker.io/nats:2.8";
 
-    await this.docker.createImage({ fromImage: imageName });
+    let image = await this.docker.createImage({ fromImage: imageName });
+    console.log("image", image)
 
     const container = await this.docker.createContainer({
       Image: imageName,
