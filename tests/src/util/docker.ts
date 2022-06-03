@@ -21,7 +21,7 @@ export class Docker implements DropHandler {
 
   async runNats(): Promise<number> {
     const port = await getPort();
-    const imageName = "nats:latest";
+    const imageName = "docker.io/nats:latest";
 
     await this.docker.pull(imageName);
 
@@ -42,7 +42,7 @@ export class Docker implements DropHandler {
     const port = await getPort();
     const tempdir = mkdtempSync(join(tmpdir(), "spawner-pebble-config-"));
     const certs = await generateCertificates();
-    const imageName = "letsencrypt/pebble:latest";
+    const imageName = "docker.io/letsencrypt/pebble:latest";
 
     const pebbleConfig = {
       pebble: {
