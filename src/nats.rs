@@ -1,9 +1,13 @@
+//! Typed wrappers around NATS.
+//!
+//! These use serde to serialize data to/from JSON over nats into Rust types.
+
 use anyhow::Result;
 use nats::asynk::{Connection, Message, Subscription};
 use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
 
-pub trait TypedMessage: Serialize + DeserializeOwned {
+pub trait TypedSubject: Serialize + DeserializeOwned {
     type Response: Serialize + DeserializeOwned;
 
     fn subject(&self) -> String;
@@ -11,7 +15,7 @@ pub trait TypedMessage: Serialize + DeserializeOwned {
 
 pub struct MessageWithResponseHandle<T>
 where
-    T: TypedMessage,
+    T: TypedSubject,
 {
     pub value: T,
     message: Message,
@@ -19,7 +23,7 @@ where
 
 impl<T> MessageWithResponseHandle<T>
 where
-    T: TypedMessage,
+    T: TypedSubject,
 {
     fn new(message: Message) -> Result<Self> {
         Ok(MessageWithResponseHandle {
@@ -35,7 +39,7 @@ where
 
 pub struct TypedSubscription<T>
 where
-    T: TypedMessage,
+    T: TypedSubject,
 {
     subscription: Subscription,
     _ph: PhantomData<T>,
@@ -43,7 +47,7 @@ where
 
 impl<T> TypedSubscription<T>
 where
-    T: TypedMessage,
+    T: TypedSubject,
 {
     fn new(subscription: Subscription) -> Self {
         TypedSubscription {
@@ -78,7 +82,7 @@ impl TypedNats {
 
     pub async fn publish<T>(&self, value: &T) -> Result<()>
     where
-        T: TypedMessage<Response = ()>,
+        T: TypedSubject<Response = ()>,
     {
         self.nc
             .publish(&value.subject(), serde_json::to_vec(value)?)
@@ -88,7 +92,7 @@ impl TypedNats {
 
     pub async fn request<T>(&self, value: &T) -> Result<T::Response>
     where
-        T: TypedMessage,
+        T: TypedSubject,
     {
         let result = self
             .nc
@@ -101,7 +105,7 @@ impl TypedNats {
 
     pub async fn subscribe<T>(&self, subject: &str) -> Result<TypedSubscription<T>>
     where
-        T: TypedMessage,
+        T: TypedSubject,
     {
         let subscription = self.nc.subscribe(subject).await?;
         Ok(TypedSubscription::new(subscription))
