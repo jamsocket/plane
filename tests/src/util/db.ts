@@ -31,7 +31,7 @@ export class DroneDatabase {
       select address from route
       where backend = ?
       `,
-      backend,
+      backend
     )
     return row["address"]
   }

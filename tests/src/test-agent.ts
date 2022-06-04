@@ -115,7 +115,7 @@ test("Spawn with agent", async (t) => {
 
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
-  t.is('Ready', (await backendStatusSubscription.next())[0].state)
+  t.is("Ready", (await backendStatusSubscription.next())[0].state)
   await sleep(500)
 
   // Result should exist in database.
