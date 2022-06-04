@@ -106,7 +106,7 @@ export class DroneRunner implements DropHandler {
       "--host-ip",
       "123.123.123.123",
       "serve",
-      "--agent"
+      "--agent",
     ]
 
     const proc = spawn(SPAWNER_PATH, args, {

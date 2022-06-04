@@ -9,7 +9,8 @@ import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
  * Path to a world-readable Docker image that serves a "hello world" page.
  * This image is generated from this repo: https://github.com/drifting-in-space/demo-image-hello-world
  */
-const HELLO_WORLD_IMAGE = 'ghcr.io/drifting-in-space/demo-image-hello-world:sha-f98d60d'
+const HELLO_WORLD_IMAGE =
+  "ghcr.io/drifting-in-space/demo-image-hello-world:sha-f98d60d"
 
 const test = anyTest as TestFn<TestEnvironment>
 
@@ -31,22 +32,31 @@ interface DroneConnectRequest {
 }
 
 interface Duration {
-  secs: number,
-  nanos: number,
+  secs: number
+  nanos: number
 }
 
 interface SpawnRequest {
-  image: string,
-  backend_id: string,
-  max_idle_time: Duration,
-  env: Record<string, string>,
-  metadata: Record<string, string>,
+  image: string
+  backend_id: string
+  max_idle_time: Duration
+  env: Record<string, string>
+  metadata: Record<string, string>
 }
 
-type BackendStatus = 'Loading' | 'ErrorLoading' | 'Starting' | 'ErrorStarting' | 'Ready' | 'TimedOutBeforeReady' | 'Failed' | 'Exited' | 'Swept';
+type BackendStatus =
+  | "Loading"
+  | "ErrorLoading"
+  | "Starting"
+  | "ErrorStarting"
+  | "Ready"
+  | "TimedOutBeforeReady"
+  | "Failed"
+  | "Exited"
+  | "Swept"
 
 interface BackendStateMessage {
-  state: BackendStatus,
+  state: BackendStatus
   time: string
 }
 
@@ -55,9 +65,10 @@ test("Spawn with agent", async (t) => {
   const nats = await connect({ port: natsPort })
   await sleep(1000)
 
-  const connectionRequestSubscription = new NatsMessageIterator<DroneConnectRequest>(
-    nats.subscribe("drone.register")
-  )
+  const connectionRequestSubscription =
+    new NatsMessageIterator<DroneConnectRequest>(
+      nats.subscribe("drone.register")
+    )
 
   t.context.runner.runAgent(natsPort)
 
@@ -68,11 +79,13 @@ test("Spawn with agent", async (t) => {
     ip: "123.12.1.123",
   })
 
-  await msg.respond(JSON_CODEC.encode({
-    "Success": {
-      "drone_id": 1
-    }
-  }))
+  await msg.respond(
+    JSON_CODEC.encode({
+      Success: {
+        drone_id: 1,
+      },
+    })
+  )
 
   await sleep(100)
 
@@ -84,19 +97,22 @@ test("Spawn with agent", async (t) => {
     env: {},
     metadata: {},
   }
-  const rawSpawnResult = await nats.request("drone.1.spawn", JSON_CODEC.encode(request))
+  const rawSpawnResult = await nats.request(
+    "drone.1.spawn",
+    JSON_CODEC.encode(request)
+  )
   const spawnResult = JSON_CODEC.decode(rawSpawnResult.data)
 
   t.is(spawnResult, true)
 
   // Status update stages
-  const backendStatusSubscription = new NatsMessageIterator<BackendStateMessage>(
-    nats.subscribe("backend.abcde.status")
-  )
-  
-  t.is('Loading', (await backendStatusSubscription.next())[0].state)
-  t.is('Starting', (await backendStatusSubscription.next())[0].state)
+  const backendStatusSubscription =
+    new NatsMessageIterator<BackendStateMessage>(
+      nats.subscribe("backend.abcde.status")
+    )
 
+  t.is("Loading", (await backendStatusSubscription.next())[0].state)
+  t.is("Starting", (await backendStatusSubscription.next())[0].state)
 
   //t.is('Ready', (await backendStatusSubscription.next())[0].state)
 
