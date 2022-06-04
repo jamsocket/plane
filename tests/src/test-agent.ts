@@ -94,7 +94,9 @@ test("Spawn with agent", async (t) => {
     image: HELLO_WORLD_IMAGE,
     backend_id: "abcde",
     max_idle_time: { secs: 10, nanos: 0 },
-    env: {},
+    env: {
+      PORT: "8080",
+    },
     metadata: {},
   }
   const rawSpawnResult = await nats.request(
@@ -113,10 +115,13 @@ test("Spawn with agent", async (t) => {
 
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
-
-  //t.is('Ready', (await backendStatusSubscription.next())[0].state)
+  t.is('Ready', (await backendStatusSubscription.next())[0].state)
+  await sleep(500)
 
   // Result should exist in database.
+
+  const address = await t.context.db.getAddress("abcde")
+  t.regex(address, /^127\.0\.0\.1:\d+$/)
 
   // Result should respond to ping.
 

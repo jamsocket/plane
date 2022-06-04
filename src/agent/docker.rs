@@ -70,8 +70,8 @@ impl ContainerEvent {
 }
 
 pub struct ContainerHandle {
-    container_id: String,
-    network_id: String,
+    pub container_id: String,
+    pub network_id: String,
 }
 
 fn make_exposed_ports(port: u16) -> Option<HashMap<String, HashMap<(), ()>>> {
@@ -144,18 +144,40 @@ impl DockerInterface {
         Ok(())
     }
 
+    pub async fn get_port(&self, container_name: &str) -> Option<u16> {
+        let inspect = self
+            .docker
+            .inspect_container(container_name, None)
+            .await
+            .ok()?;
+
+        let port = inspect
+            .network_settings
+            .as_ref()?
+            .ports
+            .as_ref()?
+            .get(&format!("{}/tcp", CONTAINER_PORT))?
+            .as_ref()?
+            .first()?
+            .host_port
+            .as_ref()?;
+
+        port.parse().ok()
+    }
+
     /// Run the specified image and return the name of the created container.
     pub async fn run_container(
         &self,
         name: &str,
         image: &str,
-        env: HashMap<String, String>,
+        env: &HashMap<String, String>,
     ) -> Result<ContainerHandle> {
         let env: Vec<String> = env
             .into_iter()
             .map(|(k, v)| format!("{}={}", k, v))
             .collect();
 
+        // Build the network.
         let network_id = {
             let network_name = format!("{}-network", name);
             let options: CreateNetworkOptions<&str> = CreateNetworkOptions {

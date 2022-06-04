@@ -24,10 +24,6 @@ impl<M, R> Subject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + D
             _ph_r: PhantomData::default(),
         }
     }
-
-    pub fn as_subscribe(self) -> SubscribeSubject<M, R> {
-        SubscribeSubject { subject: self.subject, _ph_m: PhantomData::default(), _ph_r: PhantomData::default() }
-    }
 }
 
 pub struct SubscribeSubject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {

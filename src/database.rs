@@ -38,14 +38,30 @@ impl DroneDatabase {
         .map(|d| d.address))
     }
 
+    pub async fn insert_proxy_route(&self, backend: &str, address: &str) -> Result<()> {
+        sqlx::query!(
+            r"
+            insert into route
+            (backend, address, last_active)
+            values
+            (?, ?, unixepoch())
+            ",
+            backend, address
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn reset_last_active_times(&self, backends: &[String]) -> Result<()> {
         for backend in backends {
             sqlx::query!(
                 r"
-            update route
-            set last_active = unixepoch()
-            where backend = ?
-            ",
+                update route
+                set last_active = unixepoch()
+                where backend = ?
+                ",
                 backend
             )
             .execute(&self.pool)

@@ -1,15 +1,5 @@
 {
   "db": "SQLite",
-  "1bc283d462bf2728c43d51529e9cf39e886fb92bf9c26277da0a5d8b364c0efc": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Right": 1
-      }
-    },
-    "query": "\n            update route\n            set last_active = unixepoch()\n            where backend = ?\n            "
-  },
   "20b9907e634e90906cc94cd6dfaf974a0f3cdb150dd310f355352ff1237de2e2": {
     "describe": {
       "columns": [
@@ -27,5 +17,25 @@
       }
     },
     "query": "\n            select address\n            from route\n            where backend = ?\n            "
+  },
+  "3273c36e72a0f8eac21e2bed70b8ef379da9e0ad7b037f92272c14a55d575a10": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n                update route\n                set last_active = unixepoch()\n                where backend = ?\n                "
+  },
+  "934c12f2b909322598117fcaf91202d383aa03b8e61d8613c21b9596b910fcae": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 2
+      }
+    },
+    "query": "\n            insert into route\n            (backend, address, last_active)\n            values\n            (?, ?, unixepoch())\n            "
   }
 }

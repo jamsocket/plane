@@ -1,14 +1,16 @@
+use self::docker::DockerInterface;
 use crate::{
     messages::agent::{
         BackendState, BackendStateMessage, DroneConnectRequest, DroneConnectResponse, SpawnRequest,
     },
     nats::TypedNats,
-    types::DroneId,
+    retry::do_with_retry,
+    types::DroneId, database::DroneDatabase, get_db,
 };
 use anyhow::{anyhow, Result};
-use std::net::IpAddr;
-
-use self::docker::DockerInterface;
+use http::Uri;
+use hyper::Client;
+use std::{net::IpAddr, time::Duration};
 
 mod docker;
 
@@ -45,11 +47,23 @@ pub struct AgentOptions {
     pub docker_options: DockerOptions,
 }
 
+pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
+    tracing::info!(port, %host_ip, "Waiting for ready port.");
+
+    let client = Client::new();
+    let uri = Uri::from_maybe_shared(format!("http://{}:{}/", host_ip, port))?;
+
+    do_with_retry(|| client.get(uri.clone()), 3000, Duration::from_millis(10)).await?;
+
+    Ok(())
+}
+
 pub async fn start_backend(
-    spawn_request: SpawnRequest,
+    spawn_request: &SpawnRequest,
     docker: DockerInterface,
     nats: TypedNats,
-) -> Result<()> {
+    host_ip: IpAddr,
+) -> Result<String> {
     let subject = BackendStateMessage::subject(spawn_request.backend_id.clone());
 
     nats.publish(&subject, &BackendStateMessage::new(BackendState::Loading))
@@ -59,19 +73,37 @@ pub async fn start_backend(
 
     let backend_id = spawn_request.backend_id.id().to_string();
     let container_name = docker
-        .run_container(&backend_id, &spawn_request.image, spawn_request.env)
-        .await;
+        .run_container(&backend_id, &spawn_request.image, &spawn_request.env)
+        .await?;
 
     nats.publish(&subject, &BackendStateMessage::new(BackendState::Starting))
         .await?;
 
-    Ok(())
+    let port = docker
+        .get_port(&container_name.container_id)
+        .await
+        .ok_or_else(|| {
+            anyhow!(
+                "Couldn't get port of container {}",
+                container_name.container_id
+            )
+        })?;
+
+    tracing::info!(%port, "Got port from container.");
+    wait_port_ready(port, host_ip).await?;
+
+    nats.publish(&subject, &BackendStateMessage::new(BackendState::Ready))
+        .await?;
+
+    Ok(format!("{}:{}", host_ip, port))
 }
 
 pub async fn listen_for_spawn_requests(
     drone_id: DroneId,
     docker: DockerInterface,
     nats: TypedNats,
+    host_ip: IpAddr,
+    db: DroneDatabase,
 ) -> Result<()> {
     let mut sub = nats.subscribe(&SpawnRequest::subject(drone_id)).await?;
 
@@ -83,11 +115,15 @@ pub async fn listen_for_spawn_requests(
                 let _ = req.respond(&true).await;
                 let nats = nats.clone();
                 let docker = docker.clone();
+                let db = db.clone();
 
                 // Run the backend.
                 tokio::spawn(async move {
-                    if let Err(error) = start_backend(req.value, docker, nats).await {
-                        tracing::error!(?error, "Error starting backend.");
+                    match start_backend(&req.value, docker, nats, host_ip).await {
+                        Err(error) => tracing::error!(?error, "Error starting backend."),
+                        Ok(addr) => {
+                            let _ = db.insert_proxy_route(req.value.backend_id.id(), &addr).await;
+                        }
                     }
                 });
             }
@@ -102,6 +138,7 @@ pub async fn listen_for_spawn_requests(
 pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     let nats = TypedNats::connect(&agent_opts.nats_url).await?;
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
+    let db = get_db(&agent_opts.db_path).await?;
 
     let result = nats
         .request(
@@ -115,7 +152,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
 
     match result {
         DroneConnectResponse::Success { drone_id } => {
-            listen_for_spawn_requests(drone_id, docker, nats).await
+            listen_for_spawn_requests(drone_id, docker, nats, agent_opts.host_ip, db).await
         }
         DroneConnectResponse::NoSuchCluster => todo!(),
     }

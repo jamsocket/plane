@@ -25,6 +25,7 @@ mod keys;
 mod messages;
 mod nats;
 mod proxy;
+mod retry;
 mod types;
 
 fn init_tracing() -> Result<()> {

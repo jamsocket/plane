@@ -104,7 +104,7 @@ export class DroneRunner implements DropHandler {
       "--ip",
       "123.12.1.123",
       "--host-ip",
-      "123.123.123.123",
+      "127.0.0.1",
       "serve",
       "--agent",
     ]
