@@ -46,6 +46,8 @@ locations.
 
 ## Architecture
 
+![Spawner architecture diagram.](https://raw.githubusercontent.com/drifting-in-space/spawner/main/architecture.svg)
+
 Spawner consists of two main pieces, the **controller** and the **drone**, which communicate with each other
 over [NATS](https://nats.io/).
 
