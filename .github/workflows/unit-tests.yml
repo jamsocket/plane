@@ -18,9 +18,5 @@ jobs:
     - uses: Swatinem/rust-cache@v1
       with:
         cache-on-failure: true
-    - name: Build test image
-      run: docker build -t spawner-test-image:latest .
-      with:
-        working-directory: tests/test-image
     - name: Run tests
       run: cargo test --verbose
