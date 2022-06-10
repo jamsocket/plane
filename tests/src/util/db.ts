@@ -2,10 +2,10 @@ import * as sqlite from "sqlite"
 import sqlite3 from "sqlite3"
 
 export interface Backend {
-  name: string,
-  spec: Record<string, unknown>,
-  state: string,
-  exit_code: number,
+  name: string
+  spec: Record<string, unknown>
+  state: string
+  exit_code: number
 }
 
 export class DroneDatabase {
@@ -19,14 +19,13 @@ export class DroneDatabase {
     return new DroneDatabase(db)
   }
 
-  async getBackend(
-    backend: string,
-  ): Promise<Backend> {
+  async getBackend(backend: string): Promise<Backend> {
     return await this.db.get(
       `
       select * from backend
       where name = ?
-      `, backend
+      `,
+      backend
     )
   }
 
