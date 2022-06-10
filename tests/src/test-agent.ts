@@ -133,5 +133,5 @@ test("Spawn with agent", async (t) => {
   t.is(result.data.message, "Hello World")
 
   // Status should update to swept.
-  t.is('Swept', (await backendStatusSubscription.next())[0].state)
+  t.is("Swept", (await backendStatusSubscription.next())[0].state)
 })

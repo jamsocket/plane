@@ -12,7 +12,11 @@ export class DroneDatabase {
     return new DroneDatabase(db)
   }
 
-  async addProxy(subdomain: string, backend: string, address: string): Promise<void> {
+  async addProxy(
+    subdomain: string,
+    backend: string,
+    address: string
+  ): Promise<void> {
     await this.db.run(
       `
       insert into route

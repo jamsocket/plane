@@ -42,7 +42,11 @@ test("Simple request to HTTP server", async (t) => {
   const proxy = await t.context.runner.runProxy()
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
-  await t.context.db.addProxy("foobar", "backend", `127.0.0.1:${dummyServerPort}`)
+  await t.context.db.addProxy(
+    "foobar",
+    "backend",
+    `127.0.0.1:${dummyServerPort}`
+  )
 
   const result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/`, {
     headers: { host: "foobar.mydomain.test" },
@@ -56,7 +60,11 @@ test("Host header is set appropriately", async (t) => {
   const proxy = await t.context.runner.runProxy()
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
-  await t.context.db.addProxy("foobar", "backend", `127.0.0.1:${dummyServerPort}`)
+  await t.context.db.addProxy(
+    "foobar",
+    "backend",
+    `127.0.0.1:${dummyServerPort}`
+  )
 
   const result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/host`, {
     headers: { host: "foobar.mydomain.test" },
