@@ -4,19 +4,27 @@
 
 use anyhow::Result;
 use nats::asynk::{Connection, Message, Subscription};
-use serde::{de::DeserializeOwned, Serialize, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::marker::PhantomData;
 
 #[derive(Serialize, Deserialize)]
 pub enum NoReply {}
 
-pub struct Subject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+pub struct Subject<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
     subject: String,
     _ph_m: PhantomData<M>,
     _ph_r: PhantomData<R>,
 }
 
-impl<M, R> Subject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+impl<M, R> Subject<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
     pub fn new(subject: String) -> Subject<M, R> {
         Subject {
             subject,
@@ -26,13 +34,21 @@ impl<M, R> Subject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + D
     }
 }
 
-pub struct SubscribeSubject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+pub struct SubscribeSubject<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
     subject: String,
     _ph_m: PhantomData<M>,
     _ph_r: PhantomData<R>,
 }
 
-impl<M, R> SubscribeSubject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+impl<M, R> SubscribeSubject<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
     pub fn new(subject: String) -> SubscribeSubject<M, R> {
         SubscribeSubject {
             subject,
@@ -42,22 +58,33 @@ impl<M, R> SubscribeSubject<M, R> where M: Serialize + DeserializeOwned, R: Seri
     }
 }
 
-pub trait Subscribable<M, R>  where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+pub trait Subscribable<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
     fn subject(&self) -> &str;
 }
 
-impl<M, R> Subscribable<M, R> for &Subject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+impl<M, R> Subscribable<M, R> for &Subject<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
     fn subject(&self) -> &str {
         &self.subject
     }
 }
 
-impl<M, R> Subscribable<M, R> for &SubscribeSubject<M, R> where M: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned {
+impl<M, R> Subscribable<M, R> for &SubscribeSubject<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
     fn subject(&self) -> &str {
         &self.subject
     }
 }
-
 
 pub struct MessageWithResponseHandle<T, R>
 where
@@ -106,7 +133,7 @@ where
         TypedSubscription {
             subscription,
             _ph_r: PhantomData::default(),
-            _ph_t: PhantomData::default()
+            _ph_t: PhantomData::default(),
         }
     }
 
@@ -136,7 +163,8 @@ impl TypedNats {
     }
 
     pub async fn publish<T>(&self, subject: &Subject<T, NoReply>, value: &T) -> Result<()>
-    where T: Serialize + DeserializeOwned
+    where
+        T: Serialize + DeserializeOwned,
     {
         self.nc
             .publish(&subject.subject, serde_json::to_vec(value)?)
@@ -146,7 +174,8 @@ impl TypedNats {
 
     pub async fn request<T, R>(&self, subject: &Subject<T, R>, value: &T) -> Result<R>
     where
-        T: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned
+        T: Serialize + DeserializeOwned,
+        R: Serialize + DeserializeOwned,
     {
         let result = self
             .nc
@@ -161,7 +190,7 @@ impl TypedNats {
     where
         P: Subscribable<T, R>,
         T: Serialize + DeserializeOwned,
-        R: Serialize + DeserializeOwned
+        R: Serialize + DeserializeOwned,
     {
         let subscription = self.nc.subscribe(subject.subject()).await?;
         Ok(TypedSubscription::new(subscription))

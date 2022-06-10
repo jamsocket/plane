@@ -8,7 +8,7 @@
 //! based on type information stored in `sqlx-data.json`. If
 //! you change a query in this file, you will likely need to
 //! run `generate-sqlx-data.mjs` to get Rust to accept it.
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, TimeZone, Utc};
 use sqlx::{Result, SqlitePool};
 
 use crate::{

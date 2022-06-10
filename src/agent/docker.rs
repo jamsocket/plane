@@ -196,11 +196,9 @@ impl DockerInterface {
 
         // Build the container.
         let container_id = {
-            let options: Option<CreateContainerOptions<String>> = Some(
-                CreateContainerOptions {
-                    name: backend_name(name)
-                }
-            );
+            let options: Option<CreateContainerOptions<String>> = Some(CreateContainerOptions {
+                name: backend_name(name),
+            });
 
             let config: Config<String> = Config {
                 image: Some(image.to_string()),

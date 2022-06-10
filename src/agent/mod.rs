@@ -2,9 +2,7 @@ use self::{docker::DockerInterface, executor::Executor};
 use crate::{
     database::DroneDatabase,
     get_db,
-    messages::agent::{
-        BackendState, DroneConnectRequest, DroneConnectResponse, SpawnRequest,
-    },
+    messages::agent::{BackendState, DroneConnectRequest, DroneConnectResponse, SpawnRequest},
     nats::TypedNats,
     retry::do_with_retry,
     types::DroneId,
@@ -12,7 +10,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use http::Uri;
 use hyper::Client;
-use std::{net::IpAddr, time::Duration, sync::Arc};
+use std::{net::IpAddr, sync::Arc, time::Duration};
 
 mod docker;
 mod executor;
@@ -80,7 +78,9 @@ pub async fn listen_for_spawn_requests(
 
                 req.respond(&true).await?;
                 tokio::spawn(async move {
-                    let _ = executor.run_backend(&req.value, BackendState::Loading).await;
+                    let _ = executor
+                        .run_backend(&req.value, BackendState::Loading)
+                        .await;
                 });
             }
             Ok(None) => return Err(anyhow!("Spawn request subscription closed.")),
@@ -92,7 +92,12 @@ pub async fn listen_for_spawn_requests(
 }
 
 pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
-    let nats = do_with_retry(|| TypedNats::connect(&agent_opts.nats_url), 30, Duration::from_secs(10)).await?;
+    let nats = do_with_retry(
+        || TypedNats::connect(&agent_opts.nats_url),
+        30,
+        Duration::from_secs(10),
+    )
+    .await?;
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
     let db = get_db(&agent_opts.db_path).await?;
 
@@ -110,6 +115,8 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
         DroneConnectResponse::Success { drone_id } => {
             listen_for_spawn_requests(drone_id, docker, nats, agent_opts.host_ip, db).await
         }
-        DroneConnectResponse::NoSuchCluster => todo!(),
+        DroneConnectResponse::NoSuchCluster => {
+            Err(anyhow!("The platform server did not recognize the cluster {}", agent_opts.cluster_domain))
+        },
     }
 }

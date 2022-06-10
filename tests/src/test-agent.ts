@@ -128,7 +128,7 @@ test("Spawn with agent", async (t) => {
   t.regex(address, /^127\.0\.0\.1:\d+$/)
 
   // Result should respond to ping.
-  let result = await axios.get(`http://${address}`)
+  const result = await axios.get(`http://${address}`)
   t.is(result.status, 200)
   t.is(result.data.message, "Hello World")
 

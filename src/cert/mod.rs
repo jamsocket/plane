@@ -1,5 +1,5 @@
 use self::https_client::get_https_client;
-use crate::{keys::KeyCertPathPair, nats::TypedNats, messages::cert::SetAcmeDnsRecord};
+use crate::{keys::KeyCertPathPair, messages::cert::SetAcmeDnsRecord, nats::TypedNats};
 use acme2::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
@@ -51,10 +51,13 @@ pub async fn get_certificate(
             .ok_or_else(|| anyhow!("No authorization value."))?;
 
         tracing::info!("Requesting TXT record from platform.");
-        nats.request(&SetAcmeDnsRecord::subject(), &SetAcmeDnsRecord {
-            cluster: cluster_domain.to_string(),
-            value,
-        })
+        nats.request(
+            &SetAcmeDnsRecord::subject(),
+            &SetAcmeDnsRecord {
+                cluster: cluster_domain.to_string(),
+                value,
+            },
+        )
         .await?;
 
         tracing::info!("Validating challenge.");
