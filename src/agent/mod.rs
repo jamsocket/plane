@@ -115,8 +115,9 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
         DroneConnectResponse::Success { drone_id } => {
             listen_for_spawn_requests(drone_id, docker, nats, agent_opts.host_ip, db).await
         }
-        DroneConnectResponse::NoSuchCluster => {
-            Err(anyhow!("The platform server did not recognize the cluster {}", agent_opts.cluster_domain))
-        },
+        DroneConnectResponse::NoSuchCluster => Err(anyhow!(
+            "The platform server did not recognize the cluster {}",
+            agent_opts.cluster_domain
+        )),
     }
 }

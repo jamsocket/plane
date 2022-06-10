@@ -1,5 +1,7 @@
 use self::https_client::get_https_client;
-use crate::{keys::KeyCertPathPair, messages::cert::SetAcmeDnsRecord, nats::TypedNats};
+use crate::{
+    keys::KeyCertPathPair, messages::cert::SetAcmeDnsRecord, nats::TypedNats, retry::do_with_retry,
+};
 use acme2::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
@@ -112,8 +114,12 @@ pub async fn refresh_certificate(
     acme_server_url: &str,
 ) -> Result<()> {
     let client = get_https_client()?;
-    let nats = TypedNats::connect(nats_url).await?;
-
+    let nats = do_with_retry(
+        || TypedNats::connect(&nats_url),
+        30,
+        Duration::from_secs(10),
+    )
+    .await?;
     let (pkey, cert) = get_certificate(cluster_domain, &nats, acme_server_url, &client).await?;
 
     std::fs::write(&key_paths.certificate_path, cert.to_pem()?)?;
