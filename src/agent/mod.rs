@@ -1,18 +1,21 @@
-use self::docker::DockerInterface;
+use self::{docker::DockerInterface, executor::Executor};
 use crate::{
+    database::DroneDatabase,
+    get_db,
     messages::agent::{
-        BackendState, BackendStateMessage, DroneConnectRequest, DroneConnectResponse, SpawnRequest,
+        BackendState, DroneConnectRequest, DroneConnectResponse, SpawnRequest,
     },
     nats::TypedNats,
     retry::do_with_retry,
-    types::DroneId, database::DroneDatabase, get_db,
+    types::DroneId,
 };
 use anyhow::{anyhow, Result};
 use http::Uri;
 use hyper::Client;
-use std::{net::IpAddr, time::Duration};
+use std::{net::IpAddr, time::Duration, sync::Arc};
 
 mod docker;
+mod executor;
 
 #[derive(PartialEq, Debug)]
 pub enum DockerApiTransport {
@@ -58,46 +61,6 @@ pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
     Ok(())
 }
 
-pub async fn start_backend(
-    spawn_request: &SpawnRequest,
-    docker: DockerInterface,
-    nats: TypedNats,
-    host_ip: IpAddr,
-) -> Result<String> {
-    let subject = BackendStateMessage::subject(spawn_request.backend_id.clone());
-
-    nats.publish(&subject, &BackendStateMessage::new(BackendState::Loading))
-        .await?;
-
-    docker.pull_image(&spawn_request.image).await?;
-
-    let backend_id = spawn_request.backend_id.id().to_string();
-    let container_name = docker
-        .run_container(&backend_id, &spawn_request.image, &spawn_request.env)
-        .await?;
-
-    nats.publish(&subject, &BackendStateMessage::new(BackendState::Starting))
-        .await?;
-
-    let port = docker
-        .get_port(&container_name.container_id)
-        .await
-        .ok_or_else(|| {
-            anyhow!(
-                "Couldn't get port of container {}",
-                container_name.container_id
-            )
-        })?;
-
-    tracing::info!(%port, "Got port from container.");
-    wait_port_ready(port, host_ip).await?;
-
-    nats.publish(&subject, &BackendStateMessage::new(BackendState::Ready))
-        .await?;
-
-    Ok(format!("{}:{}", host_ip, port))
-}
-
 pub async fn listen_for_spawn_requests(
     drone_id: DroneId,
     docker: DockerInterface,
@@ -106,25 +69,18 @@ pub async fn listen_for_spawn_requests(
     db: DroneDatabase,
 ) -> Result<()> {
     let mut sub = nats.subscribe(&SpawnRequest::subject(drone_id)).await?;
+    let executor = Arc::new(Executor::new(docker, db, nats, host_ip));
 
     loop {
         let req = sub.next().await;
 
         match req {
             Ok(Some(req)) => {
-                let _ = req.respond(&true).await;
-                let nats = nats.clone();
-                let docker = docker.clone();
-                let db = db.clone();
+                let executor = executor.clone();
 
-                // Run the backend.
+                req.respond(&true).await?;
                 tokio::spawn(async move {
-                    match start_backend(&req.value, docker, nats, host_ip).await {
-                        Err(error) => tracing::error!(?error, "Error starting backend."),
-                        Ok(addr) => {
-                            let _ = db.insert_proxy_route(req.value.backend_id.id(), &addr).await;
-                        }
-                    }
+                    let _ = executor.run_backend(&req.value, BackendState::Loading).await;
                 });
             }
             Ok(None) => return Err(anyhow!("Spawn request subscription closed.")),
@@ -136,7 +92,7 @@ pub async fn listen_for_spawn_requests(
 }
 
 pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
-    let nats = TypedNats::connect(&agent_opts.nats_url).await?;
+    let nats = do_with_retry(|| TypedNats::connect(&agent_opts.nats_url), 30, Duration::from_secs(10)).await?;
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
     let db = get_db(&agent_opts.db_path).await?;
 

@@ -1,6 +1,54 @@
 {
   "db": "SQLite",
-  "20b9907e634e90906cc94cd6dfaf974a0f3cdb150dd310f355352ff1237de2e2": {
+  "0a5f8a8921f096aed1c345a3d51bf4b83b284f9be221bafc0fdd03e786fe41f5": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n                update route\n                set last_active = unixepoch()\n                where subdomain = ?\n                "
+  },
+  "4d40d5ab7036ae0a6cf6e49e133ad531d3260c27c1bdf0745f869d7567d6c07d": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 2
+      }
+    },
+    "query": "\n            insert into backend\n            (name, spec, state)\n            values\n            (?, ?, 'Loading')\n            "
+  },
+  "9bde1570de3c5e831902027cc3d86457d3fef08176acb3d5aedc8eaec1f607b7": {
+    "describe": {
+      "columns": [
+        {
+          "name": "last_active",
+          "ordinal": 0,
+          "type_info": "Int64"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n            select last_active\n            from route\n            where backend = ?\n            "
+  },
+  "d12abb6ea7bb7588dfec936a945b9aa20769a851a7b390485d535cd5936a6f29": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 3
+      }
+    },
+    "query": "\n            insert into route\n            (backend, subdomain, address, last_active)\n            values\n            (?, ?, ?, unixepoch())\n            "
+  },
+  "e2b351bb878b0e2ffc84d405acf44eb7328f910564c66447aa336c4f49727740": {
     "describe": {
       "columns": [
         {
@@ -16,9 +64,9 @@
         "Right": 1
       }
     },
-    "query": "\n            select address\n            from route\n            where backend = ?\n            "
+    "query": "\n            select address\n            from route\n            where subdomain = ?\n            "
   },
-  "3273c36e72a0f8eac21e2bed70b8ef379da9e0ad7b037f92272c14a55d575a10": {
+  "e8f539cb76298c46fb8e833061efab5b0e742302281aff930c81f85cb245dd7c": {
     "describe": {
       "columns": [],
       "nullable": [],
@@ -26,16 +74,6 @@
         "Right": 1
       }
     },
-    "query": "\n                update route\n                set last_active = unixepoch()\n                where backend = ?\n                "
-  },
-  "934c12f2b909322598117fcaf91202d383aa03b8e61d8613c21b9596b910fcae": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Right": 2
-      }
-    },
-    "query": "\n            insert into route\n            (backend, address, last_active)\n            values\n            (?, ?, unixepoch())\n            "
+    "query": "\n            update backend\n            set state = ?\n            "
   }
 }

@@ -1,4 +1,7 @@
-use crate::{nats::{Subject, NoReply}, types::{DroneId, BackendId}};
+use crate::{
+    nats::{NoReply, Subject},
+    types::{BackendId, DroneId},
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::IpAddr, time::Duration};
@@ -86,6 +89,20 @@ pub enum BackendState {
     Swept,
 }
 
+impl BackendState {
+    pub fn terminal(self) -> bool {
+        match self {
+            BackendState::ErrorLoading
+            | BackendState::ErrorStarting
+            | BackendState::TimedOutBeforeReady
+            | BackendState::Failed
+            | BackendState::Exited
+            | BackendState::Swept => true,
+            _ => false,
+        }
+    }
+}
+
 /// An message representing a change in the state of a backend.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BackendStateMessage {
@@ -105,7 +122,7 @@ impl BackendStateMessage {
         }
     }
 
-    pub fn subject(backend_id: BackendId) -> Subject<BackendStateMessage, NoReply> {
+    pub fn subject(backend_id: &BackendId) -> Subject<BackendStateMessage, NoReply> {
         Subject::new(format!("backend.{}.status", backend_id.id()))
     }
 }

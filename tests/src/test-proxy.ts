@@ -42,7 +42,7 @@ test("Simple request to HTTP server", async (t) => {
   const proxy = await t.context.runner.runProxy()
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
-  await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
+  await t.context.db.addProxy("foobar", "backend", `127.0.0.1:${dummyServerPort}`)
 
   const result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/`, {
     headers: { host: "foobar.mydomain.test" },
@@ -56,7 +56,7 @@ test("Host header is set appropriately", async (t) => {
   const proxy = await t.context.runner.runProxy()
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
-  await t.context.db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
+  await t.context.db.addProxy("foobar", "backend", `127.0.0.1:${dummyServerPort}`)
 
   const result = await axios.get(`http://127.0.0.1:${proxy.httpPort}/host`, {
     headers: { host: "foobar.mydomain.test" },
@@ -71,7 +71,7 @@ test("SSL provided at startup works", async (t) => {
   const proxy = await t.context.runner.runProxy(certs)
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
 
-  await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
+  await t.context.db.addProxy("blah", "backend", `127.0.0.1:${dummyServerPort}`)
 
   const result = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`, {
     headers: { host: "blah.mydomain.test" },
@@ -86,7 +86,7 @@ test("WebSockets", async (t) => {
   const wsPort = await t.context.dummyServer.serveWebSocket()
   const proxy = await t.context.runner.runProxy()
 
-  await t.context.db.addProxy("abcd", `127.0.0.1:${wsPort}`)
+  await t.context.db.addProxy("abcd", "backend", `127.0.0.1:${wsPort}`)
   const client = await WebSocketClient.create(
     `ws://127.0.0.1:${proxy.httpPort}`,
     "abcd.mydomain.test"
@@ -107,10 +107,10 @@ test("Connection status information is recorded", async (t) => {
   const proxy = await runner.runProxy()
   const dummyServerPort = await dummyServer.serveHelloWorld()
 
-  await db.addProxy("foobar", `127.0.0.1:${dummyServerPort}`)
+  await db.addProxy("foobar", "backend", `127.0.0.1:${dummyServerPort}`)
   await sleep(1000)
 
-  const lastActive1 = (await db.getLastActiveTime("foobar")) as number
+  const lastActive1 = (await db.getLastActiveTime("backend")) as number
 
   await axios.get(`http://127.0.0.1:${proxy.httpPort}/`, {
     headers: { host: "foobar.mydomain.test" },
@@ -118,7 +118,7 @@ test("Connection status information is recorded", async (t) => {
 
   await sleep(2000)
 
-  const lastActive2 = (await db.getLastActiveTime("foobar")) as number
+  const lastActive2 = (await db.getLastActiveTime("backend")) as number
   t.assert(
     lastActive2 > lastActive1,
     "After activity, last active time should have increased."
@@ -126,7 +126,7 @@ test("Connection status information is recorded", async (t) => {
 
   await sleep(2000)
 
-  const lastActive3 = (await db.getLastActiveTime("foobar")) as number
+  const lastActive3 = (await db.getLastActiveTime("backend")) as number
   t.is(
     lastActive3,
     lastActive2,
@@ -139,7 +139,7 @@ test("Connection status information is recorded", async (t) => {
 
   await sleep(1000)
 
-  const lastActive4 = (await db.getLastActiveTime("foobar")) as number
+  const lastActive4 = (await db.getLastActiveTime("backend")) as number
   t.assert(
     lastActive4 > lastActive3,
     "After activity, last active time should increase."
@@ -152,9 +152,9 @@ test("Connection status for WebSocket connections", async (t) => {
   const proxy = await runner.runProxy()
   const wsServerPort = await dummyServer.serveWebSocket()
 
-  await db.addProxy("abcde", `127.0.0.1:${wsServerPort}`)
+  await db.addProxy("abcde", "backend", `127.0.0.1:${wsServerPort}`)
 
-  const lastActive1 = (await db.getLastActiveTime("abcde")) as number
+  const lastActive1 = (await db.getLastActiveTime("backend")) as number
 
   const client = await WebSocketClient.create(
     `ws://127.0.0.1:${proxy.httpPort}`,
@@ -162,7 +162,7 @@ test("Connection status for WebSocket connections", async (t) => {
   )
   await sleep(2000)
 
-  const lastActive2 = (await db.getLastActiveTime("abcde")) as number
+  const lastActive2 = (await db.getLastActiveTime("backend")) as number
   t.assert(
     lastActive2 > lastActive1,
     "Last active time sould recognize an open WebSocket connection."
@@ -170,7 +170,7 @@ test("Connection status for WebSocket connections", async (t) => {
 
   await sleep(2000)
   client.close()
-  const lastActive3 = (await db.getLastActiveTime("abcde")) as number
+  const lastActive3 = (await db.getLastActiveTime("backend")) as number
   t.assert(
     lastActive3 > lastActive2,
     "Last active time should continue to increase while WebSocket connection is held open."
@@ -178,7 +178,7 @@ test("Connection status for WebSocket connections", async (t) => {
 
   await sleep(1000)
 
-  const lastActive4 = (await db.getLastActiveTime("abcde")) as number
+  const lastActive4 = (await db.getLastActiveTime("backend")) as number
   t.is(
     lastActive4,
     lastActive3,
@@ -200,7 +200,7 @@ test("Certificate provided after start-up", async (t) => {
   const proxy = await t.context.runner.runProxy(certs)
 
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
-  await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
+  await t.context.db.addProxy("blah", "backend", `127.0.0.1:${dummyServerPort}`)
 
   await generateCertificates(certs)
 
@@ -219,7 +219,7 @@ test("Certificate changed while running", async (t) => {
   const proxy = await t.context.runner.runProxy(certs)
 
   const dummyServerPort = await t.context.dummyServer.serveHelloWorld()
-  await t.context.db.addProxy("blah", `127.0.0.1:${dummyServerPort}`)
+  await t.context.db.addProxy("blah", "backend", `127.0.0.1:${dummyServerPort}`)
   const ca1 = certs.getCert()
 
   const result1 = await axios.get(`https://127.0.0.1:${proxy.httpsPort}/`, {

@@ -4,6 +4,8 @@ import { DroneRunner } from "./util/runner.js"
 import { connect } from "nats"
 import { sleep } from "./util/sleep.js"
 import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
+import { generateId } from "./util/id_gen.js"
+import axios from "axios"
 
 /**
  * Path to a world-readable Docker image that serves a "hello world" page.
@@ -61,6 +63,8 @@ interface BackendStateMessage {
 }
 
 test("Spawn with agent", async (t) => {
+  const backendId = generateId()
+
   const natsPort = await t.context.docker.runNats()
   const nats = await connect({ port: natsPort })
   await sleep(1000)
@@ -92,7 +96,7 @@ test("Spawn with agent", async (t) => {
   // Spawn request.
   const request: SpawnRequest = {
     image: HELLO_WORLD_IMAGE,
-    backend_id: "abcde",
+    backend_id: backendId,
     max_idle_time: { secs: 10, nanos: 0 },
     env: {
       PORT: "8080",
@@ -110,7 +114,7 @@ test("Spawn with agent", async (t) => {
   // Status update stages
   const backendStatusSubscription =
     new NatsMessageIterator<BackendStateMessage>(
-      nats.subscribe("backend.abcde.status")
+      nats.subscribe(`backend.${backendId}.status`)
     )
 
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
@@ -120,11 +124,14 @@ test("Spawn with agent", async (t) => {
 
   // Result should exist in database.
 
-  const address = await t.context.db.getAddress("abcde")
+  const address = await t.context.db.getAddress(backendId)
   t.regex(address, /^127\.0\.0\.1:\d+$/)
 
   // Result should respond to ping.
+  let result = await axios.get(`http://${address}`)
+  t.is(result.status, 200)
+  t.is(result.data.message, "Hello World")
 
   // Status should update to swept.
-  // t.is('Swept', (await backendStatusSubscription.next())[0].state)
+  t.is('Swept', (await backendStatusSubscription.next())[0].state)
 })

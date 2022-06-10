@@ -37,6 +37,14 @@ pub struct ContainerEvent {
     container: String,
 }
 
+pub fn backend_name(backend: &str) -> String {
+    format!("backend-{}", backend)
+}
+
+pub fn network_name(backend: &str) -> String {
+    format!("network-{}", backend)
+}
+
 impl ContainerEvent {
     pub fn from_event_message(event: &EventMessage) -> Option<Self> {
         let action = event.action.as_deref()?;
@@ -67,11 +75,6 @@ impl ContainerEvent {
 
         Some(ContainerEvent { event, container })
     }
-}
-
-pub struct ContainerHandle {
-    pub container_id: String,
-    pub network_id: String,
 }
 
 fn make_exposed_ports(port: u16) -> Option<HashMap<String, HashMap<(), ()>>> {
@@ -132,14 +135,14 @@ impl DockerInterface {
         Ok(())
     }
 
-    pub async fn stop_container(&self, container: &ContainerHandle) -> Result<()> {
+    pub async fn stop_container(&self, name: &str) -> Result<()> {
         let options = StopContainerOptions { t: 10 };
 
         self.docker
-            .stop_container(&container.container_id, Some(options))
+            .stop_container(&backend_name(name), Some(options))
             .await?;
 
-        self.docker.remove_network(&container.network_id).await?;
+        self.docker.remove_network(&network_name(name)).await?;
 
         Ok(())
     }
@@ -147,7 +150,7 @@ impl DockerInterface {
     pub async fn get_port(&self, container_name: &str) -> Option<u16> {
         let inspect = self
             .docker
-            .inspect_container(container_name, None)
+            .inspect_container(&backend_name(container_name), None)
             .await
             .ok()?;
 
@@ -171,7 +174,7 @@ impl DockerInterface {
         name: &str,
         image: &str,
         env: &HashMap<String, String>,
-    ) -> Result<ContainerHandle> {
+    ) -> Result<()> {
         let env: Vec<String> = env
             .into_iter()
             .map(|(k, v)| format!("{}={}", k, v))
@@ -179,7 +182,7 @@ impl DockerInterface {
 
         // Build the network.
         let network_id = {
-            let network_name = format!("{}-network", name);
+            let network_name = network_name(name);
             let options: CreateNetworkOptions<&str> = CreateNetworkOptions {
                 name: &network_name,
                 ..CreateNetworkOptions::default()
@@ -193,7 +196,11 @@ impl DockerInterface {
 
         // Build the container.
         let container_id = {
-            let options: Option<CreateContainerOptions<&str>> = None;
+            let options: Option<CreateContainerOptions<String>> = Some(
+                CreateContainerOptions {
+                    name: backend_name(name)
+                }
+            );
 
             let config: Config<String> = Config {
                 image: Some(image.to_string()),
@@ -237,9 +244,6 @@ impl DockerInterface {
             self.docker.start_container(&container_id, options).await?;
         };
 
-        Ok(ContainerHandle {
-            container_id,
-            network_id,
-        })
+        Ok(())
     }
 }
