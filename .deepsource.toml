@@ -12,6 +12,7 @@ enabled = true
 [[analyzers]]
 name = "javascript"
 enabled = true
+environment = ["node"]
 
 [[transformers]]
 name = "prettier"

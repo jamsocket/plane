@@ -1,6 +1,13 @@
 import * as sqlite from "sqlite"
 import sqlite3 from "sqlite3"
 
+export interface Backend {
+  name: string,
+  spec: Record<string, unknown>,
+  state: string,
+  exit_code: number,
+}
+
 export class DroneDatabase {
   private constructor(private db: sqlite.Database) {}
 
@@ -10,6 +17,17 @@ export class DroneDatabase {
       driver: sqlite3.Database,
     })
     return new DroneDatabase(db)
+  }
+
+  async getBackend(
+    backend: string,
+  ): Promise<Backend> {
+    return await this.db.get(
+      `
+      select * from backend
+      where name = ?
+      `, backend
+    )
   }
 
   async addProxy(

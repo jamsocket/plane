@@ -1,24 +1,13 @@
 import anyTest, { TestFn } from "ava"
-import { TestEnvironment } from "./util/environment.js"
-import { DroneRunner } from "./util/runner.js"
-import { connect } from "nats"
-import { sleep } from "./util/sleep.js"
-import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
-import { generateId } from "./util/id_gen.js"
 import axios from "axios"
-
-/**
- * Path to a world-readable Docker image that serves a "hello world" page.
- * This image is generated from this repo: https://github.com/drifting-in-space/demo-image-hello-world
- */
-const HELLO_WORLD_IMAGE =
-  "ghcr.io/drifting-in-space/demo-image-hello-world:sha-f98d60d"
+import { connect } from "nats"
+import { TestEnvironment } from "./util/environment.js"
+import { generateId } from "./util/id_gen.js"
+import { TEST_IMAGE } from "./util/images.js"
+import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
+import { sleep } from "./util/sleep.js"
 
 const test = anyTest as TestFn<TestEnvironment>
-
-test.before(async () => {
-  await DroneRunner.build()
-})
 
 test.beforeEach(async (t) => {
   t.context = await TestEnvironment.create()
@@ -66,8 +55,9 @@ test("Spawn with agent", async (t) => {
   const backendId = generateId()
 
   const natsPort = await t.context.docker.runNats()
+  await sleep(100)
   const nats = await connect({ port: natsPort })
-  await sleep(1000)
+  await sleep(100)
 
   const connectionRequestSubscription =
     new NatsMessageIterator<DroneConnectRequest>(
@@ -95,7 +85,7 @@ test("Spawn with agent", async (t) => {
 
   // Spawn request.
   const request: SpawnRequest = {
-    image: HELLO_WORLD_IMAGE,
+    image: TEST_IMAGE,
     backend_id: backendId,
     max_idle_time: { secs: 10, nanos: 0 },
     env: {
@@ -120,6 +110,9 @@ test("Spawn with agent", async (t) => {
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
   t.is("Ready", (await backendStatusSubscription.next())[0].state)
+
+  t.is("Ready", (await t.context.db.getBackend(backendId)).state)
+
   await sleep(500)
 
   // Result should exist in database.
@@ -130,8 +123,9 @@ test("Spawn with agent", async (t) => {
   // Result should respond to ping.
   const result = await axios.get(`http://${address}`)
   t.is(result.status, 200)
-  t.is(result.data.message, "Hello World")
+  t.is(result.data, "Hello World!")
 
-  // Status should update to swept.
+  // Status should update to swept after ~10 seconds.
   t.is("Swept", (await backendStatusSubscription.next())[0].state)
+  t.is("Swept", (await t.context.db.getBackend(backendId)).state)
 })

@@ -5,7 +5,6 @@ import { sleep } from "./sleep.js"
 import { PebbleResult } from "./docker.js"
 import getPort from "@ava/get-port"
 
-const MANIFEST_PATH = process.env.MANIFEST_PATH || "../Cargo.toml"
 const SPAWNER_PATH = "../target/debug/spawner"
 const CLUSTER_DOMAIN = "mydomain.test"
 
@@ -40,14 +39,6 @@ export class DroneRunner implements DropHandler {
     if (this.server !== undefined) {
       await killProcAndWait(this.server)
     }
-  }
-
-  static build(): Promise<void> {
-    const proc = spawn("cargo", ["build", "--manifest-path", MANIFEST_PATH], {
-      stdio: "inherit",
-    })
-
-    return waitForExit(proc)
   }
 
   async migrate() {

@@ -20,8 +20,5 @@ jobs:
         cache-on-failure: true
     - run: npm install
       working-directory: tests
-    # The tests build, but they are likely to hit their timeout if the cache isn't warm.
-    - name: Run tests
-      run: cargo test --verbose
     - run: npm test
       working-directory: tests

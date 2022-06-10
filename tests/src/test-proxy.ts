@@ -5,15 +5,10 @@ import * as https from "https"
 import { join } from "path"
 import { generateCertificates, KeyCertPair } from "./util/certificates.js"
 import { TestEnvironment } from "./util/environment.js"
-import { DroneRunner } from "./util/runner.js"
 import { sleep } from "./util/sleep.js"
 import { WebSocketClient } from "./util/websocket.js"
 
 const test = anyTest as TestFn<TestEnvironment>
-
-test.before(async () => {
-  await DroneRunner.build()
-})
 
 test.beforeEach(async (t) => {
   t.context = await TestEnvironment.create()

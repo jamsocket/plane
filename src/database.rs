@@ -54,8 +54,7 @@ impl DroneDatabase {
         backend: &BackendId,
         state: BackendState,
     ) -> Result<()> {
-        let state =
-            serde_json::to_string(&state).expect("BackendState serialization should never fail.");
+        let state = state.to_string();
 
         sqlx::query!(
             r"

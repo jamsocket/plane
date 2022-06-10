@@ -4,7 +4,7 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::IpAddr, time::Duration};
+use std::{collections::HashMap, net::IpAddr, time::Duration, str::FromStr};
 
 /// A request from a drone to connect to the platform.
 #[derive(Serialize, Deserialize, Debug)]
@@ -87,6 +87,41 @@ pub enum BackendState {
 
     /// The container was terminated because all connections were closed.
     Swept,
+}
+
+impl FromStr for BackendState {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Loading" => Ok(BackendState::Loading),
+            "ErrorLoading" => Ok(BackendState::ErrorLoading),
+            "Starting" => Ok(BackendState::Starting),
+            "ErrorStarting" => Ok(BackendState::ErrorStarting),
+            "Ready" => Ok(BackendState::Ready),
+            "TimedOutBeforeReady" => Ok(BackendState::TimedOutBeforeReady),
+            "Failed" => Ok(BackendState::Failed),
+            "Exited" => Ok(BackendState::Exited),
+            "Swept" => Ok(BackendState::Swept),
+            _ => Err(anyhow::anyhow!("The string {:?} does not describe a valid state.", s))
+        }
+    }
+}
+
+impl ToString for BackendState {
+    fn to_string(&self) -> String {
+        match self {
+            BackendState::Loading => "Loading".to_string(),
+            BackendState::ErrorLoading => "ErrorLoading".to_string(),
+            BackendState::Starting => "Starting".to_string(),
+            BackendState::ErrorStarting => "ErrorStarting".to_string(),
+            BackendState::Ready => "Ready".to_string(),
+            BackendState::TimedOutBeforeReady => "TimedOutBeforeReady".to_string(),
+            BackendState::Failed => "Failed".to_string(),
+            BackendState::Exited => "Exited".to_string(),
+            BackendState::Swept => "Swept".to_string(),
+        }
+    }
 }
 
 impl BackendState {

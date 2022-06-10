@@ -14,7 +14,7 @@ app.get('/', (req, res) => {
   res.send('Hello World!')
 })
 
-app.get('/exit/:code', (req, res) => {
+app.get('/exit/:code', (req) => {
   exit(parseInt(req.params.code))
 })
 

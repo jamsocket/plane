@@ -1,17 +1,12 @@
 import anyTest, { TestFn } from "ava"
+import { mkdirSync } from "fs"
+import { connect } from "nats"
 import { KeyCertPair, validateCertificateKeyPair } from "./util/certificates.js"
 import { TestEnvironment } from "./util/environment.js"
-import { DroneRunner } from "./util/runner.js"
-import { connect } from "nats"
-import { sleep } from "./util/sleep.js"
-import { mkdirSync } from "fs"
 import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
+import { sleep } from "./util/sleep.js"
 
 const test = anyTest as TestFn<TestEnvironment>
-
-test.before(async () => {
-  await DroneRunner.build()
-})
 
 test.beforeEach(async (t) => {
   t.context = await TestEnvironment.create()

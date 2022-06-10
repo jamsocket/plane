@@ -1,5 +1,3 @@
-use std::pin::Pin;
-
 use crate::database::DroneDatabase;
 use agent::run_agent;
 use anyhow::Result;
@@ -13,6 +11,7 @@ use sqlx::{
     migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
+use std::pin::Pin;
 use tracing_subscriber::{
     prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
