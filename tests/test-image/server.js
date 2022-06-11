@@ -15,6 +15,7 @@ if (exitCode !== null) {
     res.send("Hello World!")
   })
 
+  // Immediately termiante the process with the given exit code.
   app.get('/exit/:code', (req) => {
     exit(parseInt(req.params.code, 10))
   })
