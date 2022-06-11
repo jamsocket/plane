@@ -1,7 +1,7 @@
 {
 	"scripts": {
 		"build": "tsc",
-		"test": "tsc && ava --timeout=30s"
+		"test": "cargo build --manifest-path=../Cargo.toml && tsc && ava --timeout=30s"
 	},
 	"devDependencies": {
 		"@types/express": "^4.17.13",

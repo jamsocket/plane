@@ -5,7 +5,6 @@ import { sleep } from "./sleep.js"
 import { PebbleResult } from "./docker.js"
 import getPort from "@ava/get-port"
 
-const MANIFEST_PATH = process.env.MANIFEST_PATH || "../Cargo.toml"
 const SPAWNER_PATH = "../target/debug/spawner"
 const CLUSTER_DOMAIN = "mydomain.test"
 
@@ -40,14 +39,6 @@ export class DroneRunner implements DropHandler {
     if (this.server !== undefined) {
       await killProcAndWait(this.server)
     }
-  }
-
-  static build(): Promise<void> {
-    const proc = spawn("cargo", ["build", "--manifest-path", MANIFEST_PATH], {
-      stdio: "inherit",
-    })
-
-    return waitForExit(proc)
   }
 
   async migrate() {
@@ -93,7 +84,37 @@ export class DroneRunner implements DropHandler {
     await waitForExit(proc)
   }
 
-  async serve(certs?: KeyCertPair): Promise<ServeResult> {
+  async runAgent(natsPort: number): Promise<void> {
+    const args = [
+      "--cluster-domain",
+      CLUSTER_DOMAIN,
+      "--db-path",
+      this.dbPath,
+      "--nats-url",
+      `nats://localhost:${natsPort}`,
+      "--ip",
+      "123.12.1.123",
+      "--host-ip",
+      "127.0.0.1",
+      "serve",
+      "--agent",
+    ]
+
+    const proc = spawn(SPAWNER_PATH, args, {
+      stdio: "inherit",
+    })
+
+    proc.on("exit", (code) => {
+      if (code !== null) {
+        // Server process should not exit until we kill it.
+        throw new Error(`Process exited with code ${code}.`)
+      }
+    })
+
+    this.server = proc
+  }
+
+  async runProxy(certs?: KeyCertPair): Promise<ServeResult> {
     const httpPort = await getPort()
     let httpsPort
 
