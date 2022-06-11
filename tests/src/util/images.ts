@@ -1,1 +1,1 @@
-export const TEST_IMAGE = "spawner-test-image:latest"
+export const TEST_IMAGE = "ghcr.io/drifting-in-space/test-image:latest"

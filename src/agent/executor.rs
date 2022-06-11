@@ -163,7 +163,7 @@ impl Executor {
     ) -> Result<Option<BackendState>> {
         match state {
             BackendState::Loading => {
-                // self.docker.pull_image(&spawn_request.image).await?;
+                self.docker.pull_image(&spawn_request.image).await?;
 
                 let backend_id = spawn_request.backend_id.to_resource_name();
                 self.docker
