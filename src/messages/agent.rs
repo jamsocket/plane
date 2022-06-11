@@ -4,7 +4,7 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::IpAddr, time::Duration, str::FromStr};
+use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
 
 /// A request from a drone to connect to the platform.
 #[derive(Serialize, Deserialize, Debug)]
@@ -103,7 +103,10 @@ impl FromStr for BackendState {
             "Failed" => Ok(BackendState::Failed),
             "Exited" => Ok(BackendState::Exited),
             "Swept" => Ok(BackendState::Swept),
-            _ => Err(anyhow::anyhow!("The string {:?} does not describe a valid state.", s))
+            _ => Err(anyhow::anyhow!(
+                "The string {:?} does not describe a valid state.",
+                s
+            )),
         }
     }
 }
@@ -126,15 +129,15 @@ impl ToString for BackendState {
 
 impl BackendState {
     pub fn terminal(self) -> bool {
-        match self {
+        matches!(
+            self,
             BackendState::ErrorLoading
-            | BackendState::ErrorStarting
-            | BackendState::TimedOutBeforeReady
-            | BackendState::Failed
-            | BackendState::Exited
-            | BackendState::Swept => true,
-            _ => false,
-        }
+                | BackendState::ErrorStarting
+                | BackendState::TimedOutBeforeReady
+                | BackendState::Failed
+                | BackendState::Exited
+                | BackendState::Swept
+        )
     }
 }
 

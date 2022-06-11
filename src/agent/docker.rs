@@ -21,11 +21,11 @@ pub struct DockerInterface {
     runtime: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ContainerEventType {
     Start,
     Create,
-    Die { error_status: bool },
+    Die,
     Stop,
     Kill,
 }
@@ -33,36 +33,18 @@ pub enum ContainerEventType {
 #[allow(unused)]
 #[derive(Debug)]
 pub struct ContainerEvent {
-    event: ContainerEventType,
-    container: String,
-}
-
-pub fn backend_name(backend: &str) -> String {
-    format!("backend-{}", backend)
-}
-
-pub fn network_name(backend: &str) -> String {
-    format!("network-{}", backend)
+    pub event: ContainerEventType,
+    pub name: String,
 }
 
 impl ContainerEvent {
     pub fn from_event_message(event: &EventMessage) -> Option<Self> {
         let action = event.action.as_deref()?;
         let actor = event.actor.as_ref()?;
-        let container = actor.id.as_deref()?.to_string();
+        let name: String = actor.attributes.as_ref()?.get("name")?.to_string();
 
         let event = match action {
-            "die" => {
-                let exit_code: u32 = actor
-                    .attributes
-                    .as_ref()?
-                    .get("exitCode")?
-                    .parse()
-                    .unwrap_or(1);
-                ContainerEventType::Die {
-                    error_status: exit_code != 0,
-                }
-            }
+            "die" => ContainerEventType::Die,
             "stop" => ContainerEventType::Stop,
             "start" => ContainerEventType::Start,
             "kill" => ContainerEventType::Kill,
@@ -73,7 +55,7 @@ impl ContainerEvent {
             }
         };
 
-        Some(ContainerEvent { event, container })
+        Some(ContainerEvent { event, name })
     }
 }
 
@@ -86,12 +68,12 @@ impl DockerInterface {
     pub async fn try_new(config: &DockerOptions) -> Result<Self> {
         let docker = match &config.transport {
             super::DockerApiTransport::Socket(docker_socket) => Docker::connect_with_unix(
-                &docker_socket,
+                docker_socket,
                 DEFAULT_DOCKER_TIMEOUT_SECONDS,
                 API_DEFAULT_VERSION,
             )?,
             super::DockerApiTransport::Http(docker_http) => Docker::connect_with_http(
-                &docker_http,
+                docker_http,
                 DEFAULT_DOCKER_TIMEOUT_SECONDS,
                 API_DEFAULT_VERSION,
             )?,
@@ -138,19 +120,32 @@ impl DockerInterface {
     pub async fn stop_container(&self, name: &str) -> Result<()> {
         let options = StopContainerOptions { t: 10 };
 
-        self.docker
-            .stop_container(&backend_name(name), Some(options))
-            .await?;
+        self.docker.stop_container(name, Some(options)).await?;
 
-        self.docker.remove_network(&network_name(name)).await?;
+        self.docker.remove_network(name).await?;
 
         Ok(())
+    }
+
+    pub async fn is_running(&self, container_name: &str) -> Result<(bool, Option<i64>)> {
+        let container = self.docker.inspect_container(container_name, None).await?;
+        let state = container
+            .state
+            .ok_or_else(|| anyhow!("No state found for container."))?;
+
+        let running = state
+            .running
+            .ok_or_else(|| anyhow!("State found but no running field for container."))?;
+
+        let exit_code = if running { None } else { state.exit_code };
+
+        Ok((running, exit_code))
     }
 
     pub async fn get_port(&self, container_name: &str) -> Option<u16> {
         let inspect = self
             .docker
-            .inspect_container(&backend_name(container_name), None)
+            .inspect_container(container_name, None)
             .await
             .ok()?;
 
@@ -175,16 +170,12 @@ impl DockerInterface {
         image: &str,
         env: &HashMap<String, String>,
     ) -> Result<()> {
-        let env: Vec<String> = env
-            .into_iter()
-            .map(|(k, v)| format!("{}={}", k, v))
-            .collect();
+        let env: Vec<String> = env.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
 
         // Build the network.
         let network_id = {
-            let network_name = network_name(name);
             let options: CreateNetworkOptions<&str> = CreateNetworkOptions {
-                name: &network_name,
+                name,
                 ..CreateNetworkOptions::default()
             };
 
@@ -197,7 +188,7 @@ impl DockerInterface {
         // Build the container.
         let container_id = {
             let options: Option<CreateContainerOptions<String>> = Some(CreateContainerOptions {
-                name: backend_name(name),
+                name: name.to_string(),
             });
 
             let config: Config<String> = Config {

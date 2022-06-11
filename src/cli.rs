@@ -165,9 +165,9 @@ impl From<Opts> for DronePlan {
 
                 let agent_options = if agent {
                     let docker_transport = if let Some(docker_socket) = opts.docker_socket {
-                        DockerApiTransport::Socket(docker_socket.clone())
+                        DockerApiTransport::Socket(docker_socket)
                     } else if let Some(docker_http) = opts.docker_http {
-                        DockerApiTransport::Http(docker_http.clone())
+                        DockerApiTransport::Http(docker_http)
                     } else {
                         DockerApiTransport::default()
                     };
@@ -180,8 +180,8 @@ impl From<Opts> for DronePlan {
                             transport: docker_transport,
                         },
                         nats_url: opts.nats_url.clone().expect("Expected --nats-url for running agent."),
-                        ip: opts.ip.clone().expect("Expected --ip for running agent."),
-                        host_ip: opts.host_ip.clone().expect("Expected --host-ip for running agent.")
+                        ip: opts.ip.expect("Expected --ip for running agent."),
+                        host_ip: opts.host_ip.expect("Expected --host-ip for running agent.")
                     })
                 } else {
                     None

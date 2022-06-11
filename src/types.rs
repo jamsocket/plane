@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+const RESOURCE_PREFIX: &str = "spawner-";
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct DroneId(u32);
 
@@ -15,5 +17,15 @@ pub struct BackendId(String);
 impl BackendId {
     pub fn id(&self) -> &str {
         &self.0
+    }
+
+    pub fn to_resource_name(&self) -> String {
+        format!("{}{}", RESOURCE_PREFIX, self.0)
+    }
+
+    pub fn from_resource_name(resource_name: &str) -> Option<Self> {
+        resource_name
+            .strip_prefix(RESOURCE_PREFIX)
+            .map(|d| BackendId(d.to_string()))
     }
 }

@@ -1,21 +1,21 @@
 use super::docker::DockerInterface;
 use crate::{
-    agent::wait_port_ready,
+    agent::{docker::ContainerEventType, wait_port_ready},
     database::DroneDatabase,
     messages::agent::{BackendState, BackendStateMessage, SpawnRequest},
     nats::TypedNats,
+    types::BackendId,
 };
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use std::{fmt::Debug, net::IpAddr};
+use dashmap::DashMap;
+use std::{fmt::Debug, net::IpAddr, sync::Arc};
+use tokio::{
+    sync::mpsc::{channel, Sender},
+    task::JoinHandle,
+};
+use tokio_stream::StreamExt;
 use tracing::Level;
-
-pub struct Executor {
-    host_ip: IpAddr,
-    docker: DockerInterface,
-    database: DroneDatabase,
-    nc: TypedNats,
-}
 
 trait LogError {
     fn log_error(&self) -> &Self;
@@ -32,6 +32,15 @@ impl<T, E: Debug> LogError for Result<T, E> {
     }
 }
 
+pub struct Executor {
+    host_ip: IpAddr,
+    docker: DockerInterface,
+    database: DroneDatabase,
+    nc: TypedNats,
+    _container_events_handle: JoinHandle<()>,
+    backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
+}
+
 impl Executor {
     pub fn new(
         docker: DockerInterface,
@@ -39,11 +48,42 @@ impl Executor {
         nc: TypedNats,
         host_ip: IpAddr,
     ) -> Self {
+        let backend_to_listener: Arc<DashMap<BackendId, Sender<()>>> = Arc::default();
+        let container_events_handle = tokio::spawn(Self::listen_for_container_events(
+            docker.clone(),
+            backend_to_listener.clone(),
+        ));
+
         Executor {
             host_ip,
             docker,
             database,
             nc,
+            _container_events_handle: container_events_handle,
+            backend_to_listener,
+        }
+    }
+
+    pub async fn listen_for_container_events(
+        docker: DockerInterface,
+        backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
+    ) {
+        let mut event_stream = docker.container_events().await;
+        while let Some(event) = event_stream.next().await {
+            tracing::info!(?event, "Event about container.");
+
+            if event.event == ContainerEventType::Die {
+                let backend_id =
+                    if let Some(backend_id) = BackendId::from_resource_name(&event.name) {
+                        backend_id
+                    } else {
+                        continue;
+                    };
+
+                if let Some(v) = backend_to_listener.get(&backend_id) {
+                    v.try_send(()).log_error();
+                }
+            }
         }
     }
 
@@ -61,27 +101,47 @@ impl Executor {
             .await
             .log_error();
 
+        let (send, mut recv) = channel(1);
+        self.backend_to_listener
+            .insert(spawn_request.backend_id.clone(), send);
+
+        self.database
+            .update_backend_state(&spawn_request.backend_id, state)
+            .await
+            .log_error();
+        self.nc
+            .publish(
+                &BackendStateMessage::subject(&spawn_request.backend_id),
+                &BackendStateMessage::new(state),
+            )
+            .await
+            .log_error();
+
         loop {
             tracing::info!(?state, "Executing state.");
-            self.database
-                .update_backend_state(&spawn_request.backend_id, state)
-                .await
-                .log_error();
-            self.nc
-                .publish(
-                    &BackendStateMessage::subject(&spawn_request.backend_id),
-                    &BackendStateMessage::new(state),
-                )
-                .await
-                .log_error();
 
-            let next_state = self.step(spawn_request, state).await;
+            let next_state = tokio::select! {
+                next_state = self.step(spawn_request, state) => next_state,
+                v = recv.recv() => {
+                    tracing::info!(?v, "got result");
+                    continue;
+                },
+            };
 
             match next_state {
                 Ok(Some(new_state)) => {
                     state = new_state;
-
-                    continue;
+                    self.database
+                        .update_backend_state(&spawn_request.backend_id, state)
+                        .await
+                        .log_error();
+                    self.nc
+                        .publish(
+                            &BackendStateMessage::subject(&spawn_request.backend_id),
+                            &BackendStateMessage::new(state),
+                        )
+                        .await
+                        .log_error();
                 }
                 Ok(None) => {
                     // Successful termination.
@@ -105,7 +165,7 @@ impl Executor {
             BackendState::Loading => {
                 // self.docker.pull_image(&spawn_request.image).await?;
 
-                let backend_id = spawn_request.backend_id.id().to_string();
+                let backend_id = spawn_request.backend_id.to_resource_name();
                 self.docker
                     .run_container(&backend_id, &spawn_request.image, &spawn_request.env)
                     .await?;
@@ -113,14 +173,23 @@ impl Executor {
                 Ok(Some(BackendState::Starting))
             }
             BackendState::Starting => {
+                if !self
+                    .docker
+                    .is_running(&spawn_request.backend_id.to_resource_name())
+                    .await?
+                    .0
+                {
+                    return Ok(Some(BackendState::ErrorStarting));
+                }
+
                 let port = self
                     .docker
-                    .get_port(&spawn_request.backend_id.id())
+                    .get_port(&spawn_request.backend_id.to_resource_name())
                     .await
                     .ok_or_else(|| {
                         anyhow!(
                             "Couldn't get port of container {}",
-                            spawn_request.backend_id.id()
+                            spawn_request.backend_id.to_resource_name()
                         )
                     })?;
 
@@ -138,8 +207,19 @@ impl Executor {
                 Ok(Some(BackendState::Ready))
             }
             BackendState::Ready => {
-                // wait for idle
+                if let (false, exit_code) = self
+                    .docker
+                    .is_running(&spawn_request.backend_id.to_resource_name())
+                    .await?
+                {
+                    if exit_code == Some(0) {
+                        return Ok(Some(BackendState::Exited));
+                    } else {
+                        return Ok(Some(BackendState::Failed));
+                    }
+                }
 
+                // wait for idle
                 loop {
                     let last_active = self
                         .database
@@ -149,7 +229,7 @@ impl Executor {
                         .checked_add_signed(chrono::Duration::from_std(
                             spawn_request.max_idle_time,
                         )?)
-                        .ok_or(anyhow!("Checked add error."))?;
+                        .ok_or_else(|| anyhow!("Checked add error."))?;
 
                     if next_check < Utc::now() {
                         break;
@@ -167,9 +247,13 @@ impl Executor {
             | BackendState::Failed
             | BackendState::Exited
             | BackendState::Swept => {
-                self.docker
-                    .stop_container(&spawn_request.backend_id.id())
-                    .await?;
+                let container_name = spawn_request.backend_id.to_resource_name();
+                if self.docker.is_running(&container_name).await?.0 {
+                    self.docker
+                        .stop_container(&container_name)
+                        .await
+                        .map_err(|e| anyhow!("Error stopping container: {:?}", e))?;
+                }
 
                 Ok(None)
             }
