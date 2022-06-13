@@ -473,6 +473,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "dis-spawner"
+version = "0.2.0"
+dependencies = [
+ "acme2",
+ "anyhow",
+ "bollard",
+ "chrono",
+ "clap",
+ "dashmap",
+ "futures",
+ "http",
+ "hyper",
+ "nats",
+ "notify",
+ "openssl",
+ "reqwest",
+ "rustls 0.20.6",
+ "rustls-pemfile 1.0.0",
+ "serde",
+ "serde_json",
+ "signal-hook",
+ "sqlx",
+ "tokio",
+ "tokio-rustls 0.23.4",
+ "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "dotenv"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1866,6 +1896,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "signal-hook"
+version = "0.3.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a253b5e89e2698464fc26b545c9edceb338e18a89effeeecfea192c3025be29d"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1912,35 +1952,6 @@ checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "spawner"
-version = "0.1.0"
-dependencies = [
- "acme2",
- "anyhow",
- "bollard",
- "chrono",
- "clap",
- "dashmap",
- "futures",
- "http",
- "hyper",
- "nats",
- "notify",
- "openssl",
- "reqwest",
- "rustls 0.20.6",
- "rustls-pemfile 1.0.0",
- "serde",
- "serde_json",
- "sqlx",
- "tokio",
- "tokio-rustls 0.23.4",
- "tokio-stream",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

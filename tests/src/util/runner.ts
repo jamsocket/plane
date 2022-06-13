@@ -5,7 +5,7 @@ import { sleep } from "./sleep.js"
 import { PebbleResult } from "./docker.js"
 import getPort from "@ava/get-port"
 
-const SPAWNER_PATH = "../target/debug/spawner"
+const SPAWNER_PATH = "../target/debug/spawner-drone"
 const CLUSTER_DOMAIN = "mydomain.test"
 
 export function waitForExit(proc: ChildProcess): Promise<void> {
