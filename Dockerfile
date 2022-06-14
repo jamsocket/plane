@@ -1,4 +1,4 @@
-FROM rust:latest as build
+FROM rust:buster as build
 
 WORKDIR /work
 
@@ -8,7 +8,7 @@ RUN cargo build --bin=spawner-drone --features=full --release
 
 RUN ls /work/target/release
 
-FROM debian:buster-slim
+FROM gcr.io/distroless/cc-debian11
 
 COPY --from=build /work/target/release/spawner-drone /bin/spawner-drone
 
