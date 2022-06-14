@@ -1,4 +1,5 @@
 target
 .vscode
 .github
+.cargo
 tests
