@@ -8,8 +8,8 @@ RUN cargo build --bin=spawner-drone --features=full --release
 
 RUN ls /work/target/release
 
-FROM alpine:latest
+FROM debian:buster-slim
 
 COPY --from=build /work/target/release/spawner-drone /bin/spawner-drone
 
-CMD ["/bin/spawner-drone"]
+ENTRYPOINT ["/bin/spawner-drone"]
