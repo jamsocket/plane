@@ -1,4 +1,3 @@
-
 #[cfg(feature = "full")]
 mod agent;
 #[cfg(feature = "full")]
@@ -17,4 +16,3 @@ mod proxy;
 #[cfg(feature = "full")]
 mod retry;
 pub mod types;
-

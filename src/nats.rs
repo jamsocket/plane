@@ -2,13 +2,15 @@
 //!
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use futures::channel::oneshot::channel;
+use futures::Stream;
 use nats::asynk::{Connection, Message, Subscription};
 use nats::jetstream::{JetStream, SubscribeOptions};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::time::Duration;
+use tokio::sync::mpsc;
 
 #[derive(Serialize, Deserialize)]
 pub enum NoReply {}
@@ -67,6 +69,26 @@ where
     R: Serialize + DeserializeOwned,
 {
     fn subject(&self) -> &str;
+}
+
+impl<M, R> Subscribable<M, R> for Subject<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
+    fn subject(&self) -> &str {
+        &self.subject
+    }
+}
+
+impl<M, R> Subscribable<M, R> for SubscribeSubject<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
+    fn subject(&self) -> &str {
+        &self.subject
+    }
 }
 
 impl<M, R> Subscribable<M, R> for &Subject<M, R>
@@ -191,6 +213,56 @@ impl TypedNats {
         } else {
             Ok(None)
         }
+    }
+
+    pub async fn subscribe_jetstream<P, T, R>(&self, subject: P) -> impl Stream<Item = T>
+    where
+        P: Subscribable<T, R>,
+        T: Serialize + DeserializeOwned + Send + 'static,
+        R: Serialize + DeserializeOwned,
+    {
+        let jetstream = self.jetstream.clone();
+        let subject = subject.subject().to_string();
+
+        // nats_rs does not yet have async support (https://github.com/nats-io/nats.rs/issues/194),
+        // so this is less elegant than it could be.
+        // The approach is to create a multiple-producer, single-consumer (mpsc) channel,
+        // and run a loop in a tokio thread designated to allow blocking.
+        // Technically, this could be a oneshot channel rather than mpsc, since we only ever
+        // have one sender. But tokio ships with a convenient `ReceiverStream` that wraps
+        // an mpsc receiver and implements `Stream`, so we use that approach for now.
+        let (tx, rx) = mpsc::channel(256);
+        tokio::task::spawn_blocking(move || {
+            let subscription = match jetstream.subscribe(&subject) {
+                Ok(subscription) => subscription,
+                Err(error) => {
+                    tracing::error!(?error, "Error subscribing to backend status.");
+                    return;
+                }
+            };
+
+            for message in subscription.iter() {
+                if let Err(error) = message.ack() {
+                    tracing::warn!(%error, "Error acknowledging backend status message.");
+                }
+
+                let v: T = match serde_json::from_slice(&message.data) {
+                    Ok(v) => v,
+                    Err(error) => {
+                        tracing::error!(?error, "Couldn't parse backend status.");
+                        continue;
+                    }
+                };
+
+                let _ = tx.blocking_send(v);
+            }
+        });
+
+        // TODO: is the connection leaked?
+        // We probably want to keep track of the `JoinHandle` created by `spawn_blocking`,
+        // and call .abort() on it when the stream is dropped. This will require implementing
+        // an alternative to tokio's `ReceiverStream`.
+        tokio_stream::wrappers::ReceiverStream::new(rx)
     }
 
     pub async fn publish<T>(&self, subject: &Subject<T, NoReply>, value: &T) -> Result<()>

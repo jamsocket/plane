@@ -8,11 +8,15 @@
 //! based on type information stored in `sqlx-data.json`. If
 //! you change a query in this file, you will likely need to
 //! run `generate-sqlx-data.mjs` to get Rust to accept it.
-use chrono::{DateTime, TimeZone, Utc};
-use sqlx::{Result, SqlitePool, sqlite::{SqliteConnectOptions, SqlitePoolOptions}, migrate};
 use crate::{
     messages::agent::{BackendState, SpawnRequest},
     types::BackendId,
+};
+use chrono::{DateTime, TimeZone, Utc};
+use sqlx::{
+    migrate,
+    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    Result, SqlitePool,
 };
 
 #[allow(unused)]

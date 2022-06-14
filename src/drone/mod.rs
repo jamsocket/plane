@@ -1,5 +1,8 @@
 use self::cli::{DronePlan, Opts};
-use crate::{agent::run_agent, cert::refresh_certificate, proxy::serve, logging::init_tracing, database::get_db};
+use crate::{
+    agent::run_agent, cert::refresh_certificate, database::get_db, logging::init_tracing,
+    proxy::serve,
+};
 use anyhow::Result;
 use clap::Parser;
 use futures::{future::select_all, Future};

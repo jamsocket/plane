@@ -9,7 +9,7 @@ use tokio::sync::mpsc::Sender;
 use tracing::field::{Field, Visit};
 use tracing_stackdriver::Stackdriver;
 use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::{layer::Context, EnvFilter, Layer, util::SubscriberInitExt};
+use tracing_subscriber::{layer::Context, util::SubscriberInitExt, EnvFilter, Layer};
 
 const TRACE_STACKDRIVER: &str = "TRACE_STACKDRIVER";
 
@@ -22,10 +22,10 @@ async fn do_logs(nc: &TypedNats, mut recv: tokio::sync::mpsc::Receiver<LogMessag
 }
 
 pub fn init_tracing() -> Result<()> {
-    let filter_layer = EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info,sqlx=warn"))?;
+    let filter_layer =
+        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info,sqlx=warn"))?;
 
-    let registry = tracing_subscriber::registry()
-        .with(filter_layer);
+    let registry = tracing_subscriber::registry().with(filter_layer);
 
     let trace_stackdriver = std::env::var(TRACE_STACKDRIVER).is_ok();
     if trace_stackdriver {
@@ -40,7 +40,8 @@ pub fn init_tracing() -> Result<()> {
 pub fn init_tracing_with_nats(nats: TypedNats) -> Result<()> {
     let (send, recv) = tokio::sync::mpsc::channel::<LogMessage>(128);
 
-    let filter_layer = EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info,sqlx=warn"))?;
+    let filter_layer =
+        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info,sqlx=warn"))?;
 
     let registry = tracing_subscriber::registry()
         .with(LogManagerLogger::new(send))
