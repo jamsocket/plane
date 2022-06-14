@@ -9,8 +9,7 @@
 //! you change a query in this file, you will likely need to
 //! run `generate-sqlx-data.mjs` to get Rust to accept it.
 use chrono::{DateTime, TimeZone, Utc};
-use sqlx::{Result, SqlitePool};
-
+use sqlx::{Result, SqlitePool, sqlite::{SqliteConnectOptions, SqlitePoolOptions}, migrate};
 use crate::{
     messages::agent::{BackendState, SpawnRequest},
     types::BackendId,
@@ -142,4 +141,14 @@ impl DroneDatabase {
 
         Ok(Utc.timestamp(time, 0))
     }
+}
+
+pub async fn get_db(db_path: &str) -> Result<DroneDatabase> {
+    let co = SqliteConnectOptions::new()
+        .filename(db_path)
+        .create_if_missing(true);
+    let pool = SqlitePoolOptions::new().connect_with(co).await?;
+    migrate!("./migrations").run(&pool).await?;
+
+    Ok(DroneDatabase::new(pool))
 }

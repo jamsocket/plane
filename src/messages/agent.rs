@@ -6,6 +6,19 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DroneStatusMessage {
+    pub drone_id: DroneId,
+    pub cluster: String,
+    pub capacity: u32,
+}
+
+impl DroneStatusMessage {
+    pub fn subject() -> Subject<DroneStatusMessage, NoReply> {
+        Subject::new("drone.status".to_string())
+    }
+}
+
 /// A request from a drone to connect to the platform.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DroneConnectRequest {

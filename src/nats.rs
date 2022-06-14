@@ -2,10 +2,13 @@
 //!
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
+use futures::channel::oneshot::channel;
 use nats::asynk::{Connection, Message, Subscription};
+use nats::jetstream::{JetStream, SubscribeOptions};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::marker::PhantomData;
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize)]
 pub enum NoReply {}
@@ -86,6 +89,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct MessageWithResponseHandle<T, R>
 where
     T: Serialize + DeserializeOwned,
@@ -149,17 +153,44 @@ where
 #[derive(Clone)]
 pub struct TypedNats {
     nc: Connection,
+    jetstream: JetStream,
 }
 
 impl TypedNats {
     pub async fn connect(nats_url: &str) -> Result<Self> {
         let nc = nats::asynk::connect(nats_url).await?;
+        let jetstream = nats::jetstream::new(nats::connect(nats_url)?);
 
-        Ok(Self::new(nc))
+        Ok(Self::new(nc, jetstream))
     }
 
-    pub fn new(nc: Connection) -> Self {
-        TypedNats { nc }
+    pub fn new(nc: Connection, jetstream: JetStream) -> Self {
+        TypedNats { nc, jetstream }
+    }
+
+    pub async fn get_latest<T>(&self, subject: &Subject<T, NoReply>) -> Result<Option<T>>
+    where
+        T: Serialize + DeserializeOwned,
+    {
+        let subscription = self
+            .jetstream
+            .subscribe_with_options(subject.subject(), &SubscribeOptions::new().deliver_last())?;
+
+        let (send, recv) = channel();
+        tokio::task::spawn_blocking(move || {
+            let result = subscription.next_timeout(Duration::from_secs(1));
+            send.send(result)
+        });
+
+        let result = recv
+            .await
+            .map_err(|_| anyhow!("Error receiving from channel."))?;
+
+        if let Ok(result) = result {
+            Ok(Some(serde_json::from_slice(&result.data)?))
+        } else {
+            Ok(None)
+        }
     }
 
     pub async fn publish<T>(&self, subject: &Subject<T, NoReply>, value: &T) -> Result<()>

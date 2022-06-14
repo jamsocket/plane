@@ -1,5 +1,5 @@
 use self::cli::{DronePlan, Opts};
-use crate::{agent::run_agent, cert::refresh_certificate, get_db, init_tracing, proxy::serve};
+use crate::{agent::run_agent, cert::refresh_certificate, proxy::serve, logging::init_tracing, database::get_db};
 use anyhow::Result;
 use clap::Parser;
 use futures::{future::select_all, Future};
@@ -9,7 +9,7 @@ use std::{pin::Pin, thread};
 pub mod cli;
 
 async fn main() -> Result<()> {
-    init_tracing()?;
+    init_tracing()?; // TODO: init sender if we have nats.
     let opts = Opts::parse();
     let plan = DronePlan::try_from(opts)?;
 

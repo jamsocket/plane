@@ -1,7 +1,6 @@
 use self::{docker::DockerInterface, executor::Executor};
 use crate::{
-    database::DroneDatabase,
-    get_db,
+    database::{DroneDatabase, get_db},
     messages::agent::{BackendState, DroneConnectRequest, DroneConnectResponse, SpawnRequest},
     nats::TypedNats,
     retry::do_with_retry,
