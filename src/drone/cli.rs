@@ -11,49 +11,49 @@ pub struct Opts {
     /// Path to sqlite3 database file to use for getting route information.
     ///
     /// This may be a file that does not exist. In this case, it will be created.
-    #[clap(long)]
+    #[clap(long, action)]
     pub db_path: Option<String>,
 
     /// The domain of the cluster that this drone serves.
-    #[clap(long)]
+    #[clap(long, action)]
     pub cluster_domain: Option<String>,
 
     /// Port to listen for HTTP requests on.
-    #[clap(long, default_value = "80")]
+    #[clap(long, default_value = "80", action)]
     pub http_port: u16,
 
     /// Port to listen for HTTPS requests on.
-    #[clap(long, default_value = "443")]
+    #[clap(long, default_value = "443", action)]
     pub https_port: u16,
 
     /// Path to read private key from.
-    #[clap(long)]
+    #[clap(long, action)]
     pub https_private_key: Option<PathBuf>,
 
     /// Path to read certificate from.
-    #[clap(long)]
+    #[clap(long, action)]
     pub https_certificate: Option<PathBuf>,
 
     /// Hostname for connecting to NATS.
-    #[clap(long)]
+    #[clap(long, action)]
     pub nats_url: Option<String>,
 
-    #[clap(long)]
+    #[clap(long, action)]
     pub acme_server_url: Option<String>,
 
-    #[clap(long)]
+    #[clap(long, action)]
     pub ip: Option<IpAddr>,
 
-    #[clap(long)]
+    #[clap(long, action)]
     pub host_ip: Option<IpAddr>,
 
-    #[clap(long)]
+    #[clap(long, action)]
     pub docker_runtime: Option<String>,
 
-    #[clap(long)]
+    #[clap(long, action)]
     pub docker_socket: Option<String>,
 
-    #[clap(long)]
+    #[clap(long, action)]
     pub docker_http: Option<String>,
 
     #[clap(subcommand)]
@@ -71,11 +71,11 @@ enum Command {
     /// Run one or more components as a service, indefinitely. Components are selected with --proxy, --agent, and --refresh.
     Serve {
         /// Run the proxy server.
-        #[clap(long)]
+        #[clap(long, action)]
         proxy: bool,
 
         /// Run the agent.
-        #[clap(long)]
+        #[clap(long, action)]
         agent: bool,
     },
 }

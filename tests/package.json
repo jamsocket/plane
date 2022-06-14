@@ -1,7 +1,7 @@
 {
 	"scripts": {
 		"build": "tsc",
-		"test": "cargo build --manifest-path=../Cargo.toml && tsc && ava --timeout=120s"
+		"test": "cargo build --manifest-path=../Cargo.toml --features=full --bin=spawner-drone && tsc && ava --timeout=60s"
 	},
 	"devDependencies": {
 		"@types/express": "^4.17.13",

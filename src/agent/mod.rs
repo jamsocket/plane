@@ -1,11 +1,10 @@
 use self::{docker::DockerInterface, executor::Executor};
 use crate::{
-    database::DroneDatabase,
-    get_db,
-    messages::agent::{BackendState, DroneConnectRequest, DroneConnectResponse, SpawnRequest},
+    database::{get_db, DroneDatabase},
+    messages::agent::{BackendState, DroneConnectRequest, DroneConnectResponse, SpawnRequest, DroneStatusMessage},
     nats::TypedNats,
     retry::do_with_retry,
-    types::DroneId,
+    types::DroneId, logging::LogError,
 };
 use anyhow::{anyhow, Result};
 use http::Uri;
@@ -91,6 +90,23 @@ pub async fn listen_for_spawn_requests(
     }
 }
 
+/// Repeatedly publish a status message advertising this drone as available.
+async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: String) {
+    let mut interval = tokio::time::interval(Duration::from_secs(4));
+
+    loop {
+        nc.publish(&DroneStatusMessage::subject(&drone_id), &DroneStatusMessage {
+            drone_id,
+            capacity: 100,
+            cluster: cluster.to_string(),
+        })
+        .await
+        .log_error("Error in ready loop.");
+
+        interval.tick().await;
+    }
+}
+
 pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     let nats = do_with_retry(
         || TypedNats::connect(&agent_opts.nats_url),
@@ -100,19 +116,28 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     .await?;
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
     let db = get_db(&agent_opts.db_path).await?;
+    let cluster = agent_opts.cluster_domain.to_string();
 
     let result = nats
         .request(
             &DroneConnectRequest::subject(),
             &DroneConnectRequest {
-                cluster: agent_opts.cluster_domain.to_string(),
+                cluster: cluster.clone(),
                 ip: agent_opts.ip,
             },
         )
         .await?;
+    
+    tracing::info!(?result, "here1");
 
     match result {
         DroneConnectResponse::Success { drone_id } => {
+            {
+                let nats = nats.clone();
+                let cluster = cluster.clone();
+                tokio::spawn(ready_loop(nats, drone_id, cluster));
+            }
+
             listen_for_spawn_requests(drone_id, docker, nats, agent_opts.host_ip, db).await
         }
         DroneConnectResponse::NoSuchCluster => Err(anyhow!(

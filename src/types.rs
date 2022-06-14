@@ -6,8 +6,16 @@ const RESOURCE_PREFIX: &str = "spawner-";
 pub struct DroneId(u32);
 
 impl DroneId {
+    pub fn new(id: u32) -> Self {
+        DroneId(id)
+    }
+
     pub fn id(&self) -> u32 {
         self.0
+    }
+
+    pub fn id_i32(&self) -> i32 {
+        self.0 as i32
     }
 }
 
@@ -15,6 +23,10 @@ impl DroneId {
 pub struct BackendId(String);
 
 impl BackendId {
+    pub fn new(id: String) -> Self {
+        BackendId(id)
+    }
+
     pub fn id(&self) -> &str {
         &self.0
     }

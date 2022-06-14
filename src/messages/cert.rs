@@ -11,7 +11,7 @@ pub struct SetAcmeDnsRecord {
 }
 
 impl SetAcmeDnsRecord {
-    pub fn subject() -> Subject<SetAcmeDnsRecord, ()> {
+    pub fn subject() -> Subject<SetAcmeDnsRecord, bool> {
         Subject::new("acme.set_dns_record".to_string())
     }
 }

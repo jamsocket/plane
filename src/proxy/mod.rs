@@ -2,7 +2,10 @@ use self::{
     certs::CertRefresher, connection_tracker::ConnectionTracker, service::MakeProxyService,
     tls::TlsAcceptor,
 };
-use crate::{database::DroneDatabase, get_db, KeyCertPathPair};
+use crate::{
+    database::{get_db, DroneDatabase},
+    keys::KeyCertPathPair,
+};
 use anyhow::Result;
 use hyper::{server::conn::AddrIncoming, Server};
 use std::{net::SocketAddr, sync::Arc, time::Duration};

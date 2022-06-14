@@ -1,10 +1,27 @@
 use crate::{
-    nats::{NoReply, Subject},
+    nats::{NoReply, Subject, SubscribeSubject},
     types::{BackendId, DroneId},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DroneStatusMessage {
+    pub drone_id: DroneId,
+    pub cluster: String,
+    pub capacity: u32,
+}
+
+impl DroneStatusMessage {
+    pub fn subject(drone_id: &DroneId) -> Subject<DroneStatusMessage, NoReply> {
+        Subject::new(format!("drone.{}.status", drone_id.id()))
+    }
+
+    pub fn subject_subscribe() -> SubscribeSubject<DroneStatusMessage, bool> {
+        SubscribeSubject::new("drone.*.status".to_string())
+    }
+}
 
 /// A request from a drone to connect to the platform.
 #[derive(Serialize, Deserialize, Debug)]
