@@ -3,12 +3,8 @@ name: Build Drone Image
 on:
   push:
     branches: [ "main" ]
-    paths:
-    - 'tests/test-image/*'
   pull_request:
     branches: [ "main" ]
-    paths:
-    - 'tests/test-image/*'
 
 env:
   REGISTRY: ghcr.io
