@@ -1,5 +1,5 @@
 use crate::{
-    nats::{NoReply, Subject},
+    nats::{NoReply, Subject, SubscribeSubject},
     types::{BackendId, DroneId},
 };
 use chrono::{DateTime, Utc};
@@ -14,8 +14,12 @@ pub struct DroneStatusMessage {
 }
 
 impl DroneStatusMessage {
-    pub fn subject() -> Subject<DroneStatusMessage, NoReply> {
-        Subject::new("drone.status".to_string())
+    pub fn subject(drone_id: &DroneId) -> Subject<DroneStatusMessage, NoReply> {
+        Subject::new(format!("drone.{}.status", drone_id.id()))
+    }
+
+    pub fn subject_subscribe() -> SubscribeSubject<DroneStatusMessage, bool> {
+        SubscribeSubject::new("drone.*.status".to_string())
     }
 }
 

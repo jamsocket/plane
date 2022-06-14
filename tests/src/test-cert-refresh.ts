@@ -23,10 +23,12 @@ interface DnsMessage {
 
 test("Generate certificate", async (t) => {
   const natsPort = await t.context.docker.runNats()
-  const nats = await connect({ port: natsPort })
   const pebble = await t.context.docker.runPebble()
 
-  await sleep(1000)
+  await sleep(500)
+  const nats = await connect({ port: natsPort })
+  await sleep(500)
+  
   mkdirSync(t.context.tempdir.path("keys"))
 
   const keyPair = new KeyCertPair(
@@ -45,7 +47,7 @@ test("Generate certificate", async (t) => {
   )
 
   const [val, msg] = await sub.next()
-  await msg.respond(JSON_CODEC.encode(null))
+  await msg.respond(JSON_CODEC.encode(true))
 
   t.is(val.cluster, "mydomain.test")
   t.regex(val.value, /^.{10,}$/)

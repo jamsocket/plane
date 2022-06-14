@@ -51,6 +51,52 @@ interface BackendStateMessage {
   time: string
 }
 
+interface DroneStatusMessage {
+  drone_id: number,
+  capacity: number,
+  cluster: string,
+}
+
+test("Drone sends ready messages", async (t) => {
+  const natsPort = await t.context.docker.runNats()
+  await sleep(100)
+  const nats = await connect({ port: natsPort })
+
+  const connectionRequestSubscription =
+    new NatsMessageIterator<DroneConnectRequest>(
+      nats.subscribe("drone.register")
+    )
+
+  t.context.runner.runAgent(natsPort)
+
+  // Initial handshake.
+  const [val, msg] = await connectionRequestSubscription.next()
+  t.deepEqual(val, {
+    cluster: "mydomain.test",
+    ip: "123.12.1.123",
+  })
+
+  await msg.respond(
+    JSON_CODEC.encode({
+      Success: {
+        drone_id: 345,
+      },
+    })
+  )
+
+  const droneStatusSubscription = new NatsMessageIterator<DroneStatusMessage>(
+    nats.subscribe("drone.345.status")
+  )
+
+  let status1 = (await droneStatusSubscription.next())[0]
+  t.is(status1.drone_id, 345)
+  t.is(status1.cluster, "mydomain.test")
+
+  let status2 = (await droneStatusSubscription.next())[0]
+  t.is(status2.drone_id, 345)
+  t.is(status2.cluster, "mydomain.test")
+})
+
 test("Spawn with agent", async (t) => {
   const backendId = generateId()
 
