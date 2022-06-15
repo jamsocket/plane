@@ -264,7 +264,7 @@ test("Backend fails after ready", async (t) => {
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
-  const nats = await connect({ port: natsPort })
+  const nats = await connect({ port: natsPort, token: "mytoken" })
 
   const connectionRequestSubscription =
     new NatsMessageIterator<DroneConnectRequest>(

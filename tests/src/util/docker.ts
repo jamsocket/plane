@@ -46,6 +46,12 @@ export class Docker implements DropHandler {
       HostConfig: {
         PortBindings: { ["4222/tcp"]: [{ HostPort: port.toString() }] },
       },
+      Cmd: [
+        "--config",
+        "nats-server.conf",
+        "--auth",
+        "mytoken"
+      ]
     })
 
     return port
