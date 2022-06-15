@@ -1,3 +1,4 @@
+import getPort from "@ava/get-port"
 import anyTest, { TestFn } from "ava"
 import axios from "axios"
 import { connect } from "nats"
@@ -56,6 +57,27 @@ interface DroneStatusMessage {
   capacity: number,
   cluster: string,
 }
+
+test("Test using IP lookup API", async (t) => {
+  const natsPort = await t.context.docker.runNats()
+  await sleep(100)
+  const nats = await connect({ port: natsPort })
+
+  const connectionRequestSubscription =
+    new NatsMessageIterator<DroneConnectRequest>(
+      nats.subscribe("drone.register")
+    )
+
+  const lookupApiPort = await t.context.dummyServer.serveIpAddress()
+  t.context.runner.runAgentWithIpApi(natsPort, `http://localhost:${lookupApiPort}/ip`)
+
+  // Initial handshake.
+  const [val, msg] = await connectionRequestSubscription.next()
+  t.deepEqual(val, {
+    cluster: "mydomain.test",
+    ip: "21.22.23.24",
+  })
+})
 
 test("Drone sends ready messages", async (t) => {
   const natsPort = await t.context.docker.runNats()

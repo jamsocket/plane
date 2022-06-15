@@ -70,8 +70,6 @@ impl Executor {
     ) {
         let mut event_stream = docker.container_events().await;
         while let Some(event) = event_stream.next().await {
-            tracing::info!(?event, "Event about container.");
-
             if event.event == ContainerEventType::Die {
                 let backend_id =
                     if let Some(backend_id) = BackendId::from_resource_name(&event.name) {

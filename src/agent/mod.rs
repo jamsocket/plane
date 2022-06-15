@@ -4,7 +4,7 @@ use crate::{
     messages::agent::{BackendState, DroneConnectRequest, DroneConnectResponse, SpawnRequest, DroneStatusMessage},
     nats::TypedNats,
     retry::do_with_retry,
-    types::DroneId, logging::LogError,
+    types::DroneId, logging::LogError, drone::cli::IpProvider,
 };
 use anyhow::{anyhow, Result};
 use http::Uri;
@@ -39,7 +39,7 @@ pub struct AgentOptions {
     pub cluster_domain: String,
 
     /// Public IP of the machine the drone is running on.
-    pub ip: IpAddr,
+    pub ip: IpProvider,
 
     /// Internal IP of the machine the drone is running on.
     pub host_ip: IpAddr,
@@ -117,13 +117,14 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
     let db = get_db(&agent_opts.db_path).await?;
     let cluster = agent_opts.cluster_domain.to_string();
+    let ip = agent_opts.ip.get_ip().await?;
 
     let result = nats
         .request(
             &DroneConnectRequest::subject(),
             &DroneConnectRequest {
                 cluster: cluster.clone(),
-                ip: agent_opts.ip,
+                ip,
             },
         )
         .await?;

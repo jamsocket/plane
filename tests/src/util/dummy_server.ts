@@ -7,6 +7,23 @@ import getPort from "@ava/get-port"
 export class DummyServer implements DropHandler {
   servers: Array<Server | WebSocketServer> = []
 
+  async serveIpAddress(): Promise<number> {
+    const app = express()
+    const port = await getPort()
+    
+    app.get("/ip", (req, res) => {
+      res.send("21.22.23.24")
+    })
+
+    return await new Promise((accept) => {
+      this.servers.push(
+        app.listen(port, () => {
+          accept(port)
+        })
+      )
+    })
+  }
+
   async serveHelloWorld(): Promise<number> {
     const app = express()
 

@@ -84,6 +84,36 @@ export class DroneRunner implements DropHandler {
     await waitForExit(proc)
   }
 
+  async runAgentWithIpApi(natsPort: number, ipApi: string): Promise<void> {
+    const args = [
+      "--cluster-domain",
+      CLUSTER_DOMAIN,
+      "--db-path",
+      this.dbPath,
+      "--nats-url",
+      `nats://localhost:${natsPort}`,
+      "--ip-api",
+      ipApi,
+      "--host-ip",
+      "127.0.0.1",
+      "serve",
+      "--agent",
+    ]
+
+    const proc = spawn(SPAWNER_PATH, args, {
+      stdio: "inherit",
+    })
+
+    proc.on("exit", (code) => {
+      if (code !== null) {
+        // Server process should not exit until we kill it.
+        throw new Error(`Process exited with code ${code}.`)
+      }
+    })
+
+    this.server = proc
+  }
+
   async runAgent(natsPort: number): Promise<void> {
     const args = [
       "--cluster-domain",
