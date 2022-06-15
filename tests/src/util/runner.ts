@@ -62,7 +62,7 @@ export class DroneRunner implements DropHandler {
       SPAWNER_PATH,
       [
         "--nats-url",
-        `localhost:${natsPort}`,
+        `nats://mytoken@localhost:${natsPort}`,
         "--https-private-key",
         certs.privateKeyPath,
         "--https-certificate",
@@ -91,7 +91,7 @@ export class DroneRunner implements DropHandler {
       "--db-path",
       this.dbPath,
       "--nats-url",
-      `nats://localhost:${natsPort}`,
+      `nats://mytoken@localhost:${natsPort}`,
       "--ip-api",
       ipApi,
       "--host-ip",

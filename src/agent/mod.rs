@@ -1,10 +1,14 @@
 use self::{docker::DockerInterface, executor::Executor};
 use crate::{
     database::{get_db, DroneDatabase},
-    messages::agent::{BackendState, DroneConnectRequest, DroneConnectResponse, SpawnRequest, DroneStatusMessage},
+    drone::cli::IpProvider,
+    logging::LogError,
+    messages::agent::{
+        BackendState, DroneConnectRequest, DroneConnectResponse, DroneStatusMessage, SpawnRequest,
+    },
     nats::TypedNats,
     retry::do_with_retry,
-    types::DroneId, logging::LogError, drone::cli::IpProvider,
+    types::DroneId,
 };
 use anyhow::{anyhow, Result};
 use http::Uri;
@@ -95,11 +99,14 @@ async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: String) {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
-        nc.publish(&DroneStatusMessage::subject(&drone_id), &DroneStatusMessage {
-            drone_id,
-            capacity: 100,
-            cluster: cluster.to_string(),
-        })
+        nc.publish(
+            &DroneStatusMessage::subject(&drone_id),
+            &DroneStatusMessage {
+                drone_id,
+                capacity: 100,
+                cluster: cluster.to_string(),
+            },
+        )
         .await
         .log_error("Error in ready loop.");
 
@@ -119,17 +126,20 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     let cluster = agent_opts.cluster_domain.to_string();
     let ip = agent_opts.ip.get_ip().await?;
 
-    let result = nats
-        .request(
-            &DroneConnectRequest::subject(),
-            &DroneConnectRequest {
-                cluster: cluster.clone(),
-                ip,
-            },
-        )
-        .await?;
-    
-    tracing::info!(?result, "here1");
+    let result = {
+        let subject = DroneConnectRequest::subject();
+        let request = DroneConnectRequest {
+            cluster: cluster.clone(),
+            ip,
+        };
+        do_with_retry(|| {
+            nats.request(
+                &subject,
+                &request,
+            )
+        }, 30, Duration::from_secs(10))
+        .await?
+    };
 
     match result {
         DroneConnectResponse::Success { drone_id } => {

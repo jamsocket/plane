@@ -26,7 +26,7 @@ test("Generate certificate", async (t) => {
   const pebble = await t.context.docker.runPebble()
 
   await sleep(500)
-  const nats = await connect({ port: natsPort })
+  const nats = await connect({ port: natsPort, token: "mytoken" })
   await sleep(500)
   
   mkdirSync(t.context.tempdir.path("keys"))

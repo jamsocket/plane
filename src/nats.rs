@@ -15,6 +15,7 @@ use tokio::sync::mpsc;
 #[derive(Serialize, Deserialize)]
 pub enum NoReply {}
 
+#[derive(Clone, Debug)]
 pub struct Subject<M, R>
 where
     M: Serialize + DeserializeOwned,

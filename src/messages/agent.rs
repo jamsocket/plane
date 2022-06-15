@@ -24,7 +24,7 @@ impl DroneStatusMessage {
 }
 
 /// A request from a drone to connect to the platform.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DroneConnectRequest {
     /// The cluster the drone is requesting to join.
     pub cluster: String,
@@ -34,7 +34,7 @@ pub struct DroneConnectRequest {
 }
 
 /// A response from the platform to a drone's request to join.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum DroneConnectResponse {
     /// The drone has joined the cluster and been given an ID.
     Success { drone_id: DroneId },
