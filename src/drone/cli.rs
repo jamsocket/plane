@@ -3,7 +3,9 @@ use crate::{
     keys::KeyCertPathPair,
     proxy::{ProxyHttpsOptions, ProxyOptions},
 };
+use anyhow::Result;
 use clap::{Parser, Subcommand};
+use reqwest::Url;
 use std::{net::IpAddr, path::PathBuf};
 
 #[derive(Parser)]
@@ -38,21 +40,33 @@ pub struct Opts {
     #[clap(long, action)]
     pub nats_url: Option<String>,
 
+    /// Server to use for certificate signing.
     #[clap(long, action)]
     pub acme_server_url: Option<String>,
 
+    /// Public IP of this drone, used for directing traffic outside the host.
     #[clap(long, action)]
     pub ip: Option<IpAddr>,
 
+    /// API endpoint which returns the requestor's IP.
+    #[clap(long, action)]
+    pub ip_api: Option<Url>,
+
+    /// Local IP of the host (i.e. the IP published docker ports are published on),
+    /// used for proxying locally.
     #[clap(long, action)]
     pub host_ip: Option<IpAddr>,
 
+    /// Runtime to use with docker. Default is runc; runsc is an alternative if gVisor
+    /// is available.
     #[clap(long, action)]
     pub docker_runtime: Option<String>,
 
+    /// Unix socket through which to send Docker commands.
     #[clap(long, action)]
     pub docker_socket: Option<String>,
 
+    /// HTTP url through which to send Docker commands. Mutually exclusive with --docker-socket.
     #[clap(long, action)]
     pub docker_http: Option<String>,
 
@@ -105,6 +119,25 @@ pub enum DronePlan {
         key_paths: KeyCertPathPair,
         acme_server_url: String,
     },
+}
+
+#[derive(PartialEq, Debug)]
+pub enum IpProvider {
+    Api(Url),
+    Literal(IpAddr),
+}
+
+impl IpProvider {
+    pub async fn get_ip(&self) -> Result<IpAddr> {
+        match self {
+            IpProvider::Literal(ip) => Ok(ip.clone()),
+            IpProvider::Api(url) => {
+                let result = reqwest::get(url.as_ref()).await?.text().await?;
+                let ip: IpAddr = result.parse()?;
+                Ok(ip)
+            }
+        }
+    }
 }
 
 impl From<Opts> for DronePlan {
@@ -172,6 +205,14 @@ impl From<Opts> for DronePlan {
                         DockerApiTransport::default()
                     };
 
+                    let ip = if let Some(ip) = opts.ip {
+                        IpProvider::Literal(ip)
+                    } else if let Some(ip_api) = opts.ip_api {
+                        IpProvider::Api(ip_api)
+                    } else {
+                        panic!("Expected one of --ip or --ip-api.")
+                    };
+                    
                     Some(AgentOptions {
                         cluster_domain: opts.cluster_domain.clone().expect("Expected --cluster-domain for running agent."),
                         db_path: opts.db_path.clone().expect("Expected --db-path for running agent."),
@@ -180,7 +221,8 @@ impl From<Opts> for DronePlan {
                             transport: docker_transport,
                         },
                         nats_url: opts.nats_url.clone().expect("Expected --nats-url for running agent."),
-                        ip: opts.ip.expect("Expected --ip for running agent."),
+                        ip,
+
                         host_ip: opts.host_ip.expect("Expected --host-ip for running agent.")
                     })
                 } else {
@@ -364,7 +406,7 @@ mod test {
                         transport: DockerApiTransport::Socket("/var/run/docker.sock".to_string()),
                         runtime: None,
                     },
-                    ip: "123.123.123.123".parse().unwrap(),
+                    ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
                     host_ip: "56.56.56.56".parse().unwrap(),
                     nats_url: "nats://foo@bar".to_string(),
                 })
@@ -417,7 +459,7 @@ mod test {
                         transport: DockerApiTransport::Socket("/var/run/docker.sock".to_string()),
                         runtime: None,
                     },
-                    ip: "123.123.123.123".parse().unwrap(),
+                    ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
                     host_ip: "56.56.56.56".parse().unwrap(),
                     nats_url: "nats://foo@bar".to_string(),
                 })
