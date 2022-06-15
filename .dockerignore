@@ -1,6 +1,5 @@
 target
 .vscode
 .github
-.cargo
 tests
 Dockerfile
