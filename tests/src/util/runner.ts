@@ -121,7 +121,7 @@ export class DroneRunner implements DropHandler {
       "--db-path",
       this.dbPath,
       "--nats-url",
-      `nats://localhost:${natsPort}`,
+      `nats://mytoken@localhost:${natsPort}`,
       "--ip",
       "123.12.1.123",
       "--host-ip",
