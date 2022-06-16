@@ -212,7 +212,7 @@ impl From<Opts> for DronePlan {
                     } else {
                         panic!("Expected one of --ip or --ip-api.")
                     };
-                    
+
                     Some(AgentOptions {
                         cluster_domain: opts.cluster_domain.clone().expect("Expected --cluster-domain for running agent."),
                         db_path: opts.db_path.clone().expect("Expected --db-path for running agent."),

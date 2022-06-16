@@ -18,7 +18,7 @@ impl DroneStatusMessage {
         Subject::new(format!("drone.{}.status", drone_id.id()))
     }
 
-    pub fn subject_subscribe() -> SubscribeSubject<DroneStatusMessage, bool> {
+    pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage, bool> {
         SubscribeSubject::new("drone.*.status".to_string())
     }
 }
@@ -179,5 +179,9 @@ impl BackendStateMessage {
 
     pub fn subject(backend_id: &BackendId) -> Subject<BackendStateMessage, NoReply> {
         Subject::new(format!("backend.{}.status", backend_id.id()))
+    }
+
+    pub fn subscribe_subject() -> SubscribeSubject<BackendStateMessage, NoReply> {
+        SubscribeSubject::new("backend.*.status".to_string())
     }
 }

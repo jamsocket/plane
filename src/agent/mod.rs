@@ -4,7 +4,8 @@ use crate::{
     drone::cli::IpProvider,
     logging::LogError,
     messages::agent::{
-        BackendState, DroneConnectRequest, DroneConnectResponse, DroneStatusMessage, SpawnRequest,
+        BackendState, BackendStateMessage, DroneConnectRequest, DroneConnectResponse,
+        DroneStatusMessage, SpawnRequest,
     },
     nats::TypedNats,
     retry::do_with_retry,
@@ -121,6 +122,9 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
         Duration::from_secs(10),
     )
     .await?;
+
+    nats.add_jetstream_stream("backend_status", BackendStateMessage::subscribe_subject())?;
+
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
     let db = get_db(&agent_opts.db_path).await?;
     let cluster = agent_opts.cluster_domain.to_string();
@@ -132,12 +136,11 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
             cluster: cluster.clone(),
             ip,
         };
-        do_with_retry(|| {
-            nats.request(
-                &subject,
-                &request,
-            )
-        }, 30, Duration::from_secs(10))
+        do_with_retry(
+            || nats.request(&subject, &request),
+            30,
+            Duration::from_secs(10),
+        )
         .await?
     };
 
