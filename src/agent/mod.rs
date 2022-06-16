@@ -4,7 +4,8 @@ use crate::{
     drone::cli::IpProvider,
     logging::LogError,
     messages::agent::{
-        BackendState, DroneConnectRequest, DroneConnectResponse, DroneStatusMessage, SpawnRequest,
+        BackendState, BackendStateMessage, DroneConnectRequest, DroneConnectResponse,
+        DroneStatusMessage, SpawnRequest,
     },
     nats::TypedNats,
     retry::do_with_retry,
@@ -115,29 +116,36 @@ async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: String) {
 }
 
 pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
+    tracing::info!("Connecting to NATS.");
     let nats = do_with_retry(
         || TypedNats::connect(&agent_opts.nats_url),
         30,
         Duration::from_secs(10),
     )
     .await?;
+
+    tracing::info!("Ensuring backend_status stream exists.");
+    nats.add_jetstream_stream("backend_status", BackendStateMessage::subscribe_subject())?;
+
+    tracing::info!("Connecting to Docker.");
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
+    tracing::info!("Connecting to sqlite.");
     let db = get_db(&agent_opts.db_path).await?;
     let cluster = agent_opts.cluster_domain.to_string();
     let ip = agent_opts.ip.get_ip().await?;
 
+    tracing::info!("Requesting drone id.");
     let result = {
         let subject = DroneConnectRequest::subject();
         let request = DroneConnectRequest {
             cluster: cluster.clone(),
             ip,
         };
-        do_with_retry(|| {
-            nats.request(
-                &subject,
-                &request,
-            )
-        }, 30, Duration::from_secs(10))
+        do_with_retry(
+            || nats.request(&subject, &request),
+            30,
+            Duration::from_secs(10),
+        )
         .await?
     };
 
@@ -149,6 +157,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
                 tokio::spawn(ready_loop(nats, drone_id, cluster));
             }
 
+            tracing::info!("Listening for spawn requests.");
             listen_for_spawn_requests(drone_id, docker, nats, agent_opts.host_ip, db).await
         }
         DroneConnectResponse::NoSuchCluster => Err(anyhow!(

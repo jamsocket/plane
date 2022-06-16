@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use futures::channel::oneshot::channel;
 use futures::Stream;
 use nats::asynk::{Connection, Message, Subscription};
-use nats::jetstream::{JetStream, SubscribeOptions};
+use nats::jetstream::{JetStream, StreamConfig, SubscribeOptions};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::time::Duration;
@@ -180,6 +180,21 @@ pub struct TypedNats {
 }
 
 impl TypedNats {
+    pub fn add_jetstream_stream<P, T, R>(&self, stream_name: &str, subject: P) -> Result<()>
+    where
+        P: Subscribable<T, R>,
+        T: Serialize + DeserializeOwned,
+        R: Serialize + DeserializeOwned,
+    {
+        self.jetstream.add_stream(StreamConfig {
+            name: stream_name.to_string(),
+            subjects: vec![subject.subject().to_string()],
+            ..StreamConfig::default()
+        })?;
+
+        Ok(())
+    }
+
     pub async fn connect(nats_url: &str) -> Result<Self> {
         let nc = nats::asynk::connect(nats_url).await?;
         let jetstream = nats::jetstream::new(nats::connect(nats_url)?);

@@ -1,4 +1,3 @@
-import getPort from "@ava/get-port"
 import anyTest, { TestFn } from "ava"
 import axios from "axios"
 import { connect } from "nats"
