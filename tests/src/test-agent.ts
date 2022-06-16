@@ -61,7 +61,7 @@ interface DroneStatusMessage {
 test("Test using IP lookup API", async (t) => {
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
-  const nats = await connect({ port: natsPort })
+  const nats = await connect({ port: natsPort, token: "mytoken" })
 
   const connectionRequestSubscription =
     new NatsMessageIterator<DroneConnectRequest>(
@@ -82,7 +82,7 @@ test("Test using IP lookup API", async (t) => {
 test("Drone sends ready messages", async (t) => {
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
-  const nats = await connect({ port: natsPort })
+  const nats = await connect({ port: natsPort, token: "mytoken" })
 
   const connectionRequestSubscription =
     new NatsMessageIterator<DroneConnectRequest>(
@@ -124,7 +124,7 @@ test("Spawn with agent", async (t) => {
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
-  const nats = await connect({ port: natsPort })
+  const nats = await connect({ port: natsPort, token: "mytoken" })
 
   const connectionRequestSubscription =
     new NatsMessageIterator<DroneConnectRequest>(
@@ -202,7 +202,7 @@ test("Spawn fails during start", async (t) => {
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
-  const nats = await connect({ port: natsPort })
+  const nats = await connect({ port: natsPort, token: "mytoken" })
   const connectionRequestSubscription =
     new NatsMessageIterator<DroneConnectRequest>(
       nats.subscribe("drone.register")
