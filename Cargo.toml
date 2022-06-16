@@ -13,7 +13,7 @@ dashmap = "5.3.4"
 futures = "0.3.21"
 http = "0.2.7"
 hyper = { version = "0.14.19", features = ["server", "client", "http1", "http2", "tcp"] }
-nats = { git="https://github.com/paulgb/nats.rs.git", rev="1cc387" }
+nats = { git="https://github.com/paulgb/nats.rs.git", rev="1f5648" }
 #nats = { path="../nats.rs/nats" }
 notify = "5.0.0-pre.15"
 openssl = "0.10.40"
