@@ -1,12 +1,12 @@
 use crate::{
-    agent::{AgentOptions, DockerApiTransport, DockerOptions},
     keys::KeyCertPathPair,
-    proxy::{ProxyHttpsOptions, ProxyOptions},
 };
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use reqwest::Url;
 use std::{net::IpAddr, path::PathBuf};
+
+use super::{proxy::{ProxyOptions, ProxyHttpsOptions}, agent::{AgentOptions, DockerApiTransport, DockerOptions}};
 
 #[derive(Parser)]
 pub struct Opts {
@@ -241,8 +241,6 @@ impl From<Opts> for DronePlan {
 
 #[cfg(test)]
 mod test {
-    use crate::agent::{DockerApiTransport, DockerOptions};
-
     use super::*;
     use anyhow::Result;
 

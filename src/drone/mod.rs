@@ -1,7 +1,6 @@
-use self::cli::{DronePlan, Opts};
+use self::{cli::{DronePlan, Opts}, proxy::serve, agent::run_agent, cert::refresh_certificate};
 use crate::{
-    agent::run_agent, cert::refresh_certificate, database::get_db, logging::init_tracing,
-    proxy::serve,
+    database::get_db, logging::init_tracing,
 };
 use anyhow::Result;
 use clap::Parser;
@@ -10,6 +9,9 @@ use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::{pin::Pin, thread};
 
 pub mod cli;
+mod cert;
+mod agent;
+mod proxy;
 
 async fn main() -> Result<()> {
     init_tracing()?; // TODO: init sender if we have nats.

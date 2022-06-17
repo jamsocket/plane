@@ -1,10 +1,9 @@
-use super::docker::DockerInterface;
+use super::docker::{DockerInterface, ContainerEventType};
 use crate::{
-    agent::{docker::ContainerEventType, wait_port_ready},
     database::DroneDatabase,
     messages::agent::{BackendState, BackendStateMessage, SpawnRequest},
     nats::TypedNats,
-    types::BackendId,
+    types::BackendId, drone::agent::wait_port_ready,
 };
 use anyhow::{anyhow, Result};
 use chrono::Utc;
