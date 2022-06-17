@@ -1,6 +1,6 @@
 use self::{
     agent::run_agent,
-    cert::{refresh_certificate, refresh_loop},
+    cert::{refresh_certificate, refresh_loop, refresh_if_not_valid},
     cli::{DronePlan, Opts},
     proxy::serve,
 };
@@ -29,16 +29,18 @@ async fn main() -> Result<()> {
         } => {
             let mut futs: Vec<Pin<Box<dyn Future<Output = Result<()>>>>> = vec![];
 
+            if let Some(cert_options) = cert_options {
+                refresh_if_not_valid(&cert_options).await?;
+
+                futs.push(Box::pin(refresh_loop(cert_options)))
+            }
+
             if let Some(proxy_options) = proxy_options {
                 futs.push(Box::pin(serve(proxy_options)));
             }
 
             if let Some(agent_options) = agent_options {
                 futs.push(Box::pin(run_agent(agent_options)))
-            }
-
-            if let Some(cert_options) = cert_options {
-                futs.push(Box::pin(refresh_loop(cert_options)))
             }
 
             let (result, _, _) = select_all(futs.into_iter()).await;

@@ -148,27 +148,37 @@ pub fn cert_validity(certificate_path: &Path) -> Option<DateTime<Utc>> {
     Some(DateTime::from_utc(not_after_naive, Utc))
 }
 
-pub async fn refresh_loop(cert_options: CertOptions) -> Result<()> {
-    loop {
-        if let Some(valid_until) = cert_validity(&cert_options.key_paths.certificate_path) {
-            let refresh_at = valid_until.checked_sub_signed(chrono::Duration::from_std(REFRESH_MARGIN)?).ok_or_else(|| anyhow!("Date subtraction would result in over/underflow, this should never happen."))?;
-            let time_until_refresh = refresh_at.signed_duration_since(Utc::now());
+pub async fn refresh_if_not_valid(cert_options: &CertOptions) -> Result<Option<Duration>> {
+    if let Some(valid_until) = cert_validity(&cert_options.key_paths.certificate_path) {
+        let refresh_at = valid_until.checked_sub_signed(chrono::Duration::from_std(REFRESH_MARGIN)?).ok_or_else(|| anyhow!("Date subtraction would result in over/underflow, this should never happen."))?;
+        let time_until_refresh = refresh_at.signed_duration_since(Utc::now());
 
-            if time_until_refresh > chrono::Duration::zero() {
-                let time_to_sleep = time_until_refresh.min(chrono::Duration::from_std(MAX_SLEEP)?);
-
-                tokio::time::sleep(time_to_sleep.to_std()?).await;
-                continue;
-            }
-
-            tracing::info!(
-                ?valid_until,
-                "Certificate exists, but is ready for refresh."
-            );
+        if time_until_refresh > chrono::Duration::zero() {
+            return Ok(Some(time_until_refresh.to_std()?))
         }
 
-        tracing::info!("Refreshing certificate.");
-        refresh_certificate(&cert_options).await?;
-        tracing::info!("Done refreshing certificate.");
+        tracing::info!(
+            ?valid_until,
+            "Certificate exists, but is ready for refresh."
+        );
+    }
+
+    tracing::info!("Refreshing certificate.");
+    refresh_certificate(&cert_options).await?;
+    tracing::info!("Done refreshing certificate.");
+
+    Ok(None)
+}
+
+pub async fn refresh_loop(cert_options: CertOptions) -> Result<()> {
+    loop {
+        match refresh_if_not_valid(&cert_options).await {
+            Ok(Some(valid_until)) => tokio::time::sleep(valid_until.min(MAX_SLEEP)).await,
+            Ok(None) => tokio::time::sleep(MAX_SLEEP).await,
+            Err(error) => {
+                tracing::warn!(?error, "Error issuing certificate, will try again.");
+                tokio::time::sleep(Duration::from_secs(3600)).await;
+            }
+        }
     }
 }

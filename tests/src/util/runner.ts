@@ -84,7 +84,7 @@ export class DroneRunner implements DropHandler {
     await waitForExit(proc)
   }
 
-  async runAgentWithIpApi(natsPort: number, ipApi: string): Promise<void> {
+  runAgentWithIpApi(natsPort: number, ipApi: string) {
     const args = [
       "--cluster-domain",
       CLUSTER_DOMAIN,
@@ -114,7 +114,7 @@ export class DroneRunner implements DropHandler {
     this.server = proc
   }
 
-  async runAgent(natsPort: number): Promise<void> {
+  runAgent(natsPort: number) {
     const args = [
       "--cluster-domain",
       CLUSTER_DOMAIN,
@@ -132,6 +132,50 @@ export class DroneRunner implements DropHandler {
 
     const proc = spawn(SPAWNER_PATH, args, {
       stdio: "inherit",
+    })
+
+    proc.on("exit", (code) => {
+      if (code !== null) {
+        // Server process should not exit until we kill it.
+        throw new Error(`Process exited with code ${code}.`)
+      }
+    })
+
+    this.server = proc
+  }
+
+  async runEverything(natsPort: number, certs: KeyCertPair, pebble: PebbleResult): Promise<void> {
+    const httpPort = await getPort()
+    const httpsPort = await getPort()
+
+    const args = [
+      "--cluster-domain",
+      CLUSTER_DOMAIN,
+      "--db-path",
+      this.dbPath,
+      "--nats-url",
+      `nats://mytoken@localhost:${natsPort}`,
+      "--ip",
+      "123.12.1.123",
+      "--host-ip",
+      "127.0.0.1",
+      "--http-port",
+      httpPort.toString(),
+      "--https-port",
+      httpsPort.toString(),
+      "--https-private-key",
+      certs.privateKeyPath,
+      "--https-certificate",
+      certs.certificatePath,
+      "--acme-server",
+      `https://localhost:${pebble.port}/dir`,
+    ]
+
+    const proc = spawn(SPAWNER_PATH, args, {
+      stdio: "inherit",
+      env: {
+        SPAWNER_TEST_ALLOWED_CERTIFICATE: pebble.cert,
+      },
     })
 
     proc.on("exit", (code) => {

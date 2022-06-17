@@ -5,6 +5,7 @@ import { KeyCertPair, validateCertificateKeyPair } from "./util/certificates.js"
 import { TestEnvironment } from "./util/environment.js"
 import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
+import { DnsMessage } from "./util/types.js"
 
 const test = anyTest as TestFn<TestEnvironment>
 
@@ -15,11 +16,6 @@ test.beforeEach(async (t) => {
 test.afterEach.always(async (t) => {
   await t.context.drop()
 })
-
-interface DnsMessage {
-  cluster: string
-  value: string
-}
 
 test("Generate certificate", async (t) => {
   const natsPort = await t.context.docker.runNats()
