@@ -5,6 +5,7 @@ use self::{
     proxy::serve,
 };
 use crate::{database::get_db, logging::init_tracing};
+use crate::{retry::do_with_retry};
 use anyhow::Result;
 use clap::Parser;
 use futures::{future::select_all, Future};
@@ -30,7 +31,7 @@ async fn main() -> Result<()> {
             let mut futs: Vec<Pin<Box<dyn Future<Output = Result<()>>>>> = vec![];
 
             if let Some(cert_options) = cert_options {
-                refresh_if_not_valid(&cert_options).await?;
+                do_with_retry(|| refresh_if_not_valid(&cert_options), 5, std::time::Duration::from_secs(10)).await?;
 
                 futs.push(Box::pin(refresh_loop(cert_options)))
             }
