@@ -6,7 +6,7 @@ use bollard::{
     models::{EventMessage, HostConfig, PortBinding},
     network::CreateNetworkOptions,
     system::EventsOptions,
-    Docker, API_DEFAULT_VERSION,
+    Docker, API_DEFAULT_VERSION, auth::DockerCredentials,
 };
 use std::collections::HashMap;
 use tokio_stream::{Stream, StreamExt};
@@ -103,13 +103,13 @@ impl DockerInterface {
     }
 
     #[allow(unused)]
-    pub async fn pull_image(&self, image: &str) -> Result<()> {
+    pub async fn pull_image(&self, image: &str, credentials: &Option<DockerCredentials>) -> Result<()> {
         let options = Some(CreateImageOptions {
             from_image: image,
             ..Default::default()
         });
 
-        let mut result = self.docker.create_image(options, None, None);
+        let mut result = self.docker.create_image(options, None, credentials.clone());
         while let Some(next) = result.next().await {
             next?;
         }

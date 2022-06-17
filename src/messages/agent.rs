@@ -2,6 +2,7 @@ use crate::{
     nats::{NoReply, Subject, SubscribeSubject},
     types::{BackendId, DroneId},
 };
+use bollard::auth::DockerCredentials;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
@@ -67,6 +68,9 @@ pub struct SpawnRequest {
 
     /// Metadata for the spawn. Typically added to log messages for debugging and observability.
     pub metadata: HashMap<String, String>,
+
+    /// Credentials used to fetch the image.
+    pub credentials: Option<DockerCredentials>,
 }
 
 impl SpawnRequest {
