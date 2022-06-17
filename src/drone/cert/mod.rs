@@ -1,22 +1,26 @@
 use self::https_client::get_https_client;
-use crate::{
-    keys::KeyCertPathPair, messages::cert::SetAcmeDnsRecord, nats::TypedNats, retry::do_with_retry,
-};
+use crate::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, retry::do_with_retry};
 use acme2::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
 use anyhow::{anyhow, Result};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use openssl::{
+    asn1::Asn1Time,
     pkey::{PKey, Private},
     x509::X509,
 };
 use reqwest::Client;
-use std::time::Duration;
+use std::{path::Path, time::Duration};
+
+use super::cli::CertOptions;
 
 mod https_client;
 
 const DNS_01: &str = "dns-01";
+const REFRESH_MARGIN: Duration = Duration::from_secs(3600 * 24 * 15);
+const MAX_SLEEP: Duration = Duration::from_secs(3600);
 
 pub async fn get_certificate(
     cluster_domain: &str,
@@ -107,21 +111,74 @@ pub async fn get_certificate(
     Ok((pkey, cert))
 }
 
-pub async fn refresh_certificate(
-    cluster_domain: &str,
-    nats_url: &str,
-    key_paths: &KeyCertPathPair,
-    acme_server_url: &str,
-) -> Result<()> {
+pub async fn refresh_certificate(cert_options: &CertOptions) -> Result<()> {
     let client = get_https_client()?;
-    let nats = do_with_retry(|| TypedNats::connect(nats_url), 30, Duration::from_secs(10)).await?;
-    let (pkey, cert) = get_certificate(cluster_domain, &nats, acme_server_url, &client).await?;
+    let nats = do_with_retry(
+        || TypedNats::connect(&cert_options.nats_url),
+        30,
+        Duration::from_secs(10),
+    )
+    .await?;
+    let (pkey, cert) = get_certificate(
+        &cert_options.cluster_domain,
+        &nats,
+        &cert_options.acme_server_url,
+        &client,
+    )
+    .await?;
 
-    std::fs::write(&key_paths.certificate_path, cert.to_pem()?)?;
+    std::fs::write(&cert_options.key_paths.certificate_path, cert.to_pem()?)?;
     std::fs::write(
-        &key_paths.private_key_path,
+        &cert_options.key_paths.private_key_path,
         pkey.private_key_to_pem_pkcs8()?,
     )?;
 
     Ok(())
+}
+
+pub fn cert_validity(certificate_path: &Path) -> Option<DateTime<Utc>> {
+    let cert_pem = std::fs::read(certificate_path).ok()?;
+    let cert = X509::from_pem(&cert_pem).ok()?;
+    let not_after_asn1 = cert.not_after();
+    let not_after_unix = Asn1Time::from_unix(0).ok()?.diff(not_after_asn1).ok()?;
+    let not_after_naive = NaiveDateTime::from_timestamp(
+        not_after_unix.days as i64 * 86400 + not_after_unix.secs as i64,
+        0,
+    );
+    Some(DateTime::from_utc(not_after_naive, Utc))
+}
+
+pub async fn refresh_if_not_valid(cert_options: &CertOptions) -> Result<Option<Duration>> {
+    if let Some(valid_until) = cert_validity(&cert_options.key_paths.certificate_path) {
+        let refresh_at = valid_until.checked_sub_signed(chrono::Duration::from_std(REFRESH_MARGIN)?).ok_or_else(|| anyhow!("Date subtraction would result in over/underflow, this should never happen."))?;
+        let time_until_refresh = refresh_at.signed_duration_since(Utc::now());
+
+        if time_until_refresh > chrono::Duration::zero() {
+            return Ok(Some(time_until_refresh.to_std()?))
+        }
+
+        tracing::info!(
+            ?valid_until,
+            "Certificate exists, but is ready for refresh."
+        );
+    }
+
+    tracing::info!("Refreshing certificate.");
+    refresh_certificate(&cert_options).await?;
+    tracing::info!("Done refreshing certificate.");
+
+    Ok(None)
+}
+
+pub async fn refresh_loop(cert_options: CertOptions) -> Result<()> {
+    loop {
+        match refresh_if_not_valid(&cert_options).await {
+            Ok(Some(valid_until)) => tokio::time::sleep(valid_until.min(MAX_SLEEP)).await,
+            Ok(None) => tokio::time::sleep(MAX_SLEEP).await,
+            Err(error) => {
+                tracing::warn!(?error, "Error issuing certificate, will try again.");
+                tokio::time::sleep(Duration::from_secs(3600)).await;
+            }
+        }
+    }
 }

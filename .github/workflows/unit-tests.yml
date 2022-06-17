@@ -19,4 +19,4 @@ jobs:
       with:
         cache-on-failure: true
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --verbose --features=full

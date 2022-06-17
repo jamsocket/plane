@@ -6,6 +6,7 @@ import { generateId } from "./util/id_gen.js"
 import { TEST_IMAGE } from "./util/images.js"
 import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
+import { BackendStateMessage, DroneConnectRequest, DroneStatusMessage, SpawnRequest } from "./util/types.js"
 
 const test = anyTest as TestFn<TestEnvironment>
 
@@ -16,46 +17,6 @@ test.beforeEach(async (t) => {
 test.afterEach.always(async (t) => {
   await t.context.drop()
 })
-
-interface DroneConnectRequest {
-  cluster: string
-  ip: string
-}
-
-interface Duration {
-  secs: number
-  nanos: number
-}
-
-interface SpawnRequest {
-  image: string
-  backend_id: string
-  max_idle_time: Duration
-  env: Record<string, string>
-  metadata: Record<string, string>
-}
-
-type BackendStatus =
-  | "Loading"
-  | "ErrorLoading"
-  | "Starting"
-  | "ErrorStarting"
-  | "Ready"
-  | "TimedOutBeforeReady"
-  | "Failed"
-  | "Exited"
-  | "Swept"
-
-interface BackendStateMessage {
-  state: BackendStatus
-  time: string
-}
-
-interface DroneStatusMessage {
-  drone_id: number,
-  capacity: number,
-  cluster: string,
-}
 
 test("Test using IP lookup API", async (t) => {
   const natsPort = await t.context.docker.runNats()
