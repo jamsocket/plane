@@ -1,9 +1,10 @@
-use super::docker::{DockerInterface, ContainerEventType};
+use super::docker::{ContainerEventType, DockerInterface};
 use crate::{
     database::DroneDatabase,
+    drone::agent::wait_port_ready,
     messages::agent::{BackendState, BackendStateMessage, SpawnRequest},
     nats::TypedNats,
-    types::BackendId, drone::agent::wait_port_ready,
+    types::BackendId,
 };
 use anyhow::{anyhow, Result};
 use chrono::Utc;
@@ -160,7 +161,9 @@ impl Executor {
     ) -> Result<Option<BackendState>> {
         match state {
             BackendState::Loading => {
-                self.docker.pull_image(&spawn_request.image, &spawn_request.credentials).await?;
+                self.docker
+                    .pull_image(&spawn_request.image, &spawn_request.credentials)
+                    .await?;
 
                 let backend_id = spawn_request.backend_id.to_resource_name();
                 self.docker

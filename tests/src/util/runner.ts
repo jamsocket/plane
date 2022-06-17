@@ -69,7 +69,7 @@ export class DroneRunner implements DropHandler {
         certs.certificatePath,
         "--cluster-domain",
         CLUSTER_DOMAIN,
-        "--acme-server-url",
+        "--acme-server",
         `https://localhost:${pebble.port}/dir`,
         "cert",
       ],

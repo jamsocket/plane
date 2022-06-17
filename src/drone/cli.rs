@@ -1,12 +1,13 @@
-use crate::{
-    keys::KeyCertPathPair,
-};
+use crate::keys::KeyCertPathPair;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use reqwest::Url;
 use std::{net::IpAddr, path::PathBuf};
 
-use super::{proxy::{ProxyOptions, ProxyHttpsOptions}, agent::{AgentOptions, DockerApiTransport, DockerOptions}};
+use super::{
+    agent::{AgentOptions, DockerApiTransport, DockerOptions},
+    proxy::{ProxyHttpsOptions, ProxyOptions},
+};
 
 #[derive(Parser)]
 pub struct Opts {
@@ -42,7 +43,7 @@ pub struct Opts {
 
     /// Server to use for certificate signing.
     #[clap(long, action)]
-    pub acme_server_url: Option<String>,
+    pub acme_server: Option<String>,
 
     /// Public IP of this drone, used for directing traffic outside the host.
     #[clap(long, action)]
@@ -91,6 +92,10 @@ enum Command {
         /// Run the agent.
         #[clap(long, action)]
         agent: bool,
+
+        /// Run the certificate refresh loop.
+        #[clap(long, action)]
+        cert_refresh: bool,
     },
 }
 
@@ -99,8 +104,17 @@ impl Default for Command {
         Command::Serve {
             proxy: true,
             agent: true,
+            cert_refresh: true,
         }
     }
+}
+
+#[derive(PartialEq, Debug)]
+pub struct CertOptions {
+    pub cluster_domain: String,
+    pub nats_url: String,
+    pub key_paths: KeyCertPathPair,
+    pub acme_server_url: String,
 }
 
 #[allow(unused)]
@@ -109,16 +123,12 @@ pub enum DronePlan {
     RunService {
         proxy_options: Option<ProxyOptions>,
         agent_options: Option<AgentOptions>,
+        cert_options: Option<CertOptions>,
     },
     DoMigration {
         db_path: String,
     },
-    DoCertificateRefresh {
-        cluster_domain: String,
-        nats_url: String,
-        key_paths: KeyCertPathPair,
-        acme_server_url: String,
-    },
+    DoCertificateRefresh(CertOptions),
 }
 
 #[derive(PartialEq, Debug)]
@@ -167,14 +177,25 @@ impl From<Opts> for DronePlan {
                     .expect("Expected --db-path when using migrate."),
             },
             Command::Cert => {
-                DronePlan::DoCertificateRefresh {
+                DronePlan::DoCertificateRefresh(CertOptions {
                     cluster_domain: opts.cluster_domain.expect("Expected --cluster-domain when using cert command."),
                     nats_url: opts.nats_url.expect("Expected --nats-host when using cert command."),
                     key_paths: key_cert_pair.expect("Expected --https-certificate and --https-private-key to point to location to write cert and key."),
-                    acme_server_url: opts.acme_server_url.expect("Expected --acme-server-url when using cert command."),
-                }
+                    acme_server_url: opts.acme_server.expect("Expected --acme-server when using cert command."),
+                })
             },
-            Command::Serve { proxy, agent } => {
+            Command::Serve { proxy, agent, cert_refresh } => {
+                let cert_options = if cert_refresh {
+                    Some(CertOptions {
+                        acme_server_url: opts.acme_server.clone().expect("Expected --acme-server for certificate refreshing."),
+                        cluster_domain: opts.cluster_domain.clone().expect("Expected --cluster-domain for certificate refreshing."),
+                        key_paths: key_cert_pair.clone().expect("Expected --https-certificate and --https-private-key for certificate refresh."),
+                        nats_url: opts.nats_url.clone().expect("Expected --nats-url."),
+                    })
+                } else {
+                    None
+                };
+
                 let proxy_options = if proxy {
                     let https_options = key_cert_pair.map(|key_cert_pair| ProxyHttpsOptions {
                         key_paths: key_cert_pair,
@@ -233,7 +254,7 @@ impl From<Opts> for DronePlan {
                     panic!("Expected at least one of --proxy, --agent, --certloop if `serve` is provided explicitly.");
                 }
 
-                DronePlan::RunService { proxy_options, agent_options }
+                DronePlan::RunService { proxy_options, agent_options, cert_options }
             }
         }
     }
@@ -274,13 +295,13 @@ mod test {
             "nats://foo@bar",
             "--cluster-domain",
             "mydomain.test",
-            "--acme-server-url",
+            "--acme-server",
             "https://acme.server/dir",
             "cert",
         ])
         .unwrap();
         assert_eq!(
-            DronePlan::DoCertificateRefresh {
+            DronePlan::DoCertificateRefresh(CertOptions {
                 cluster_domain: "mydomain.test".to_string(),
                 nats_url: "nats://foo@bar".to_string(),
                 key_paths: KeyCertPathPair {
@@ -288,7 +309,7 @@ mod test {
                     certificate_path: PathBuf::from("mycert.cert"),
                 },
                 acme_server_url: "https://acme.server/dir".to_string(),
-            },
+            }),
             opts
         );
     }
@@ -313,25 +334,26 @@ mod test {
                     https_options: None,
                 }),
                 agent_options: None,
+                cert_options: None,
             },
             opts
         );
     }
 
     #[test]
-    #[should_panic(expected = "Expected --cluster-domain")]
+    #[should_panic(expected = "Expected ")]
     fn test_proxy_no_cluster_domain() {
         parse_args(&["--db-path", "mydatabase"]).unwrap();
     }
 
     #[test]
-    #[should_panic(expected = "Expected --db-path")]
+    #[should_panic(expected = "Expected ")]
     fn test_proxy_no_db_path() {
         parse_args(&["--cluster-domain", "blah"]).unwrap();
     }
 
     #[test]
-    #[should_panic(expected = "Expected --db-path")]
+    #[should_panic(expected = "Expected ")]
     fn test_migrate_no_db_path() {
         parse_args(&["migrate"]).unwrap();
     }
@@ -381,6 +403,9 @@ mod test {
             "56.56.56.56",
             "--nats-url",
             "nats://foo@bar",
+            "serve",
+            "--proxy",
+            "--agent",
         ])
         .unwrap();
         assert_eq!(
@@ -407,7 +432,8 @@ mod test {
                     ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
                     host_ip: "56.56.56.56".parse().unwrap(),
                     nats_url: "nats://foo@bar".to_string(),
-                })
+                }),
+                cert_options: None,
             },
             opts
         );
@@ -434,6 +460,8 @@ mod test {
             "56.56.56.56",
             "--nats-url",
             "nats://foo@bar",
+            "--acme-server",
+            "https://acme-server",
         ])
         .unwrap();
         assert_eq!(
@@ -459,6 +487,15 @@ mod test {
                     },
                     ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
                     host_ip: "56.56.56.56".parse().unwrap(),
+                    nats_url: "nats://foo@bar".to_string(),
+                }),
+                cert_options: Some(CertOptions {
+                    acme_server_url: "https://acme-server".to_string(),
+                    cluster_domain: "mycluster.test".to_string(),
+                    key_paths: KeyCertPathPair {
+                        private_key_path: PathBuf::from("mycert.key"),
+                        certificate_path: PathBuf::from("mycert.cert"),
+                    },
                     nats_url: "nats://foo@bar".to_string(),
                 })
             },

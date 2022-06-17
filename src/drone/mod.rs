@@ -1,16 +1,19 @@
-use self::{cli::{DronePlan, Opts}, proxy::serve, agent::run_agent, cert::refresh_certificate};
-use crate::{
-    database::get_db, logging::init_tracing,
+use self::{
+    agent::run_agent,
+    cert::{refresh_certificate, refresh_loop},
+    cli::{DronePlan, Opts},
+    proxy::serve,
 };
+use crate::{database::get_db, logging::init_tracing};
 use anyhow::Result;
 use clap::Parser;
 use futures::{future::select_all, Future};
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::{pin::Pin, thread};
 
-pub mod cli;
-mod cert;
 mod agent;
+mod cert;
+pub mod cli;
 mod proxy;
 
 async fn main() -> Result<()> {
@@ -22,6 +25,7 @@ async fn main() -> Result<()> {
         DronePlan::RunService {
             proxy_options,
             agent_options,
+            cert_options,
         } => {
             let mut futs: Vec<Pin<Box<dyn Future<Output = Result<()>>>>> = vec![];
 
@@ -33,19 +37,18 @@ async fn main() -> Result<()> {
                 futs.push(Box::pin(run_agent(agent_options)))
             }
 
+            if let Some(cert_options) = cert_options {
+                futs.push(Box::pin(refresh_loop(cert_options)))
+            }
+
             let (result, _, _) = select_all(futs.into_iter()).await;
             result?;
         }
         DronePlan::DoMigration { db_path } => {
             get_db(&db_path).await?;
         }
-        DronePlan::DoCertificateRefresh {
-            acme_server_url,
-            cluster_domain,
-            key_paths,
-            nats_url,
-        } => {
-            refresh_certificate(&cluster_domain, &nats_url, &key_paths, &acme_server_url).await?;
+        DronePlan::DoCertificateRefresh(cert_options) => {
+            refresh_certificate(&cert_options).await?;
         }
     }
     Ok(())

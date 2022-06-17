@@ -1,12 +1,13 @@
 use super::DockerOptions;
 use anyhow::{anyhow, Result};
 use bollard::{
+    auth::DockerCredentials,
     container::{Config, CreateContainerOptions, StartContainerOptions, StopContainerOptions},
     image::CreateImageOptions,
     models::{EventMessage, HostConfig, PortBinding},
     network::CreateNetworkOptions,
     system::EventsOptions,
-    Docker, API_DEFAULT_VERSION, auth::DockerCredentials,
+    Docker, API_DEFAULT_VERSION,
 };
 use std::collections::HashMap;
 use tokio_stream::{Stream, StreamExt};
@@ -103,7 +104,11 @@ impl DockerInterface {
     }
 
     #[allow(unused)]
-    pub async fn pull_image(&self, image: &str, credentials: &Option<DockerCredentials>) -> Result<()> {
+    pub async fn pull_image(
+        &self,
+        image: &str,
+        credentials: &Option<DockerCredentials>,
+    ) -> Result<()> {
         let options = Some(CreateImageOptions {
             from_image: image,
             ..Default::default()
