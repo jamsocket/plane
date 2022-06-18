@@ -37,3 +37,4 @@ required-features = ["full"]
 
 [features]
 full = []
+docker-unit-test = []

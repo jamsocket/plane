@@ -2,7 +2,9 @@ use super::DockerOptions;
 use anyhow::{anyhow, Result};
 use bollard::{
     auth::DockerCredentials,
-    container::{Config, CreateContainerOptions, StartContainerOptions, StopContainerOptions},
+    container::{
+        Config, CreateContainerOptions, LogsOptions, StartContainerOptions, StopContainerOptions,
+    },
     image::CreateImageOptions,
     models::{EventMessage, HostConfig, PortBinding},
     network::CreateNetworkOptions,
@@ -29,6 +31,7 @@ pub enum ContainerEventType {
     Die,
     Stop,
     Kill,
+    Destroy,
 }
 
 #[allow(unused)]
@@ -50,6 +53,7 @@ impl ContainerEvent {
             "start" => ContainerEventType::Start,
             "kill" => ContainerEventType::Kill,
             "create" => ContainerEventType::Create,
+            "destroy" => ContainerEventType::Destroy,
             _ => {
                 tracing::info!(?action, "Unhandled container action.");
                 return None;
@@ -125,7 +129,11 @@ impl DockerInterface {
     pub async fn stop_container(&self, name: &str) -> Result<()> {
         let options = StopContainerOptions { t: 10 };
 
-        self.docker.stop_container(name, Some(options)).await?;
+        if let Ok(val) = self.is_running(name).await {
+            if val.0 {
+                self.docker.stop_container(name, Some(options)).await?;
+            }
+        }
 
         self.docker.remove_network(name).await?;
 
@@ -174,7 +182,7 @@ impl DockerInterface {
         name: &str,
         image: &str,
         env: &HashMap<String, String>,
-    ) -> Result<()> {
+    ) -> Result<String> {
         let env: Vec<String> = env.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
 
         // Build the network.
@@ -238,6 +246,65 @@ impl DockerInterface {
             self.docker.start_container(&container_id, options).await?;
         };
 
-        Ok(())
+        Ok(container_id)
+    }
+
+    #[allow(dead_code)]
+    pub async fn get_last_n_log_lines(&self, container_id: &str, n: usize) -> Result<Vec<String>> {
+        let stream = self.docker.logs(
+            &container_id,
+            Some(LogsOptions {
+                stdout: true,
+                stderr: true,
+                tail: n.to_string(),
+                ..Default::default()
+            }),
+        );
+
+        Ok(stream
+            .map(|log| log.unwrap().to_string())
+            .collect::<Vec<_>>()
+            .await)
+    }
+}
+
+#[cfg(feature = "docker-unit-test")]
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    async fn get_docker_interface() -> DockerInterface {
+        let docker_options = DockerOptions {
+            transport: crate::drone::agent::DockerApiTransport::Socket(
+                "/var/run/docker.sock".to_string(),
+            ),
+            runtime: None,
+        };
+        DockerInterface::try_new(&docker_options).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_hello_world_img() {
+        let docker = get_docker_interface().await;
+
+        let container_name = "test";
+        let image_name = "hello-world";
+
+        let container_id = docker
+            .run_container(&container_name, &image_name, &HashMap::new())
+            .await
+            .unwrap();
+        let log_lines = docker.get_last_n_log_lines(&container_id, 2).await.unwrap();
+
+        assert_eq!(log_lines.len(), 2);
+        assert_eq!(log_lines[0], " https://docs.docker.com/get-started/\n");
+        assert_eq!(log_lines[1], "\n");
+
+        let stopped = docker.stop_container(&container_name).await;
+
+        assert_eq!(stopped.is_ok(), true);
+
+        let removed = docker.docker.remove_container(&container_id, None).await;
+        assert_eq!(removed.is_ok(), true);
     }
 }
