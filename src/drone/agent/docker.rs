@@ -129,8 +129,8 @@ impl DockerInterface {
     pub async fn stop_container(&self, name: &str) -> Result<()> {
         let options = StopContainerOptions { t: 10 };
 
-        if let Ok(val) = self.is_running(name).await {
-            if val.0 {
+        if let Ok(run_state) = self.is_running(name).await {
+            if run_state.0 {
                 self.docker.stop_container(name, Some(options)).await?;
             }
         }
@@ -289,14 +289,15 @@ mod test {
 
         let container_name = "test";
         let image_name = "hello-world";
+        let total_log_lines = 2;
 
         let container_id = docker
             .run_container(&container_name, &image_name, &HashMap::new())
             .await
             .unwrap();
-        let log_lines = docker.get_last_n_log_lines(&container_id, 2).await.unwrap();
+        let log_lines = docker.get_last_n_log_lines(&container_id, total_log_lines).await.unwrap();
 
-        assert_eq!(log_lines.len(), 2);
+        assert_eq!(log_lines.len(), total_log_lines);
         assert_eq!(log_lines[0], " https://docs.docker.com/get-started/\n");
         assert_eq!(log_lines[1], "\n");
 

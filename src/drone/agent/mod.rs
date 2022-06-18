@@ -157,6 +157,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
                 tokio::spawn(ready_loop(nats, drone_id, cluster));
             }
 
+            // TODO?: this should become listen to drone.{id}.* and handle specific sub-requests (i.e. get logs instead of spawn)
             tracing::info!("Listening for spawn requests.");
             listen_for_spawn_requests(drone_id, docker, nats, agent_opts.host_ip, db).await
         }
