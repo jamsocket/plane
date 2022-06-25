@@ -1,5 +1,5 @@
 use self::https_client::get_https_client;
-use crate::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, retry::do_with_retry};
+use crate::{messages::cert::SetAcmeDnsRecord, nats::TypedNats};
 use acme2::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
@@ -112,13 +112,9 @@ pub async fn get_certificate(
 }
 
 pub async fn refresh_certificate(cert_options: &CertOptions) -> Result<()> {
-    let client = get_https_client().context("Error getting HTTPS client.")?;
-    let nats = do_with_retry(
-        || TypedNats::connect(&cert_options.nats_url),
-        30,
-        Duration::from_secs(10),
-    )
-    .await?;
+    let client = get_https_client()?;
+    let nats = cert_options.nats.connection().await?;
+
     let (pkey, cert) = get_certificate(
         &cert_options.cluster_domain,
         &nats,

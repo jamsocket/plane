@@ -16,6 +16,8 @@ use http::Uri;
 use hyper::Client;
 use std::{net::IpAddr, sync::Arc, time::Duration};
 
+use super::cli::NatsConnection;
+
 mod docker;
 mod executor;
 
@@ -40,7 +42,7 @@ pub struct DockerOptions {
 #[derive(PartialEq, Debug)]
 pub struct AgentOptions {
     pub db_path: String,
-    pub nats_url: String,
+    pub nats: NatsConnection,
     pub cluster_domain: String,
 
     /// Public IP of the machine the drone is running on.
@@ -116,13 +118,7 @@ async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: String) {
 }
 
 pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
-    tracing::info!("Connecting to NATS.");
-    let nats = do_with_retry(
-        || TypedNats::connect(&agent_opts.nats_url),
-        30,
-        Duration::from_secs(10),
-    )
-    .await?;
+    let nats = agent_opts.nats.connection().await?;
 
     tracing::info!("Ensuring backend_status stream exists.");
     nats.add_jetstream_stream("backend_status", BackendStateMessage::subscribe_subject())?;

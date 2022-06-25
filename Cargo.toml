@@ -22,7 +22,7 @@ rustls-pemfile = "1.0.0"
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 signal-hook = "0.3.14"
-sqlx = { version = "0.5.13", features = ["runtime-tokio-rustls", "sqlite", "migrate", "macros", "offline"] }
+sqlx = { version = "0.6.0", features = ["runtime-tokio-rustls", "sqlite", "migrate", "macros", "offline"] }
 tokio = { version = "1.18.2", features = ["full"] }
 tokio-rustls = "0.23.4"
 tokio-stream = "0.1.8"
