@@ -1165,8 +1165,9 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.20.1"
-source = "git+https://github.com/paulgb/nats.rs.git?rev=1f5648#1f5648ea663c3b68e707376d900a99bdc9ebc8af"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fdfb3fb75f20d8a9ff93e4f5ad7f9e2c61f722b0e71daa62bd2b28f515a2a78"
 dependencies = [
  "base64",
  "base64-url",
