@@ -4,7 +4,7 @@ use acme2::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Result, Context};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use openssl::{
     asn1::Asn1Time,
@@ -160,7 +160,7 @@ pub async fn refresh_if_not_valid(cert_options: &CertOptions) -> Result<Option<D
     }
 
     tracing::info!("Refreshing certificate.");
-    refresh_certificate(&cert_options).await?;
+    refresh_certificate(&cert_options).await.context("Error refreshing certificate.")?;
     tracing::info!("Done refreshing certificate.");
 
     Ok(None)
