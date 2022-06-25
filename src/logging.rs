@@ -12,6 +12,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{layer::Context, util::SubscriberInitExt, EnvFilter, Layer};
 
 const TRACE_STACKDRIVER: &str = "TRACE_STACKDRIVER";
+const LOG_DEFAULT: &str = "info,sqlx=warn";
 
 async fn do_logs(nc: &TypedNats, mut recv: tokio::sync::mpsc::Receiver<LogMessage>) {
     while let Some(msg) = recv.recv().await {
@@ -23,7 +24,7 @@ async fn do_logs(nc: &TypedNats, mut recv: tokio::sync::mpsc::Receiver<LogMessag
 
 pub fn init_tracing() -> Result<()> {
     let filter_layer =
-        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info,sqlx=warn"))?;
+        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new(LOG_DEFAULT))?;
 
     let registry = tracing_subscriber::registry().with(filter_layer);
 
@@ -41,7 +42,7 @@ pub fn init_tracing_with_nats(nats: TypedNats) -> Result<()> {
     let (send, recv) = tokio::sync::mpsc::channel::<LogMessage>(128);
 
     let filter_layer =
-        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info,sqlx=warn"))?;
+        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new(LOG_DEFAULT))?;
 
     let registry = tracing_subscriber::registry()
         .with(LogManagerLogger::new(send))

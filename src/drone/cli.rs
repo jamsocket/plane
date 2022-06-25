@@ -1,13 +1,12 @@
-use crate::keys::KeyCertPathPair;
-use anyhow::Result;
-use clap::{Parser, Subcommand};
-use reqwest::Url;
-use std::{net::IpAddr, path::PathBuf};
-
 use super::{
     agent::{AgentOptions, DockerApiTransport, DockerOptions},
     proxy::{ProxyHttpsOptions, ProxyOptions},
 };
+use crate::{keys::KeyCertPathPair, nats::TypedNats, retry::do_with_retry};
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+use reqwest::Url;
+use std::{cell::RefCell, fmt::Debug, net::IpAddr, path::PathBuf, sync::Arc, time::Duration};
 
 #[derive(Parser)]
 pub struct Opts {
@@ -75,6 +74,56 @@ pub struct Opts {
     command: Option<Command>,
 }
 
+/// Represents a shared, lazy connection to NATS.
+/// No connection is made until connection().await is first
+/// called. Once a successful connection is made, it is
+/// cached and a clone of it is returned.
+#[derive(Clone)]
+pub struct NatsConnection {
+    connection_string: String,
+    connection: Arc<RefCell<Option<TypedNats>>>,
+}
+
+impl PartialEq for NatsConnection {
+    fn eq(&self, other: &Self) -> bool {
+        self.connection_string == other.connection_string
+    }
+}
+
+impl Debug for NatsConnection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NatsConnection")
+            .field("connection_string", &self.connection_string)
+            .finish()
+    }
+}
+
+impl NatsConnection {
+    pub fn new(connection_string: String) -> Self {
+        NatsConnection {
+            connection_string,
+            connection: Arc::default(),
+        }
+    }
+
+    pub async fn connection(&self) -> Result<TypedNats> {
+        if let Some(nats) = self.connection.borrow().as_ref() {
+            return Ok(nats.clone());
+        }
+
+        let nats = do_with_retry(
+            || TypedNats::connect(&self.connection_string),
+            30,
+            Duration::from_secs(10),
+        )
+        .await?;
+
+        self.connection.replace(Some(nats.clone()));
+
+        Ok(nats)
+    }
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// Migrate the database, and then exit.
@@ -112,7 +161,7 @@ impl Default for Command {
 #[derive(PartialEq, Debug)]
 pub struct CertOptions {
     pub cluster_domain: String,
-    pub nats_url: String,
+    pub nats: NatsConnection,
     pub key_paths: KeyCertPathPair,
     pub acme_server_url: String,
 }
@@ -124,6 +173,7 @@ pub enum DronePlan {
         proxy_options: Option<ProxyOptions>,
         agent_options: Option<AgentOptions>,
         cert_options: Option<CertOptions>,
+        nats: Option<NatsConnection>,
     },
     DoMigration {
         db_path: String,
@@ -170,6 +220,8 @@ impl From<Opts> for DronePlan {
             None
         };
 
+        let nats = opts.nats_url.map(NatsConnection::new);
+
         match opts.command.unwrap_or_default() {
             Command::Migrate => DronePlan::DoMigration {
                 db_path: opts
@@ -179,7 +231,7 @@ impl From<Opts> for DronePlan {
             Command::Cert => {
                 DronePlan::DoCertificateRefresh(CertOptions {
                     cluster_domain: opts.cluster_domain.expect("Expected --cluster-domain when using cert command."),
-                    nats_url: opts.nats_url.expect("Expected --nats-host when using cert command."),
+                    nats: nats.expect("Expected --nats-host when using cert command."),
                     key_paths: key_cert_pair.expect("Expected --https-certificate and --https-private-key to point to location to write cert and key."),
                     acme_server_url: opts.acme_server.expect("Expected --acme-server when using cert command."),
                 })
@@ -190,7 +242,7 @@ impl From<Opts> for DronePlan {
                         acme_server_url: opts.acme_server.clone().expect("Expected --acme-server for certificate refreshing."),
                         cluster_domain: opts.cluster_domain.clone().expect("Expected --cluster-domain for certificate refreshing."),
                         key_paths: key_cert_pair.clone().expect("Expected --https-certificate and --https-private-key for certificate refresh."),
-                        nats_url: opts.nats_url.clone().expect("Expected --nats-url."),
+                        nats: nats.clone().expect("Expected --nats-url."),
                     })
                 } else {
                     None
@@ -241,7 +293,7 @@ impl From<Opts> for DronePlan {
                             runtime: opts.docker_runtime.clone(),
                             transport: docker_transport,
                         },
-                        nats_url: opts.nats_url.clone().expect("Expected --nats-url for running agent."),
+                        nats: nats.clone().expect("Expected --nats-url for running agent."),
                         ip,
 
                         host_ip: opts.host_ip.expect("Expected --host-ip for running agent.")
@@ -254,7 +306,7 @@ impl From<Opts> for DronePlan {
                     panic!("Expected at least one of --proxy, --agent, --certloop if `serve` is provided explicitly.");
                 }
 
-                DronePlan::RunService { proxy_options, agent_options, cert_options }
+                DronePlan::RunService { proxy_options, agent_options, cert_options, nats }
             }
         }
     }
@@ -303,7 +355,7 @@ mod test {
         assert_eq!(
             DronePlan::DoCertificateRefresh(CertOptions {
                 cluster_domain: "mydomain.test".to_string(),
-                nats_url: "nats://foo@bar".to_string(),
+                nats: NatsConnection::new("nats://foo@bar".to_string()),
                 key_paths: KeyCertPathPair {
                     private_key_path: PathBuf::from("mycert.key"),
                     certificate_path: PathBuf::from("mycert.cert"),
@@ -335,6 +387,7 @@ mod test {
                 }),
                 agent_options: None,
                 cert_options: None,
+                nats: None,
             },
             opts
         );
@@ -431,9 +484,10 @@ mod test {
                     },
                     ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
                     host_ip: "56.56.56.56".parse().unwrap(),
-                    nats_url: "nats://foo@bar".to_string(),
+                    nats: NatsConnection::new("nats://foo@bar".to_string()),
                 }),
                 cert_options: None,
+                nats: Some(NatsConnection::new("nats://foo@bar".to_string())),
             },
             opts
         );
@@ -487,7 +541,7 @@ mod test {
                     },
                     ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
                     host_ip: "56.56.56.56".parse().unwrap(),
-                    nats_url: "nats://foo@bar".to_string(),
+                    nats: NatsConnection::new("nats://foo@bar".to_string()),
                 }),
                 cert_options: Some(CertOptions {
                     acme_server_url: "https://acme-server".to_string(),
@@ -496,8 +550,9 @@ mod test {
                         private_key_path: PathBuf::from("mycert.key"),
                         certificate_path: PathBuf::from("mycert.cert"),
                     },
-                    nats_url: "nats://foo@bar".to_string(),
-                })
+                    nats: NatsConnection::new("nats://foo@bar".to_string()),
+                }),
+                nats: Some(NatsConnection::new("nats://foo@bar".to_string())),
             },
             opts
         );

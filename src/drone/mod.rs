@@ -4,7 +4,7 @@ use self::{
     cli::{DronePlan, Opts},
     proxy::serve,
 };
-use crate::{database::get_db, logging::init_tracing};
+use crate::{database::get_db, logging::{init_tracing, init_tracing_with_nats}};
 use crate::{retry::do_with_retry};
 use anyhow::Result;
 use clap::Parser;
@@ -18,7 +18,6 @@ pub mod cli;
 mod proxy;
 
 async fn main() -> Result<()> {
-    init_tracing()?; // TODO: init sender if we have nats.
     let opts = Opts::parse();
     let plan = DronePlan::try_from(opts)?;
 
@@ -27,7 +26,15 @@ async fn main() -> Result<()> {
             proxy_options,
             agent_options,
             cert_options,
+            nats,
         } => {
+            if let Some(nats) = nats {
+                let nats = nats.connection().await?;
+                init_tracing_with_nats(nats)?;
+            } else {
+                init_tracing()?;
+            }
+
             let mut futs: Vec<Pin<Box<dyn Future<Output = Result<()>>>>> = vec![];
 
             if let Some(cert_options) = cert_options {
