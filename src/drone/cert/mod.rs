@@ -4,7 +4,7 @@ use acme2::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
-use anyhow::{anyhow, Result, Context};
+use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use openssl::{
     asn1::Asn1Time,
@@ -146,11 +146,17 @@ pub fn cert_validity(certificate_path: &Path) -> Option<DateTime<Utc>> {
 
 pub async fn refresh_if_not_valid(cert_options: &CertOptions) -> Result<Option<Duration>> {
     if let Some(valid_until) = cert_validity(&cert_options.key_paths.certificate_path) {
-        let refresh_at = valid_until.checked_sub_signed(chrono::Duration::from_std(REFRESH_MARGIN)?).ok_or_else(|| anyhow!("Date subtraction would result in over/underflow, this should never happen."))?;
+        let refresh_at = valid_until
+            .checked_sub_signed(chrono::Duration::from_std(REFRESH_MARGIN)?)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Date subtraction would result in over/underflow, this should never happen."
+                )
+            })?;
         let time_until_refresh = refresh_at.signed_duration_since(Utc::now());
 
         if time_until_refresh > chrono::Duration::zero() {
-            return Ok(Some(time_until_refresh.to_std()?))
+            return Ok(Some(time_until_refresh.to_std()?));
         }
 
         tracing::info!(
@@ -160,7 +166,9 @@ pub async fn refresh_if_not_valid(cert_options: &CertOptions) -> Result<Option<D
     }
 
     tracing::info!("Refreshing certificate.");
-    refresh_certificate(&cert_options).await.context("Error refreshing certificate.")?;
+    refresh_certificate(&cert_options)
+        .await
+        .context("Error refreshing certificate.")?;
     tracing::info!("Done refreshing certificate.");
 
     Ok(None)
