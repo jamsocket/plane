@@ -134,18 +134,23 @@ impl ProxyService {
                             .duration_since(started)
                             .unwrap_or_default()
                             .as_secs();
-                            
+
                         match result {
                             Ok((from_client, from_server)) => {
-                                
-
                                 tracing::info!(%from_client, %from_server, ?duration, "Upgraded connection closed.");
                             }
                             Err(error) if error.kind() == ErrorKind::UnexpectedEof => {
-                                tracing::info!(?duration, "Upgraded connection closed with UnexpectedEof.");
+                                tracing::info!(
+                                    ?duration,
+                                    "Upgraded connection closed with UnexpectedEof."
+                                );
                             }
                             Err(error) => {
-                                tracing::error!(?duration, ?error, "Error with upgraded connection.");
+                                tracing::error!(
+                                    ?duration,
+                                    ?error,
+                                    "Error with upgraded connection."
+                                );
                             }
                         }
                     }

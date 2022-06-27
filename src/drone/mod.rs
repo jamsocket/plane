@@ -1,11 +1,14 @@
 use self::{
     agent::run_agent,
-    cert::{refresh_certificate, refresh_loop, refresh_if_not_valid},
+    cert::{refresh_certificate, refresh_if_not_valid, refresh_loop},
     cli::{DronePlan, Opts},
     proxy::serve,
 };
-use crate::{database::get_db, logging::{init_tracing, init_tracing_with_nats}};
-use crate::{retry::do_with_retry};
+use crate::retry::do_with_retry;
+use crate::{
+    database::get_db,
+    logging::{init_tracing, init_tracing_with_nats},
+};
 use anyhow::Result;
 use clap::Parser;
 use futures::{future::select_all, Future};
@@ -38,7 +41,12 @@ async fn main() -> Result<()> {
             let mut futs: Vec<Pin<Box<dyn Future<Output = Result<()>>>>> = vec![];
 
             if let Some(cert_options) = cert_options {
-                do_with_retry(|| refresh_if_not_valid(&cert_options), 5, std::time::Duration::from_secs(10)).await?;
+                do_with_retry(
+                    || refresh_if_not_valid(&cert_options),
+                    5,
+                    std::time::Duration::from_secs(10),
+                )
+                .await?;
 
                 futs.push(Box::pin(refresh_loop(cert_options)))
             }
