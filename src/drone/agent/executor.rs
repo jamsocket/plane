@@ -120,8 +120,8 @@ impl Executor {
 
             let next_state = tokio::select! {
                 next_state = self.step(spawn_request, state) => next_state,
-                v = recv.recv() => {
-                    tracing::info!(?v, "got result");
+                _ = recv.recv() => {
+                    tracing::info!("State may have updated externally.");
                     continue;
                 },
             };

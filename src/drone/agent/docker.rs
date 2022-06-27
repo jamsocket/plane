@@ -5,7 +5,6 @@ use bollard::{
     container::{Config, CreateContainerOptions, StartContainerOptions, StopContainerOptions},
     image::CreateImageOptions,
     models::{EventMessage, HostConfig, PortBinding},
-    network::CreateNetworkOptions,
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
@@ -127,8 +126,6 @@ impl DockerInterface {
 
         self.docker.stop_container(name, Some(options)).await?;
 
-        self.docker.remove_network(name).await?;
-
         Ok(())
     }
 
@@ -177,19 +174,6 @@ impl DockerInterface {
     ) -> Result<()> {
         let env: Vec<String> = env.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
 
-        // Build the network.
-        let network_id = {
-            let options: CreateNetworkOptions<&str> = CreateNetworkOptions {
-                name,
-                ..CreateNetworkOptions::default()
-            };
-
-            let response = self.docker.create_network(options).await?;
-            response
-                .id
-                .ok_or_else(|| anyhow!("Network response contained no network id."))?
-        };
-
         // Build the container.
         let container_id = {
             let options: Option<CreateContainerOptions<String>> = Some(CreateContainerOptions {
@@ -209,7 +193,6 @@ impl DockerInterface {
                     .collect(),
                 ),
                 host_config: Some(HostConfig {
-                    network_mode: Some(network_id.clone()),
                     port_bindings: Some(
                         vec![(
                             format!("{}/tcp", CONTAINER_PORT),
