@@ -6,6 +6,7 @@ use http::Uri;
 use hyper::client::HttpConnector;
 use hyper::Client;
 use hyper::{service::Service, Body, Request, Response, StatusCode};
+use std::io::ErrorKind;
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::{
@@ -129,18 +130,22 @@ impl ProxyService {
                         )
                         .await;
                         connection_tracker.decrement_connections(&backend);
-
+                        let duration = SystemTime::now()
+                            .duration_since(started)
+                            .unwrap_or_default()
+                            .as_secs();
+                            
                         match result {
                             Ok((from_client, from_server)) => {
-                                let duration = SystemTime::now()
-                                    .duration_since(started)
-                                    .unwrap_or_default()
-                                    .as_secs();
+                                
 
                                 tracing::info!(%from_client, %from_server, ?duration, "Upgraded connection closed.");
                             }
+                            Err(error) if error.kind() == ErrorKind::UnexpectedEof => {
+                                tracing::info!(?duration, "Upgraded connection closed with UnexpectedEof.");
+                            }
                             Err(error) => {
-                                tracing::error!(?error, "IO error upgrading connection.");
+                                tracing::error!(?duration, ?error, "Error with upgraded connection.");
                             }
                         }
                     }
