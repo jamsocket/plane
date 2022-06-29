@@ -43,7 +43,7 @@ pub struct LogMessage {
 }
 
 impl LogMessage {
-    pub fn subject() -> Subject<LogMessage, NoReply> {
-        Subject::new("logs.drone".to_string())
+    pub fn subject(subject_name: &str) -> Subject<LogMessage, NoReply> {
+        Subject::new(subject_name.to_string())
     }
 }
