@@ -14,9 +14,9 @@ use tracing_subscriber::{layer::Context, util::SubscriberInitExt, EnvFilter, Lay
 const TRACE_STACKDRIVER: &str = "TRACE_STACKDRIVER";
 const LOG_DEFAULT: &str = "info,sqlx=warn";
 
-async fn do_logs(nc: &TypedNats, mut recv: tokio::sync::mpsc::Receiver<LogMessage>) {
+async fn do_logs(nc: &TypedNats, mut recv: tokio::sync::mpsc::Receiver<LogMessage>, subject: &str) {
     while let Some(msg) = recv.recv().await {
-        if let Err(err) = nc.publish(&LogMessage::subject(), &msg).await {
+        if let Err(err) = nc.publish(&LogMessage::subject(subject), &msg).await {
             println!("{:?}", err);
         }
     }
@@ -38,7 +38,7 @@ pub fn init_tracing() -> Result<()> {
     Ok(())
 }
 
-pub fn init_tracing_with_nats(nats: TypedNats) -> Result<()> {
+pub fn init_tracing_with_nats(nats: TypedNats, subject: String) -> Result<()> {
     let (send, recv) = tokio::sync::mpsc::channel::<LogMessage>(128);
 
     let filter_layer =
@@ -56,7 +56,7 @@ pub fn init_tracing_with_nats(nats: TypedNats) -> Result<()> {
     };
 
     tokio::spawn(async move {
-        let result = do_logs(&nats, recv).await;
+        let result = do_logs(&nats, recv, &subject).await;
         tracing::error!(?result, "do_logs terminated.");
     });
 

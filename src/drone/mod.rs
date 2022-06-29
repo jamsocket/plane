@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
         } => {
             if let Some(nats) = nats {
                 let nats = nats.connection().await?;
-                init_tracing_with_nats(nats)?;
+                init_tracing_with_nats(nats, "logs.drone".to_string())?;
             } else {
                 init_tracing()?;
             }
