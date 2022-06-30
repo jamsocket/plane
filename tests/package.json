@@ -1,7 +1,7 @@
 {
 	"scripts": {
 		"build": "tsc",
-		"test": "cargo build --manifest-path=../Cargo.toml --features=full --bin=spawner-drone && tsc && ava --timeout=90s --match='NATS Logs'"
+		"test": "cargo build --manifest-path=../Cargo.toml --features=full --bin=spawner-drone && tsc && ava --timeout=90s"
 	},
 	"devDependencies": {
 		"@types/express": "^4.17.13",
