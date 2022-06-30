@@ -65,32 +65,21 @@ test("NATS logs", async (t) => {
   await sleep(100)
   const nats = await connect({ port: natsPort, token: "mytoken" })
 
-  const connectionRequestSubscription =
-    new NatsMessageIterator<DroneConnectRequest>(
-      nats.subscribe("drone.register")
-    )
-
   t.context.runner.runAgent(natsPort)
 
   // Initial handshake.
-  const [val, msg] = await connectionRequestSubscription.next()
-  t.deepEqual(val, {
+  await expectMessage(t, nats, "drone.register", {
     cluster: "mydomain.test",
     ip: "123.12.1.123",
+  }, {
+    Success: {
+      drone_id: 1,
+    },
   })
 
-  await msg.respond(
-    JSON_CODEC.encode({
-      Success: {
-        drone_id: 1,
-      },
-    })
-  )
-
   await sleep(100)
-
   const logSubscription = new NatsMessageIterator<{fields: Record<string, any>}>(
-    nats.subscribe("logs.drone")
+    nats.subscribe("logs.drone", {timeout: 1000})
   )
 
   // Spawn request.
@@ -105,13 +94,7 @@ test("NATS logs", async (t) => {
       foo: "bar",
     },
   }
-  const rawSpawnResult = await nats.request(
-    "drone.1.spawn",
-    JSON_CODEC.encode(request)
-  )
-  const spawnResult = JSON_CODEC.decode(rawSpawnResult.data)
-
-  t.is(spawnResult, true)
+  expectResponse(t, nats, "drone.1.spawn", request, true)
 
   let [result] = await logSubscription.next()
   t.deepEqual(result.fields.metadata, {foo: "bar"})

@@ -4,7 +4,7 @@ import { JSONCodec, Msg, NatsConnection, Subscription } from "nats"
 export const JSON_CODEC = JSONCodec()
 
 export async function expectResponse<T, R>(t: ExecutionContext<unknown>, nats: NatsConnection, subject: string, request: T, expectedResponse: R) {
-  const responseEnc = await nats.request(subject, JSON_CODEC.encode(request))
+  const responseEnc = await nats.request(subject, JSON_CODEC.encode(request), {timeout: 300})
   const response = JSON_CODEC.decode(responseEnc.data)
   t.deepEqual(response, expectedResponse)
 }
@@ -17,6 +17,7 @@ export async function expectMessage<T, R>(t: ExecutionContext<unknown>, nats: Na
   if (typeof response !== "undefined") {
     messageEnc.value.respond(JSON_CODEC.encode(response))
   }
+  sub.unsubscribe()
 }
 
 export class NatsMessageIterator<T> {

@@ -10,13 +10,13 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use serde_json::json;
+use tracing::Level;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
     sync::mpsc::{channel, Sender},
     task::JoinHandle,
 };
 use tokio_stream::StreamExt;
-use tracing::Level;
 
 trait LogError {
     fn log_error(&self) -> &Self;
@@ -87,6 +87,7 @@ impl Executor {
     }
 
     pub async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
+        println!("here1x");
         let _span = tracing::span!(
             Level::INFO,
             "run_backend",
