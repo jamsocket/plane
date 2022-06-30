@@ -1,4 +1,3 @@
-import anyTest, { TestFn } from "ava"
 import { mkdirSync } from "fs"
 import { connect } from "nats"
 import { KeyCertPair, validateCertificateKeyPair } from "./util/certificates.js"
@@ -7,15 +6,7 @@ import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
 import { DnsMessage } from "./util/types.js"
 
-const test = anyTest as TestFn<TestEnvironment>
-
-test.beforeEach(async (t) => {
-  t.context = await TestEnvironment.create()
-})
-
-test.afterEach.always(async (t) => {
-  await t.context.drop()
-})
+const test = TestEnvironment.wrappedTestFunction()
 
 test("Generate certificate", async (t) => {
   const natsPort = await t.context.docker.runNats()

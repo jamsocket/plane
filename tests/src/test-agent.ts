@@ -1,39 +1,23 @@
-import anyTest, { TestFn } from "ava"
 import axios from "axios"
 import { connect } from "nats"
 import { TestEnvironment } from "./util/environment.js"
 import { generateId } from "./util/id_gen.js"
 import { TEST_IMAGE } from "./util/images.js"
-import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
+import { expectMessage, expectResponse, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
 import { BackendStateMessage, DroneConnectRequest, DroneStatusMessage, SpawnRequest } from "./util/types.js"
 
-const test = anyTest as TestFn<TestEnvironment>
-
-test.beforeEach(async (t) => {
-  t.context = await TestEnvironment.create()
-})
-
-test.afterEach.always(async (t) => {
-  await t.context.drop()
-})
+const test = TestEnvironment.wrappedTestFunction()
 
 test("Test using IP lookup API", async (t) => {
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
   const nats = await connect({ port: natsPort, token: "mytoken" })
 
-  const connectionRequestSubscription =
-    new NatsMessageIterator<DroneConnectRequest>(
-      nats.subscribe("drone.register")
-    )
-
   const lookupApiPort = await t.context.dummyServer.serveIpAddress()
   t.context.runner.runAgentWithIpApi(natsPort, `http://localhost:${lookupApiPort}/ip`)
 
-  // Initial handshake.
-  const [val, msg] = await connectionRequestSubscription.next()
-  t.deepEqual(val, {
+  await expectMessage(t, nats, "drone.register", {
     cluster: "mydomain.test",
     ip: "21.22.23.24",
   })
@@ -52,19 +36,14 @@ test("Drone sends ready messages", async (t) => {
   t.context.runner.runAgent(natsPort)
 
   // Initial handshake.
-  const [val, msg] = await connectionRequestSubscription.next()
-  t.deepEqual(val, {
+  await expectMessage(t, nats, "drone.register", {
     cluster: "mydomain.test",
     ip: "123.12.1.123",
+  }, {
+    Success: {
+      drone_id: 345,
+    },
   })
-
-  await msg.respond(
-    JSON_CODEC.encode({
-      Success: {
-        drone_id: 345,
-      },
-    })
-  )
 
   const droneStatusSubscription = new NatsMessageIterator<DroneStatusMessage>(
     nats.subscribe("drone.345.status")
@@ -145,27 +124,15 @@ test("Spawn with agent", async (t) => {
   await sleep(100)
   const nats = await connect({ port: natsPort, token: "mytoken" })
 
-  const connectionRequestSubscription =
-    new NatsMessageIterator<DroneConnectRequest>(
-      nats.subscribe("drone.register")
-    )
-
   t.context.runner.runAgent(natsPort)
-
-  // Initial handshake.
-  const [val, msg] = await connectionRequestSubscription.next()
-  t.deepEqual(val, {
+  await expectMessage(t, nats, "drone.register", {
     cluster: "mydomain.test",
     ip: "123.12.1.123",
+  }, {
+    Success: {
+      drone_id: 1,
+    },
   })
-
-  await msg.respond(
-    JSON_CODEC.encode({
-      Success: {
-        drone_id: 1,
-      },
-    })
-  )
 
   await sleep(100)
 
@@ -179,13 +146,7 @@ test("Spawn with agent", async (t) => {
     },
     metadata: {},
   }
-  const rawSpawnResult = await nats.request(
-    "drone.1.spawn",
-    JSON_CODEC.encode(request)
-  )
-  const spawnResult = JSON_CODEC.decode(rawSpawnResult.data)
-
-  t.is(spawnResult, true)
+  expectResponse(t, nats, "drone.1.spawn", request, true)
 
   // Status update stages
   const backendStatusSubscription =
@@ -222,27 +183,17 @@ test("Spawn fails during start", async (t) => {
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
   const nats = await connect({ port: natsPort, token: "mytoken" })
-  const connectionRequestSubscription =
-    new NatsMessageIterator<DroneConnectRequest>(
-      nats.subscribe("drone.register")
-    )
 
   t.context.runner.runAgent(natsPort)
 
-  // Initial handshake.
-  const [val, msg] = await connectionRequestSubscription.next()
-  t.deepEqual(val, {
+  await expectMessage(t, nats, "drone.register", {
     cluster: "mydomain.test",
     ip: "123.12.1.123",
+  }, {
+    Success: {
+      drone_id: 1,
+    },
   })
-
-  await msg.respond(
-    JSON_CODEC.encode({
-      Success: {
-        drone_id: 1,
-      },
-    })
-  )
 
   await sleep(100)
 
@@ -258,13 +209,7 @@ test("Spawn fails during start", async (t) => {
     },
     metadata: {},
   }
-  const rawSpawnResult = await nats.request(
-    "drone.1.spawn",
-    JSON_CODEC.encode(request)
-  )
-  const spawnResult = JSON_CODEC.decode(rawSpawnResult.data)
-
-  t.is(spawnResult, true)
+  expectResponse(t, nats, "drone.1.spawn", request, true)
 
   // Status update stages
   const backendStatusSubscription =
@@ -293,19 +238,14 @@ test("Backend fails after ready", async (t) => {
   t.context.runner.runAgent(natsPort)
 
   // Initial handshake.
-  const [val, msg] = await connectionRequestSubscription.next()
-  t.deepEqual(val, {
+  await expectMessage(t, nats, "drone.register", {
     cluster: "mydomain.test",
     ip: "123.12.1.123",
+  }, {
+    Success: {
+      drone_id: 1,
+    },
   })
-
-  await msg.respond(
-    JSON_CODEC.encode({
-      Success: {
-        drone_id: 1,
-      },
-    })
-  )
 
   await sleep(100)
 
@@ -319,13 +259,7 @@ test("Backend fails after ready", async (t) => {
     },
     metadata: {},
   }
-  const rawSpawnResult = await nats.request(
-    "drone.1.spawn",
-    JSON_CODEC.encode(request)
-  )
-  const spawnResult = JSON_CODEC.decode(rawSpawnResult.data)
-
-  t.is(spawnResult, true)
+  expectResponse(t, nats, "drone.1.spawn", request, true)
 
   // Status update stages
   const backendStatusSubscription =

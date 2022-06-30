@@ -1,4 +1,3 @@
-import anyTest, { TestFn } from "ava"
 import axios from "axios"
 import { mkdirSync } from "fs"
 import { connect } from "nats"
@@ -10,15 +9,7 @@ import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
 import { BackendStateMessage, DnsMessage, DroneConnectRequest, SpawnRequest } from "./util/types.js"
 
-const test = anyTest as TestFn<TestEnvironment>
-
-test.beforeEach(async (t) => {
-    t.context = await TestEnvironment.create()
-})
-
-test.afterEach.always(async (t) => {
-    await t.context.drop()
-})
+const test = TestEnvironment.wrappedTestFunction()
 
 test("Test end-to-end", async (t) => {
     const backendId = generateId()
