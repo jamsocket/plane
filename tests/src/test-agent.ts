@@ -1,22 +1,13 @@
-import anyTest, { TestFn } from "ava"
 import axios from "axios"
 import { connect } from "nats"
 import { TestEnvironment } from "./util/environment.js"
 import { generateId } from "./util/id_gen.js"
 import { TEST_IMAGE } from "./util/images.js"
-import { expectMessage, expectResponse, JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
+import { expectMessage, expectResponse, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
 import { BackendStateMessage, DroneConnectRequest, DroneStatusMessage, SpawnRequest } from "./util/types.js"
 
-const test = anyTest as TestFn<TestEnvironment>
-
-test.beforeEach(async (t) => {
-  t.context = await TestEnvironment.create()
-})
-
-test.afterEach.always(async (t) => {
-  await t.context.drop()
-})
+const test = TestEnvironment.wrappedTestFunction()
 
 test("Test using IP lookup API", async (t) => {
   const natsPort = await t.context.docker.runNats()
