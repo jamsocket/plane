@@ -10,7 +10,7 @@ export async function expectResponse<T, R>(t: ExecutionContext<unknown>, nats: N
 }
 
 export async function expectMessage<T, R>(t: ExecutionContext<unknown>, nats: NatsConnection, subject: string, expected: T, response?: R) {
-  const sub = await nats.subscribe(subject)
+  const sub = await nats.subscribe(subject, {timeout: 5000})
   const messageEnc = await sub[Symbol.asyncIterator]().next()
   const message = JSON_CODEC.decode(messageEnc.value.data)
   t.deepEqual(message, expected)
