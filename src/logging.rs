@@ -6,10 +6,14 @@ use anyhow::Result;
 use chrono::Utc;
 use std::{collections::BTreeMap, fmt::Debug};
 use tokio::sync::mpsc::Sender;
-use tracing::field::{Field, Visit};
+use tracing::{
+    field::{Field, Visit},
+    span::Attributes,
+    Id,
+};
 use tracing_stackdriver::Stackdriver;
-use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{layer::Context, util::SubscriberInitExt, EnvFilter, Layer};
+use tracing_subscriber::{layer::SubscriberExt, registry::LookupSpan};
 
 const TRACE_STACKDRIVER: &str = "TRACE_STACKDRIVER";
 const LOG_DEFAULT: &str = "info,sqlx=warn";
@@ -98,11 +102,41 @@ impl LogManagerLogger {
 
 impl<S> Layer<S> for LogManagerLogger
 where
-    S: tracing::Subscriber,
+    S: tracing::Subscriber + for<'a> LookupSpan<'a>,
 {
-    fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
-        let mut fields = BTreeMap::new();
-        let mut visitor = JsonVisitor(&mut fields);
+    fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
+        // Adapted from:
+        // https://github.com/LukeMathWalker/tracing-bunyan-formatter/blob/master/src/storage_layer.rs
+        let span = ctx.span(id).expect("Span not found, this is a bug");
+
+        let mut visitor = if let Some(parent_span) = span.parent() {
+            let mut extensions = parent_span.extensions_mut();
+            extensions
+                .get_mut::<JsonVisitor>()
+                .map(|v| v.to_owned())
+                .unwrap_or_default()
+        } else {
+            JsonVisitor::default()
+        };
+
+        let mut extensions = span.extensions_mut();
+
+        attrs.record(&mut visitor);
+        extensions.insert(visitor);
+    }
+
+    fn on_event(&self, event: &tracing::Event<'_>, ctx: Context<'_, S>) {
+        let mut visitor = if let Some(span) = ctx.lookup_current() {
+            let extensions = span.extensions();
+            if let Some(visitor) = extensions.get::<JsonVisitor>() {
+                visitor.clone()
+            } else {
+                JsonVisitor::default()
+            }
+        } else {
+            JsonVisitor::default()
+        };
+
         event.record(&mut visitor);
 
         let output = LogMessage {
@@ -110,7 +144,7 @@ where
             name: event.metadata().name().to_string(),
             severity: SerializableLevel(*event.metadata().level()),
             time: Utc::now(),
-            fields,
+            fields: visitor.0,
         };
 
         // make sure logging in this function call does not trigger an infinite loop
@@ -121,9 +155,10 @@ where
     }
 }
 
-struct JsonVisitor<'a>(&'a mut BTreeMap<String, serde_json::Value>);
+#[derive(Clone, Default)]
+struct JsonVisitor(BTreeMap<String, serde_json::Value>);
 
-impl<'a> Visit for JsonVisitor<'a> {
+impl Visit for JsonVisitor {
     fn record_f64(&mut self, field: &Field, value: f64) {
         self.0
             .insert(field.name().to_string(), serde_json::json!(value));
@@ -145,9 +180,22 @@ impl<'a> Visit for JsonVisitor<'a> {
             .insert(field.name().to_string(), serde_json::json!(value));
     }
     fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        self.0.insert(
-            field.name().to_string(),
-            serde_json::Value::from(format!("{:?}", value)),
-        );
+        // If a field value is a serde_json Value type, it will
+        // stringify to valid JSON. Since we are outputting JSON,
+        // rather than encoding JSON as a string, we replace it
+        // with the JSON-decoded string.
+        // This is kind of inefficient, because we pass a Value
+        // through an encode/decode cycle just to get back the
+        // same value, but it's the best we can do (see
+        // https://github.com/tokio-rs/tracing/issues/663)
+        let value = format!("{:?}", value);
+        match serde_json::from_str::<serde_json::Value>(&value) {
+            Ok(value) => {
+                self.0.insert(field.name().into(), value);
+            }
+            Err(_) => {
+                self.0.insert(field.name().into(), value.into());
+            }
+        }
     }
 }
