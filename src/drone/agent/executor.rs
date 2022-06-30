@@ -87,14 +87,6 @@ impl Executor {
     }
 
     pub async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
-        let _span = tracing::span!(
-            Level::INFO,
-            "run_backend",
-            backend_id = spawn_request.backend_id.id(),
-            metadata = %json!(spawn_request.metadata),
-        );
-        let _handle = _span.enter();
-
         // TODO: allow resuming backend.
         self.database
             .insert_backend(spawn_request)
@@ -118,7 +110,12 @@ impl Executor {
             .log_error();
 
         loop {
-            tracing::info!(?state, "Executing state.");
+            tracing::info!(
+                ?state,
+                backend_id = spawn_request.backend_id.id(),
+                metadata = %json!(spawn_request.metadata),
+                "Executing state."
+            );
 
             let next_state = tokio::select! {
                 next_state = self.step(spawn_request, state) => next_state,
