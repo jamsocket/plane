@@ -9,6 +9,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dashmap::DashMap;
+use serde_json::json;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
     sync::mpsc::{channel, Sender},
@@ -89,7 +90,8 @@ impl Executor {
         let _span = tracing::span!(
             Level::INFO,
             "run_backend",
-            backend_id = spawn_request.backend_id.id()
+            backend_id = spawn_request.backend_id.id(),
+            metadata = %json!(spawn_request.metadata),
         );
         let _handle = _span.enter();
 
