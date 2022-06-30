@@ -3,7 +3,7 @@ import { mkdirSync } from "fs"
 import { connect } from "nats"
 import { KeyCertPair, validateCertificateKeyPair } from "./util/certificates.js"
 import { TestEnvironment } from "./util/environment.js"
-import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
+import { expectMessage, expectResponse, JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
 import { DnsMessage } from "./util/types.js"
 
