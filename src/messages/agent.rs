@@ -5,6 +5,8 @@ use crate::{
 use bollard::auth::DockerCredentials;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use serde_with::DurationSeconds;
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -51,6 +53,7 @@ impl DroneConnectRequest {
 }
 
 /// A message telling a drone to spawn a backend.
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SpawnRequest {
     /// The container image to run.
@@ -61,7 +64,8 @@ pub struct SpawnRequest {
     pub backend_id: BackendId,
 
     /// The timeout after which the drone is shut down if no connections are made.
-    pub max_idle_time: Duration,
+    #[serde_as(as = "DurationSeconds")]
+    pub max_idle_secs: Duration,
 
     /// Environment variables to pass in to the container.
     pub env: HashMap<String, String>,

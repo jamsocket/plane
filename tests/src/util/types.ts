@@ -4,15 +4,10 @@ export interface DroneConnectRequest {
     ip: string
 }
 
-export interface Duration {
-    secs: number
-    nanos: number
-}
-
 export interface SpawnRequest {
     image: string
     backend_id: string
-    max_idle_time: Duration
+    max_idle_secs: number
     env: Record<string, string>
     metadata: Record<string, string>
 }

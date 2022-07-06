@@ -10,7 +10,6 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use serde_json::json;
-use tracing::Level;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
     sync::mpsc::{channel, Sender},
@@ -226,7 +225,7 @@ impl Executor {
                         .await?;
                     let next_check = last_active
                         .checked_add_signed(chrono::Duration::from_std(
-                            spawn_request.max_idle_time,
+                            spawn_request.max_idle_secs,
                         )?)
                         .ok_or_else(|| anyhow!("Checked add error."))?;
 

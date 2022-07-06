@@ -512,6 +512,7 @@ dependencies = [
  "rustls-pemfile 1.0.0",
  "serde",
  "serde_json",
+ "serde_with",
  "signal-hook",
  "sqlx",
  "tokio",

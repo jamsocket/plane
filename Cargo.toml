@@ -29,6 +29,7 @@ tokio-stream = "0.1.8"
 tracing = "0.1.34"
 tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
 tracing-stackdriver = { git = "https://github.com/drifting-in-space/tracing-stackdriver" }
+serde_with = "1.14.0"
 
 [[bin]]
 name = "spawner-drone"

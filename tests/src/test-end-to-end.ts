@@ -60,7 +60,7 @@ test("Test end-to-end", async (t) => {
     const request: SpawnRequest = {
         image: TEST_IMAGE,
         backend_id: backendId,
-        max_idle_time: { secs: 10, nanos: 0 },
+        max_idle_secs: 10,
         env: {
             PORT: "8080",
         },
