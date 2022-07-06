@@ -27,7 +27,6 @@ test("Drone sends ready messages", async (t) => {
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
   const nats = await connect({ port: natsPort, token: "mytoken" })
-
   t.context.runner.runAgent(natsPort)
 
   // Initial handshake.
@@ -81,7 +80,7 @@ test("NATS logs", async (t) => {
   const request: SpawnRequest = {
     image: TEST_IMAGE,
     backend_id: backendId,
-    max_idle_time: { secs: 10, nanos: 0 },
+    max_idle_secs: 10,
     env: {
       PORT: "8080",
     },
@@ -118,7 +117,7 @@ test("Spawn with agent", async (t) => {
   const request: SpawnRequest = {
     image: TEST_IMAGE,
     backend_id: backendId,
-    max_idle_time: { secs: 10, nanos: 0 },
+    max_idle_secs: 10,
     env: {
       PORT: "8080",
     },
@@ -179,7 +178,7 @@ test("Spawn fails during start", async (t) => {
   const request: SpawnRequest = {
     image: TEST_IMAGE,
     backend_id: backendId,
-    max_idle_time: { secs: 10, nanos: 0 },
+    max_idle_secs: 10,
     env: {
       PORT: "8080",
       EXIT_CODE: "1",
@@ -231,7 +230,7 @@ test("Backend fails after ready", async (t) => {
   const request: SpawnRequest = {
     image: TEST_IMAGE,
     backend_id: backendId,
-    max_idle_time: { secs: 10, nanos: 0 },
+    max_idle_secs: 10,
     env: {
       PORT: "8080",
     },
