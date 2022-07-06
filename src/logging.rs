@@ -2,10 +2,10 @@ use crate::{
     messages::logging::{LogMessage, SerializableLevel},
     nats::TypedNats,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use chrono::Utc;
 use std::{collections::BTreeMap, fmt::Debug};
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{
     field::{Field, Visit},
     span::Attributes,
@@ -26,45 +26,42 @@ async fn do_logs(nc: &TypedNats, mut recv: tokio::sync::mpsc::Receiver<LogMessag
     }
 }
 
-pub fn init_tracing() -> Result<()> {
-    let filter_layer =
-        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new(LOG_DEFAULT))?;
-
-    let registry = tracing_subscriber::registry().with(filter_layer);
-
-    let trace_stackdriver = std::env::var(TRACE_STACKDRIVER).is_ok();
-    if trace_stackdriver {
-        registry.with(Stackdriver::default()).init();
-    } else {
-        registry.with(tracing_subscriber::fmt::layer()).init();
-    };
-
-    Ok(())
+pub struct TracingHandle {
+    recv: Option<Receiver<LogMessage>>,
 }
 
-pub fn init_tracing_with_nats(nats: TypedNats, subject: String) -> Result<()> {
-    let (send, recv) = tokio::sync::mpsc::channel::<LogMessage>(128);
+impl TracingHandle {
+    pub fn init() -> Result<Self> {
+        let (send, recv) = tokio::sync::mpsc::channel::<LogMessage>(128);
 
-    let filter_layer =
-        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new(LOG_DEFAULT))?;
+        let filter_layer =
+            EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new(LOG_DEFAULT))?;
 
-    let registry = tracing_subscriber::registry()
-        .with(LogManagerLogger::new(send))
-        .with(filter_layer);
+        let registry = tracing_subscriber::registry()
+            .with(LogManagerLogger::new(send))
+            .with(filter_layer);
 
-    let trace_stackdriver = std::env::var(TRACE_STACKDRIVER).is_ok();
-    if trace_stackdriver {
-        registry.with(Stackdriver::default()).init();
-    } else {
-        registry.with(tracing_subscriber::fmt::layer()).init();
-    };
+        let trace_stackdriver = std::env::var(TRACE_STACKDRIVER).is_ok();
+        if trace_stackdriver {
+            registry.with(Stackdriver::default()).init();
+        } else {
+            registry.with(tracing_subscriber::fmt::layer()).init();
+        };
 
-    tokio::spawn(async move {
-        let result = do_logs(&nats, recv, &subject).await;
-        tracing::error!(?result, "do_logs terminated.");
-    });
+        Ok(TracingHandle { recv: Some(recv) })
+    }
 
-    Ok(())
+    pub fn attach_nats(&mut self, nats: TypedNats, subject: String) -> Result<()> {
+        let recv = self.recv.take().ok_or_else(|| {
+            anyhow!("connect_nats on TracingHandle should not be called more than once.")
+        })?;
+        tokio::spawn(async move {
+            let result = do_logs(&nats, recv, &subject).await;
+            tracing::error!(?result, "do_logs terminated.");
+        });
+
+        Ok(())
+    }
 }
 
 /// Helper trait for consuming and logging errors without further processing.

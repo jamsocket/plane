@@ -5,10 +5,7 @@ use self::{
     proxy::serve,
 };
 use crate::retry::do_with_retry;
-use crate::{
-    database::get_db,
-    logging::{init_tracing, init_tracing_with_nats},
-};
+use crate::{database::get_db, logging::TracingHandle};
 use anyhow::Result;
 use clap::Parser;
 use futures::{future::select_all, Future};
@@ -21,6 +18,8 @@ pub mod cli;
 mod proxy;
 
 async fn main() -> Result<()> {
+    let mut tracing_handle = TracingHandle::init()?;
+
     let opts = Opts::parse();
     let plan = DronePlan::try_from(opts)?;
 
@@ -33,9 +32,7 @@ async fn main() -> Result<()> {
         } => {
             if let Some(nats) = nats {
                 let nats = nats.connection().await?;
-                init_tracing_with_nats(nats, "logs.drone".to_string())?;
-            } else {
-                init_tracing()?;
+                tracing_handle.attach_nats(nats, "logs.drone".to_string())?;
             }
 
             let mut futs: Vec<Pin<Box<dyn Future<Output = Result<()>>>>> = vec![];

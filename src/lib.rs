@@ -7,6 +7,6 @@ mod keys;
 pub mod logging;
 pub mod messages;
 pub mod nats;
-#[cfg(feature = "full")]
+pub mod nats_connection;
 mod retry;
 pub mod types;

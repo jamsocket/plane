@@ -1,3 +1,4 @@
+import assert from "assert"
 import axios from "axios"
 import { mkdirSync } from "fs"
 import { connect } from "nats"
@@ -19,11 +20,6 @@ test("Test end-to-end", async (t) => {
     await sleep(100)
     const nats = await connect({ port: natsPort, token: "mytoken" })
 
-    const connectionRequestSubscription =
-        new NatsMessageIterator<DroneConnectRequest>(
-            nats.subscribe("drone.register")
-        )
-
     mkdirSync(t.context.tempdir.path("keys"))
     const keyPair = new KeyCertPair(
         t.context.tempdir.path("keys/cert.key"),
@@ -39,6 +35,10 @@ test("Test end-to-end", async (t) => {
     const [, msg1] = await sub.next()
     await msg1.respond(JSON_CODEC.encode(true))
 
+    const connectionRequestSubscription = new NatsMessageIterator<DroneConnectRequest>(
+        nats.subscribe("drone.register")
+    )
+
     // Initial handshake.
     const [val, msg] = await connectionRequestSubscription.next()
     t.deepEqual(val, {
@@ -52,6 +52,11 @@ test("Test end-to-end", async (t) => {
                 drone_id: 1,
             },
         })
+    )
+
+    // Status update stages
+    const backendStatusSubscription = new NatsMessageIterator<BackendStateMessage>(
+        nats.subscribe(`backend.${backendId}.status`)
     )
 
     await sleep(100)
@@ -71,14 +76,7 @@ test("Test end-to-end", async (t) => {
         JSON_CODEC.encode(request)
     )
     const spawnResult = JSON_CODEC.decode(rawSpawnResult.data)
-
     t.is(spawnResult, true)
-
-    // Status update stages
-    const backendStatusSubscription =
-        new NatsMessageIterator<BackendStateMessage>(
-            nats.subscribe(`backend.${backendId}.status`)
-        )
 
     t.is("Loading", (await backendStatusSubscription.next())[0].state)
     t.is("Starting", (await backendStatusSubscription.next())[0].state)

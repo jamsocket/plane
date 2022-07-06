@@ -8,6 +8,7 @@ use crate::{
         DroneStatusMessage, SpawnRequest,
     },
     nats::TypedNats,
+    nats_connection::NatsConnection,
     retry::do_with_retry,
     types::DroneId,
 };
@@ -16,12 +17,10 @@ use http::Uri;
 use hyper::Client;
 use std::{net::IpAddr, sync::Arc, time::Duration};
 
-use super::cli::NatsConnection;
-
 mod docker;
 mod executor;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum DockerApiTransport {
     Socket(String),
     Http(String),
@@ -84,7 +83,7 @@ pub async fn listen_for_spawn_requests(
 
                 req.respond(&true).await?;
                 tokio::spawn(async move {
-                    let _ = executor
+                    executor
                         .run_backend(&req.value, BackendState::Loading)
                         .await;
                 });
@@ -121,7 +120,8 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     let nats = agent_opts.nats.connection().await?;
 
     tracing::info!("Ensuring backend_status stream exists.");
-    nats.add_jetstream_stream("backend_status", BackendStateMessage::subscribe_subject())?;
+    nats.add_jetstream_stream("backend_status", BackendStateMessage::subscribe_subject())
+        .await?;
 
     tracing::info!("Connecting to Docker.");
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;

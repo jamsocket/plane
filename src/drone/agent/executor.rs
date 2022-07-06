@@ -10,7 +10,6 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use serde_json::json;
-use tracing::Level;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
     sync::mpsc::{channel, Sender},
