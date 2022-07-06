@@ -2,11 +2,11 @@ use super::{
     agent::{AgentOptions, DockerApiTransport, DockerOptions},
     proxy::{ProxyHttpsOptions, ProxyOptions},
 };
-use crate::{keys::KeyCertPathPair, nats::TypedNats, retry::do_with_retry};
+use crate::{keys::KeyCertPathPair, nats_connection::NatsConnection};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use reqwest::Url;
-use std::{cell::RefCell, fmt::Debug, net::IpAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{fmt::Debug, net::IpAddr, path::PathBuf};
 
 #[derive(Parser)]
 pub struct Opts {
@@ -74,56 +74,6 @@ pub struct Opts {
     command: Option<Command>,
 }
 
-/// Represents a shared, lazy connection to NATS.
-/// No connection is made until connection().await is first
-/// called. Once a successful connection is made, it is
-/// cached and a clone of it is returned.
-#[derive(Clone)]
-pub struct NatsConnection {
-    connection_string: String,
-    connection: Arc<RefCell<Option<TypedNats>>>,
-}
-
-impl PartialEq for NatsConnection {
-    fn eq(&self, other: &Self) -> bool {
-        self.connection_string == other.connection_string
-    }
-}
-
-impl Debug for NatsConnection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("NatsConnection")
-            .field("connection_string", &self.connection_string)
-            .finish()
-    }
-}
-
-impl NatsConnection {
-    pub fn new(connection_string: String) -> Self {
-        NatsConnection {
-            connection_string,
-            connection: Arc::default(),
-        }
-    }
-
-    pub async fn connection(&self) -> Result<TypedNats> {
-        if let Some(nats) = self.connection.borrow().as_ref() {
-            return Ok(nats.clone());
-        }
-
-        let nats = do_with_retry(
-            || TypedNats::connect(&self.connection_string),
-            30,
-            Duration::from_secs(10),
-        )
-        .await?;
-
-        self.connection.replace(Some(nats.clone()));
-
-        Ok(nats)
-    }
-}
-
 #[derive(Subcommand)]
 enum Command {
     /// Migrate the database, and then exit.
@@ -166,7 +116,7 @@ pub struct CertOptions {
     pub acme_server_url: String,
 }
 
-#[allow(unused)]
+#[allow(clippy::large_enum_variant)]
 #[derive(PartialEq, Debug)]
 pub enum DronePlan {
     RunService {
@@ -220,7 +170,11 @@ impl From<Opts> for DronePlan {
             None
         };
 
-        let nats = opts.nats_url.map(NatsConnection::new);
+        let nats = opts
+            .nats_url
+            .map(NatsConnection::new)
+            .transpose()
+            .expect("Error parsing NATS URL.");
 
         match opts.command.unwrap_or_default() {
             Command::Migrate => DronePlan::DoMigration {
@@ -355,7 +309,7 @@ mod test {
         assert_eq!(
             DronePlan::DoCertificateRefresh(CertOptions {
                 cluster_domain: "mydomain.test".to_string(),
-                nats: NatsConnection::new("nats://foo@bar".to_string()),
+                nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
                 key_paths: KeyCertPathPair {
                     private_key_path: PathBuf::from("mycert.key"),
                     certificate_path: PathBuf::from("mycert.cert"),
@@ -484,10 +438,10 @@ mod test {
                     },
                     ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
                     host_ip: "56.56.56.56".parse().unwrap(),
-                    nats: NatsConnection::new("nats://foo@bar".to_string()),
+                    nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
                 }),
                 cert_options: None,
-                nats: Some(NatsConnection::new("nats://foo@bar".to_string())),
+                nats: Some(NatsConnection::new("nats://foo@bar".to_string()).unwrap()),
             },
             opts
         );
@@ -541,7 +495,7 @@ mod test {
                     },
                     ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
                     host_ip: "56.56.56.56".parse().unwrap(),
-                    nats: NatsConnection::new("nats://foo@bar".to_string()),
+                    nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
                 }),
                 cert_options: Some(CertOptions {
                     acme_server_url: "https://acme-server".to_string(),
@@ -550,9 +504,9 @@ mod test {
                         private_key_path: PathBuf::from("mycert.key"),
                         certificate_path: PathBuf::from("mycert.cert"),
                     },
-                    nats: NatsConnection::new("nats://foo@bar".to_string()),
+                    nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
                 }),
-                nats: Some(NatsConnection::new("nats://foo@bar".to_string())),
+                nats: Some(NatsConnection::new("nats://foo@bar".to_string()).unwrap()),
             },
             opts
         );

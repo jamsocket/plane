@@ -72,8 +72,8 @@ test("NATS logs", async (t) => {
   })
 
   await sleep(100)
-  const logSubscription = new NatsMessageIterator<{fields: Record<string, any>}>(
-    nats.subscribe("logs.drone", {timeout: 1000})
+  const logSubscription = new NatsMessageIterator<{ fields: Record<string, any> }>(
+    nats.subscribe("logs.drone", { timeout: 1000 })
   )
 
   // Spawn request.
@@ -91,7 +91,7 @@ test("NATS logs", async (t) => {
   expectResponse(t, nats, "drone.1.spawn", request, true)
 
   let [result] = await logSubscription.next()
-  t.deepEqual(result.fields.metadata, {foo: "bar"})
+  t.deepEqual(result.fields.metadata, { foo: "bar" })
 })
 
 test("Spawn with agent", async (t) => {

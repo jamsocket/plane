@@ -3,19 +3,23 @@
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
 use anyhow::{anyhow, Result};
-use futures::channel::oneshot::channel;
-use futures::Stream;
-use nats::asynk::{Connection, Message, Subscription};
-use nats::jetstream::{JetStream, StreamConfig, SubscribeOptions};
+use async_nats::jetstream::consumer::DeliverPolicy;
+use async_nats::jetstream::stream::Config;
+use async_nats::jetstream::Context;
+use async_nats::{Client, ConnectOptions, Message, Subscriber};
+use async_stream::stream;
+use bytes::Bytes;
+use futures::{Stream, StreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::time::timeout;
 
 #[derive(Serialize, Deserialize)]
 pub enum NoReply {}
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Subject<M, R>
 where
     M: Serialize + DeserializeOwned,
@@ -24,6 +28,16 @@ where
     subject: String,
     _ph_m: PhantomData<M>,
     _ph_r: PhantomData<R>,
+}
+
+impl<M, R> Debug for Subject<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        self.subject.fmt(f)
+    }
 }
 
 impl<M, R> Subject<M, R>
@@ -120,6 +134,7 @@ where
 {
     pub value: T,
     message: Message,
+    nc: Client,
     _ph: PhantomData<R>,
 }
 
@@ -128,16 +143,30 @@ where
     T: Serialize + DeserializeOwned,
     R: Serialize + DeserializeOwned,
 {
-    fn new(message: Message) -> Result<Self> {
+    fn new(message: Message, nc: Client) -> Result<Self> {
         Ok(MessageWithResponseHandle {
-            value: serde_json::from_slice(&message.data)?,
+            value: serde_json::from_slice(&message.payload)?,
             message,
+            nc,
             _ph: PhantomData::default(),
         })
     }
 
     pub async fn respond(&self, response: &R) -> Result<()> {
-        Ok(self.message.respond(&serde_json::to_vec(response)?).await?)
+        self.nc
+            .publish(
+                self.message
+                    .reply
+                    .as_ref()
+                    .ok_or_else(|| {
+                        anyhow!("Attempted to respond to a message with no reply subject.")
+                    })?
+                    .to_string(),
+                Bytes::from(serde_json::to_vec(response)?),
+            )
+            .await
+            .map_err(|_| anyhow!("Bad"))?;
+        Ok(())
     }
 }
 
@@ -146,7 +175,8 @@ where
     T: Serialize + DeserializeOwned,
     R: Serialize + DeserializeOwned,
 {
-    subscription: Subscription,
+    subscription: Subscriber,
+    nc: Client,
     _ph_t: PhantomData<T>,
     _ph_r: PhantomData<R>,
 }
@@ -156,9 +186,10 @@ where
     T: Serialize + DeserializeOwned,
     R: Serialize + DeserializeOwned,
 {
-    fn new(subscription: Subscription) -> Self {
+    fn new(subscription: Subscriber, nc: Client) -> Self {
         TypedSubscription {
             subscription,
+            nc,
             _ph_r: PhantomData::default(),
             _ph_t: PhantomData::default(),
         }
@@ -166,7 +197,10 @@ where
 
     pub async fn next(&mut self) -> Result<Option<MessageWithResponseHandle<T, R>>> {
         if let Some(message) = self.subscription.next().await {
-            Ok(Some(MessageWithResponseHandle::new(message)?))
+            Ok(Some(MessageWithResponseHandle::new(
+                message,
+                self.nc.clone(),
+            )?))
         } else {
             Ok(None)
         }
@@ -175,63 +209,84 @@ where
 
 #[derive(Clone)]
 pub struct TypedNats {
-    nc: Connection,
-    jetstream: JetStream,
+    nc: Client,
+    jetstream: Context,
 }
 
 impl TypedNats {
-    pub fn add_jetstream_stream<P, T, R>(&self, stream_name: &str, subject: P) -> Result<()>
+    pub async fn add_jetstream_stream<P, T, R>(&self, stream_name: &str, subject: P) -> Result<()>
     where
         P: Subscribable<T, R>,
         T: Serialize + DeserializeOwned,
         R: Serialize + DeserializeOwned,
     {
-        self.jetstream.add_stream(StreamConfig {
-            name: stream_name.to_string(),
-            subjects: vec![subject.subject().to_string()],
-            ..StreamConfig::default()
-        })?;
+        self.jetstream
+            .get_or_create_stream(Config {
+                name: stream_name.to_string(),
+                subjects: vec![subject.subject().to_string()],
+                ..Config::default()
+            })
+            .await
+            .map_err(|_| anyhow!("Blah"))?;
 
         Ok(())
     }
 
-    pub async fn connect(nats_url: &str) -> Result<Self> {
-        let nc = nats::asynk::connect(nats_url).await?;
-        let jetstream = nats::jetstream::new(nats::connect(nats_url)?);
+    pub async fn connect(nats_url: &str, options: ConnectOptions) -> Result<Self> {
+        let nc = async_nats::connect_with_options(nats_url, options).await?;
 
-        Ok(Self::new(nc, jetstream))
+        Ok(Self::new(nc))
     }
 
-    pub fn new(nc: Connection, jetstream: JetStream) -> Self {
+    pub fn new(nc: Client) -> Self {
+        let jetstream = async_nats::jetstream::new(nc.clone());
         TypedNats { nc, jetstream }
     }
 
-    pub async fn get_latest<T>(&self, subject: &Subject<T, NoReply>) -> Result<Option<T>>
+    pub async fn get_latest<T>(
+        &self,
+        subject: &Subject<T, NoReply>,
+        stream_name: &str,
+    ) -> Result<Option<T>>
     where
         T: Serialize + DeserializeOwned,
     {
-        let subscription = self
+        let stream = self
             .jetstream
-            .subscribe_with_options(subject.subject(), &SubscribeOptions::new().deliver_last())?;
-
-        let (send, recv) = channel();
-        tokio::task::spawn_blocking(move || {
-            let result = subscription.next_timeout(Duration::from_secs(1));
-            send.send(result)
-        });
-
-        let result = recv
+            .get_stream(stream_name)
             .await
-            .map_err(|_| anyhow!("Error receiving from channel."))?;
+            .map_err(|_| anyhow!("Bad"))?;
 
-        if let Ok(result) = result {
-            Ok(Some(serde_json::from_slice(&result.data)?))
-        } else {
-            Ok(None)
-        }
+        let consumer_info = stream
+            .create_consumer(async_nats::jetstream::consumer::Config {
+                deliver_policy: DeliverPolicy::Last,
+                filter_subject: subject.subject().to_string(),
+                ..async_nats::jetstream::consumer::Config::default()
+            })
+            .await
+            .map_err(|_| anyhow!("Bad"))?;
+
+        let consumer = stream
+            .get_consumer(&consumer_info.name)
+            .await
+            .map_err(|_| anyhow!("Bad"))?;
+
+        let result = timeout(
+            Duration::from_secs(1),
+            consumer.stream().map_err(|_| anyhow!("Bad"))?.next(),
+        )
+        .await?
+        .ok_or_else(|| anyhow!("Bad"))?
+        .map_err(|_| anyhow!("Bad"))?;
+
+        Ok(Some(serde_json::from_slice(&result.payload)?))
     }
 
-    pub async fn subscribe_jetstream<P, T, R>(&self, subject: P) -> impl Stream<Item = T>
+    pub async fn subscribe_jetstream<P, T, R>(
+        &self,
+        subject: P,
+        stream_name: &str,
+    ) -> impl Stream<Item = T>
     where
         P: Subscribable<T, R>,
         T: Serialize + DeserializeOwned + Send + 'static,
@@ -239,46 +294,34 @@ impl TypedNats {
     {
         let jetstream = self.jetstream.clone();
         let subject = subject.subject().to_string();
+        let stream_name = stream_name.to_string();
 
-        // nats_rs does not yet have async support (https://github.com/nats-io/nats.rs/issues/194),
-        // so this is less elegant than it could be.
-        // The approach is to create a multiple-producer, single-consumer (mpsc) channel,
-        // and run a loop in a tokio thread designated to allow blocking.
-        // Technically, this could be a oneshot channel rather than mpsc, since we only ever
-        // have one sender. But tokio ships with a convenient `ReceiverStream` that wraps
-        // an mpsc receiver and implements `Stream`, so we use that approach for now.
-        let (tx, rx) = mpsc::channel(256);
-        tokio::task::spawn_blocking(move || {
-            let subscription = match jetstream.subscribe(&subject) {
-                Ok(subscription) => subscription,
-                Err(error) => {
-                    tracing::error!(?error, "Error subscribing to backend status.");
-                    return;
+        let stream = stream!({
+            let stream = jetstream.get_stream(stream_name.to_string()).await.unwrap();
+
+            let consumer_info = stream
+                .create_consumer(async_nats::jetstream::consumer::Config {
+                    deliver_policy: DeliverPolicy::All,
+                    filter_subject: subject,
+                    ..async_nats::jetstream::consumer::Config::default()
+                })
+                .await
+                .unwrap();
+
+            let consumer = stream.get_consumer(&consumer_info.name).await.unwrap();
+
+            let mut stream = consumer.stream().unwrap();
+
+            while let Some(Ok(value)) = stream.next().await {
+                let value: Result<T, _> = serde_json::from_slice(&value.payload);
+                match value {
+                    Ok(value) => yield value,
+                    Err(error) => tracing::warn!(?error, "Parse Err"),
                 }
-            };
-
-            for message in subscription.iter() {
-                if let Err(error) = message.ack() {
-                    tracing::warn!(%error, "Error acknowledging backend status message.");
-                }
-
-                let v: T = match serde_json::from_slice(&message.data) {
-                    Ok(v) => v,
-                    Err(error) => {
-                        tracing::error!(?error, "Couldn't parse backend status.");
-                        continue;
-                    }
-                };
-
-                let _ = tx.blocking_send(v);
             }
         });
 
-        // TODO: is the connection leaked?
-        // We probably want to keep track of the `JoinHandle` created by `spawn_blocking`,
-        // and call .abort() on it when the stream is dropped. This will require implementing
-        // an alternative to tokio's `ReceiverStream`.
-        tokio_stream::wrappers::ReceiverStream::new(rx)
+        stream
     }
 
     pub async fn publish<T>(&self, subject: &Subject<T, NoReply>, value: &T) -> Result<()>
@@ -286,8 +329,12 @@ impl TypedNats {
         T: Serialize + DeserializeOwned,
     {
         self.nc
-            .publish(&subject.subject, serde_json::to_vec(value)?)
-            .await?;
+            .publish(
+                subject.subject.clone(),
+                Bytes::from(serde_json::to_vec(value)?),
+            )
+            .await
+            .map_err(|_| anyhow!("Bad"))?;
         Ok(())
     }
 
@@ -298,10 +345,14 @@ impl TypedNats {
     {
         let result = self
             .nc
-            .request(&subject.subject, serde_json::to_vec(value)?)
-            .await?;
+            .request(
+                subject.subject.to_string(),
+                Bytes::from(serde_json::to_vec(value)?),
+            )
+            .await
+            .map_err(|_| anyhow!("Bad"))?;
 
-        let value: R = serde_json::from_slice(&result.data)?;
+        let value: R = serde_json::from_slice(&result.payload)?;
         Ok(value)
     }
 
@@ -311,7 +362,7 @@ impl TypedNats {
         T: Serialize + DeserializeOwned,
         R: Serialize + DeserializeOwned,
     {
-        let subscription = self.nc.subscribe(subject.subject()).await?;
-        Ok(TypedSubscription::new(subscription))
+        let subscription = self.nc.subscribe(subject.subject().to_string()).await?;
+        Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }
 }

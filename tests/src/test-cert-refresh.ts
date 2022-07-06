@@ -15,7 +15,7 @@ test("Generate certificate", async (t) => {
   await sleep(500)
   const nats = await connect({ port: natsPort, token: "mytoken" })
   await sleep(500)
-  
+
   mkdirSync(t.context.tempdir.path("keys"))
 
   const keyPair = new KeyCertPair(
