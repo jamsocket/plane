@@ -3,8 +3,7 @@ use self::{
     tls::TlsAcceptor,
 };
 use crate::{
-    database::{get_db, DroneDatabase},
-    keys::KeyCertPathPair,
+    database::DroneDatabase, database_connection::DatabaseConnection, keys::KeyCertPathPair,
 };
 use anyhow::Result;
 use hyper::{server::conn::AddrIncoming, Server};
@@ -24,7 +23,7 @@ pub struct ProxyHttpsOptions {
 
 #[derive(PartialEq, Debug)]
 pub struct ProxyOptions {
-    pub db_path: String,
+    pub db: DatabaseConnection,
     pub http_port: u16,
     pub https_options: Option<ProxyHttpsOptions>,
     pub cluster_domain: String,
@@ -75,7 +74,7 @@ async fn run_server(
 
 pub async fn serve(options: ProxyOptions) -> Result<()> {
     let connection_tracker = ConnectionTracker::default();
-    let db = get_db(&options.db_path).await?;
+    let db = options.db.connection().await?;
 
     select! {
         result = run_server(db.clone(), options, connection_tracker.clone()) => {

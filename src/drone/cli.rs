@@ -2,7 +2,9 @@ use super::{
     agent::{AgentOptions, DockerApiTransport, DockerOptions},
     proxy::{ProxyHttpsOptions, ProxyOptions},
 };
-use crate::{keys::KeyCertPathPair, nats_connection::NatsConnection};
+use crate::{
+    database_connection::DatabaseConnection, keys::KeyCertPathPair, nats_connection::NatsConnection,
+};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use reqwest::Url;
@@ -126,7 +128,7 @@ pub enum DronePlan {
         nats: Option<NatsConnection>,
     },
     DoMigration {
-        db_path: String,
+        db: DatabaseConnection,
     },
     DoCertificateRefresh(CertOptions),
 }
@@ -176,11 +178,11 @@ impl From<Opts> for DronePlan {
             .transpose()
             .expect("Error parsing NATS URL.");
 
+        let db = opts.db_path.map(DatabaseConnection::new);
+
         match opts.command.unwrap_or_default() {
             Command::Migrate => DronePlan::DoMigration {
-                db_path: opts
-                    .db_path
-                    .expect("Expected --db-path when using migrate."),
+                db: db.expect("Expected --db-path when using migrate."),
             },
             Command::Cert => {
                 DronePlan::DoCertificateRefresh(CertOptions {
@@ -212,8 +214,7 @@ impl From<Opts> for DronePlan {
                         cluster_domain: opts
                             .cluster_domain.clone()
                             .expect("Expected --cluster-domain for serving proxy."),
-                        db_path: opts
-                            .db_path
+                        db: db
                             .clone()
                             .expect("Expected --db-path for serving proxy."),
                         http_port: opts.http_port,
@@ -242,7 +243,7 @@ impl From<Opts> for DronePlan {
 
                     Some(AgentOptions {
                         cluster_domain: opts.cluster_domain.clone().expect("Expected --cluster-domain for running agent."),
-                        db_path: opts.db_path.clone().expect("Expected --db-path for running agent."),
+                        db: db.clone().expect("Expected --db-path for running agent."),
                         docker_options: DockerOptions {
                             runtime: opts.docker_runtime.clone(),
                             transport: docker_transport,
@@ -282,7 +283,7 @@ mod test {
         let opts = parse_args(&["--db-path", "mydatabase", "migrate"]).unwrap();
         assert_eq!(
             DronePlan::DoMigration {
-                db_path: "mydatabase".to_string()
+                db: DatabaseConnection::new("mydatabase".to_string())
             },
             opts
         );
@@ -334,7 +335,7 @@ mod test {
         assert_eq!(
             DronePlan::RunService {
                 proxy_options: Some(ProxyOptions {
-                    db_path: "mydatabase".to_string(),
+                    db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
                     http_port: 80,
                     https_options: None,
@@ -418,7 +419,7 @@ mod test {
         assert_eq!(
             DronePlan::RunService {
                 proxy_options: Some(ProxyOptions {
-                    db_path: "mydatabase".to_string(),
+                    db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
                     http_port: 80,
                     https_options: Some(ProxyHttpsOptions {
@@ -430,7 +431,7 @@ mod test {
                     }),
                 }),
                 agent_options: Some(AgentOptions {
-                    db_path: "mydatabase".to_string(),
+                    db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
                     docker_options: DockerOptions {
                         transport: DockerApiTransport::Socket("/var/run/docker.sock".to_string()),
@@ -475,7 +476,7 @@ mod test {
         assert_eq!(
             DronePlan::RunService {
                 proxy_options: Some(ProxyOptions {
-                    db_path: "mydatabase".to_string(),
+                    db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
                     http_port: 12345,
                     https_options: Some(ProxyHttpsOptions {
@@ -487,7 +488,7 @@ mod test {
                     }),
                 }),
                 agent_options: Some(AgentOptions {
-                    db_path: "mydatabase".to_string(),
+                    db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
                     docker_options: DockerOptions {
                         transport: DockerApiTransport::Socket("/var/run/docker.sock".to_string()),

@@ -1,6 +1,8 @@
 #[cfg(feature = "full")]
 mod database;
 #[cfg(feature = "full")]
+mod database_connection;
+#[cfg(feature = "full")]
 pub mod drone;
 #[cfg(feature = "full")]
 mod keys;

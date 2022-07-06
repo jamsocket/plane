@@ -1,6 +1,7 @@
 use self::{docker::DockerInterface, executor::Executor};
 use crate::{
-    database::{get_db, DroneDatabase},
+    database::DroneDatabase,
+    database_connection::DatabaseConnection,
     drone::cli::IpProvider,
     logging::LogError,
     messages::agent::{
@@ -40,7 +41,7 @@ pub struct DockerOptions {
 
 #[derive(PartialEq, Debug)]
 pub struct AgentOptions {
-    pub db_path: String,
+    pub db: DatabaseConnection,
     pub nats: NatsConnection,
     pub cluster_domain: String,
 
@@ -126,7 +127,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     tracing::info!("Connecting to Docker.");
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
     tracing::info!("Connecting to sqlite.");
-    let db = get_db(&agent_opts.db_path).await?;
+    let db = agent_opts.db.connection().await?;
     let cluster = agent_opts.cluster_domain.to_string();
     let ip = agent_opts.ip.get_ip().await?;
 

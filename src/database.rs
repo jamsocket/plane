@@ -13,14 +13,10 @@ use crate::{
     types::BackendId,
 };
 use chrono::{DateTime, TimeZone, Utc};
-use sqlx::{
-    migrate,
-    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
-    Result, SqlitePool,
-};
+use sqlx::{Result, SqlitePool};
 
 #[allow(unused)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DroneDatabase {
     pool: SqlitePool,
 }
@@ -145,14 +141,4 @@ impl DroneDatabase {
 
         Ok(Utc.timestamp(time, 0))
     }
-}
-
-pub async fn get_db(db_path: &str) -> Result<DroneDatabase> {
-    let co = SqliteConnectOptions::new()
-        .filename(db_path)
-        .create_if_missing(true);
-    let pool = SqlitePoolOptions::new().connect_with(co).await?;
-    migrate!("./migrations").run(&pool).await?;
-
-    Ok(DroneDatabase::new(pool))
 }

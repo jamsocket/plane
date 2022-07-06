@@ -1,7 +1,11 @@
 use crate::{nats::TypedNats, retry::do_with_retry};
 use anyhow::Result;
 use async_nats::ConnectOptions;
-use std::{cell::RefCell, fmt::Debug, sync::Arc, time::Duration};
+use std::{
+    fmt::Debug,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use url::Url;
 
 /// This matches NATS' Authorization struct, which is crate-private.
@@ -39,7 +43,7 @@ impl Authorization {
 pub struct NatsConnection {
     connection_string: String,
     authorization: Authorization,
-    connection: Arc<RefCell<Option<TypedNats>>>,
+    connection: Arc<Mutex<Option<TypedNats>>>,
 }
 
 impl PartialEq for NatsConnection {
@@ -76,7 +80,9 @@ impl NatsConnection {
     }
 
     pub async fn connection(&self) -> Result<TypedNats> {
-        if let Some(nats) = self.connection.borrow().as_ref() {
+        let mut shared_connection = self.connection.lock().unwrap();
+
+        if let Some(nats) = shared_connection.as_ref() {
             return Ok(nats.clone());
         }
 
@@ -92,7 +98,7 @@ impl NatsConnection {
         )
         .await?;
 
-        self.connection.replace(Some(nats.clone()));
+        shared_connection.replace(nats.clone());
 
         Ok(nats)
     }
