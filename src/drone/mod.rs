@@ -4,8 +4,8 @@ use self::{
     cli::{DronePlan, Opts},
     proxy::serve,
 };
+use crate::logging::TracingHandle;
 use crate::retry::do_with_retry;
-use crate::{database::get_db, logging::TracingHandle};
 use anyhow::Result;
 use clap::Parser;
 use futures::{future::select_all, Future};
@@ -59,8 +59,8 @@ async fn main() -> Result<()> {
             let (result, _, _) = select_all(futs.into_iter()).await;
             result?;
         }
-        DronePlan::DoMigration { db_path } => {
-            get_db(&db_path).await?;
+        DronePlan::DoMigration { db } => {
+            db.connection().await?;
         }
         DronePlan::DoCertificateRefresh(cert_options) => {
             refresh_certificate(&cert_options).await?;
