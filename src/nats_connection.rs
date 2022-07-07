@@ -24,6 +24,21 @@ pub enum Authorization {
 }
 
 impl Authorization {
+    pub fn from_url(url: &str) -> Result<Authorization> {
+        let url = Url::parse(&url)?;
+
+        if let Some(password) = url.password().as_ref() {
+            Ok(Authorization::UserAndPassword(
+                url.username().to_string(),
+                password.to_string(),
+            ))
+        } else if !url.username().is_empty() {
+            Ok(Authorization::Token(url.username().to_string()))
+        } else {
+            Ok(Authorization::None)
+        }
+    }
+
     pub fn connect_options(&self) -> ConnectOptions {
         match self {
             Authorization::None => ConnectOptions::new(),
@@ -62,15 +77,7 @@ impl Debug for NatsConnection {
 
 impl NatsConnection {
     pub fn new(connection_string: String) -> Result<Self> {
-        let url = Url::parse(&connection_string)?;
-
-        let authorization = if let Some(password) = url.password().as_ref() {
-            Authorization::UserAndPassword(url.username().to_string(), password.to_string())
-        } else if !url.username().is_empty() {
-            Authorization::Token(url.username().to_string())
-        } else {
-            Authorization::None
-        };
+        let authorization = Authorization::from_url(&connection_string)?;
 
         Ok(NatsConnection {
             connection_string,
