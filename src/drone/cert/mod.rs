@@ -56,7 +56,7 @@ pub async fn get_certificate(
             .ok_or_else(|| anyhow!("No authorization value."))?;
 
         tracing::info!("Requesting TXT record from platform.");
-        nats.request(
+        let result = nats.request(
             &SetAcmeDnsRecord::subject(),
             &SetAcmeDnsRecord {
                 cluster: cluster_domain.to_string(),
@@ -64,6 +64,10 @@ pub async fn get_certificate(
             },
         )
         .await?;
+
+        if !result {
+            return Err(anyhow!("Platform rejected TXT record."));
+        }
 
         tracing::info!("Validating challenge.");
         let challenge = challenge.validate().await?;
