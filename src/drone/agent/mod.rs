@@ -33,7 +33,7 @@ impl Default for DockerApiTransport {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct DockerOptions {
     pub transport: DockerApiTransport,
     pub runtime: Option<String>,

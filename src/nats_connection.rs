@@ -1,11 +1,8 @@
 use crate::{nats::TypedNats, retry::do_with_retry};
 use anyhow::Result;
 use async_nats::ConnectOptions;
-use std::{
-    fmt::Debug,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{fmt::Debug, sync::Arc, time::Duration};
+use tokio::sync::Mutex;
 use url::Url;
 
 /// This matches NATS' Authorization struct, which is crate-private.
@@ -25,7 +22,7 @@ pub enum Authorization {
 
 impl Authorization {
     pub fn from_url(url: &str) -> Result<Authorization> {
-        let url = Url::parse(&url)?;
+        let url = Url::parse(url)?;
 
         if let Some(password) = url.password().as_ref() {
             Ok(Authorization::UserAndPassword(
@@ -87,7 +84,7 @@ impl NatsConnection {
     }
 
     pub async fn connection(&self) -> Result<TypedNats> {
-        let mut shared_connection = self.connection.lock().unwrap();
+        let mut shared_connection = self.connection.lock().await;
 
         if let Some(nats) = shared_connection.as_ref() {
             return Ok(nats.clone());

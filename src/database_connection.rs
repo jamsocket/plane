@@ -4,7 +4,8 @@ use sqlx::{
     migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Clone)]
 pub struct DatabaseConnection {
@@ -27,7 +28,7 @@ impl DatabaseConnection {
     }
 
     pub async fn connection(&self) -> Result<DroneDatabase> {
-        let mut shared_connection = self.connection.lock().unwrap();
+        let mut shared_connection = self.connection.lock().await;
 
         if let Some(connection) = shared_connection.as_ref() {
             Ok(connection.clone())

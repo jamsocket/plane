@@ -21,7 +21,7 @@ pub struct DockerInterface {
     runtime: Option<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ContainerEventType {
     Start,
     Create,

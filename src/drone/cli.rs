@@ -133,7 +133,7 @@ pub enum DronePlan {
     DoCertificateRefresh(CertOptions),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum IpProvider {
     Api(Url),
     Literal(IpAddr),
@@ -142,7 +142,7 @@ pub enum IpProvider {
 impl IpProvider {
     pub async fn get_ip(&self) -> Result<IpAddr> {
         match self {
-            IpProvider::Literal(ip) => Ok(ip.clone()),
+            IpProvider::Literal(ip) => Ok(*ip),
             IpProvider::Api(url) => {
                 let result = reqwest::get(url.as_ref()).await?.text().await?;
                 let ip: IpAddr = result.parse()?;
@@ -243,7 +243,7 @@ impl From<Opts> for DronePlan {
 
                     Some(AgentOptions {
                         cluster_domain: opts.cluster_domain.clone().expect("Expected --cluster-domain for running agent."),
-                        db: db.clone().expect("Expected --db-path for running agent."),
+                        db: db.expect("Expected --db-path for running agent."),
                         docker_options: DockerOptions {
                             runtime: opts.docker_runtime.clone(),
                             transport: docker_transport,

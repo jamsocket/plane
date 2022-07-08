@@ -56,8 +56,8 @@ impl TracingHandle {
             anyhow!("connect_nats on TracingHandle should not be called more than once.")
         })?;
         tokio::spawn(async move {
-            let result = do_logs(&nats, recv, &subject).await;
-            tracing::error!(?result, "do_logs terminated.");
+            do_logs(&nats, recv, &subject).await;
+            tracing::error!("do_logs terminated.");
         });
 
         Ok(())
