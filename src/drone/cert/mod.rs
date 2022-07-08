@@ -56,14 +56,15 @@ pub async fn get_certificate(
             .ok_or_else(|| anyhow!("No authorization value."))?;
 
         tracing::info!("Requesting TXT record from platform.");
-        let result = nats.request(
-            &SetAcmeDnsRecord::subject(),
-            &SetAcmeDnsRecord {
-                cluster: cluster_domain.to_string(),
-                value,
-            },
-        )
-        .await?;
+        let result = nats
+            .request(
+                &SetAcmeDnsRecord::subject(),
+                &SetAcmeDnsRecord {
+                    cluster: cluster_domain.to_string(),
+                    value,
+                },
+            )
+            .await?;
 
         if !result {
             return Err(anyhow!("Platform rejected TXT record."));
@@ -169,7 +170,7 @@ pub async fn refresh_if_not_valid(cert_options: &CertOptions) -> Result<Option<D
     }
 
     tracing::info!("Refreshing certificate.");
-    refresh_certificate(&cert_options)
+    refresh_certificate(cert_options)
         .await
         .context("Error refreshing certificate.")?;
     tracing::info!("Done refreshing certificate.");

@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyCertPathPair {
     pub private_key_path: PathBuf,
     pub certificate_path: PathBuf,
@@ -43,12 +43,12 @@ impl KeyCertPathPair {
             .expect("Key file should never be filesystem root.");
 
         if key_parent_dir == certificate_parent_dir {
-            return vec![key_parent_dir.to_path_buf()];
+            vec![key_parent_dir.to_path_buf()]
         } else {
-            return vec![
+            vec![
                 key_parent_dir.to_path_buf(),
                 certificate_parent_dir.to_path_buf(),
-            ];
+            ]
         }
     }
 }
