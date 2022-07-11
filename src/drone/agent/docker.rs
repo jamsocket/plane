@@ -21,13 +21,34 @@ pub struct DockerInterface {
     runtime: Option<String>,
 }
 
+/// The list of possible container events.
+/// Comes from [Docker documentation](https://docs.docker.com/engine/reference/commandline/events/).
 #[derive(Debug, PartialEq, Eq)]
 pub enum ContainerEventType {
-    Start,
+    Attach,
+    Commit,
+    Copy,
     Create,
+    Destroy,
+    Detach,
     Die,
-    Stop,
+    ExecCreate,
+    ExecDetach,
+    ExecDie,
+    ExecStart,
+    Export,
+    HealthStatus,
     Kill,
+    Oom,
+    Pause,
+    Rename,
+    Resize,
+    Restart,
+    Start,
+    Stop,
+    Top,
+    Unpause,
+    Update,
 }
 
 #[allow(unused)]
@@ -44,11 +65,30 @@ impl ContainerEvent {
         let name: String = actor.attributes.as_ref()?.get("name")?.to_string();
 
         let event = match action {
-            "die" => ContainerEventType::Die,
-            "stop" => ContainerEventType::Stop,
-            "start" => ContainerEventType::Start,
-            "kill" => ContainerEventType::Kill,
+            "attach" => ContainerEventType::Attach,
+            "commit" => ContainerEventType::Commit,
+            "copy" => ContainerEventType::Copy,
             "create" => ContainerEventType::Create,
+            "destroy" => ContainerEventType::Destroy,
+            "detach" => ContainerEventType::Detach,
+            "die" => ContainerEventType::Die,
+            "exec_create" => ContainerEventType::ExecCreate,
+            "exec_detach" => ContainerEventType::ExecDetach,
+            "exec_die" => ContainerEventType::ExecDie,
+            "exec_start" => ContainerEventType::ExecStart,
+            "export" => ContainerEventType::Export,
+            "health_status" => ContainerEventType::HealthStatus,
+            "kill" => ContainerEventType::Kill,
+            "oom" => ContainerEventType::Oom,
+            "pause" => ContainerEventType::Pause,
+            "rename" => ContainerEventType::Rename,
+            "resize" => ContainerEventType::Resize,
+            "restart" => ContainerEventType::Restart,
+            "start" => ContainerEventType::Start,
+            "stop" => ContainerEventType::Stop,
+            "top" => ContainerEventType::Top,
+            "unpause" => ContainerEventType::Unpause,
+            "update" => ContainerEventType::Update,
             _ => {
                 tracing::info!(?action, "Unhandled container action.");
                 return None;
