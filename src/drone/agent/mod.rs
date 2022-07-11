@@ -5,8 +5,8 @@ use crate::{
     drone::cli::IpProvider,
     logging::LogError,
     messages::agent::{
-        BackendState, BackendStateMessage, DroneConnectRequest, DroneConnectResponse,
-        DroneStatusMessage, SpawnRequest,
+        BackendStateMessage, DroneConnectRequest, DroneConnectResponse, DroneStatusMessage,
+        SpawnRequest,
     },
     nats::TypedNats,
     nats_connection::NatsConnection,
@@ -74,6 +74,7 @@ pub async fn listen_for_spawn_requests(
 ) -> Result<()> {
     let mut sub = nats.subscribe(&SpawnRequest::subject(drone_id)).await?;
     let executor = Arc::new(Executor::new(docker, db, nats, host_ip));
+    executor.resume_backends().await?;
 
     loop {
         let req = sub.next().await;
@@ -84,9 +85,7 @@ pub async fn listen_for_spawn_requests(
 
                 req.respond(&true).await?;
                 tokio::spawn(async move {
-                    executor
-                        .run_backend(&req.value, BackendState::Loading)
-                        .await;
+                    executor.start_backend(&req.value).await;
                 });
             }
             Ok(None) => return Err(anyhow!("Spawn request subscription closed.")),

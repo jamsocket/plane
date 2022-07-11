@@ -1,6 +1,6 @@
 use super::docker::{ContainerEventType, DockerInterface};
 use crate::{
-    database::DroneDatabase,
+    database::{DroneDatabase, Backend},
     drone::agent::wait_port_ready,
     messages::agent::{BackendState, BackendStateMessage, SpawnRequest},
     nats::TypedNats,
@@ -64,7 +64,7 @@ impl Executor {
         }
     }
 
-    pub async fn listen_for_container_events(
+    async fn listen_for_container_events(
         docker: DockerInterface,
         backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
     ) {
@@ -85,28 +85,39 @@ impl Executor {
         }
     }
 
-    pub async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
-        // TODO: allow resuming backend.
+    pub async fn start_backend(&self, spawn_request: &SpawnRequest) {
         self.database
             .insert_backend(spawn_request)
             .await
             .log_error();
 
-        let (send, mut recv) = channel(1);
-        self.backend_to_listener
-            .insert(spawn_request.backend_id.clone(), send);
-
-        self.database
-            .update_backend_state(&spawn_request.backend_id, state)
-            .await
-            .log_error();
         self.nc
             .publish(
                 &BackendStateMessage::subject(&spawn_request.backend_id),
-                &BackendStateMessage::new(state),
+                &BackendStateMessage::new(BackendState::Loading),
             )
             .await
             .log_error();
+
+        self.run_backend(spawn_request, BackendState::Loading).await
+    }
+
+    pub async fn resume_backends(&self) -> Result<()> {
+        let backends = self.database.get_backends().await?;
+
+        for backend in backends {
+            let Backend { name, state, spec } = backend;
+            tracing::info!(%name, ?state, "Resuming backend");
+            self.run_backend(&spec, state).await;
+        }
+
+        Ok(())
+    }
+
+    async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
+        let (send, mut recv) = channel(1);
+        self.backend_to_listener
+            .insert(spawn_request.backend_id.clone(), send);
 
         loop {
             tracing::info!(

@@ -39,4 +39,5 @@ name = "spawner-drone"
 required-features = ["full"]
 
 [features]
+default = ["full"]
 full = []

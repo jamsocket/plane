@@ -38,6 +38,36 @@
     },
     "query": "\n            select last_active\n            from route\n            where backend = ?\n            "
   },
+  "c9f1d28a8a6adb1c5d83095a09e88788c6d6382977073db81b5f4b0e3522481f": {
+    "describe": {
+      "columns": [
+        {
+          "name": "name",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "spec",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "state",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n            select name, spec, state\n            from backend\n            "
+  },
   "d12abb6ea7bb7588dfec936a945b9aa20769a851a7b390485d535cd5936a6f29": {
     "describe": {
       "columns": [],
