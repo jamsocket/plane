@@ -54,7 +54,7 @@ impl DroneConnectRequest {
 
 /// A message telling a drone to spawn a backend.
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SpawnRequest {
     /// The container image to run.
     pub image: String,
