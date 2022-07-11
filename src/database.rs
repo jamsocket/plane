@@ -8,6 +8,8 @@
 //! based on type information stored in `sqlx-data.json`. If
 //! you change a query in this file, you will likely need to
 //! run `generate-sqlx-data.mjs` to get Rust to accept it.
+use std::str::FromStr;
+
 use crate::{
     messages::agent::{BackendState, SpawnRequest},
     types::BackendId,
@@ -19,6 +21,12 @@ use sqlx::{Result, SqlitePool};
 #[derive(Clone, Debug)]
 pub struct DroneDatabase {
     pool: SqlitePool,
+}
+
+pub struct Backend {
+    pub name: String,
+    pub state: BackendState,
+    pub spec: SpawnRequest,
 }
 
 #[allow(unused)]
@@ -46,6 +54,26 @@ impl DroneDatabase {
         .await?;
 
         Ok(())
+    }
+
+    pub async fn get_backends(&self) -> anyhow::Result<Vec<Backend>> {
+        sqlx::query!(
+            r"
+            select name, spec, state
+            from backend
+            "
+        )
+        .fetch_all(&self.pool)
+        .await?
+        .iter()
+        .map(|d| {
+            Ok(Backend {
+                name: d.name.clone(),
+                spec: serde_json::from_str(&d.spec)?,
+                state: BackendState::from_str(&d.state)?,
+            })
+        })
+        .collect()
     }
 
     pub async fn update_backend_state(

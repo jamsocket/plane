@@ -2,7 +2,7 @@
 -- Source of truth for lifecycle status.
 create table "backend" (
     -- A unique (string) name of this resource.
-    "name" text primary key,
+    "name" text primary key not null,
 
     -- The spec for this backend, as JSON.
     "spec" text not null,

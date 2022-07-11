@@ -12,4 +12,4 @@ process.env.DATABASE_URL = connString
 
 await $`sqlx migrate run --database-url ${connString}`
 
-await $`cargo sqlx prepare --database-url ${connString}`
+await $`cargo sqlx prepare --database-url ${connString} -- --lib`

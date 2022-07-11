@@ -154,6 +154,66 @@ test("Spawn with agent", async (t) => {
   t.is("Swept", (await t.context.db.getBackend(backendId)).state)
 })
 
+test("Lifecycle is managed when agent is restarted.", async (t) => {
+  const backendId = generateId()
+
+  const natsPort = await t.context.docker.runNats()
+  await sleep(100)
+  const nats = await connect({ port: natsPort, token: "mytoken" })
+
+  t.context.runner.runAgent(natsPort)
+  await expectMessage(t, nats, "drone.register", {
+    cluster: "mydomain.test",
+    ip: "123.12.1.123",
+  }, {
+    Success: {
+      drone_id: 1,
+    },
+  })
+
+  await sleep(100)
+
+  // Spawn request.
+  const request: SpawnRequest = {
+    image: TEST_IMAGE,
+    backend_id: backendId,
+    max_idle_secs: 10,
+    env: {
+      PORT: "8080",
+    },
+    metadata: {},
+  }
+  expectResponse(t, nats, "drone.1.spawn", request, true)
+
+  // Status update stages
+  const backendStatusSubscription =
+    new NatsMessageIterator<BackendStateMessage>(
+      nats.subscribe(`backend.${backendId}.status`)
+    )
+
+  t.is("Loading", (await backendStatusSubscription.next())[0].state)
+  t.is("Starting", (await backendStatusSubscription.next())[0].state)
+  t.is("Ready", (await backendStatusSubscription.next())[0].state)
+
+  // Restart drone.
+  t.context.runner.drop()
+  t.context.runner.runAgent(natsPort)
+  t.timeout(5000, "Failed while waiting for drone register request.")
+  await expectMessage(t, nats, "drone.register", {
+    cluster: "mydomain.test",
+    ip: "123.12.1.123",
+  }, {
+    Success: {
+      drone_id: 1,
+    },
+  })
+
+  // Status should update to swept after ~10 seconds.
+  t.timeout(10000, "Failed while waiting for backend to be swept.")
+  t.is("Swept", (await backendStatusSubscription.next())[0].state)
+  t.is("Swept", (await t.context.db.getBackend(backendId)).state)
+})
+
 test("Spawn fails during start", async (t) => {
   const backendId = generateId()
 
