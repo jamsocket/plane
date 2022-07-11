@@ -101,7 +101,7 @@ impl SpawnRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum BackendState {
     /// The backend has been created, and the image is being fetched.
     Loading,
@@ -171,6 +171,7 @@ impl ToString for BackendState {
 }
 
 impl BackendState {
+    /// true if the state is a final state of a backend that can not change.
     pub fn terminal(self) -> bool {
         matches!(
             self,
@@ -180,6 +181,14 @@ impl BackendState {
                 | BackendState::Failed
                 | BackendState::Exited
                 | BackendState::Swept
+        )
+    }
+
+    /// true if the state implies that the container is running.
+    pub fn running(self) -> bool {
+        matches!(
+            self,
+            BackendState::Starting | BackendState::Ready
         )
     }
 }
