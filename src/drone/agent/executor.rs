@@ -1,6 +1,6 @@
 use super::docker::{ContainerEventType, DockerInterface};
 use crate::{
-    database::{DroneDatabase, Backend},
+    database::{Backend, DroneDatabase},
     drone::agent::wait_port_ready,
     messages::agent::{BackendState, BackendStateMessage, SpawnRequest},
     nats::TypedNats,
@@ -102,13 +102,15 @@ impl Executor {
         self.run_backend(spawn_request, BackendState::Loading).await
     }
 
-    pub async fn resume_backends(&self) -> Result<()> {
+    pub async fn resume_backends(self: &Arc<Self>) -> Result<()> {
         let backends = self.database.get_backends().await?;
 
         for backend in backends {
+            let executor = self.clone();
             let Backend { name, state, spec } = backend;
             tracing::info!(%name, ?state, "Resuming backend");
-            self.run_backend(&spec, state).await;
+
+            tokio::spawn(async move { executor.run_backend(&spec, state).await });
         }
 
         Ok(())
