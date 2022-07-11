@@ -2,7 +2,9 @@ use super::docker::{ContainerEventType, DockerInterface};
 use crate::{
     database::{Backend, DroneDatabase},
     drone::agent::wait_port_ready,
-    messages::agent::{BackendState, BackendStateMessage, SpawnRequest},
+    messages::agent::{
+        BackendState, BackendStateMessage, DroneLogMessage, DroneLogMessageKind, SpawnRequest,
+    },
     nats::TypedNats,
     types::BackendId,
 };
@@ -120,6 +122,62 @@ impl Executor {
         let (send, mut recv) = channel(1);
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
+
+        {
+            let docker = self.docker.clone();
+            let nc = self.nc.clone();
+            let backend_id = spawn_request.backend_id.clone();
+
+            tokio::spawn(async move {
+                let container_name = backend_id.id().to_string();
+                let mut stream = docker.get_logs(&container_name);
+
+                while let Some(v) = stream.next().await {
+                    match v {
+                        Ok(v) => {
+                            let message = match v {
+                                bollard::container::LogOutput::StdErr { message } => {
+                                    DroneLogMessage {
+                                        kind: DroneLogMessageKind::Stderr,
+                                        text: std::str::from_utf8(&message)?.to_string(),
+                                    }
+                                }
+                                bollard::container::LogOutput::StdOut { message } => {
+                                    DroneLogMessage {
+                                        kind: DroneLogMessageKind::Stdout,
+                                        text: std::str::from_utf8(&message)?.to_string(),
+                                    }
+                                }
+                                bollard::container::LogOutput::StdIn { message } => {
+                                    tracing::warn!(
+                                        ?message,
+                                        ?backend_id,
+                                        "Unexpected stdin message."
+                                    );
+                                    continue;
+                                }
+                                bollard::container::LogOutput::Console { message } => {
+                                    tracing::warn!(
+                                        ?message,
+                                        ?backend_id,
+                                        "Unexpected console message."
+                                    );
+                                    continue;
+                                }
+                            };
+
+                            nc.publish(&DroneLogMessage::subject(&backend_id), &message)
+                                .await?;
+                        }
+                        Err(error) => {
+                            tracing::warn!(?error, "Error encountered forwarding log.");
+                        }
+                    }
+                }
+
+                Ok::<(), anyhow::Error>(())
+            });
+        }
 
         loop {
             tracing::info!(

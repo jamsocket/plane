@@ -10,6 +10,24 @@ use serde_with::DurationSeconds;
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum DroneLogMessageKind {
+    Stdout,
+    Stderr,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DroneLogMessage {
+    pub kind: DroneLogMessageKind,
+    pub text: String,
+}
+
+impl DroneLogMessage {
+    pub fn subject(backend_id: &BackendId) -> Subject<DroneLogMessage, NoReply> {
+        Subject::new(format!("backend.{}.log", backend_id.id()))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
     pub cluster: String,

@@ -2,7 +2,10 @@ use super::DockerOptions;
 use anyhow::{anyhow, Result};
 use bollard::{
     auth::DockerCredentials,
-    container::{Config, CreateContainerOptions, StartContainerOptions, StopContainerOptions},
+    container::{
+        Config, CreateContainerOptions, LogOutput, LogsOptions, StartContainerOptions,
+        StopContainerOptions,
+    },
     image::CreateImageOptions,
     models::{EventMessage, HostConfig, PortBinding},
     system::EventsOptions,
@@ -140,6 +143,24 @@ impl DockerInterface {
                     None
                 }
             })
+    }
+
+    pub fn get_logs(
+        &self,
+        container_name: &str,
+    ) -> impl Stream<Item = Result<LogOutput, bollard::errors::Error>> {
+        self.docker.logs(
+            container_name,
+            Some(LogsOptions {
+                follow: true,
+                stdout: true,
+                stderr: true,
+                since: 0,
+                until: 0,
+                timestamps: true,
+                tail: "all",
+            }),
+        )
     }
 
     #[allow(unused)]
