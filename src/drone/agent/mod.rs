@@ -6,7 +6,7 @@ use crate::{
     logging::LogError,
     messages::agent::{
         BackendStateMessage, DroneConnectRequest, DroneConnectResponse, DroneStatusMessage,
-        SpawnRequest,
+        SpawnRequest
     },
     nats::TypedNats,
     nats_connection::NatsConnection,
@@ -119,7 +119,7 @@ async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: String) {
 pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     let nats = agent_opts.nats.connection().await?;
 
-    tracing::info!("Ensuring backend_status stream exists.");
+    // Ensure that status stream exists.
     nats.add_jetstream_stream("backend_status", BackendStateMessage::subscribe_subject())
         .await?;
 
