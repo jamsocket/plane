@@ -1,5 +1,4 @@
 use std::fmt::Display;
-
 use serde::{Deserialize, Serialize};
 
 const RESOURCE_PREFIX: &str = "spawner-";

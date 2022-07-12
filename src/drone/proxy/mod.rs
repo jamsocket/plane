@@ -15,7 +15,7 @@ mod connection_tracker;
 mod service;
 mod tls;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct ProxyHttpsOptions {
     pub port: u16,
     pub key_paths: KeyCertPathPair,

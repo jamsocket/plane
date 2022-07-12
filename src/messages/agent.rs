@@ -2,7 +2,7 @@ use crate::{
     nats::{NoReply, Subject, SubscribeSubject},
     types::{BackendId, DroneId},
 };
-use bollard::auth::DockerCredentials;
+use bollard::{auth::DockerCredentials, container::LogOutput};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -24,6 +24,27 @@ pub struct DroneLogMessage {
 impl DroneLogMessage {
     pub fn subject(backend_id: &BackendId) -> Subject<DroneLogMessage, NoReply> {
         Subject::new(format!("backend.{}.log", backend_id.id()))
+    }
+
+    pub fn from_log_message(log_message: &LogOutput) -> Option<DroneLogMessage> {
+        match log_message {
+            bollard::container::LogOutput::StdErr { message } => Some(DroneLogMessage {
+                kind: DroneLogMessageKind::Stderr,
+                text: std::str::from_utf8(message).ok()?.to_string(),
+            }),
+            bollard::container::LogOutput::StdOut { message } => Some(DroneLogMessage {
+                kind: DroneLogMessageKind::Stdout,
+                text: std::str::from_utf8(message).ok()?.to_string(),
+            }),
+            bollard::container::LogOutput::StdIn { message } => {
+                tracing::warn!(?message, "Unexpected stdin message.");
+                None
+            }
+            bollard::container::LogOutput::Console { message } => {
+                tracing::warn!(?message, "Unexpected console message.");
+                None
+            }
+        }
     }
 }
 
@@ -101,7 +122,7 @@ impl SpawnRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackendState {
     /// The backend has been created, and the image is being fetched.
     Loading,
@@ -186,10 +207,7 @@ impl BackendState {
 
     /// true if the state implies that the container is running.
     pub fn running(self) -> bool {
-        matches!(
-            self,
-            BackendState::Starting | BackendState::Ready
-        )
+        matches!(self, BackendState::Starting | BackendState::Ready)
     }
 }
 

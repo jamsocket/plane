@@ -2,9 +2,7 @@ use super::docker::{ContainerEventType, DockerInterface};
 use crate::{
     database::{Backend, DroneDatabase},
     drone::agent::wait_port_ready,
-    messages::agent::{
-        BackendState, BackendStateMessage, DroneLogMessage, DroneLogMessageKind, SpawnRequest,
-    },
+    messages::agent::{BackendState, BackendStateMessage, DroneLogMessage, SpawnRequest},
     nats::TypedNats,
     types::BackendId,
 };
@@ -41,7 +39,8 @@ pub struct Executor {
     nc: TypedNats,
     _container_events_handle: JoinHandle<()>,
     backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
-    backend_to_log_loop: Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
+    backend_to_log_loop:
+        Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
 }
 
 impl Executor {
@@ -111,7 +110,11 @@ impl Executor {
 
         for backend in backends {
             let executor = self.clone();
-            let Backend { backend_id, state, spec } = backend;
+            let Backend {
+                backend_id,
+                state,
+                spec,
+            } = backend;
             tracing::info!(%backend_id, ?state, "Resuming backend");
 
             if state.running() {
@@ -127,61 +130,33 @@ impl Executor {
         let docker = self.docker.clone();
         let nc = self.nc.clone();
         let backend_id = backend_id.clone();
-        self.backend_to_log_loop.entry(backend_id.clone()).or_insert_with(move || {
-            tokio::spawn(async move {
-                let container_name = backend_id.to_resource_name();
-                tracing::info!(%backend_id, "Log recording loop started.");
-                let mut stream = docker.get_logs(&container_name);
-    
-                while let Some(v) = stream.next().await {
-                    match v {
-                        Ok(v) => {
-                            tracing::info!(%backend_id, ?v, "Log event received.");
-                            let message = match v {
-                                bollard::container::LogOutput::StdErr { message } => {
-                                    DroneLogMessage {
-                                        kind: DroneLogMessageKind::Stderr,
-                                        text: std::str::from_utf8(&message)?.to_string(),
-                                    }
+        self.backend_to_log_loop
+            .entry(backend_id.clone())
+            .or_insert_with(move || {
+                tokio::spawn(async move {
+                    let container_name = backend_id.to_resource_name();
+                    tracing::info!(%backend_id, "Log recording loop started.");
+                    let mut stream = docker.get_logs(&container_name);
+
+                    while let Some(v) = stream.next().await {
+                        match v {
+                            Ok(v) => {
+                                if let Some(message) = DroneLogMessage::from_log_message(&v) {
+                                    nc.publish(&DroneLogMessage::subject(&backend_id), &message)
+                                        .await?;
                                 }
-                                bollard::container::LogOutput::StdOut { message } => {
-                                    DroneLogMessage {
-                                        kind: DroneLogMessageKind::Stdout,
-                                        text: std::str::from_utf8(&message)?.to_string(),
-                                    }
-                                }
-                                bollard::container::LogOutput::StdIn { message } => {
-                                    tracing::warn!(
-                                        ?message,
-                                        %backend_id,
-                                        "Unexpected stdin message."
-                                    );
-                                    continue;
-                                }
-                                bollard::container::LogOutput::Console { message } => {
-                                    tracing::warn!(
-                                        ?message,
-                                        %backend_id,
-                                        "Unexpected console message."
-                                    );
-                                    continue;
-                                }
-                            };
-    
-                            nc.publish(&DroneLogMessage::subject(&backend_id), &message)
-                                .await?;
-                        }
-                        Err(error) => {
-                            tracing::warn!(?error, "Error encountered forwarding log.");
+                            }
+                            Err(error) => {
+                                tracing::warn!(?error, "Error encountered forwarding log.");
+                            }
                         }
                     }
-                }
-    
-                tracing::info!(%backend_id, "Log loop terminated.");
-    
-                Ok::<(), anyhow::Error>(())
-            })
-        });
+
+                    tracing::info!(%backend_id, "Log loop terminated.");
+
+                    Ok::<(), anyhow::Error>(())
+                })
+            });
     }
 
     async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
@@ -200,7 +175,7 @@ impl Executor {
             let next_state = loop {
                 if state == BackendState::Swept {
                     // When sweeping, we ignore external state changes to avoid an infinite loop.
-                    break self.step(spawn_request, state).await
+                    break self.step(spawn_request, state).await;
                 } else {
                     // Otherwise, we allow the step to be interrupted if the state changes (i.e.
                     // if the container dies).
