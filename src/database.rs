@@ -24,7 +24,7 @@ pub struct DroneDatabase {
 }
 
 pub struct Backend {
-    pub name: String,
+    pub backend_id: BackendId,
     pub state: BackendState,
     pub spec: SpawnRequest,
 }
@@ -68,7 +68,7 @@ impl DroneDatabase {
         .iter()
         .map(|d| {
             Ok(Backend {
-                name: d.name.clone(),
+                backend_id: BackendId::new(d.name.clone()),
                 spec: serde_json::from_str(&d.spec)?,
                 state: BackendState::from_str(&d.state)?,
             })

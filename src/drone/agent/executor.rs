@@ -2,7 +2,7 @@ use super::docker::{ContainerEventType, DockerInterface};
 use crate::{
     database::{Backend, DroneDatabase},
     drone::agent::wait_port_ready,
-    messages::agent::{BackendState, BackendStateMessage, SpawnRequest},
+    messages::agent::{BackendState, BackendStateMessage, DroneLogMessage, SpawnRequest},
     nats::TypedNats,
     types::BackendId,
 };
@@ -39,6 +39,8 @@ pub struct Executor {
     nc: TypedNats,
     _container_events_handle: JoinHandle<()>,
     backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
+    backend_to_log_loop:
+        Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
 }
 
 impl Executor {
@@ -61,6 +63,7 @@ impl Executor {
             nc,
             _container_events_handle: container_events_handle,
             backend_to_listener,
+            backend_to_log_loop: Arc::default(),
         }
     }
 
@@ -107,13 +110,53 @@ impl Executor {
 
         for backend in backends {
             let executor = self.clone();
-            let Backend { name, state, spec } = backend;
-            tracing::info!(%name, ?state, "Resuming backend");
+            let Backend {
+                backend_id,
+                state,
+                spec,
+            } = backend;
+            tracing::info!(%backend_id, ?state, "Resuming backend");
 
+            if state.running() {
+                self.start_log_loop(&backend_id);
+            }
             tokio::spawn(async move { executor.run_backend(&spec, state).await });
         }
 
         Ok(())
+    }
+
+    fn start_log_loop(&self, backend_id: &BackendId) {
+        let docker = self.docker.clone();
+        let nc = self.nc.clone();
+        let backend_id = backend_id.clone();
+        self.backend_to_log_loop
+            .entry(backend_id.clone())
+            .or_insert_with(move || {
+                tokio::spawn(async move {
+                    let container_name = backend_id.to_resource_name();
+                    tracing::info!(%backend_id, "Log recording loop started.");
+                    let mut stream = docker.get_logs(&container_name);
+
+                    while let Some(v) = stream.next().await {
+                        match v {
+                            Ok(v) => {
+                                if let Some(message) = DroneLogMessage::from_log_message(&v) {
+                                    nc.publish(&DroneLogMessage::subject(&backend_id), &message)
+                                        .await?;
+                                }
+                            }
+                            Err(error) => {
+                                tracing::warn!(?error, "Error encountered forwarding log.");
+                            }
+                        }
+                    }
+
+                    tracing::info!(%backend_id, "Log loop terminated.");
+
+                    Ok::<(), anyhow::Error>(())
+                })
+            });
     }
 
     async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
@@ -129,17 +172,31 @@ impl Executor {
                 "Executing state."
             );
 
-            let next_state = tokio::select! {
-                next_state = self.step(spawn_request, state) => next_state,
-                _ = recv.recv() => {
-                    tracing::info!("State may have updated externally.");
-                    continue;
-                },
+            let next_state = loop {
+                if state == BackendState::Swept {
+                    // When sweeping, we ignore external state changes to avoid an infinite loop.
+                    break self.step(spawn_request, state).await;
+                } else {
+                    // Otherwise, we allow the step to be interrupted if the state changes (i.e.
+                    // if the container dies).
+                    tokio::select! {
+                        next_state = self.step(spawn_request, state) => break next_state,
+                        _ = recv.recv() => {
+                            tracing::info!("State may have updated externally.");
+                            continue;
+                        },
+                    }
+                };
             };
 
             match next_state {
                 Ok(Some(new_state)) => {
                     state = new_state;
+
+                    if state.running() {
+                        self.start_log_loop(&spawn_request.backend_id);
+                    }
+
                     self.database
                         .update_backend_state(&spawn_request.backend_id, state)
                         .await
@@ -180,6 +237,7 @@ impl Executor {
                 self.docker
                     .run_container(&backend_id, &spawn_request.image, &spawn_request.env)
                     .await?;
+                tracing::info!(%backend_id, "Container is running.");
 
                 Ok(Some(BackendState::Starting))
             }

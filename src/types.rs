@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 
 const RESOURCE_PREFIX: &str = "spawner-";
@@ -21,6 +22,12 @@ impl DroneId {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct BackendId(String);
+
+impl Display for BackendId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 impl BackendId {
     pub fn new(id: String) -> Self {

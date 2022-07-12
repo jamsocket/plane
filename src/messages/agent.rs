@@ -2,12 +2,51 @@ use crate::{
     nats::{NoReply, Subject, SubscribeSubject},
     types::{BackendId, DroneId},
 };
-use bollard::auth::DockerCredentials;
+use bollard::{auth::DockerCredentials, container::LogOutput};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum DroneLogMessageKind {
+    Stdout,
+    Stderr,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DroneLogMessage {
+    pub kind: DroneLogMessageKind,
+    pub text: String,
+}
+
+impl DroneLogMessage {
+    pub fn subject(backend_id: &BackendId) -> Subject<DroneLogMessage, NoReply> {
+        Subject::new(format!("backend.{}.log", backend_id.id()))
+    }
+
+    pub fn from_log_message(log_message: &LogOutput) -> Option<DroneLogMessage> {
+        match log_message {
+            bollard::container::LogOutput::StdErr { message } => Some(DroneLogMessage {
+                kind: DroneLogMessageKind::Stderr,
+                text: std::str::from_utf8(message).ok()?.to_string(),
+            }),
+            bollard::container::LogOutput::StdOut { message } => Some(DroneLogMessage {
+                kind: DroneLogMessageKind::Stdout,
+                text: std::str::from_utf8(message).ok()?.to_string(),
+            }),
+            bollard::container::LogOutput::StdIn { message } => {
+                tracing::warn!(?message, "Unexpected stdin message.");
+                None
+            }
+            bollard::container::LogOutput::Console { message } => {
+                tracing::warn!(?message, "Unexpected console message.");
+                None
+            }
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatusMessage {
@@ -83,7 +122,7 @@ impl SpawnRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackendState {
     /// The backend has been created, and the image is being fetched.
     Loading,
@@ -153,6 +192,7 @@ impl ToString for BackendState {
 }
 
 impl BackendState {
+    /// true if the state is a final state of a backend that can not change.
     pub fn terminal(self) -> bool {
         matches!(
             self,
@@ -163,6 +203,11 @@ impl BackendState {
                 | BackendState::Exited
                 | BackendState::Swept
         )
+    }
+
+    /// true if the state implies that the container is running.
+    pub fn running(self) -> bool {
+        matches!(self, BackendState::Starting | BackendState::Ready)
     }
 }
 
