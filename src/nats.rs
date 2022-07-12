@@ -257,23 +257,18 @@ impl TypedNats {
             .await
             .map_err(|_| anyhow!("Bad"))?;
 
-        let consumer_info = stream
-            .create_consumer(async_nats::jetstream::consumer::Config {
+        let consumer = stream
+            .create_consumer(async_nats::jetstream::consumer::pull::Config {
                 deliver_policy: DeliverPolicy::Last,
                 filter_subject: subject.subject().to_string(),
-                ..async_nats::jetstream::consumer::Config::default()
+                ..async_nats::jetstream::consumer::pull::Config::default()
             })
-            .await
-            .map_err(|_| anyhow!("Bad"))?;
-
-        let consumer = stream
-            .get_consumer(&consumer_info.name)
             .await
             .map_err(|_| anyhow!("Bad"))?;
 
         let result = timeout(
             Duration::from_secs(1),
-            consumer.stream().map_err(|_| anyhow!("Bad"))?.next(),
+            consumer.stream().await.map_err(|_| anyhow!("Bad"))?.next(),
         )
         .await?
         .ok_or_else(|| anyhow!("Bad"))?
@@ -299,18 +294,16 @@ impl TypedNats {
         let stream = stream!({
             let stream = jetstream.get_stream(stream_name.to_string()).await.unwrap();
 
-            let consumer_info = stream
-                .create_consumer(async_nats::jetstream::consumer::Config {
+            let consumer = stream
+                .create_consumer(async_nats::jetstream::consumer::pull::Config {
                     deliver_policy: DeliverPolicy::All,
                     filter_subject: subject,
-                    ..async_nats::jetstream::consumer::Config::default()
+                    ..async_nats::jetstream::consumer::pull::Config::default()
                 })
                 .await
                 .unwrap();
 
-            let consumer = stream.get_consumer(&consumer_info.name).await.unwrap();
-
-            let mut stream = consumer.stream().unwrap();
+            let mut stream = consumer.stream().await.unwrap();
 
             while let Some(Ok(value)) = stream.next().await {
                 let value: Result<T, _> = serde_json::from_slice(&value.payload);
@@ -362,7 +355,7 @@ impl TypedNats {
         T: Serialize + DeserializeOwned,
         R: Serialize + DeserializeOwned,
     {
-        let subscription = self.nc.subscribe(subject.subject().to_string()).await?;
+        let subscription = self.nc.subscribe(subject.subject().to_string()).await.map_err(|_| anyhow!("Bad"))?;
         Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }
 }
