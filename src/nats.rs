@@ -164,8 +164,7 @@ where
                     .to_string(),
                 Bytes::from(serde_json::to_vec(response)?),
             )
-            .await
-            .map_err(|_| anyhow!("Bad"))?;
+            .await?;
         Ok(())
     }
 }
@@ -207,6 +206,28 @@ where
     }
 }
 
+trait NatsResultExt<T> {
+    fn as_anyhow(self) -> Result<T>;
+
+    fn with_message(self, message: &'static str) -> Result<T>;
+}
+
+impl<T> NatsResultExt<T> for std::result::Result<T, async_nats::Error> {
+    fn with_message(self, message: &'static str) -> Result<T> {
+        match self {
+            Ok(v) => Ok(v),
+            Err(err) => Err(anyhow!("NATS Error: {:?} ({})", err, message)),
+        }
+    }
+
+    fn as_anyhow(self) -> Result<T> {
+        match self {
+            Ok(v) => Ok(v),
+            Err(err) => Err(anyhow!("NATS Error: {:?}", err)),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct TypedNats {
     nc: Client,
@@ -227,7 +248,7 @@ impl TypedNats {
                 ..Config::default()
             })
             .await
-            .map_err(|_| anyhow!("Blah"))?;
+            .as_anyhow()?;
 
         Ok(())
     }
@@ -251,11 +272,7 @@ impl TypedNats {
     where
         T: Serialize + DeserializeOwned,
     {
-        let stream = self
-            .jetstream
-            .get_stream(stream_name)
-            .await
-            .map_err(|_| anyhow!("Bad"))?;
+        let stream = self.jetstream.get_stream(stream_name).await.as_anyhow()?;
 
         let consumer = stream
             .create_consumer(async_nats::jetstream::consumer::pull::Config {
@@ -264,11 +281,11 @@ impl TypedNats {
                 ..async_nats::jetstream::consumer::pull::Config::default()
             })
             .await
-            .map_err(|_| anyhow!("Bad"))?;
+            .as_anyhow()?;
 
         let result = timeout(
             Duration::from_secs(1),
-            consumer.stream().await.map_err(|_| anyhow!("Bad"))?.next(),
+            consumer.stream().await.as_anyhow()?.next(),
         )
         .await?
         .ok_or_else(|| anyhow!("Bad"))?
@@ -326,8 +343,7 @@ impl TypedNats {
                 subject.subject.clone(),
                 Bytes::from(serde_json::to_vec(value)?),
             )
-            .await
-            .map_err(|_| anyhow!("Bad"))?;
+            .await?;
         Ok(())
     }
 
@@ -343,7 +359,7 @@ impl TypedNats {
                 Bytes::from(serde_json::to_vec(value)?),
             )
             .await
-            .map_err(|_| anyhow!("Bad"))?;
+            .as_anyhow()?;
 
         let value: R = serde_json::from_slice(&result.payload)?;
         Ok(value)
@@ -355,7 +371,11 @@ impl TypedNats {
         T: Serialize + DeserializeOwned,
         R: Serialize + DeserializeOwned,
     {
-        let subscription = self.nc.subscribe(subject.subject().to_string()).await.map_err(|_| anyhow!("Bad"))?;
+        let subscription = self
+            .nc
+            .subscribe(subject.subject().to_string())
+            .await
+            .as_anyhow()?;
         Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }
 }
