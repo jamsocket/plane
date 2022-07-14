@@ -323,6 +323,7 @@ impl TypedNats {
             let mut stream = consumer.stream().await.unwrap();
 
             while let Some(Ok(value)) = stream.next().await {
+                let _ = value.ack().await;
                 let value: Result<T, _> = serde_json::from_slice(&value.payload);
                 match value {
                     Ok(value) => yield value,
