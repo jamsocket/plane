@@ -193,10 +193,10 @@ impl DockerInterface {
     pub async fn is_running(&self, container_name: &str) -> Result<(bool, Option<i64>)> {
         let container = match self.docker.inspect_container(container_name, None).await {
             Ok(container) => container,
-            Err(bollard::errors::Error::DockerResponseServerError {status_code: 404, ..}) => {
-                return Ok((false, None))
-            },
-            Err(err) => return Err(err.into())
+            Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 404, ..
+            }) => return Ok((false, None)),
+            Err(err) => return Err(err.into()),
         };
         let state = container
             .state
