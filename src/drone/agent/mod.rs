@@ -6,7 +6,7 @@ use crate::{
     logging::LogError,
     messages::agent::{
         BackendStateMessage, DroneConnectRequest, DroneConnectResponse, DroneStatusMessage,
-        SpawnRequest
+        SpawnRequest,
     },
     nats::TypedNats,
     nats_connection::NatsConnection,

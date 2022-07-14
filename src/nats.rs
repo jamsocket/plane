@@ -286,7 +286,9 @@ impl TypedNats {
         let result = match timeout(
             Duration::from_secs(1),
             consumer.stream().await.as_anyhow()?.next(),
-        ).await {
+        )
+        .await
+        {
             Ok(Some(v)) => v.as_anyhow()?,
             _ => return Ok(None),
         };
