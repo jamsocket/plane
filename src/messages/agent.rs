@@ -26,6 +26,10 @@ impl DroneLogMessage {
         Subject::new(format!("backend.{}.log", backend_id.id()))
     }
 
+    pub fn subscribe_subject() -> SubscribeSubject<DroneLogMessage, NoReply> {
+        SubscribeSubject::new("backend.*.log".into())
+    }
+
     pub fn from_log_message(log_message: &LogOutput) -> Option<DroneLogMessage> {
         match log_message {
             bollard::container::LogOutput::StdErr { message } => Some(DroneLogMessage {

@@ -283,13 +283,13 @@ impl TypedNats {
             .await
             .as_anyhow()?;
 
-        let result = timeout(
+        let result = match timeout(
             Duration::from_secs(1),
             consumer.stream().await.as_anyhow()?.next(),
-        )
-        .await?
-        .ok_or_else(|| anyhow!("Bad"))?
-        .map_err(|_| anyhow!("Bad"))?;
+        ).await {
+            Ok(Some(v)) => v.as_anyhow()?,
+            _ => return Ok(None),
+        };
 
         Ok(Some(serde_json::from_slice(&result.payload)?))
     }
