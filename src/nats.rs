@@ -285,7 +285,7 @@ impl TypedNats {
 
         let result = match timeout(
             Duration::from_secs(1),
-            consumer.stream().await.as_anyhow()?.next(),
+            consumer.stream().messages().await.as_anyhow()?.next(),
         )
         .await
         {
@@ -322,7 +322,7 @@ impl TypedNats {
                 .await
                 .unwrap();
 
-            let mut stream = consumer.stream().await.unwrap();
+            let mut stream = consumer.stream().messages().await.unwrap();
 
             while let Some(Ok(value)) = stream.next().await {
                 let _ = value.ack().await;
