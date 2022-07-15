@@ -27,7 +27,7 @@ impl Authorization {
         if let Some(password) = url.password().as_ref() {
             Ok(Authorization::UserAndPassword(
                 url.username().to_string(),
-                password.to_string(),
+                (*password).to_string(),
             ))
         } else if !url.username().is_empty() {
             Ok(Authorization::Token(url.username().to_string()))
@@ -36,7 +36,7 @@ impl Authorization {
         }
     }
 
-    pub fn connect_options(&self) -> ConnectOptions {
+    #[must_use] pub fn connect_options(&self) -> ConnectOptions {
         match self {
             Authorization::None => ConnectOptions::new(),
             Authorization::Token(token) => ConnectOptions::with_token(token.to_string()),

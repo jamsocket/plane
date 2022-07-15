@@ -142,7 +142,7 @@ pub fn cert_validity(certificate_path: &Path) -> Option<DateTime<Utc>> {
     let not_after_asn1 = cert.not_after();
     let not_after_unix = Asn1Time::from_unix(0).ok()?.diff(not_after_asn1).ok()?;
     let not_after_naive = NaiveDateTime::from_timestamp(
-        not_after_unix.days as i64 * 86400 + not_after_unix.secs as i64,
+        i64::from(not_after_unix.days) * 86400 + i64::from(not_after_unix.secs),
         0,
     );
     Some(DateTime::from_utc(not_after_naive, Utc))

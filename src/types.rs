@@ -7,15 +7,15 @@ const RESOURCE_PREFIX: &str = "spawner-";
 pub struct DroneId(u32);
 
 impl DroneId {
-    pub fn new(id: u32) -> Self {
+    #[must_use] pub fn new(id: u32) -> Self {
         DroneId(id)
     }
 
-    pub fn id(&self) -> u32 {
+    #[must_use] pub fn id(&self) -> u32 {
         self.0
     }
 
-    pub fn id_i32(&self) -> i32 {
+    #[must_use] pub fn id_i32(&self) -> i32 {
         self.0 as i32
     }
 }
@@ -30,19 +30,19 @@ impl Display for BackendId {
 }
 
 impl BackendId {
-    pub fn new(id: String) -> Self {
+    #[must_use] pub fn new(id: String) -> Self {
         BackendId(id)
     }
 
-    pub fn id(&self) -> &str {
+    #[must_use] pub fn id(&self) -> &str {
         &self.0
     }
 
-    pub fn to_resource_name(&self) -> String {
+    #[must_use] pub fn to_resource_name(&self) -> String {
         format!("{}{}", RESOURCE_PREFIX, self.0)
     }
 
-    pub fn from_resource_name(resource_name: &str) -> Option<Self> {
+    #[must_use] pub fn from_resource_name(resource_name: &str) -> Option<Self> {
         resource_name
             .strip_prefix(RESOURCE_PREFIX)
             .map(|d| BackendId(d.to_string()))

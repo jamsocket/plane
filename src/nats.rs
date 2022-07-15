@@ -45,7 +45,7 @@ where
     M: Serialize + DeserializeOwned,
     R: Serialize + DeserializeOwned,
 {
-    pub fn new(subject: String) -> Subject<M, R> {
+    #[must_use] pub fn new(subject: String) -> Subject<M, R> {
         Subject {
             subject,
             _ph_m: PhantomData::default(),
@@ -69,7 +69,7 @@ where
     M: Serialize + DeserializeOwned,
     R: Serialize + DeserializeOwned,
 {
-    pub fn new(subject: String) -> SubscribeSubject<M, R> {
+    #[must_use] pub fn new(subject: String) -> SubscribeSubject<M, R> {
         SubscribeSubject {
             subject,
             _ph_m: PhantomData::default(),
@@ -259,7 +259,7 @@ impl TypedNats {
         Ok(Self::new(nc))
     }
 
-    pub fn new(nc: Client) -> Self {
+    #[must_use] pub fn new(nc: Client) -> Self {
         let jetstream = async_nats::jetstream::new(nc.clone());
         TypedNats { nc, jetstream }
     }
