@@ -110,7 +110,7 @@ where
             let mut extensions = parent_span.extensions_mut();
             extensions
                 .get_mut::<JsonVisitor>()
-                .map(|v| v.to_owned())
+                .map(|v| v.clone())
                 .unwrap_or_default()
         } else {
             JsonVisitor::default()

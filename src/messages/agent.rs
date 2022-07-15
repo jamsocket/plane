@@ -22,11 +22,11 @@ pub struct DroneLogMessage {
 }
 
 impl DroneLogMessage {
-    pub fn subject(backend_id: &BackendId) -> Subject<DroneLogMessage, NoReply> {
+    #[must_use] pub fn subject(backend_id: &BackendId) -> Subject<DroneLogMessage, NoReply> {
         Subject::new(format!("backend.{}.log", backend_id.id()))
     }
 
-    pub fn subscribe_subject() -> SubscribeSubject<DroneLogMessage, NoReply> {
+    #[must_use] pub fn subscribe_subject() -> SubscribeSubject<DroneLogMessage, NoReply> {
         SubscribeSubject::new("backend.*.log".into())
     }
 
@@ -60,11 +60,11 @@ pub struct DroneStatusMessage {
 }
 
 impl DroneStatusMessage {
-    pub fn subject(drone_id: &DroneId) -> Subject<DroneStatusMessage, NoReply> {
+    #[must_use] pub fn subject(drone_id: &DroneId) -> Subject<DroneStatusMessage, NoReply> {
         Subject::new(format!("drone.{}.status", drone_id.id()))
     }
 
-    pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage, bool> {
+    #[must_use] pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage, bool> {
         SubscribeSubject::new("drone.*.status".to_string())
     }
 }
@@ -90,7 +90,7 @@ pub enum DroneConnectResponse {
 }
 
 impl DroneConnectRequest {
-    pub fn subject() -> Subject<DroneConnectRequest, DroneConnectResponse> {
+    #[must_use] pub fn subject() -> Subject<DroneConnectRequest, DroneConnectResponse> {
         Subject::new("drone.register".to_string())
     }
 }
@@ -121,7 +121,7 @@ pub struct SpawnRequest {
 }
 
 impl SpawnRequest {
-    pub fn subject(drone_id: DroneId) -> Subject<SpawnRequest, bool> {
+    #[must_use] pub fn subject(drone_id: DroneId) -> Subject<SpawnRequest, bool> {
         Subject::new(format!("drone.{}.spawn", drone_id.id()))
     }
 }
@@ -197,7 +197,7 @@ impl ToString for BackendState {
 
 impl BackendState {
     /// true if the state is a final state of a backend that can not change.
-    pub fn terminal(self) -> bool {
+    #[must_use] pub fn terminal(self) -> bool {
         matches!(
             self,
             BackendState::ErrorLoading
@@ -210,7 +210,7 @@ impl BackendState {
     }
 
     /// true if the state implies that the container is running.
-    pub fn running(self) -> bool {
+    #[must_use] pub fn running(self) -> bool {
         matches!(self, BackendState::Starting | BackendState::Ready)
     }
 }
@@ -227,18 +227,18 @@ pub struct BackendStateMessage {
 
 impl BackendStateMessage {
     /// Construct a status message using the current time as its timestamp.
-    pub fn new(state: BackendState) -> Self {
+    #[must_use] pub fn new(state: BackendState) -> Self {
         BackendStateMessage {
             state,
             time: Utc::now(),
         }
     }
 
-    pub fn subject(backend_id: &BackendId) -> Subject<BackendStateMessage, NoReply> {
+    #[must_use] pub fn subject(backend_id: &BackendId) -> Subject<BackendStateMessage, NoReply> {
         Subject::new(format!("backend.{}.status", backend_id.id()))
     }
 
-    pub fn subscribe_subject() -> SubscribeSubject<BackendStateMessage, NoReply> {
+    #[must_use] pub fn subscribe_subject() -> SubscribeSubject<BackendStateMessage, NoReply> {
         SubscribeSubject::new("backend.*.status".to_string())
     }
 }

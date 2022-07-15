@@ -162,12 +162,14 @@ impl From<Opts> for DronePlan {
                 private_key_path: private_key_path.clone(),
             })
         } else {
-            if opts.https_private_key.is_some() {
-                panic!("Expected --https-certificate if --https-private-key is provided.")
-            }
-            if opts.https_certificate.is_some() {
-                panic!("Expected --https-private-key if --https-certificate is provided.")
-            }
+            assert!(
+                opts.https_private_key.is_none(),
+                "Expected --https-certificate if --https-private-key is provided."
+            );
+            assert!(
+                opts.https_certificate.is_none(),
+                "Expected --https-private-key if --https-certificate is provided."
+            );
 
             None
         };
@@ -257,9 +259,10 @@ impl From<Opts> for DronePlan {
                     None
                 };
 
-                if proxy_options.is_none() && agent_options.is_none() {
-                    panic!("Expected at least one of --proxy, --agent, --certloop if `serve` is provided explicitly.");
-                }
+                assert!(
+                    proxy_options.is_some() || agent_options.is_some() || cert_options.is_some(),
+                    "Expected at least one of --proxy, --agent, --cert-refresh if `serve` is provided explicitly."
+                );
 
                 DronePlan::RunService { proxy_options, agent_options, cert_options, nats }
             }
