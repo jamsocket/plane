@@ -1,6 +1,6 @@
 use super::connection_tracker::ConnectionTracker;
 use crate::database::DroneDatabase;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use http::uri::{Authority, Scheme};
 use http::Uri;
 use hyper::client::HttpConnector;
@@ -93,7 +93,7 @@ impl ProxyService {
         let mut parts = uri.clone().into_parts();
         parts.authority = Some(Authority::from_str(authority)?);
         parts.scheme = Some(Scheme::HTTP);
-        let uri = Uri::from_parts(parts)?;
+        let uri = Uri::from_parts(parts).context("Error rewriting proxy URL.")?;
 
         Ok(uri)
     }
@@ -103,10 +103,14 @@ impl ProxyService {
         mut req: Request<Body>,
         backend: &str,
     ) -> anyhow::Result<Response<Body>> {
-        let response = self.client.request(clone_request(&req)?).await?;
+        let response = self
+            .client
+            .request(clone_request(&req).context("Error cloning request.")?)
+            .await
+            .context("Error making upstream proxy request.")?;
 
         if response.status() == StatusCode::SWITCHING_PROTOCOLS {
-            let response_clone = clone_response(&response)?;
+            let response_clone = clone_response(&response).context("Error cloning response.")?;
 
             let mut upgraded_response = match hyper::upgrade::on(response).await {
                 Ok(upgraded) => upgraded,
@@ -186,8 +190,12 @@ impl ProxyService {
                         }
                     }
 
-                    let result = self.client.request(req).await;
-                    return Ok(result?);
+                    let result = self
+                        .client
+                        .request(req)
+                        .await
+                        .context("Error handling client request.")?;
+                    return Ok(result);
                 }
             }
 

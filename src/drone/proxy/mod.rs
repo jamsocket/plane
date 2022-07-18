@@ -5,7 +5,7 @@ use self::{
 use crate::{
     database::DroneDatabase, database_connection::DatabaseConnection, keys::KeyCertPathPair,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use hyper::{server::conn::AddrIncoming, Server};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::select;
@@ -48,7 +48,8 @@ async fn run_server(
     let make_proxy = MakeProxyService::new(db, options.cluster_domain, connection_tracker.clone());
 
     if let Some(https_options) = options.https_options {
-        let cert_refresher = CertRefresher::new(https_options.key_paths.clone())?;
+        let cert_refresher = CertRefresher::new(https_options.key_paths.clone())
+            .context("Error building cert refresher.")?;
 
         let tls_cfg = {
             let cfg = rustls::ServerConfig::builder()
@@ -60,13 +61,13 @@ async fn run_server(
         };
 
         let addr = SocketAddr::from(([0, 0, 0, 0], https_options.port));
-        let incoming = AddrIncoming::bind(&addr)?;
+        let incoming = AddrIncoming::bind(&addr).context("Error binding port for HTTPS.")?;
         let server = Server::builder(TlsAcceptor::new(tls_cfg, incoming)).serve(make_proxy);
-        server.await?;
+        server.await.context("Error from TLS proxy.")?;
     } else {
         let addr = SocketAddr::from(([0, 0, 0, 0], options.http_port));
         let server = Server::bind(&addr).serve(make_proxy);
-        server.await?;
+        server.await.context("Error from non-TLS proxy.")?;
     }
 
     Ok(())

@@ -1,5 +1,5 @@
 use crate::keys::{load_certs, load_private_key, KeyCertPathPair};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use notify::{
     event::{AccessKind, AccessMode},
     recommended_watcher, Event, EventKind, INotifyWatcher, RecursiveMode, Watcher,
@@ -75,7 +75,9 @@ impl CertRefresher {
         };
 
         for path in key_cert_path_pair.parent_paths() {
-            watcher.watch(&path, RecursiveMode::NonRecursive)?;
+            watcher
+                .watch(&path, RecursiveMode::NonRecursive)
+                .context("Error installing watcher.")?;
         }
 
         let resolver = CertRefresher {
@@ -90,7 +92,11 @@ impl CertRefresher {
         key_cert_path_pair: &KeyCertPathPair,
         sender: &Sender<Option<Arc<CertifiedKey>>>,
     ) -> Result<()> {
-        let cert_key_pair = Some(Arc::new(key_cert_path_pair.load_certified_key()?));
+        let cert_key_pair = Some(Arc::new(
+            key_cert_path_pair
+                .load_certified_key()
+                .context("Error loading cert pair.")?,
+        ));
         let _ = sender.send(cert_key_pair);
 
         Ok(())

@@ -36,7 +36,8 @@ impl Authorization {
         }
     }
 
-    #[must_use] pub fn connect_options(&self) -> ConnectOptions {
+    #[must_use]
+    pub fn connect_options(&self) -> ConnectOptions {
         match self {
             Authorization::None => ConnectOptions::new(),
             Authorization::Token(token) => ConnectOptions::with_token(token.to_string()),
