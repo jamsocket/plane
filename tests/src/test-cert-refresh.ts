@@ -9,10 +9,13 @@ import { DnsMessage } from "./util/types.js"
 const test = TestEnvironment.wrappedTestFunction()
 
 test("Generate certificate", async (t) => {
+  t.timeout(10000, "Starting NATS")
   const natsPort = await t.context.docker.runNats()
+  t.timeout(10000, "Starting Pebble")
   const pebble = await t.context.docker.runPebble()
 
   await sleep(500)
+  t.timeout(5000, "Connecting to NATS")
   const nats = await connect({ port: natsPort, token: "mytoken" })
   await sleep(500)
 
@@ -33,15 +36,16 @@ test("Generate certificate", async (t) => {
     pebble
   )
 
+  t.timeout(1000, "Waiting for DNS message.")
   const [val, msg] = await sub.next()
+  t.timeout(1000, "Responding to message.")
   await msg.respond(JSON_CODEC.encode(true))
 
   t.is(val.cluster, "mydomain.test")
   t.regex(val.value, /^.{10,}$/)
 
+  t.timeout(30000, "Waiting for certificate to refresh.")
   await certRefreshPromise
 
   t.assert(validateCertificateKeyPair(keyPair))
-
-  t.pass("oah")
 })
