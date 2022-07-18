@@ -36,6 +36,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
+            type=semver,pattern={{version}}
             type=raw,value=latest
 
       - name: Build and push Docker image
