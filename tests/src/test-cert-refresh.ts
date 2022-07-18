@@ -9,7 +9,7 @@ import { DnsMessage } from "./util/types.js"
 const test = TestEnvironment.wrappedTestFunction()
 
 test("Generate certificate", async (t) => {
-  t.timeout(10000, "Starting NATS")
+  t.timeout(20000, "Starting NATS")
   const natsPort = await t.context.docker.runNats()
   t.timeout(10000, "Starting Pebble")
   const pebble = await t.context.docker.runPebble()
