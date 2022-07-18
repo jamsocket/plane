@@ -36,7 +36,7 @@ test("Generate certificate", async (t) => {
     pebble
   )
 
-  t.timeout(1000, "Waiting for DNS message.")
+  t.timeout(5000, "Waiting for DNS message.")
   const [val, msg] = await sub.next()
   t.timeout(1000, "Responding to message.")
   await msg.respond(JSON_CODEC.encode(true))
