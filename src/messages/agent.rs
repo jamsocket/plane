@@ -2,7 +2,7 @@ use crate::{
     nats::{NoReply, Subject, SubscribeSubject},
     types::{BackendId, DroneId},
 };
-use bollard::{auth::DockerCredentials, container::LogOutput};
+use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -56,7 +56,10 @@ impl DroneLogMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatsMessage {
-    pub text: String,
+    //just fractions of max for now,  go from there
+    pub cpu_used: String,
+    pub mem_used: String,
+    pub disk_used: String,
 }
 
 impl DroneStatsMessage {
@@ -69,6 +72,25 @@ impl DroneStatsMessage {
     pub fn subscribe_subject() -> SubscribeSubject<DroneStatsMessage, NoReply> {
         //what is the point of this exactly?
         SubscribeSubject::new("backend.*.stats".into())
+    }
+
+    pub fn from_stats_message(stats_message: &Stats) -> Option<DroneStatsMessage> {
+        let mem_use = stats_message.memory_stats.usage? / stats_message.memory_stats.max_usage?;
+        let cpu_use = (stats_message.cpu_stats.cpu_usage.total_usage
+            / stats_message.cpu_stats.system_cpu_usage?)
+            * stats_message.cpu_stats.online_cpus?;
+        const MAX_BYTES: u64 = 1_000_000_000;
+        let disk_use = &stats_message
+            .blkio_stats
+            .io_service_bytes_recursive
+            .clone()?[0]
+            .value
+            / MAX_BYTES;
+        Some(DroneStatsMessage {
+            cpu_used: cpu_use.to_string(),
+            mem_used: mem_use.to_string(),
+            disk_used: disk_use.to_string(),
+        })
     }
 }
 
