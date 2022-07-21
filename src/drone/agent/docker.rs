@@ -168,8 +168,8 @@ impl DockerInterface {
         container_name: &str,
     ) -> impl Stream<Item = Result<Stats, bollard::errors::Error>> {
         let options = StatsOptions {
-            stream: false,
-            one_shot: true,
+            stream: true,
+            one_shot: false,
         };
         self.docker.stats(container_name, Some(options))
     }

@@ -2,7 +2,9 @@ use super::docker::{ContainerEventType, DockerInterface};
 use crate::{
     database::{Backend, DroneDatabase},
     drone::agent::wait_port_ready,
-    messages::agent::{BackendState, BackendStateMessage, DroneLogMessage, SpawnRequest},
+    messages::agent::{
+        BackendState, BackendStateMessage, DroneLogMessage, DroneStatsMessage, SpawnRequest,
+    },
     nats::TypedNats,
     types::BackendId,
 };
@@ -41,6 +43,8 @@ pub struct Executor {
     backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
     backend_to_log_loop:
         Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
+    backend_to_stats_loop:
+        Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
 }
 
 impl Executor {
@@ -64,6 +68,7 @@ impl Executor {
             _container_events_handle: container_events_handle,
             backend_to_listener,
             backend_to_log_loop: Arc::default(),
+            backend_to_stats_loop: Arc::default(),
         }
     }
 
@@ -119,6 +124,7 @@ impl Executor {
 
             if state.running() {
                 self.start_log_loop(&backend_id);
+                self.start_stats_loop(&backend_id);
             }
             tokio::spawn(async move { executor.run_backend(&spec, state).await });
         }
@@ -159,6 +165,37 @@ impl Executor {
             });
     }
 
+    fn start_stats_loop(&self, backend_id: &BackendId) {
+        let docker = self.docker.clone();
+        let nc = self.nc.clone();
+        let backend_id = backend_id.clone();
+        self.backend_to_stats_loop
+            .entry(backend_id.clone())
+            .or_insert((|| {
+                return tokio::spawn(async move {
+                    let container_name = backend_id.to_resource_name();
+                    tracing::info!(%backend_id, "Stats recording loop started.");
+                    let mut stream = docker.get_stats(&container_name);
+
+                    while let Some(v) = stream.next().await {
+                        match v {
+                            Ok(v) => {
+                                if let Some(message) = DroneStatsMessage::from_stats_message(&v) {
+                                    nc.publish(&DroneStatsMessage::subject(&backend_id), &message)
+                                        .await?
+                                }
+                            }
+                            Err(error) => {
+                                tracing::warn!(?error, "Error encountered sending stats.")
+                            }
+                        }
+                    }
+
+                    Ok(())
+                });
+            })());
+    }
+
     async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
         let (send, mut recv) = channel(1);
         self.backend_to_listener
@@ -195,6 +232,7 @@ impl Executor {
 
                     if state.running() {
                         self.start_log_loop(&spawn_request.backend_id);
+                        self.start_stats_loop(&spawn_request.backend_id)
                     }
 
                     self.database
