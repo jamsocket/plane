@@ -55,6 +55,24 @@ impl DroneLogMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct DroneStatsMessage {
+    pub text: String,
+}
+
+impl DroneStatsMessage {
+    #[must_use]
+    pub fn subject(backend_id: &BackendId) -> Subject<DroneStatsMessage, NoReply> {
+        Subject::new(format!("backend.{}.stats", backend_id.id()))
+    }
+
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<DroneStatsMessage, NoReply> {
+        //what is the point of this exactly?
+        SubscribeSubject::new("backend.*.stats".into())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
     pub cluster: String,
