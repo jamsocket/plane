@@ -3,8 +3,8 @@ use anyhow::{anyhow, Result};
 use bollard::{
     auth::DockerCredentials,
     container::{
-        Config, CreateContainerOptions, LogOutput, LogsOptions, StartContainerOptions,
-        StopContainerOptions,
+        Config, CreateContainerOptions, LogOutput, LogsOptions, StartContainerOptions, Stats,
+        StatsOptions, StopContainerOptions,
     },
     image::CreateImageOptions,
     models::{EventMessage, HostConfig, PortBinding},
@@ -161,6 +161,17 @@ impl DockerInterface {
                 tail: "all",
             }),
         )
+    }
+
+    pub fn get_stats(
+        &self,
+        container_name: &str,
+    ) -> impl Stream<Item = Result<Stats, bollard::errors::Error>> {
+        let options = StatsOptions {
+            stream: false,
+            one_shot: true,
+        };
+        self.docker.stats(container_name, Some(options))
     }
 
     #[allow(unused)]
