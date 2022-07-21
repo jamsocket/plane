@@ -180,9 +180,12 @@ impl Executor {
                     while let Some(v) = stream.next().await {
                         match v {
                             Ok(v) => {
+                                let me = DroneStatsMessage::from_stats_message(&v);
+                                tracing::warn!(?me, "why dont u fire?");
                                 if let Some(message) = DroneStatsMessage::from_stats_message(&v) {
+                                    tracing::warn!(?message, "what is this?");
                                     nc.publish(&DroneStatsMessage::subject(&backend_id), &message)
-                                        .await?
+                                        .await?;
                                 }
                             }
                             Err(error) => {

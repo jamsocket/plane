@@ -94,7 +94,7 @@ test("NATS logs", async (t) => {
   t.deepEqual(result.fields.metadata, { foo: "bar" })
 })
 
-test("Spawn with agent", async (t) => {
+test.only("Spawn with agent", async (t) => {
   const backendId = generateId()
 
   const natsPort = await t.context.docker.runNats()
@@ -130,6 +130,11 @@ test("Spawn with agent", async (t) => {
     new NatsMessageIterator<BackendStateMessage>(
       nats.subscribe(`backend.${backendId}.status`)
     )
+  
+  const statsStatusSubsription = 
+    new NatsMessageIterator<unknown>(
+      nats.subscribe(`backend.${backendId}.stats`)
+  )
 
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
@@ -146,8 +151,15 @@ test("Spawn with agent", async (t) => {
 
   // Result should respond to ping.
   const result = await axios.get(`http://${address}`)
+  console.log(result)
   t.is(result.status, 200)
   t.is(result.data, "Hello World!")
+  
+  console.log('hello?')
+  
+  const dam = (await statsStatusSubsription.next())[0]
+  console.log(dam)
+  console.log('huh')
 
   // Status should update to swept after ~10 seconds.
   t.is("Swept", (await backendStatusSubscription.next())[0].state)
