@@ -75,26 +75,27 @@ impl DroneStatsMessage {
     }
 
     pub fn from_stats_message(stats_message: &Stats) -> Option<DroneStatsMessage> {
-        let mem_use = stats_message.memory_stats.usage? / stats_message.memory_stats.limit?;
+        let mem_use = stats_message.memory_stats.usage.unwrap_or(0)
+            / stats_message.memory_stats.limit.unwrap_or(0);
         let cpu_use = (stats_message.cpu_stats.cpu_usage.total_usage
-            / stats_message.cpu_stats.system_cpu_usage?)
-            * stats_message.cpu_stats.online_cpus?;
+            / stats_message.cpu_stats.system_cpu_usage.unwrap_or(1))
+            * stats_message.cpu_stats.online_cpus.unwrap_or(1);
         const MAX_BYTES: u64 = 1_000_000_000;
         //apparently disk use straight up doesnt work sometimes, so this will need
         //try catch stuff
-        /*
-        let disk_use = &stats_message
-            .blkio_stats
-            .io_service_bytes_recursive
-            .clone()?[0]
-            .value
-            / MAX_BYTES;
-        */
-        tracing::warn!(?cpu_use, "go off");
+
+        let blkio_stats = stats_message.blkio_stats.clone();
+        let bytes_used = match blkio_stats.io_service_bytes_recursive {
+            Some(blk) => blk[0].value,
+            None => 0,
+        };
+
+        let disk_use = bytes_used / MAX_BYTES;
+
         return Some(DroneStatsMessage {
             cpu_used: cpu_use.to_string(),
             mem_used: mem_use.to_string(),
-            disk_used: "0.6".to_string(),
+            disk_used: disk_use.to_string(),
         });
     }
 }
