@@ -94,7 +94,7 @@ test("NATS logs", async (t) => {
   t.deepEqual(result.fields.metadata, { foo: "bar" })
 })
 
-test.only("Spawn with agent", async (t) => {
+test("Spawn with agent", async (t) => {
   const backendId = generateId()
 
   const natsPort = await t.context.docker.runNats()
@@ -131,11 +131,6 @@ test.only("Spawn with agent", async (t) => {
       nats.subscribe(`backend.${backendId}.status`)
     )
   
-  const statsStatusSubsription = 
-    new NatsMessageIterator<unknown>(
-      nats.subscribe(`backend.${backendId}.stats`)
-  )
-
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
   t.is("Ready", (await backendStatusSubscription.next())[0].state)
@@ -155,16 +150,50 @@ test.only("Spawn with agent", async (t) => {
   t.is(result.status, 200)
   t.is(result.data, "Hello World!")
   
-  console.log('hello?')
-  
-  const dam = (await statsStatusSubsription.next())[0]
-  console.log(dam)
-  console.log('huh')
-
   // Status should update to swept after ~10 seconds.
   t.is("Swept", (await backendStatusSubscription.next())[0].state)
   t.is("Swept", (await t.context.db.getBackend(backendId)).state)
 })
+
+test("stats are acquired", async (t) => {
+  const backendId = generateId()
+  const natsPort = await t.context.docker.runNats()
+  await sleep(100)
+  const nats = await connect({ port: natsPort, token: "mytoken" })
+  t.context.runner.runAgent(natsPort)
+
+  await expectMessage(t, nats, "drone.register", {
+    cluster: "mydomain.test",
+    ip: "123.12.1.123",
+  }, {
+    Success: {
+      drone_id: 1,
+    },
+  })
+
+  await sleep(100)
+
+  // Spawn request.
+  const request: SpawnRequest = {
+    image: TEST_IMAGE,
+    backend_id: backendId,
+    max_idle_secs: 40,
+    env: {
+      PORT: "8080",
+    },
+    metadata: {},
+  }
+  expectResponse(t, nats, "drone.1.spawn", request, true)
+
+  const statsStatusSubsription = 
+    new NatsMessageIterator<unknown>(
+      nats.subscribe(`backend.${backendId}.stats`, { timeout : 10000 })
+  )
+  t.deepEqual(["cpu_used", "mem_used", "disk_used"],
+    Object.keys((await statsStatusSubsription.next())[0]))
+})
+
+
 
 test("Lifecycle is managed when agent is restarted.", async (t) => {
   const backendId = generateId()
