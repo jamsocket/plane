@@ -175,15 +175,12 @@ impl Executor {
                 return tokio::spawn(async move {
                     let container_name = backend_id.to_resource_name();
                     tracing::info!(%backend_id, "Stats recording loop started.");
-                    let mut stream = docker.get_stats(&container_name);
+                    let mut stream = Box::pin(docker.get_stats(&container_name));
 
                     while let Some(v) = stream.next().await {
                         match v {
                             Ok(v) => {
-                                let me = DroneStatsMessage::from_stats_message(&v);
-                                tracing::warn!(?me, "why dont u fire?");
                                 if let Some(message) = DroneStatsMessage::from_stats_message(&v) {
-                                    tracing::warn!(?message, "what is this?");
                                     nc.publish(&DroneStatsMessage::subject(&backend_id), &message)
                                         .await?;
                                 }

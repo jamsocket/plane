@@ -81,8 +81,6 @@ impl DroneStatsMessage {
             / stats_message.cpu_stats.system_cpu_usage.unwrap_or(1))
             * stats_message.cpu_stats.online_cpus.unwrap_or(1);
         const MAX_BYTES: u64 = 1_000_000_000;
-        //apparently disk use straight up doesnt work sometimes, so this will need
-        //try catch stuff
 
         let blkio_stats = stats_message.blkio_stats.clone();
         let bytes_used = match blkio_stats.io_service_bytes_recursive {

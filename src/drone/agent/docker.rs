@@ -17,6 +17,7 @@ use tokio_stream::{Stream, StreamExt};
 /// The port in the container which is exposed.
 const CONTAINER_PORT: u16 = 8080;
 const DEFAULT_DOCKER_TIMEOUT_SECONDS: u64 = 30;
+const DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SECS: u64 = 10;
 
 #[derive(Clone)]
 pub struct DockerInterface {
@@ -171,7 +172,11 @@ impl DockerInterface {
             stream: true,
             one_shot: false,
         };
-        self.docker.stats(container_name, Some(options))
+        self.docker
+            .stats(container_name, Some(options))
+            .throttle(std::time::Duration::from_secs(
+                DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SECS,
+            ))
     }
 
     #[allow(unused)]
