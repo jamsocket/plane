@@ -84,7 +84,10 @@ impl DroneStatsMessage {
 
         let blkio_stats = stats_message.blkio_stats.clone();
         let bytes_used = match blkio_stats.io_service_bytes_recursive {
-            Some(blk) => blk[0].value,
+            Some(blk) => match blk.get(0) {
+                Some(v) => v.value,
+                None => 0,
+            },
             None => 0,
         };
 
