@@ -97,7 +97,7 @@ impl Executor {
         self.nc
             .publish(
                 &BackendStateMessage::subject(&spawn_request.backend_id),
-                &BackendStateMessage::new(BackendState::Loading),
+                &BackendStateMessage::new(BackendState::Loading, spawn_request.backend_id.clone()),
             )
             .await
             .log_error();
@@ -204,7 +204,7 @@ impl Executor {
                     self.nc
                         .publish(
                             &BackendStateMessage::subject(&spawn_request.backend_id),
-                            &BackendStateMessage::new(state),
+                            &BackendStateMessage::new(state, spawn_request.backend_id.clone()),
                         )
                         .await
                         .log_error();

@@ -229,6 +229,9 @@ pub struct BackendStateMessage {
     /// The new state.
     pub state: BackendState,
 
+    /// The backend id.
+    pub backend: BackendId,
+
     /// The time the state change was observed.
     pub time: DateTime<Utc>,
 }
@@ -236,9 +239,10 @@ pub struct BackendStateMessage {
 impl BackendStateMessage {
     /// Construct a status message using the current time as its timestamp.
     #[must_use]
-    pub fn new(state: BackendState) -> Self {
+    pub fn new(state: BackendState, backend: BackendId) -> Self {
         BackendStateMessage {
             state,
+            backend,
             time: Utc::now(),
         }
     }
