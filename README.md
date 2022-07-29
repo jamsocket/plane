@@ -17,6 +17,16 @@ Spawner is still new and evolving. If you're interested in using it, we'd love
 to hear about your use case and help you get started. Feel free to [open an issue on GitHub](https://github.com/drifting-in-space/spawner/issues)
 or contact [Paul](https://github.com/paulgb) at [paul@driftingin.space](mailto:paul@driftingin.space).
 
+## Open-source Roadmap
+
+We are in the process of extracting code from our platform monorepo into the Spawner open source project. The goal is for Spawner to provide all the pieces you need to run session-lived backend infrastructure.
+
+- [x] Agent
+- [x] Proxy
+- [x] Certificate fetcher
+- [ ] DNS server
+- [ ] Scheduler
+
 ## Use cases
 
 Spawner is intended for cases where a web app needs a dedicated, stateful back-end to talk to for the
