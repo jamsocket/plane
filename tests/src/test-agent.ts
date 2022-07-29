@@ -158,7 +158,7 @@ test("Spawn with agent", async (t) => {
 test("stats are acquired", async (t) => {
   const backendId = generateId()
   const natsPort = await t.context.docker.runNats()
-  await sleep(100)
+  await sleep(1000)
   const nats = await connect({ port: natsPort, token: "mytoken" })
   t.context.runner.runAgent(natsPort)
 
@@ -170,8 +170,9 @@ test("stats are acquired", async (t) => {
       drone_id: 1,
     },
   })
-
-  await sleep(100)
+  
+  await sleep(1000)
+  
 
   // Spawn request.
   const request: SpawnRequest = {
@@ -184,13 +185,15 @@ test("stats are acquired", async (t) => {
     metadata: {},
   }
   expectResponse(t, nats, "drone.1.spawn", request, true)
+  await sleep(100)
 
   const statsStatusSubsription = 
     new NatsMessageIterator<unknown>(
-      nats.subscribe(`backend.${backendId}.stats`, { timeout : 10000 })
+      nats.subscribe(`backend.${backendId}.stats`, { timeout : 1000000 })
   )
-  t.deepEqual(["cpu_used", "mem_used", "disk_used"],
-    Object.keys((await statsStatusSubsription.next())[0]))
+  const statsMessage = await statsStatusSubsription.next()
+  const stats= statsMessage[0]
+  t.assert(stats["cpu_use_percent"] > 0 && stats["mem_use_percent"] > 0)
 })
 
 
