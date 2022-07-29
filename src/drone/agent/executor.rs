@@ -172,7 +172,7 @@ impl Executor {
         self.backend_to_stats_loop
             .entry(backend_id.clone())
             .or_insert_with(|| {
-                return tokio::spawn(async move {
+                tokio::spawn(async move {
                     let container_name = backend_id.to_resource_name();
                     tracing::info!(%backend_id, "Stats recording loop started.");
                     let mut stream = Box::pin(docker.get_stats(&container_name));
@@ -192,7 +192,7 @@ impl Executor {
                     }
 
                     Ok(())
-                });
+                })
             });
     }
 

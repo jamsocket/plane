@@ -102,10 +102,10 @@ impl DroneStatsMessage {
         //disk
         //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
-        return Some(DroneStatsMessage {
+        Some(DroneStatsMessage {
             cpu_use_percent,
             mem_use_percent,
-        });
+        })
     }
 }
 
