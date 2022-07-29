@@ -57,9 +57,8 @@ impl DroneLogMessage {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatsMessage {
     //just fractions of max for now,  go from there
-    pub cpu_used: String,
-    pub mem_used: String,
-    pub disk_used: String,
+    pub cpu_use_percent: f64,
+    pub mem_use_percent: f64,
 }
 
 impl DroneStatsMessage {
@@ -70,33 +69,42 @@ impl DroneStatsMessage {
 
     #[must_use]
     pub fn subscribe_subject() -> SubscribeSubject<DroneStatsMessage, NoReply> {
-        //what is the point of this exactly?
         SubscribeSubject::new("backend.*.stats".into())
     }
 
     pub fn from_stats_message(stats_message: &Stats) -> Option<DroneStatsMessage> {
-        let mem_use = stats_message.memory_stats.usage.unwrap_or(0)
-            / stats_message.memory_stats.limit.unwrap_or(0);
-        let cpu_use = (stats_message.cpu_stats.cpu_usage.total_usage
-            / stats_message.cpu_stats.system_cpu_usage.unwrap_or(1))
-            * stats_message.cpu_stats.online_cpus.unwrap_or(1);
-        const MAX_BYTES: u64 = 1_000_000_000;
+        // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
 
-        let blkio_stats = stats_message.blkio_stats.clone();
-        let bytes_used = match blkio_stats.io_service_bytes_recursive {
-            Some(blk) => match blk.get(0) {
-                Some(v) => v.value,
-                None => 0,
+        //memory
+        let mem_naive_usage = stats_message.memory_stats.usage.unwrap_or_default();
+        let mem_available = stats_message.memory_stats.limit.unwrap_or(u64::MAX);
+        let mem_stats = stats_message.memory_stats.stats;
+        let cache_mem = match mem_stats {
+            Some(stats) => match stats {
+                bollard::container::MemoryStatsStats::V1(stats) => stats.cache,
+                bollard::container::MemoryStatsStats::V2(stats) => stats.inactive_file,
             },
             None => 0,
         };
+        let used_memory = mem_naive_usage - cache_mem;
+        let mem_use_percent = ((used_memory as f64) / (mem_available as f64)) * 100.0;
 
-        let disk_use = bytes_used / MAX_BYTES;
+        //cpu
+        let cpu_stats = &stats_message.cpu_stats;
+        let precpu_stats = &stats_message.precpu_stats;
+        let cpu_delta = cpu_stats.cpu_usage.total_usage - precpu_stats.cpu_usage.total_usage;
+        let sys_cpu_delta = cpu_stats.system_cpu_usage.unwrap_or_default()
+            - precpu_stats.system_cpu_usage.unwrap_or_default();
+        let num_cpus = cpu_stats.online_cpus.unwrap_or_default();
+        let cpu_use_percent =
+            ((cpu_delta as f64) / (sys_cpu_delta as f64)) * (num_cpus as f64) * 100.0;
+
+        //disk
+        //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
         return Some(DroneStatsMessage {
-            cpu_used: cpu_use.to_string(),
-            mem_used: mem_use.to_string(),
-            disk_used: disk_use.to_string(),
+            cpu_use_percent,
+            mem_use_percent,
         });
     }
 }
