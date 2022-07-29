@@ -154,6 +154,10 @@ where
         })
     }
 
+    pub fn message(&self) -> &Message {
+        &self.message
+    }
+
     pub async fn respond(&self, response: &R) -> Result<()> {
         self.nc
             .publish(
