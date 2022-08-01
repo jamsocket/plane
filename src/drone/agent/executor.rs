@@ -232,7 +232,7 @@ impl Executor {
 
                     if state.running() {
                         self.start_log_loop(&spawn_request.backend_id);
-                        self.start_stats_loop(&spawn_request.backend_id)
+                        self.start_stats_loop(&spawn_request.backend_id);
                     }
 
                     self.database
