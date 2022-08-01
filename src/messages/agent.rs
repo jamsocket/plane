@@ -2,7 +2,7 @@ use crate::{
     nats::{NoReply, Subject, SubscribeSubject},
     types::{BackendId, DroneId},
 };
-use bollard::{auth::DockerCredentials, container::LogOutput};
+use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -51,6 +51,61 @@ impl DroneLogMessage {
                 None
             }
         }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DroneStatsMessage {
+    //just fractions of max for now,  go from there
+    pub cpu_use_percent: f64,
+    pub mem_use_percent: f64,
+}
+
+impl DroneStatsMessage {
+    #[must_use]
+    pub fn subject(backend_id: &BackendId) -> Subject<DroneStatsMessage, NoReply> {
+        Subject::new(format!("backend.{}.stats", backend_id.id()))
+    }
+
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<DroneStatsMessage, NoReply> {
+        SubscribeSubject::new("backend.*.stats".into())
+    }
+
+    pub fn from_stats_message(stats_message: &Stats) -> Option<DroneStatsMessage> {
+        // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
+
+        //memory
+        let mem_naive_usage = stats_message.memory_stats.usage.unwrap_or_default();
+        let mem_available = stats_message.memory_stats.limit.unwrap_or(u64::MAX);
+        let mem_stats = stats_message.memory_stats.stats;
+        let cache_mem = match mem_stats {
+            Some(stats) => match stats {
+                bollard::container::MemoryStatsStats::V1(stats) => stats.cache,
+                bollard::container::MemoryStatsStats::V2(stats) => stats.inactive_file,
+            },
+            None => 0,
+        };
+        let used_memory = mem_naive_usage - cache_mem;
+        let mem_use_percent = ((used_memory as f64) / (mem_available as f64)) * 100.0;
+
+        //cpu
+        let cpu_stats = &stats_message.cpu_stats;
+        let precpu_stats = &stats_message.precpu_stats;
+        let cpu_delta = cpu_stats.cpu_usage.total_usage - precpu_stats.cpu_usage.total_usage;
+        let sys_cpu_delta = cpu_stats.system_cpu_usage.unwrap_or_default()
+            - precpu_stats.system_cpu_usage.unwrap_or_default();
+        let num_cpus = cpu_stats.online_cpus.unwrap_or_default();
+        let cpu_use_percent =
+            ((cpu_delta as f64) / (sys_cpu_delta as f64)) * (num_cpus as f64) * 100.0;
+
+        //disk
+        //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
+
+        Some(DroneStatsMessage {
+            cpu_use_percent,
+            mem_use_percent,
+        })
     }
 }
 
