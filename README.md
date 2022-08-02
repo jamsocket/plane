@@ -7,13 +7,11 @@
 **Spawner** allows web applications to create [**session-lived backends**](https://driftingin.space/posts/session-lived-application-backends),
 which are server processes dedicated to individual (or small groups of) users.
 
-_Spawner is undergoing rapid development and the API may change. The original version of Spawner was based on Kubernetes. It's available in the [original-kubernetes-based-spawner](https://github.com/drifting-in-space/spawner/tree/original-kubernetes-based-spawner) branch._
-
 The server processes can be any server that speaks HTTP, including WebSocket servers. Spawner provides
 an API for spinning these servers up when a new user connects, and automatically terminates
 them when the user disconnects.
 
-Spawner is still new and evolving. If you're interested in using it, we'd love
+Spawner is still new and evolving, and the API may change. If you're interested in using it, we'd love
 to hear about your use case and help you get started. Feel free to [open an issue on GitHub](https://github.com/drifting-in-space/spawner/issues)
 or contact [Paul](https://github.com/paulgb) at [paul@driftingin.space](mailto:paul@driftingin.space).
 
@@ -26,6 +24,8 @@ We are in the process of extracting code from our platform monorepo into the Spa
 - [x] Certificate fetcher
 - [ ] DNS server
 - [ ] Scheduler
+
+_The original version of Spawner was based on Kubernetes. It's available in the [original-kubernetes-based-spawner](https://github.com/drifting-in-space/spawner/tree/original-kubernetes-based-spawner) branch._
 
 ## Use cases
 
