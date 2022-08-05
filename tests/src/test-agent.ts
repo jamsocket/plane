@@ -130,7 +130,7 @@ test("Spawn with agent", async (t) => {
     new NatsMessageIterator<BackendStateMessage>(
       nats.subscribe(`backend.${backendId}.status`)
     )
-  
+
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
   t.is("Ready", (await backendStatusSubscription.next())[0].state)
@@ -146,57 +146,13 @@ test("Spawn with agent", async (t) => {
 
   // Result should respond to ping.
   const result = await axios.get(`http://${address}`)
-  console.log(result)
   t.is(result.status, 200)
   t.is(result.data, "Hello World!")
-  
+
   // Status should update to swept after ~10 seconds.
   t.is("Swept", (await backendStatusSubscription.next())[0].state)
   t.is("Swept", (await t.context.db.getBackend(backendId)).state)
 })
-
-test("stats are acquired", async (t) => {
-  const backendId = generateId()
-  const natsPort = await t.context.docker.runNats()
-  await sleep(1000)
-  const nats = await connect({ port: natsPort, token: "mytoken" })
-  t.context.runner.runAgent(natsPort)
-
-  await expectMessage(t, nats, "drone.register", {
-    cluster: "mydomain.test",
-    ip: "123.12.1.123",
-  }, {
-    Success: {
-      drone_id: 1,
-    },
-  })
-  
-  await sleep(1000)
-  
-
-  // Spawn request.
-  const request: SpawnRequest = {
-    image: TEST_IMAGE,
-    backend_id: backendId,
-    max_idle_secs: 40,
-    env: {
-      PORT: "8080",
-    },
-    metadata: {},
-  }
-  expectResponse(t, nats, "drone.1.spawn", request, true)
-  await sleep(100)
-
-  const statsStatusSubsription = 
-    new NatsMessageIterator<unknown>(
-      nats.subscribe(`backend.${backendId}.stats`, { timeout : 1000000 })
-  )
-  const statsMessage = await statsStatusSubsription.next()
-  const stats= statsMessage[0]
-  t.assert(stats["cpu_use_percent"] > 0 && stats["mem_use_percent"] > 0)
-})
-
-
 
 test("Lifecycle is managed when agent is restarted.", async (t) => {
   const backendId = generateId()
