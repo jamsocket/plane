@@ -187,7 +187,7 @@ impl Executor {
                                 None => {
                                     let message =
                                         "failed to get stats (container may have been swept)";
-                                    tracing::warn!(message);
+                                    tracing::info!(%backend_id, message);
                                     return Err(anyhow::Error::msg(message));
                                 }
                             },
