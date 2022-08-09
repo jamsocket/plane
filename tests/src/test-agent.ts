@@ -196,7 +196,7 @@ test("stats are acquired", async (t) => {
   t.assert(stats["cpu_use_percent"] > 0 && stats["mem_use_percent"] > 0)
 })
 
-test("stats are killed after container dies", async (t) => {
+test.only("stats are killed after container dies", async (t) => {
   const backendId = generateId()
   const natsPort = await t.context.docker.runNats()
   await sleep(1000)
@@ -233,19 +233,19 @@ test("stats are killed after container dies", async (t) => {
       nats.subscribe(`backend.${backendId}.stats`, { timeout: 1000000 })
     )
 
-  try {
-    while (true) {
-      //NOTE: this sleep is strongly coupled to 
-      //DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SEC in agent/docker.rs
-      await Promise.race([statsStatusSubsription.next(), sleep(11000)])
-        .then(val => { if (!val) { throw ("DONE") } else { console.log(val) } })
+  //TODO: figure out a way to write a test such that
+  //eventually no more stats come
+  while (true) {
+    //NOTE: this sleep is strongly coupled to 
+    //DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SEC in agent/docker.rs
+    let newMessage = await Promise.race([statsStatusSubsription.next(), sleep(11000)])
+    if (!newMessage) {
+      break;
+    } else {
+      console.log(newMessage[0])
     }
   }
-  catch (e) {
-    //TODO: figure out a way to write a test such that
-    //eventually no more stats come
-    t.pass("Eventually, stats should stop coming")
-  }
+  t.pass("Eventually, stats should stop coming")
 })
 
 
