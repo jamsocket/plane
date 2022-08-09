@@ -92,12 +92,15 @@ impl DroneStatsMessage {
         //cpu
         let cpu_stats = &stats_message.cpu_stats;
         let precpu_stats = &stats_message.precpu_stats;
-        let cpu_delta = cpu_stats.cpu_usage.total_usage - precpu_stats.cpu_usage.total_usage;
-        let sys_cpu_delta = cpu_stats.system_cpu_usage.unwrap_or_default()
-            - precpu_stats.system_cpu_usage.unwrap_or_default();
+        let cpu_delta =
+            (cpu_stats.cpu_usage.total_usage as f64) - (precpu_stats.cpu_usage.total_usage as f64);
+        let sys_cpu_delta = (cpu_stats.system_cpu_usage.unwrap_or_default() as f64)
+            - (precpu_stats.system_cpu_usage.unwrap_or_default() as f64);
         let num_cpus = cpu_stats.online_cpus.unwrap_or_default();
-        let cpu_use_percent =
-            ((cpu_delta as f64) / (sys_cpu_delta as f64)) * (num_cpus as f64) * 100.0;
+        let cpu_use_percent = (cpu_delta / sys_cpu_delta) * (num_cpus as f64) * 100.0;
+        if cpu_use_percent.is_nan() {
+            return None;
+        }
 
         //disk
         //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
