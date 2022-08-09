@@ -89,19 +89,19 @@ impl DroneStatsMessage {
         let used_memory = mem_naive_usage - cache_mem;
         let mem_use_percent = ((used_memory as f64) / (mem_available as f64)) * 100.0;
 
+        //REF: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
         //cpu
         let cpu_stats = &stats_message.cpu_stats;
         let precpu_stats = &stats_message.precpu_stats;
-        let cpu_delta =
-            (cpu_stats.cpu_usage.total_usage as f64) - (precpu_stats.cpu_usage.total_usage as f64);
+        //NOTE: total_usage gives clock cycles, this is monotonically increasing
+        let cpu_delta = cpu_stats.cpu_usage.total_usage - precpu_stats.cpu_usage.total_usage;
+        if cpu_delta == 0 {
+            return None;
+        }
         let sys_cpu_delta = (cpu_stats.system_cpu_usage.unwrap_or_default() as f64)
             - (precpu_stats.system_cpu_usage.unwrap_or_default() as f64);
         let num_cpus = cpu_stats.online_cpus.unwrap_or_default();
-        let cpu_use_percent = (cpu_delta / sys_cpu_delta) * (num_cpus as f64) * 100.0;
-        if cpu_use_percent.is_nan() {
-            return None;
-        }
-
+        let cpu_use_percent = (cpu_delta as f64 / sys_cpu_delta) * (num_cpus as f64) * 100.0;
         //disk
         //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
