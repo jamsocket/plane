@@ -25,7 +25,9 @@ pub struct DockerInterface {
     runtime: Option<String>,
 }
 
+/// Helper trait for swallowing Docker not found errors.
 trait AllowNotFound {
+    /// Swallow a result if it is a success result or a NotFound; propagate it otherwise.
     fn allow_not_found(self) -> Result<(), bollard::errors::Error>;
 }
 
