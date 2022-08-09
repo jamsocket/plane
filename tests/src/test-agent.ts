@@ -196,7 +196,7 @@ test("stats are acquired", async (t) => {
   t.assert(stats["cpu_use_percent"] > 0 && stats["mem_use_percent"] > 0)
 })
 
-test.only("stats are killed after container dies", async (t) => {
+test("stats are killed after container dies", async (t) => {
   const backendId = generateId()
   const natsPort = await t.context.docker.runNats()
   await sleep(1000)
