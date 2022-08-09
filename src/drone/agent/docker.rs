@@ -25,6 +25,22 @@ pub struct DockerInterface {
     runtime: Option<String>,
 }
 
+/// Helper trait for swallowing Docker not found errors.
+trait AllowNotFound {
+    /// Swallow a result if it is a success result or a NotFound; propagate it otherwise.
+    fn allow_not_found(self) -> Result<(), bollard::errors::Error>;
+}
+
+impl<T> AllowNotFound for Result<T, bollard::errors::Error> {
+    fn allow_not_found(self) -> Result<(), bollard::errors::Error> {
+        match self {
+            Ok(_) => Ok(()),
+            Err(bollard::errors::Error::DockerResponseServerError {status_code: 404, ..}) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 /// The list of possible container events.
 /// Comes from [Docker documentation](https://docs.docker.com/engine/reference/commandline/events/).
 #[derive(Debug, PartialEq, Eq)]
@@ -201,7 +217,8 @@ impl DockerInterface {
     pub async fn stop_container(&self, name: &str) -> Result<()> {
         let options = StopContainerOptions { t: 10 };
 
-        self.docker.stop_container(name, Some(options)).await?;
+        self.docker.stop_container(name, Some(options)).await.allow_not_found()?;
+        self.docker.remove_container(name, None).await.allow_not_found()?;
 
         Ok(())
     }

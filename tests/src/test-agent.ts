@@ -146,7 +146,6 @@ test("Spawn with agent", async (t) => {
 
   // Result should respond to ping.
   const result = await axios.get(`http://${address}`)
-  console.log(result)
   t.is(result.status, 200)
   t.is(result.data, "Hello World!")
   
@@ -195,8 +194,6 @@ test("stats are acquired", async (t) => {
   const stats= statsMessage[0]
   t.assert(stats["cpu_use_percent"] > 0 && stats["mem_use_percent"] > 0)
 })
-
-
 
 test("Lifecycle is managed when agent is restarted.", async (t) => {
   const backendId = generateId()

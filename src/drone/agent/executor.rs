@@ -355,12 +355,11 @@ impl Executor {
             | BackendState::Exited
             | BackendState::Swept => {
                 let container_name = spawn_request.backend_id.to_resource_name();
-                if self.docker.is_running(&container_name).await?.0 {
-                    self.docker
-                        .stop_container(&container_name)
-                        .await
-                        .map_err(|e| anyhow!("Error stopping container: {:?}", e))?;
-                }
+
+                self.docker
+                    .stop_container(&container_name)
+                    .await
+                    .map_err(|e| anyhow!("Error stopping container: {:?}", e))?;
 
                 Ok(None)
             }
