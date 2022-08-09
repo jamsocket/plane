@@ -146,7 +146,6 @@ test("Spawn with agent", async (t) => {
 
   // Result should respond to ping.
   const result = await axios.get(`http://${address}`)
-  console.log(result)
   t.is(result.status, 200)
   t.is(result.data, "Hello World!")
 
