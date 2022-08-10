@@ -1,7 +1,7 @@
 use self::https_client::get_https_client;
 use super::cli::CertOptions;
 use crate::{messages::cert::SetAcmeDnsRecord, nats::TypedNats};
-use acme2::{
+use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
@@ -26,6 +26,8 @@ pub async fn get_certificate(
     nats: &TypedNats,
     acme_server_url: &str,
     client: &Client,
+    acme_eab_kid: &Option<String>,
+    acme_eab_key: &Option<String>,
 ) -> Result<(PKey<Private>, X509)> {
     let _span = tracing::info_span!("Getting certificate", %cluster_domain);
     let _span_guard = _span.enter();
@@ -37,6 +39,14 @@ pub async fn get_certificate(
 
     let mut builder = AccountBuilder::new(dir);
     builder.contact(vec!["mailto:paul@driftingin.space".to_string()]);
+    if let Some(eab_key_b64) = acme_eab_key && let Some(kid) = acme_eab_kid {
+        let eab_key = {
+            let value_b64 = eab_key_b64;
+            let value = openssl::base64::decode_block(&value_b64).unwrap();
+            PKey::hmac(&value).unwrap()
+        };
+        builder.external_account_binding(kid.to_string(), eab_key);
+    }
     builder.terms_of_service_agreed(true);
     let account = builder.build().await?;
 
@@ -124,6 +134,8 @@ pub async fn refresh_certificate(cert_options: &CertOptions) -> Result<()> {
         &nats,
         &cert_options.acme_server_url,
         &client,
+        &cert_options.acme_eab_kid,
+        &cert_options.acme_eab_key,
     )
     .await?;
 
