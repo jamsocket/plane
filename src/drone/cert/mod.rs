@@ -39,13 +39,15 @@ pub async fn get_certificate(
 
     let mut builder = AccountBuilder::new(dir);
     builder.contact(vec!["mailto:paul@driftingin.space".to_string()]);
-    if let Some(eab_key_b64) = acme_eab_key && let Some(kid) = acme_eab_kid {
-        let eab_key = {
-            let value_b64 = eab_key_b64;
-            let value = openssl::base64::decode_block(&value_b64).unwrap();
-            PKey::hmac(&value).unwrap()
-        };
-        builder.external_account_binding(kid.to_string(), eab_key);
+    if let Some(eab_key_b64) = acme_eab_key {
+        if let Some(kid) = acme_eab_kid {
+            let eab_key = {
+                let value_b64 = eab_key_b64;
+                let value = openssl::base64::decode_block(&value_b64).unwrap();
+                PKey::hmac(&value).unwrap()
+            };
+            builder.external_account_binding(kid.to_string(), eab_key);
+        }
     }
     builder.terms_of_service_agreed(true);
     let account = builder.build().await?;
