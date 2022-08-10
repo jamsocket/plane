@@ -179,12 +179,18 @@ impl Executor {
 
                     while let Some(v) = stream.next().await {
                         match v {
-                            Ok(v) => {
-                                if let Some(message) = DroneStatsMessage::from_stats_message(&v) {
+                            Ok(v) => match DroneStatsMessage::from_stats_message(&v) {
+                                Some(message) => {
                                     nc.publish(&DroneStatsMessage::subject(&backend_id), &message)
                                         .await?;
                                 }
-                            }
+                                None => {
+                                    let message =
+                                        "failed to get stats (container may have been swept)";
+                                    tracing::info!(%backend_id, message);
+                                    return Err(anyhow::Error::msg(message));
+                                }
+                            },
                             Err(error) => {
                                 tracing::warn!(?error, "Error encountered sending stats.")
                             }
