@@ -232,8 +232,6 @@ test("stats are killed after container dies", async (t) => {
       nats.subscribe(`backend.${backendId}.stats`, { timeout: 1000000 })
     )
 
-  //TODO: figure out a way to write a test such that
-  //eventually no more stats come
   while (true) {
     //NOTE: this sleep is strongly coupled to 
     //DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SEC in agent/docker.rs
