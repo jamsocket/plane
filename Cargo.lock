@@ -541,6 +541,7 @@ dependencies = [
  "anyhow",
  "async-nats",
  "async-stream",
+ "base64",
  "bollard",
  "bytes",
  "chrono",

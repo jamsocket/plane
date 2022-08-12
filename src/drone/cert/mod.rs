@@ -6,6 +6,7 @@ use acme2_eab::{
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
 use anyhow::{anyhow, Context, Result};
+use base64;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use openssl::{
     asn1::Asn1Time,
@@ -44,8 +45,11 @@ pub async fn get_certificate(
         if let Some(kid) = acme_eab_kid {
             let eab_key = {
                 let value_b64 = eab_key_b64;
+                let value = base64::decode(&value_b64).expect("cannot decode base64 value");
+                /*
                 let value = openssl::base64::decode_block(&value_b64)
                     .expect("openssl cannot decode base64 value");
+                */
                 PKey::hmac(&value).unwrap()
             };
             builder.external_account_binding(kid.to_string(), eab_key);
