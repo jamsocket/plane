@@ -93,11 +93,12 @@ test("Generate cert with EAB credentials", async (t) => {
   t.assert(validateCertificateKeyPair(keyPair))
 })
 
-test("incorrect eab credentials cause panic", async (t) => {
+test.only("incorrect eab credentials cause panic", async (t) => {
   const natsPort = await t.context.docker.runNats()
   const isEab = true
   const pebble = await t.context.docker.runPebble(isEab)
   await sleep(500)
+  //needed else NatsError
   const nats = await connect({ port: natsPort, token: "mytoken" })
   await sleep(500)
 
@@ -107,34 +108,44 @@ test("incorrect eab credentials cause panic", async (t) => {
     t.context.tempdir.path("keys/cert.key"),
     t.context.tempdir.path("keys/cert.pem")
   )
-
   const sub = new NatsMessageIterator<DnsMessage>(
     nats.subscribe("acme.set_dns_record")
   )
 
-  t.timeout(2000, "spawner should panic")
-  t.plan(2)
+
+  let error_free_cert_refreshes = 0;
   try {
-    await t.context.runner.certRefresh(
+    const certRefreshPromise = t.context.runner.certRefresh(
       keyPair,
       natsPort,
       pebble,
       isEab,
       { kid: 'badkid', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W" }
     )
+    sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true)))
+    await certRefreshPromise
+    error_free_cert_refreshes++
   } catch (e) {
-    t.true(e instanceof Error, "spawner does not panic when acme_kid is invalid")
+    t.true(e instanceof Error, "spawner does not error out when acme_kid is invalid")
   }
-  
+
   try {
-    await t.context.runner.certRefresh(
+    const certRefreshPromise = t.context.runner.certRefresh(
       keyPair,
       natsPort,
       pebble,
       isEab,
-      { kid: 'kid-1', key: "invalid" }
+      //note last letter in key is different (hence invalid)
+      { kid: 'kid-1', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12w" }
     )
+    sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true)))
+    await certRefreshPromise
+    error_free_cert_refreshes++
   } catch (e) {
-    t.true(e instanceof Error, "spawner does not panic when acme_key is invalid")
+    //NOTE: check that the errors are ServerErrors in logs, sometimes NATS errors
+    //      sneak in. Ideally there'd be a way to check for this here.
+    t.true(e instanceof Error, "spawner does not error out when acme_key is invalid")
   }
+
+  t.falsy(error_free_cert_refreshes, "there was an error free cert refresh")
 })

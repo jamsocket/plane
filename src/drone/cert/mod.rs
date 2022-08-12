@@ -43,7 +43,8 @@ pub async fn get_certificate(
         if let Some(kid) = acme_eab_kid {
             let eab_key = {
                 let value_b64 = eab_key_b64;
-                let value = openssl::base64::decode_block(&value_b64).unwrap();
+                let value = openssl::base64::decode_block(&value_b64)
+                    .expect("openssl cannot decode base64 value");
                 PKey::hmac(&value).unwrap()
             };
             builder.external_account_binding(kid.to_string(), eab_key);
