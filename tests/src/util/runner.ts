@@ -33,7 +33,7 @@ export interface ServeResult {
 export class DroneRunner implements DropHandler {
   server?: ChildProcess
 
-  constructor(private dbPath: string) {}
+  constructor(private dbPath: string) { }
 
   async drop() {
     if (this.server !== undefined) {
@@ -56,11 +56,29 @@ export class DroneRunner implements DropHandler {
   async certRefresh(
     certs: KeyCertPair,
     natsPort: number,
-    pebble: PebbleResult
+    pebble: PebbleResult,
+    eab = false
   ) {
+    const eab_cli_options = [
+      "--nats-url",
+      `nats://mytoken@localhost:${natsPort}`,
+      "--https-private-key",
+      certs.privateKeyPath,
+      "--https-certificate",
+      certs.certificatePath,
+      "--cluster-domain",
+      CLUSTER_DOMAIN,
+      "--acme-server",
+      `https://localhost:${pebble.port}/dir`,
+      "--acme-eab-key",
+      "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
+      "--acme-eab-kid",
+      "kid-1",
+      "cert",
+    ]
     const proc = spawn(
       SPAWNER_PATH,
-      [
+      eab ? eab_cli_options : [
         "--nats-url",
         `nats://mytoken@localhost:${natsPort}`,
         "--https-private-key",
