@@ -72,11 +72,9 @@ export class DroneRunner implements DropHandler {
       "--acme-server",
       `https://localhost:${pebble.port}/dir`,
       "--acme-eab-key",
-      eabOptions.key,
-      //"zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
+      eabOptions?.key,
       "--acme-eab-kid",
-      eabOptions.kid,
-      //"kid-1",
+      eabOptions?.kid,
       "cert",
     ]
     const proc = spawn(

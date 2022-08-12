@@ -93,11 +93,13 @@ test("Generate cert with EAB credentials", async (t) => {
   t.assert(validateCertificateKeyPair(keyPair))
 })
 
-test.only("incorrect eab credentials cause panic", async (t) => {
+test("incorrect eab credentials cause panic", async (t) => {
   const natsPort = await t.context.docker.runNats()
   const isEab = true
   const pebble = await t.context.docker.runPebble(isEab)
-  await sleep(1000)
+  await sleep(500)
+  const nats = await connect({ port: natsPort, token: "mytoken" })
+  await sleep(500)
 
   mkdirSync(t.context.tempdir.path("keys"))
 
@@ -106,6 +108,11 @@ test.only("incorrect eab credentials cause panic", async (t) => {
     t.context.tempdir.path("keys/cert.pem")
   )
 
+  const sub = new NatsMessageIterator<DnsMessage>(
+    nats.subscribe("acme.set_dns_record")
+  )
+
+  t.timeout(2000, "spawner should panic")
   t.plan(2)
   try {
     await t.context.runner.certRefresh(
@@ -116,7 +123,7 @@ test.only("incorrect eab credentials cause panic", async (t) => {
       { kid: 'badkid', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W" }
     )
   } catch (e) {
-    t.pass("spawner panics when acme_kid invalid")
+    t.true(e instanceof Error, "spawner does not panic when acme_kid is invalid")
   }
   
   try {
@@ -125,9 +132,9 @@ test.only("incorrect eab credentials cause panic", async (t) => {
       natsPort,
       pebble,
       isEab,
-      { kid: 'kid-1', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W" }
+      { kid: 'kid-1', key: "invalid" }
     )
   } catch (e) {
-    t.pass("spawner panics when acme_key is invalid")
+    t.true(e instanceof Error, "spawner does not panic when acme_key is invalid")
   }
 })
