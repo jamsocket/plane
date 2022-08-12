@@ -328,6 +328,8 @@ mod test {
             "mydomain.test",
             "--acme-server",
             "https://acme.server/dir",
+            "--cert-email",
+            "test@test.com",
             "cert",
         ])
         .unwrap();
@@ -340,6 +342,9 @@ mod test {
                     certificate_path: PathBuf::from("mycert.cert"),
                 },
                 acme_server_url: "https://acme.server/dir".to_string(),
+                email: "test@test.com".to_string(),
+                acme_eab_key: None,
+                acme_eab_kid: None
             }),
             opts
         );
@@ -495,6 +500,8 @@ mod test {
             "nats://foo@bar",
             "--acme-server",
             "https://acme-server",
+            "--cert-email",
+            "test@test.com",
         ])
         .unwrap();
         assert_eq!(
@@ -529,7 +536,10 @@ mod test {
                         private_key_path: PathBuf::from("mycert.key"),
                         certificate_path: PathBuf::from("mycert.cert"),
                     },
+                    email: "test@test.com".to_string(),
                     nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
+                    acme_eab_key: None,
+                    acme_eab_kid: None
                 }),
                 nats: Some(NatsConnection::new("nats://foo@bar".to_string()).unwrap()),
             },
