@@ -1,6 +1,6 @@
 import { ChildProcess, spawn } from "child_process"
 import { DropHandler } from "./environment.js"
-import { KeyCertPair } from "./certificates.js"
+import { KeyCertPair, EabOptions } from "./certificates.js"
 import { sleep } from "./sleep.js"
 import { PebbleResult } from "./docker.js"
 import getPort from "@ava/get-port"
@@ -57,7 +57,8 @@ export class DroneRunner implements DropHandler {
     certs: KeyCertPair,
     natsPort: number,
     pebble: PebbleResult,
-    eab = false
+    eab = false,
+    eabOptions? : EabOptions
   ) {
     const eab_cli_options = [
       "--nats-url",
@@ -71,9 +72,11 @@ export class DroneRunner implements DropHandler {
       "--acme-server",
       `https://localhost:${pebble.port}/dir`,
       "--acme-eab-key",
-      "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
+      eabOptions.key,
+      //"zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
       "--acme-eab-kid",
-      "kid-1",
+      eabOptions.kid,
+      //"kid-1",
       "cert",
     ]
     const proc = spawn(
@@ -94,7 +97,7 @@ export class DroneRunner implements DropHandler {
       {
         stdio: "inherit",
         env: {
-          SPAWNER_TEST_ALLOWED_CERTIFICATE: pebble.cert,
+          SPAWNER_TEST_ALLOWED_CERTIFICATE: pebble.cert
         },
       }
     )
