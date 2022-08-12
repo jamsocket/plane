@@ -46,6 +46,10 @@ pub struct Opts {
     #[clap(long, action)]
     pub acme_server: Option<String>,
 
+    //email to use as mailto for cert issuance
+    #[clap(long, action)]
+    pub cert_email: Option<String>,
+
     /// EAB ID
     #[clap(long, action)]
     pub acme_eab_kid: Option<String>,
@@ -123,6 +127,7 @@ pub struct CertOptions {
     pub cluster_domain: String,
     pub nats: NatsConnection,
     pub key_paths: KeyCertPathPair,
+    pub email: String,
     pub acme_server_url: String,
     pub acme_eab_key: Option<String>,
     pub acme_eab_kid: Option<String>,
@@ -202,6 +207,7 @@ impl From<Opts> for DronePlan {
                     nats: nats.expect("Expected --nats-host when using cert command."),
                     key_paths: key_cert_pair.expect("Expected --https-certificate and --https-private-key to point to location to write cert and key."),
                     acme_server_url: opts.acme_server.expect("Expected --acme-server when using cert command."),
+                    email: opts.cert_email.expect("Expected --cert-email when using cert command"),
                     acme_eab_key: opts.acme_eab_key,
                     acme_eab_kid: opts.acme_eab_kid
                 })
@@ -210,6 +216,7 @@ impl From<Opts> for DronePlan {
                 let cert_options = if cert_refresh {
                     Some(CertOptions {
                         acme_server_url: opts.acme_server.clone().expect("Expected --acme-server for certificate refreshing."),
+                        email: opts.cert_email.expect("Expected --cert-email when using cert command"),
                         cluster_domain: opts.cluster_domain.clone().expect("Expected --cluster-domain for certificate refreshing."),
                         key_paths: key_cert_pair.clone().expect("Expected --https-certificate and --https-private-key for certificate refresh."),
                         nats: nats.clone().expect("Expected --nats-url."),

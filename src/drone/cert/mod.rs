@@ -25,6 +25,7 @@ pub async fn get_certificate(
     cluster_domain: &str,
     nats: &TypedNats,
     acme_server_url: &str,
+    mailto_email: &str,
     client: &Client,
     acme_eab_kid: &Option<String>,
     acme_eab_key: &Option<String>,
@@ -38,7 +39,7 @@ pub async fn get_certificate(
         .await?;
 
     let mut builder = AccountBuilder::new(dir);
-    builder.contact(vec!["mailto:paul@driftingin.space".to_string()]);
+    builder.contact(vec![format!("mailto:{}", mailto_email)]);
     if let Some(eab_key_b64) = acme_eab_key {
         if let Some(kid) = acme_eab_kid {
             let eab_key = {
@@ -136,6 +137,7 @@ pub async fn refresh_certificate(cert_options: &CertOptions) -> Result<()> {
         &cert_options.cluster_domain,
         &nats,
         &cert_options.acme_server_url,
+        &cert_options.email,
         &client,
         &cert_options.acme_eab_kid,
         &cert_options.acme_eab_key,
