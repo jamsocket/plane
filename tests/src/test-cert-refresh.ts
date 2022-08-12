@@ -52,10 +52,9 @@ test("Generate certificate", async (t) => {
 
 
 test("Generate cert with EAB credentials", async (t) => {
-  //t.timeout(20000, "Starting NATS")
   const natsPort = await t.context.docker.runNats()
-  //t.timeout(10000, "Starting Pebble")
-  const pebble = await t.context.docker.runPebble(true)
+  const isEab = true
+  const pebble = await t.context.docker.runPebble(isEab)
 
   await sleep(500)
   //t.timeout(5000, "Connecting to NATS")
@@ -73,7 +72,6 @@ test("Generate cert with EAB credentials", async (t) => {
     nats.subscribe("acme.set_dns_record")
   )
 
-  const isEab = true
   const certRefreshPromise = t.context.runner.certRefresh(
     keyPair,
     natsPort,
@@ -97,7 +95,8 @@ test("Generate cert with EAB credentials", async (t) => {
 
 test.only("incorrect eab credentials cause panic", async (t) => {
   const natsPort = await t.context.docker.runNats()
-  const pebble = await t.context.docker.runPebble(true)
+  const isEab = true
+  const pebble = await t.context.docker.runPebble(isEab)
   await sleep(1000)
 
   mkdirSync(t.context.tempdir.path("keys"))
@@ -107,7 +106,6 @@ test.only("incorrect eab credentials cause panic", async (t) => {
     t.context.tempdir.path("keys/cert.pem")
   )
 
-  const isEab = true
   t.plan(2)
   try {
     await t.context.runner.certRefresh(
@@ -127,7 +125,7 @@ test.only("incorrect eab credentials cause panic", async (t) => {
       natsPort,
       pebble,
       isEab,
-      { kid: 'kid-1', key: "badkey" }
+      { kid: 'kid-1', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W" }
     )
   } catch (e) {
     t.pass("spawner panics when acme_key is invalid")
