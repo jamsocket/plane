@@ -18,6 +18,9 @@ jobs:
     - uses: Swatinem/rust-cache@v1
       with:
         cache-on-failure: true
+    - uses: actions/setup-node@v3
+      with:
+      node-version: 18
     - run: npm install
       working-directory: tests
     - run: npm test
