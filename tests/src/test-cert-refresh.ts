@@ -92,7 +92,7 @@ test("Generate cert with EAB credentials", async (t) => {
   t.assert(validateCertificateKeyPair(keyPair))
 })
 
-test.only("incorrect eab credentials cause panic", async (t) => {
+test("incorrect eab credentials cause panic", async (t) => {
   const natsPort = await t.context.docker.runNats()
   const isEab = true
   const pebble = await t.context.docker.runPebble(isEab)
@@ -113,8 +113,7 @@ test.only("incorrect eab credentials cause panic", async (t) => {
   )
 
 
-  let error_free_cert_refreshes = 0;
-  try {
+  {
     const certRefreshPromise = t.context.runner.certRefresh(
       keyPair,
       natsPort,
@@ -122,13 +121,10 @@ test.only("incorrect eab credentials cause panic", async (t) => {
       { kid: 'badkid', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W" }
     )
     sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true)))
-    await certRefreshPromise
-    error_free_cert_refreshes++
-  } catch (e) {
-    t.true(e instanceof Error, "spawner does not error out when acme_kid is invalid")
+    await t.throwsAsync(certRefreshPromise, { instanceOf: Error }, "spawner does not error out when acme_kid invalid")
   }
 
-  try {
+  {
     const certRefreshPromise = t.context.runner.certRefresh(
       keyPair,
       natsPort,
@@ -136,13 +132,6 @@ test.only("incorrect eab credentials cause panic", async (t) => {
       { kid: 'kid-1', key: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
     )
     sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true)))
-    await certRefreshPromise
-    error_free_cert_refreshes++
-  } catch (e) {
-    //NOTE: check that the errors are ServerErrors in logs, sometimes NATS errors
-    //      sneak in. Ideally there'd be a way to check for this here.
-    t.true(e instanceof Error, "spawner does not error out when acme_key is invalid")
+    await t.throwsAsync(certRefreshPromise, { instanceOf: Error}, "spawner does not error out when acme_key invalid")
   }
-
-  t.falsy(error_free_cert_refreshes, "there was an error free cert refresh")
 })

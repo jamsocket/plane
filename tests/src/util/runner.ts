@@ -60,10 +60,10 @@ export class DroneRunner implements DropHandler {
     eabOptions?: EabOptions
   ) {
     const eab_cli_options = eabOptions ? [
+      "--acme-eab-key",
       eabOptions?.key,
       "--acme-eab-kid",
       eabOptions?.kid,
-      "cert",
     ] : []
     const proc = spawn(
       SPAWNER_PATH,
@@ -80,8 +80,8 @@ export class DroneRunner implements DropHandler {
         "test@test.com",
         "--acme-server",
         `https://localhost:${pebble.port}/dir`,
+        ...eab_cli_options,
         "cert",
-        ...eab_cli_options
       ],
       {
         stdio: "inherit",
