@@ -119,7 +119,7 @@ test("incorrect eab credentials cause panic", async (t) => {
       pebble,
       { kid: 'badkid', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W" }
     )
-    sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true)))
+    sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true))).catch(()=>{})
     await t.throwsAsync(certRefreshPromise, { instanceOf: Error }, "spawner does not error out when acme_kid invalid")
   }
 
@@ -130,7 +130,8 @@ test("incorrect eab credentials cause panic", async (t) => {
       pebble,
       { kid: 'kid-1', key: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
     )
-    sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true)))
+    sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true))).catch(()=>{})
     await t.throwsAsync(certRefreshPromise, { instanceOf: Error}, "spawner does not error out when acme_key invalid")
   }
+
 })
