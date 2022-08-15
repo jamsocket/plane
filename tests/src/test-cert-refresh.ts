@@ -57,7 +57,6 @@ test("Generate cert with EAB credentials", async (t) => {
   const pebble = await t.context.docker.runPebble(isEab)
 
   await sleep(500)
-  //t.timeout(5000, "Connecting to NATS")
   const nats = await connect({ port: natsPort, token: "mytoken" })
   await sleep(500)
 
