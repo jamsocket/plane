@@ -47,10 +47,6 @@ pub async fn get_certificate(
                 let value_b64 = eab_key_b64;
                 let value = base64::decode_config(&value_b64, base64::URL_SAFE)
                     .expect("cannot decode base64 value");
-                /*
-                let value = openssl::base64::decode_block(&value_b64)
-                    .expect("openssl cannot decode base64 value");
-                */
                 PKey::hmac(&value).unwrap()
             };
             builder.external_account_binding(kid.to_string(), eab_key);
