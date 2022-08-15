@@ -2,11 +2,10 @@ use super::{
     agent::{AgentOptions, DockerApiTransport, DockerOptions},
     proxy::{ProxyHttpsOptions, ProxyOptions},
 };
-use crate::{
-    database_connection::DatabaseConnection, keys::KeyCertPathPair, nats_connection::NatsConnection,
-};
+use crate::{database_connection::DatabaseConnection, keys::KeyCertPathPair};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use dis_spawner::nats_connection::NatsConnection;
 use reqwest::Url;
 use std::{fmt::Debug, net::IpAddr, path::PathBuf};
 

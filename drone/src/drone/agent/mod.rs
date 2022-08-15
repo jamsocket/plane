@@ -1,8 +1,9 @@
 use self::{docker::DockerInterface, executor::Executor};
 use crate::{
-    database::DroneDatabase,
-    database_connection::DatabaseConnection,
-    drone::cli::IpProvider,
+    database::DroneDatabase, database_connection::DatabaseConnection, drone::cli::IpProvider,
+};
+use anyhow::{anyhow, Result};
+use dis_spawner::{
     logging::LogError,
     messages::agent::{
         BackendStateMessage, DroneConnectRequest, DroneConnectResponse, DroneStatusMessage,
@@ -13,7 +14,6 @@ use crate::{
     retry::do_with_retry,
     types::DroneId,
 };
-use anyhow::{anyhow, Result};
 use http::Uri;
 use hyper::Client;
 use std::{net::IpAddr, sync::Arc, time::Duration};
