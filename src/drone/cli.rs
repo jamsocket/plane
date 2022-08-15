@@ -46,15 +46,15 @@ pub struct Opts {
     #[clap(long, action)]
     pub acme_server: Option<String>,
 
-    //email to use as mailto for cert issuance
+    /// email to use as mailto for cert issuance
     #[clap(long, action)]
     pub cert_email: Option<String>,
 
-    /// EAB ID
+    /// Acme External Account Binding (EAB) ID (NOTE: NOT USED FOR LetsEncrypt)
     #[clap(long, action)]
     pub acme_eab_kid: Option<String>,
 
-    /// EAB key
+    /// Acme External Account Binding (EAB) key (NOTE: NOT USED FOR LetsEncrypt)
     #[clap(long, action)]
     pub acme_eab_key: Option<String>,
 
