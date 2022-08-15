@@ -246,14 +246,6 @@ export class DroneRunner implements DropHandler {
   }
 }
 
-export async function waitURL(url: URL) {
-  try {
-    await sleep(10)
-    await fetch(url)
-  } catch(e) {
-    if(e.cause.code !== "ECONNRESET") {
-      return true
-    }
-    await waitURL(url)
-  }
+export async function waitURL(url: URL, interval = 10) {
+  await sleep(interval).then(() => fetch(url).catch(async (e) => e.cause.code !== "ECONNRESET" ? true : waitURL(url)))
 }
