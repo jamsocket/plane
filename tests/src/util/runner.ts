@@ -245,3 +245,15 @@ export class DroneRunner implements DropHandler {
     return { httpPort, httpsPort }
   }
 }
+
+export async function waitURL(url: URL) {
+  try {
+    await sleep(10)
+    await fetch(url)
+  } catch(e) {
+    if(e.cause.code !== "ECONNRESET") {
+      return true
+    }
+    await waitURL(url)
+  }
+}

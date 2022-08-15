@@ -5,6 +5,7 @@ import { TestEnvironment } from "./util/environment.js"
 import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
 import { DnsMessage } from "./util/types.js"
+import { waitURL } from "./util/runner.js"
 
 const test = TestEnvironment.wrappedTestFunction()
 
@@ -91,15 +92,15 @@ test("Generate cert with EAB credentials", async (t) => {
   t.assert(validateCertificateKeyPair(keyPair))
 })
 
-test("incorrect eab credentials cause panic", async (t) => {
+test.only("incorrect eab credentials cause panic", async (t) => {
   const natsPort = await t.context.docker.runNats()
   const isEab = true
   const pebble = await t.context.docker.runPebble(isEab)
-  await sleep(500)
+  await waitURL(new URL(`https://localhost:${pebble.port}/dir`))
+  await waitURL(new URL(`https://localhost:${natsPort}`))
   /* to exercise the certificate code paths, spawner requires a 
      functioning NATS server */
   const nats = await connect({ port: natsPort, token: "mytoken" })
-  await sleep(500)
 
   mkdirSync(t.context.tempdir.path("keys"))
 
@@ -107,10 +108,21 @@ test("incorrect eab credentials cause panic", async (t) => {
     t.context.tempdir.path("keys/cert.key"),
     t.context.tempdir.path("keys/cert.pem")
   )
-  const sub = new NatsMessageIterator<DnsMessage>(
-    nats.subscribe("acme.set_dns_record")
-  )
 
+  /* NOTE: This test is remarkably brittle.
+     The idea is that if kid or key are invalid,
+     the server will throw an error. However, if
+     there is no nats subscriber listening 
+     on acme.set_dns_record and responding with true,
+     it will error out with a nats error, notwithstanding
+     the fact that the kid and key are fine. The *problem*
+     is that t.context.runner cannot differentiate
+     between different kinds of errors. One solution would be
+     to parse stdout. Another is the one used here, where the
+     every message to acme.set_dns_record is responded to with
+     true.
+  */
+  nats.subscribe("acme.set_dns_record", { callback: (_, msg) => { msg.respond(JSON_CODEC.encode(true)) } })
 
   {
     const certRefreshPromise = t.context.runner.certRefresh(
@@ -119,9 +131,9 @@ test("incorrect eab credentials cause panic", async (t) => {
       pebble,
       { kid: 'badkid', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W" }
     )
-    sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true))).catch(()=>{})
     await t.throwsAsync(certRefreshPromise, { instanceOf: Error }, "spawner does not error out when acme_kid invalid")
   }
+
 
   {
     const certRefreshPromise = t.context.runner.certRefresh(
@@ -130,8 +142,20 @@ test("incorrect eab credentials cause panic", async (t) => {
       pebble,
       { kid: 'kid-1', key: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
     )
-    sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true))).catch(()=>{})
-    await t.throwsAsync(certRefreshPromise, { instanceOf: Error}, "spawner does not error out when acme_key invalid")
+    await t.throwsAsync(certRefreshPromise, { instanceOf: Error }, "spawner does not error out when acme_key invalid")
+  }
+
+  /*sanity check to see if correct response works*/
+  {
+    await t.context.runner.certRefresh(
+      keyPair,
+      natsPort,
+      pebble,
+      { kid: 'kid-1', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W"}
+    )
+
+    t.assert(validateCertificateKeyPair(keyPair))
+
   }
 
 })
