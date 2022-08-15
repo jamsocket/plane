@@ -62,7 +62,14 @@ export class Docker implements DropHandler {
     const certs = await generateCertificates()
     const imageName = "docker.io/letsencrypt/pebble:latest"
 
-    const pebbleConfig = eab ? {
+    const eabOptions = eab ? {
+        externalAccountBindingRequired: true,
+        externalAccountMACKeys: {
+          "kid-1": "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
+          "kid-2": "b10lLJs8l1GPIzsLP0s6pMt8O0XVGnfTaCeROxQM0BIt2XrJMDHJZBM5NuQmQJQH"
+        }
+    } : { externalAccountBindingRequired: false }
+    const pebbleConfig = {
       pebble: {
         listenAddress: "0.0.0.0:443",
         managementListenAddress: "0.0.0.0:15000",
@@ -71,26 +78,9 @@ export class Docker implements DropHandler {
         httpPort: 5002,
         tlsPort: 5001,
         ocspResponderURL: "",
-        externalAccountBindingRequired: true,
-        externalAccountMACKeys: {
-          "kid-1": "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
-          "kid-2": "b10lLJs8l1GPIzsLP0s6pMt8O0XVGnfTaCeROxQM0BIt2XrJMDHJZBM5NuQmQJQH"
-        }
+        ...eabOptions
       }
     }
-      : {
-        pebble: {
-          listenAddress: "0.0.0.0:443",
-          managementListenAddress: "0.0.0.0:15000",
-          certificate: "/etc/auth/local-cert.pem",
-          privateKey: "/etc/auth/local-cert.key",
-          httpPort: 5002,
-          tlsPort: 5001,
-          ocspResponderURL: "",
-          externalAccountBindingRequired: false,
-        },
-      }
-
     writeFileSync(join(tempdir, "config.json"), JSON.stringify(pebbleConfig))
 
     await this.runContainer({

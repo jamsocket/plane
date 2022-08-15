@@ -57,31 +57,17 @@ export class DroneRunner implements DropHandler {
     certs: KeyCertPair,
     natsPort: number,
     pebble: PebbleResult,
-    eab = false,
-    eabOptions? : EabOptions
+    eabOptions?: EabOptions
   ) {
-    const eab_cli_options = [
-      "--nats-url",
-      `nats://mytoken@localhost:${natsPort}`,
-      "--https-private-key",
-      certs.privateKeyPath,
-      "--https-certificate",
-      certs.certificatePath,
-      "--cluster-domain",
-      CLUSTER_DOMAIN,
-      "--cert-email",
-      "test@test.com",
-      "--acme-server",
-      `https://localhost:${pebble.port}/dir`,
-      "--acme-eab-key",
+    const eab_cli_options = eabOptions ? [
       eabOptions?.key,
       "--acme-eab-kid",
       eabOptions?.kid,
       "cert",
-    ]
+    ] : []
     const proc = spawn(
       SPAWNER_PATH,
-      eab ? eab_cli_options : [
+      [
         "--nats-url",
         `nats://mytoken@localhost:${natsPort}`,
         "--https-private-key",
@@ -95,6 +81,7 @@ export class DroneRunner implements DropHandler {
         "--acme-server",
         `https://localhost:${pebble.port}/dir`,
         "cert",
+        ...eab_cli_options
       ],
       {
         stdio: "inherit",

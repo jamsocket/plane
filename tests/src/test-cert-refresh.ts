@@ -76,7 +76,6 @@ test("Generate cert with EAB credentials", async (t) => {
     keyPair,
     natsPort,
     pebble,
-    isEab,
     { kid: 'kid-1', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W" }
   )
 
@@ -98,7 +97,8 @@ test.only("incorrect eab credentials cause panic", async (t) => {
   const isEab = true
   const pebble = await t.context.docker.runPebble(isEab)
   await sleep(500)
-  //needed else NatsError
+  /* to exercise the certificate code paths, spawner requires a 
+     functioning NATS server */
   const nats = await connect({ port: natsPort, token: "mytoken" })
   await sleep(500)
 
@@ -119,7 +119,6 @@ test.only("incorrect eab credentials cause panic", async (t) => {
       keyPair,
       natsPort,
       pebble,
-      isEab,
       { kid: 'badkid', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W" }
     )
     sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true)))
@@ -134,9 +133,7 @@ test.only("incorrect eab credentials cause panic", async (t) => {
       keyPair,
       natsPort,
       pebble,
-      isEab,
-      //note last letter in key is different (hence invalid)
-      { kid: 'kid-1', key: "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12w" }
+      { kid: 'kid-1', key: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
     )
     sub.next().then(([_, msg]) => msg.respond(JSON_CODEC.encode(true)))
     await certRefreshPromise
