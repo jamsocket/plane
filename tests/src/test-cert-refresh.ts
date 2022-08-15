@@ -5,7 +5,7 @@ import { TestEnvironment } from "./util/environment.js"
 import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
 import { DnsMessage } from "./util/types.js"
-import { waitURL } from "./util/runner.js"
+import { waitPort } from "./util/runner.js"
 
 const test = TestEnvironment.wrappedTestFunction()
 
@@ -92,12 +92,12 @@ test("Generate cert with EAB credentials", async (t) => {
   t.assert(validateCertificateKeyPair(keyPair))
 })
 
-test.only("incorrect eab credentials cause panic", async (t) => {
+test("incorrect eab credentials cause panic", async (t) => {
   const natsPort = await t.context.docker.runNats()
   const isEab = true
   const pebble = await t.context.docker.runPebble(isEab)
-  await waitURL(new URL(`https://localhost:${pebble.port}/dir`))
-  await waitURL(new URL(`https://localhost:${natsPort}`))
+  await waitPort({port:pebble.port, protocol: 'https'})
+  await waitPort({port: natsPort})
   /* to exercise the certificate code paths, spawner requires a 
      functioning NATS server */
   const nats = await connect({ port: natsPort, token: "mytoken" })
