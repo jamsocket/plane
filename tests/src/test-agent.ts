@@ -351,7 +351,7 @@ test("Spawn fails during start", async (t) => {
 
   t.timeout(100, "Waiting for loading message")
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
-  t.timeout(10000, "Waiting for starting message")
+  t.timeout(60000, "Waiting for starting message")
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
   t.timeout(5000, "Waiting for ErrorStarting message")
   t.is("ErrorStarting", (await backendStatusSubscription.next())[0].state)
