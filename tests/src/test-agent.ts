@@ -268,7 +268,7 @@ test("Lifecycle is managed when agent is restarted.", async (t) => {
   const request: SpawnRequest = {
     image: TEST_IMAGE,
     backend_id: backendId,
-    max_idle_secs: 10,
+    max_idle_secs: 20,
     env: {
       PORT: "8080",
     },
@@ -281,15 +281,19 @@ test("Lifecycle is managed when agent is restarted.", async (t) => {
       nats.subscribe(`backend.${backendId}.status`)
     )
 
+  console.log('here5')  
   await expectResponse(t, nats, "drone.1.spawn", request, true)
+  console.log('here0')
 
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
   t.is("Ready", (await backendStatusSubscription.next())[0].state)
+  console.log('here1')
 
   // Restart drone.
   t.context.runner.drop()
   t.context.runner.runAgent(natsPort)
+  console.log('here3')
   t.timeout(5000, "Failed while waiting for drone register request.")
   await expectMessage(t, nats, "drone.register", {
     cluster: "mydomain.test",
@@ -299,9 +303,10 @@ test("Lifecycle is managed when agent is restarted.", async (t) => {
       drone_id: 1,
     },
   })
+  console.log('here2')
 
   // Status should update to swept after ~10 seconds.
-  t.timeout(10000, "Failed while waiting for backend to be swept.")
+  t.timeout(20000, "Failed while waiting for backend to be swept.")
   t.is("Swept", (await backendStatusSubscription.next())[0].state)
   t.is("Swept", (await t.context.db.getBackend(backendId)).state)
 })
