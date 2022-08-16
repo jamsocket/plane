@@ -7,7 +7,6 @@ edition = "2021"
 dis-spawner = {path = "../core"}
 tracing = "0.1.36"
 
-acme2 = "0.5.1"
 anyhow = "1.0.57"
 # async-nats = "0.18.0"
 # async-stream = "0.3.3"
@@ -32,8 +31,8 @@ sqlx = { version = "0.6.1", features = ["runtime-tokio-rustls", "sqlite", "migra
 tokio = { version = "1.18.2", features = ["rt"] }
 tokio-rustls = "0.23.4"
 tokio-stream = "0.1.8"
-base64 = "0.13.0"
 acme2-eab = "0.5.1"
+base64 = "0.13.0"
 # tracing-stackdriver = "0.4.1"
 # tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
 # url = "2.2.2"

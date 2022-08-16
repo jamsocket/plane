@@ -13,24 +13,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "acme2"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "453e534d4f46dcdddd7aa8619e9a664e153f34383d14710db0b0d76c2964db89"
-dependencies = [
- "base64",
- "hyper",
- "openssl",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-futures",
-]
-
-[[package]]
 name = "acme2-eab"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -596,7 +578,6 @@ dependencies = [
 name = "dis-spawner-drone"
 version = "0.2.0"
 dependencies = [
- "acme2",
  "acme2-eab",
  "anyhow",
  "base64",
@@ -1156,9 +1137,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.131"
+version = "0.2.132"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04c3b4822ccebfa39c02fc03d1534441b22ead323fa0f48bb7ddd8e6ba076a40"
+checksum = "8371e4e5341c3a96db127eb2465ac681ced4c433e01dd0e938adbef26ba93ba5"
 
 [[package]]
 name = "libsqlite3-sys"
