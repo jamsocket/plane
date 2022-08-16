@@ -1,11 +1,12 @@
 use self::https_client::get_https_client;
 use super::cli::CertOptions;
 use crate::{messages::cert::SetAcmeDnsRecord, nats::TypedNats};
-use acme2::{
+use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
 use anyhow::{anyhow, Context, Result};
+use base64;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use openssl::{
     asn1::Asn1Time,
@@ -25,7 +26,10 @@ pub async fn get_certificate(
     cluster_domain: &str,
     nats: &TypedNats,
     acme_server_url: &str,
+    mailto_email: &str,
     client: &Client,
+    acme_eab_kid: &Option<String>,
+    acme_eab_key: &Option<String>,
 ) -> Result<(PKey<Private>, X509)> {
     let _span = tracing::info_span!("Getting certificate", %cluster_domain);
     let _span_guard = _span.enter();
@@ -36,7 +40,18 @@ pub async fn get_certificate(
         .await?;
 
     let mut builder = AccountBuilder::new(dir);
-    builder.contact(vec!["mailto:paul@driftingin.space".to_string()]);
+    builder.contact(vec![format!("mailto:{}", mailto_email)]);
+    if let Some(eab_key_b64) = acme_eab_key {
+        if let Some(kid) = acme_eab_kid {
+            let eab_key = {
+                let value_b64 = eab_key_b64;
+                let value = base64::decode_config(&value_b64, base64::URL_SAFE)
+                    .expect("cannot decode base64 value");
+                PKey::hmac(&value).unwrap()
+            };
+            builder.external_account_binding(kid.to_string(), eab_key);
+        }
+    }
     builder.terms_of_service_agreed(true);
     let account = builder.build().await?;
 
@@ -123,7 +138,10 @@ pub async fn refresh_certificate(cert_options: &CertOptions) -> Result<()> {
         &cert_options.cluster_domain,
         &nats,
         &cert_options.acme_server_url,
+        &cert_options.email,
         &client,
+        &cert_options.acme_eab_kid,
+        &cert_options.acme_eab_key,
     )
     .await?;
 

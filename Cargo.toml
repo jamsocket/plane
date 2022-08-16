@@ -4,10 +4,11 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-acme2 = "0.5.1"
+acme2-eab = "0.5.1"
 anyhow = "1.0.57"
 async-nats = "0.18.0"
 async-stream = "0.3.3"
+base64 = "0.13.0"
 bollard = "0.13.0"
 bytes = "1.1.0"
 chrono = { version = "0.4.21", features = ["serde"] }

@@ -85,3 +85,5 @@ To run the Rust tests, run `cargo test` in the root directory.
 
 The TypeScript tests require nodejs and a running Docker daemon. To run these tests, change into the `tests`
 directory and run `npm install` to install the dependencies, followed by `npm test` to run the tests.
+
+NOTE: We only test the program with the docker engine install process described in https://docs.docker.com/engine/install/ubuntu/ on ubuntu 20.04 and ubuntu 22.04. The official snap from canonical does *NOT* currently pass tests. 

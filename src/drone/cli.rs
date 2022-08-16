@@ -46,6 +46,18 @@ pub struct Opts {
     #[clap(long, action)]
     pub acme_server: Option<String>,
 
+    /// email to use as mailto for cert issuance
+    #[clap(long, action)]
+    pub cert_email: Option<String>,
+
+    /// Acme External Account Binding (EAB) ID (NOTE: NOT USED FOR LetsEncrypt)
+    #[clap(long, action)]
+    pub acme_eab_kid: Option<String>,
+
+    /// Acme External Account Binding (EAB) key (NOTE: NOT USED FOR LetsEncrypt)
+    #[clap(long, action)]
+    pub acme_eab_key: Option<String>,
+
     /// Public IP of this drone, used for directing traffic outside the host.
     #[clap(long, action)]
     pub ip: Option<IpAddr>,
@@ -115,7 +127,10 @@ pub struct CertOptions {
     pub cluster_domain: String,
     pub nats: NatsConnection,
     pub key_paths: KeyCertPathPair,
+    pub email: String,
     pub acme_server_url: String,
+    pub acme_eab_key: Option<String>,
+    pub acme_eab_kid: Option<String>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -192,15 +207,21 @@ impl From<Opts> for DronePlan {
                     nats: nats.expect("Expected --nats-host when using cert command."),
                     key_paths: key_cert_pair.expect("Expected --https-certificate and --https-private-key to point to location to write cert and key."),
                     acme_server_url: opts.acme_server.expect("Expected --acme-server when using cert command."),
+                    email: opts.cert_email.expect("Expected --cert-email when using cert command"),
+                    acme_eab_key: opts.acme_eab_key,
+                    acme_eab_kid: opts.acme_eab_kid
                 })
             },
             Command::Serve { proxy, agent, cert_refresh } => {
                 let cert_options = if cert_refresh {
                     Some(CertOptions {
                         acme_server_url: opts.acme_server.clone().expect("Expected --acme-server for certificate refreshing."),
+                        email: opts.cert_email.expect("Expected --cert-email when using cert command"),
                         cluster_domain: opts.cluster_domain.clone().expect("Expected --cluster-domain for certificate refreshing."),
                         key_paths: key_cert_pair.clone().expect("Expected --https-certificate and --https-private-key for certificate refresh."),
                         nats: nats.clone().expect("Expected --nats-url."),
+                        acme_eab_key: opts.acme_eab_key,
+                        acme_eab_kid: opts.acme_eab_kid
                     })
                 } else {
                     None
@@ -307,6 +328,8 @@ mod test {
             "mydomain.test",
             "--acme-server",
             "https://acme.server/dir",
+            "--cert-email",
+            "test@test.com",
             "cert",
         ])
         .unwrap();
@@ -319,6 +342,9 @@ mod test {
                     certificate_path: PathBuf::from("mycert.cert"),
                 },
                 acme_server_url: "https://acme.server/dir".to_string(),
+                email: "test@test.com".to_string(),
+                acme_eab_key: None,
+                acme_eab_kid: None
             }),
             opts
         );
@@ -474,6 +500,8 @@ mod test {
             "nats://foo@bar",
             "--acme-server",
             "https://acme-server",
+            "--cert-email",
+            "test@test.com",
         ])
         .unwrap();
         assert_eq!(
@@ -508,7 +536,10 @@ mod test {
                         private_key_path: PathBuf::from("mycert.key"),
                         certificate_path: PathBuf::from("mycert.cert"),
                     },
+                    email: "test@test.com".to_string(),
                     nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
+                    acme_eab_key: None,
+                    acme_eab_kid: None
                 }),
                 nats: Some(NatsConnection::new("nats://foo@bar".to_string()).unwrap()),
             },
