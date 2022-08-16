@@ -32,6 +32,8 @@ sqlx = { version = "0.6.1", features = ["runtime-tokio-rustls", "sqlite", "migra
 tokio = { version = "1.18.2", features = ["rt"] }
 tokio-rustls = "0.23.4"
 tokio-stream = "0.1.8"
+base64 = "0.13.0"
+acme2-eab = "0.5.1"
 # tracing-stackdriver = "0.4.1"
 # tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
 # url = "2.2.2"

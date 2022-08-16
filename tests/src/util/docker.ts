@@ -56,12 +56,19 @@ export class Docker implements DropHandler {
     return port
   }
 
-  async runPebble(): Promise<PebbleResult> {
+  async runPebble(eab = false): Promise<PebbleResult> {
     const port = await getPort()
     const tempdir = mkdtempSync(join(tmpdir(), "spawner-pebble-config-"))
     const certs = await generateCertificates()
     const imageName = "docker.io/letsencrypt/pebble:latest"
 
+    const eabOptions = eab ? {
+        externalAccountBindingRequired: true,
+        externalAccountMACKeys: {
+          "kid-1": "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
+          "kid-2": "b10lLJs8l1GPIzsLP0s6pMt8O0XVGnfTaCeROxQM0BIt2XrJMDHJZBM5NuQmQJQH"
+        }
+    } : { externalAccountBindingRequired: false }
     const pebbleConfig = {
       pebble: {
         listenAddress: "0.0.0.0:443",
@@ -71,10 +78,9 @@ export class Docker implements DropHandler {
         httpPort: 5002,
         tlsPort: 5001,
         ocspResponderURL: "",
-        externalAccountBindingRequired: false,
-      },
+        ...eabOptions
+      }
     }
-
     writeFileSync(join(tempdir, "config.json"), JSON.stringify(pebbleConfig))
 
     await this.runContainer({

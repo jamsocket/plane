@@ -1,6 +1,6 @@
 import { ChildProcess, spawn } from "child_process"
 import { DropHandler } from "./environment.js"
-import { KeyCertPair } from "./certificates.js"
+import { KeyCertPair, EabOptions } from "./certificates.js"
 import { sleep } from "./sleep.js"
 import { PebbleResult } from "./docker.js"
 import getPort from "@ava/get-port"
@@ -33,7 +33,7 @@ export interface ServeResult {
 export class DroneRunner implements DropHandler {
   server?: ChildProcess
 
-  constructor(private dbPath: string) {}
+  constructor(private dbPath: string) { }
 
   async drop() {
     if (this.server !== undefined) {
@@ -56,8 +56,15 @@ export class DroneRunner implements DropHandler {
   async certRefresh(
     certs: KeyCertPair,
     natsPort: number,
-    pebble: PebbleResult
+    pebble: PebbleResult,
+    eabOptions?: EabOptions
   ) {
+    const eab_cli_options = eabOptions ? [
+      "--acme-eab-key",
+      eabOptions?.key,
+      "--acme-eab-kid",
+      eabOptions?.kid,
+    ] : []
     const proc = spawn(
       SPAWNER_PATH,
       [
@@ -69,14 +76,17 @@ export class DroneRunner implements DropHandler {
         certs.certificatePath,
         "--cluster-domain",
         CLUSTER_DOMAIN,
+        "--cert-email",
+        "test@test.com",
         "--acme-server",
         `https://localhost:${pebble.port}/dir`,
+        ...eab_cli_options,
         "cert",
       ],
       {
         stdio: "inherit",
         env: {
-          SPAWNER_TEST_ALLOWED_CERTIFICATE: pebble.cert,
+          SPAWNER_TEST_ALLOWED_CERTIFICATE: pebble.cert
         },
       }
     )
@@ -167,6 +177,8 @@ export class DroneRunner implements DropHandler {
       certs.privateKeyPath,
       "--https-certificate",
       certs.certificatePath,
+      "--cert-email",
+      "test@test.com",
       "--acme-server",
       `https://localhost:${pebble.port}/dir`,
     ]
@@ -232,4 +244,12 @@ export class DroneRunner implements DropHandler {
 
     return { httpPort, httpsPort }
   }
+}
+
+export async function waitURL(url: URL, interval = 10) {
+  await sleep(interval).then(() => fetch(url).catch(async (e) => e.cause.code !== "ECONNRESET" ? true : waitURL(url)))
+}
+
+export async function waitPort({port, host = "localhost", protocol="http", path="/"}) {
+    await waitURL(new URL(`${protocol}://${host}:${port}/${path}`))
 }

@@ -4,6 +4,11 @@ import { tmpdir } from "os"
 import { dirname, join } from "path"
 import { waitForExit } from "./runner.js"
 
+export type EabOptions = {
+  kid : string,
+  key : string
+}
+
 export class KeyCertPair {
   constructor(public privateKeyPath: string, public certificatePath: string) {}
 
