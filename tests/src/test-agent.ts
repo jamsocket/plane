@@ -1,7 +1,6 @@
 import axios from "axios"
 import { connect } from "nats"
 import { TestEnvironment } from "./util/environment.js"
-import { generateId } from "./util/id_gen.js"
 import { TEST_IMAGE } from "./util/images.js"
 import { expectMessage, expectResponse, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
@@ -53,7 +52,7 @@ test("Drone sends ready messages", async (t) => {
 })
 
 test("NATS logs", async (t) => {
-  const backendId = generateId("nats-logs")
+  const backendId = 'nats-logs'
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
@@ -95,7 +94,7 @@ test("NATS logs", async (t) => {
 })
 
 test("Spawn with agent", async (t) => {
-  const backendId = generateId('spawn-with-agent')
+  const backendId = 'spawn-with-agent'
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
@@ -155,7 +154,7 @@ test("Spawn with agent", async (t) => {
 })
 
 test("stats are acquired", async (t) => {
-  const backendId = generateId('stats-acquired')
+  const backendId = 'stats-acquired'
   const natsPort = await t.context.docker.runNats()
   await sleep(1000)
   const nats = await connect({ port: natsPort, token: "mytoken" })
@@ -196,7 +195,7 @@ test("stats are acquired", async (t) => {
 })
 
 test("stats are killed after container dies", async (t) => {
-  const backendId = generateId('stats-killed')
+  const backendId = 'stats-killed'
   const natsPort = await t.context.docker.runNats()
   await sleep(1000)
   const nats = await connect({ port: natsPort, token: "mytoken" })
@@ -247,7 +246,7 @@ test("stats are killed after container dies", async (t) => {
 
 
 test("Lifecycle is managed when agent is restarted.", async (t) => {
-  const backendId = generateId('lifecycle-managed-restart')
+  const backendId = 'lifecycle-managed-restart'
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
@@ -307,7 +306,7 @@ test("Lifecycle is managed when agent is restarted.", async (t) => {
 })
 
 test("Spawn fails during start", async (t) => {
-  const backendId = generateId('spawn-fails')
+  const backendId = 'spawn-fails'
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
@@ -359,7 +358,7 @@ test("Spawn fails during start", async (t) => {
 })
 
 test("Backend fails after ready", async (t) => {
-  const backendId = generateId('backend-fails-after-ready')
+  const backendId = 'backend-fails-after-ready'
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
