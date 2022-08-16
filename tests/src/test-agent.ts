@@ -238,8 +238,6 @@ test("Stats are killed after container dies", async (t) => {
     let newMessage = await Promise.race([statsStatusSubsription.next(), sleep(11000)])
     if (!newMessage) {
       break;
-    } else {
-      console.log(newMessage[0])
     }
   }
   t.pass("Eventually, stats should stop coming")
@@ -281,19 +279,15 @@ test("Lifecycle is managed when agent is restarted.", async (t) => {
       nats.subscribe(`backend.${backendId}.status`)
     )
 
-  console.log('here5')  
   await expectResponse(t, nats, "drone.1.spawn", request, true)
-  console.log('here0')
 
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
   t.is("Ready", (await backendStatusSubscription.next())[0].state)
-  console.log('here1')
 
   // Restart drone.
   t.context.runner.drop()
   t.context.runner.runAgent(natsPort)
-  console.log('here3')
   t.timeout(5000, "Failed while waiting for drone register request.")
   await expectMessage(t, nats, "drone.register", {
     cluster: "mydomain.test",
@@ -303,7 +297,6 @@ test("Lifecycle is managed when agent is restarted.", async (t) => {
       drone_id: 1,
     },
   })
-  console.log('here2')
 
   // Status should update to swept after ~10 seconds.
   t.timeout(20000, "Failed while waiting for backend to be swept.")
