@@ -35,7 +35,9 @@ impl<T> AllowNotFound for Result<T, bollard::errors::Error> {
     fn allow_not_found(self) -> Result<(), bollard::errors::Error> {
         match self {
             Ok(_) => Ok(()),
-            Err(bollard::errors::Error::DockerResponseServerError {status_code: 404, ..}) => Ok(()),
+            Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 404, ..
+            }) => Ok(()),
             Err(e) => Err(e),
         }
     }
@@ -217,8 +219,14 @@ impl DockerInterface {
     pub async fn stop_container(&self, name: &str) -> Result<()> {
         let options = StopContainerOptions { t: 10 };
 
-        self.docker.stop_container(name, Some(options)).await.allow_not_found()?;
-        self.docker.remove_container(name, None).await.allow_not_found()?;
+        self.docker
+            .stop_container(name, Some(options))
+            .await
+            .allow_not_found()?;
+        self.docker
+            .remove_container(name, None)
+            .await
+            .allow_not_found()?;
 
         Ok(())
     }

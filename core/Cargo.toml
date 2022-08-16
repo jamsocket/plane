@@ -1,0 +1,21 @@
+[package]
+name = "dis-spawner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.61"
+async-nats = "0.18.0"
+async-stream = "0.3.3"
+bollard = "0.13.0"
+bytes = "1.2.1"
+chrono = { version = "0.4.22", features = ["serde"] }
+futures = "0.3.23"
+serde = { version = "1.0.143", features = ["derive"] }
+serde_json = "1.0.83"
+serde_with = "2.0.0"
+tokio = "1.20.1"
+tracing = "0.1.36"
+tracing-stackdriver = "0.5.0"
+tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
+url = "2.2.2"

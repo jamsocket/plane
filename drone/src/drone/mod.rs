@@ -4,10 +4,10 @@ use self::{
     cli::{DronePlan, Opts},
     proxy::serve,
 };
-use crate::logging::TracingHandle;
-use crate::retry::do_with_retry;
 use anyhow::Result;
 use clap::Parser;
+use dis_spawner::logging::TracingHandle;
+use dis_spawner::retry::do_with_retry;
 use futures::{future::select_all, Future};
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::{pin::Pin, thread};

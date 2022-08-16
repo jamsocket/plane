@@ -4,7 +4,7 @@ WORKDIR /work
 
 COPY . .
 
-RUN cargo build --bin=spawner-drone --features=full --release
+RUN cargo build --bin=spawner-drone --release
 
 RUN ls /work/target/release
 

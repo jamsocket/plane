@@ -1,6 +1,6 @@
 use self::https_client::get_https_client;
 use super::cli::CertOptions;
-use crate::{messages::cert::SetAcmeDnsRecord, nats::TypedNats};
+use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats};
 use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,

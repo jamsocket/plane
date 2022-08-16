@@ -43,7 +43,7 @@ impl TracingHandle {
 
         let trace_stackdriver = std::env::var(TRACE_STACKDRIVER).is_ok();
         if trace_stackdriver {
-            registry.with(Stackdriver::default()).init();
+            registry.with(Stackdriver::layer()).init();
         } else {
             registry.with(tracing_subscriber::fmt::layer()).init();
         };
