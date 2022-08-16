@@ -87,6 +87,12 @@ pub struct Opts {
     command: Option<Command>,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct EabKeypair {
+    pub eab_kid: String,
+    pub eab_key: Vec<u8>,
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// Migrate the database, and then exit.
@@ -128,8 +134,7 @@ pub struct CertOptions {
     pub key_paths: KeyCertPathPair,
     pub email: String,
     pub acme_server_url: String,
-    pub acme_eab_key: Option<String>,
-    pub acme_eab_kid: Option<String>,
+    pub acme_eab_keypair: Option<EabKeypair>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -196,6 +201,19 @@ impl From<Opts> for DronePlan {
 
         let db = opts.db_path.map(DatabaseConnection::new);
 
+        let acme_eab_keypair = match (opts.acme_eab_key, opts.acme_eab_kid) {
+            (Some(eab_key), Some(eab_kid)) => {
+                let eab_key = base64::decode_config(&eab_key, base64::URL_SAFE)
+                    .expect("Couldn't decode --acme-eab-key value as (url-encodable) base64.");
+                
+                Some(EabKeypair {
+                    eab_key, eab_kid
+                })
+            },
+            (None, None) => None,
+            _ => panic!("If one of --acme-eab-key or --acme-eab-kid is provided, the other must be too."),
+        };
+
         match opts.command.unwrap_or_default() {
             Command::Migrate => DronePlan::DoMigration {
                 db: db.expect("Expected --db-path when using migrate."),
@@ -207,8 +225,7 @@ impl From<Opts> for DronePlan {
                     key_paths: key_cert_pair.expect("Expected --https-certificate and --https-private-key to point to location to write cert and key."),
                     acme_server_url: opts.acme_server.expect("Expected --acme-server when using cert command."),
                     email: opts.cert_email.expect("Expected --cert-email when using cert command"),
-                    acme_eab_key: opts.acme_eab_key,
-                    acme_eab_kid: opts.acme_eab_kid
+                    acme_eab_keypair,
                 })
             },
             Command::Serve { proxy, agent, cert_refresh } => {
@@ -219,8 +236,7 @@ impl From<Opts> for DronePlan {
                         cluster_domain: opts.cluster_domain.clone().expect("Expected --cluster-domain for certificate refreshing."),
                         key_paths: key_cert_pair.clone().expect("Expected --https-certificate and --https-private-key for certificate refresh."),
                         nats: nats.clone().expect("Expected --nats-url."),
-                        acme_eab_key: opts.acme_eab_key,
-                        acme_eab_kid: opts.acme_eab_kid
+                        acme_eab_keypair,
                     })
                 } else {
                     None
@@ -342,8 +358,7 @@ mod test {
                 },
                 acme_server_url: "https://acme.server/dir".to_string(),
                 email: "test@test.com".to_string(),
-                acme_eab_key: None,
-                acme_eab_kid: None
+                acme_eab_keypair: None,
             }),
             opts
         );
@@ -537,8 +552,7 @@ mod test {
                     },
                     email: "test@test.com".to_string(),
                     nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
-                    acme_eab_key: None,
-                    acme_eab_kid: None
+                    acme_eab_keypair: None,
                 }),
                 nats: Some(NatsConnection::new("nats://foo@bar".to_string()).unwrap()),
             },

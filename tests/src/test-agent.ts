@@ -311,10 +311,12 @@ test("Spawn fails during start", async (t) => {
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
+  t.timeout(100, "Connecting to NATS.")
   const nats = await connect({ port: natsPort, token: "mytoken" })
 
   t.context.runner.runAgent(natsPort)
 
+  t.timeout(1000, "Waiting for drone registration message.")
   await expectMessage(t, nats, "drone.register", {
     cluster: "mydomain.test",
     ip: "123.12.1.123",
@@ -346,9 +348,13 @@ test("Spawn fails during start", async (t) => {
       nats.subscribe(`backend.${backendId}.status`)
     )
 
+  t.timeout(100, "Waiting for loading message")
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
+  t.timeout(5000, "Waiting for starting message")
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
+  t.timeout(5000, "Waiting for ErrorStarting message")
   t.is("ErrorStarting", (await backendStatusSubscription.next())[0].state)
+  t.timeout(100, "Waiting for ErrorStarting status response")
   t.is("ErrorStarting", (await t.context.db.getBackend(backendId)).state)
 })
 
