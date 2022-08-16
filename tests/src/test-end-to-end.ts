@@ -4,7 +4,6 @@ import { mkdirSync } from "fs"
 import { connect } from "nats"
 import { KeyCertPair } from "./util/certificates.js"
 import { TestEnvironment } from "./util/environment.js"
-import { generateId } from "./util/id_gen.js"
 import { TEST_IMAGE } from "./util/images.js"
 import { JSON_CODEC, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
@@ -13,7 +12,7 @@ import { BackendStateMessage, DnsMessage, DroneConnectRequest, SpawnRequest } fr
 const test = TestEnvironment.wrappedTestFunction()
 
 test("Test end-to-end", async (t) => {
-    const backendId = generateId()
+    const backendId = 'end-to-end'
 
     const pebble = await t.context.docker.runPebble()
     const natsPort = await t.context.docker.runNats()

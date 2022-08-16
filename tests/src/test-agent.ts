@@ -1,7 +1,6 @@
 import axios from "axios"
 import { connect } from "nats"
 import { TestEnvironment } from "./util/environment.js"
-import { generateId } from "./util/id_gen.js"
 import { TEST_IMAGE } from "./util/images.js"
 import { expectMessage, expectResponse, NatsMessageIterator } from "./util/nats.js"
 import { sleep } from "./util/sleep.js"
@@ -53,7 +52,7 @@ test("Drone sends ready messages", async (t) => {
 })
 
 test("NATS logs", async (t) => {
-  const backendId = generateId()
+  const backendId = 'nats-logs'
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
@@ -88,14 +87,14 @@ test("NATS logs", async (t) => {
       foo: "bar",
     },
   }
-  expectResponse(t, nats, "drone.1.spawn", request, true)
+  await expectResponse(t, nats, "drone.1.spawn", request, true)
 
   let [result] = await logSubscription.next()
   t.deepEqual(result.fields.metadata, { foo: "bar" })
 })
 
 test("Spawn with agent", async (t) => {
-  const backendId = generateId()
+  const backendId = 'spawn-with-agent'
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
@@ -123,13 +122,14 @@ test("Spawn with agent", async (t) => {
     },
     metadata: {},
   }
-  expectResponse(t, nats, "drone.1.spawn", request, true)
 
   // Status update stages
   const backendStatusSubscription =
     new NatsMessageIterator<BackendStateMessage>(
       nats.subscribe(`backend.${backendId}.status`)
     )
+
+  await expectResponse(t, nats, "drone.1.spawn", request, true)
 
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
@@ -154,8 +154,8 @@ test("Spawn with agent", async (t) => {
   t.is("Swept", (await t.context.db.getBackend(backendId)).state)
 })
 
-test("stats are acquired", async (t) => {
-  const backendId = generateId()
+test("Stats are acquired", async (t) => {
+  const backendId = 'stats-acquired'
   const natsPort = await t.context.docker.runNats()
   await sleep(1000)
   const nats = await connect({ port: natsPort, token: "mytoken" })
@@ -172,7 +172,6 @@ test("stats are acquired", async (t) => {
 
   await sleep(1000)
 
-
   // Spawn request.
   const request: SpawnRequest = {
     image: TEST_IMAGE,
@@ -183,20 +182,21 @@ test("stats are acquired", async (t) => {
     },
     metadata: {},
   }
-  expectResponse(t, nats, "drone.1.spawn", request, true)
-  await sleep(100)
 
   const statsStatusSubsription =
     new NatsMessageIterator<unknown>(
       nats.subscribe(`backend.${backendId}.stats`, { timeout: 1000000 })
     )
+  
+  await expectResponse(t, nats, "drone.1.spawn", request, true)
+  
   const statsMessage = await statsStatusSubsription.next()
   const stats = statsMessage[0]
   t.assert(stats["cpu_use_percent"] > 0 && stats["mem_use_percent"] > 0)
 })
 
-test("stats are killed after container dies", async (t) => {
-  const backendId = generateId()
+test("Stats are killed after container dies", async (t) => {
+  const backendId = 'stats-killed'
   const natsPort = await t.context.docker.runNats()
   await sleep(1000)
   const nats = await connect({ port: natsPort, token: "mytoken" })
@@ -223,8 +223,6 @@ test("stats are killed after container dies", async (t) => {
     metadata: {},
   }
 
-  expectResponse(t, nats, "drone.1.spawn", request, true)
-
   await sleep(100)
 
   const statsStatusSubsription =
@@ -232,22 +230,21 @@ test("stats are killed after container dies", async (t) => {
       nats.subscribe(`backend.${backendId}.stats`, { timeout: 1000000 })
     )
 
+  await expectResponse(t, nats, "drone.1.spawn", request, true)
+
   while (true) {
     //NOTE: this sleep is strongly coupled to 
     //DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SEC in agent/docker.rs
     let newMessage = await Promise.race([statsStatusSubsription.next(), sleep(11000)])
     if (!newMessage) {
       break;
-    } else {
-      console.log(newMessage[0])
     }
   }
   t.pass("Eventually, stats should stop coming")
 })
 
-
 test("Lifecycle is managed when agent is restarted.", async (t) => {
-  const backendId = generateId()
+  const backendId = 'lifecycle-managed-restart'
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
@@ -269,19 +266,20 @@ test("Lifecycle is managed when agent is restarted.", async (t) => {
   const request: SpawnRequest = {
     image: TEST_IMAGE,
     backend_id: backendId,
-    max_idle_secs: 10,
+    max_idle_secs: 20,
     env: {
       PORT: "8080",
     },
     metadata: {},
   }
-  expectResponse(t, nats, "drone.1.spawn", request, true)
 
   // Status update stages
   const backendStatusSubscription =
     new NatsMessageIterator<BackendStateMessage>(
       nats.subscribe(`backend.${backendId}.status`)
     )
+
+  await expectResponse(t, nats, "drone.1.spawn", request, true)
 
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
@@ -301,20 +299,22 @@ test("Lifecycle is managed when agent is restarted.", async (t) => {
   })
 
   // Status should update to swept after ~10 seconds.
-  t.timeout(10000, "Failed while waiting for backend to be swept.")
+  t.timeout(20000, "Failed while waiting for backend to be swept.")
   t.is("Swept", (await backendStatusSubscription.next())[0].state)
   t.is("Swept", (await t.context.db.getBackend(backendId)).state)
 })
 
 test("Spawn fails during start", async (t) => {
-  const backendId = generateId()
+  const backendId = 'spawn-fails'
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
+  t.timeout(100, "Connecting to NATS.")
   const nats = await connect({ port: natsPort, token: "mytoken" })
 
   t.context.runner.runAgent(natsPort)
 
+  t.timeout(1000, "Waiting for drone registration message.")
   await expectMessage(t, nats, "drone.register", {
     cluster: "mydomain.test",
     ip: "123.12.1.123",
@@ -338,7 +338,6 @@ test("Spawn fails during start", async (t) => {
     },
     metadata: {},
   }
-  expectResponse(t, nats, "drone.1.spawn", request, true)
 
   // Status update stages
   const backendStatusSubscription =
@@ -346,14 +345,20 @@ test("Spawn fails during start", async (t) => {
       nats.subscribe(`backend.${backendId}.status`)
     )
 
+  await expectResponse(t, nats, "drone.1.spawn", request, true)
+
+  t.timeout(100, "Waiting for loading message")
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
+  t.timeout(60000, "Waiting for starting message")
   t.is("Starting", (await backendStatusSubscription.next())[0].state)
+  t.timeout(5000, "Waiting for ErrorStarting message")
   t.is("ErrorStarting", (await backendStatusSubscription.next())[0].state)
+  t.timeout(100, "Waiting for ErrorStarting status response")
   t.is("ErrorStarting", (await t.context.db.getBackend(backendId)).state)
 })
 
 test("Backend fails after ready", async (t) => {
-  const backendId = generateId()
+  const backendId = 'backend-fails-after-ready'
 
   const natsPort = await t.context.docker.runNats()
   await sleep(100)
@@ -388,13 +393,14 @@ test("Backend fails after ready", async (t) => {
     },
     metadata: {},
   }
-  expectResponse(t, nats, "drone.1.spawn", request, true)
 
   // Status update stages
   const backendStatusSubscription =
     new NatsMessageIterator<BackendStateMessage>(
       nats.subscribe(`backend.${backendId}.status`)
     )
+
+  await expectResponse(t, nats, "drone.1.spawn", request, true)
 
   t.is("Loading", (await backendStatusSubscription.next())[0].state)
   t.is("Starting", (await backendStatusSubscription.next())[0].state)

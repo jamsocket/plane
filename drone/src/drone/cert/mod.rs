@@ -1,12 +1,11 @@
 use self::https_client::get_https_client;
-use super::cli::CertOptions;
+use super::cli::{CertOptions, EabKeypair};
 use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats};
 use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
 use anyhow::{anyhow, Context, Result};
-use base64;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use openssl::{
     asn1::Asn1Time,
@@ -28,8 +27,7 @@ pub async fn get_certificate(
     acme_server_url: &str,
     mailto_email: &str,
     client: &Client,
-    acme_eab_kid: &Option<String>,
-    acme_eab_key: &Option<String>,
+    acme_eab_keypair: Option<&EabKeypair>,
 ) -> Result<(PKey<Private>, X509)> {
     let _span = tracing::info_span!("Getting certificate", %cluster_domain);
     let _span_guard = _span.enter();
@@ -41,17 +39,11 @@ pub async fn get_certificate(
 
     let mut builder = AccountBuilder::new(dir);
     builder.contact(vec![format!("mailto:{}", mailto_email)]);
-    if let Some(eab_key_b64) = acme_eab_key {
-        if let Some(kid) = acme_eab_kid {
-            let eab_key = {
-                let value_b64 = eab_key_b64;
-                let value = base64::decode_config(&value_b64, base64::URL_SAFE)
-                    .expect("cannot decode base64 value");
-                PKey::hmac(&value).unwrap()
-            };
-            builder.external_account_binding(kid.to_string(), eab_key);
-        }
+    if let Some(acme_eab_keypair) = acme_eab_keypair {
+        let eab_key = PKey::hmac(&acme_eab_keypair.eab_key).unwrap();
+        builder.external_account_binding(acme_eab_keypair.eab_kid.clone(), eab_key);
     }
+
     builder.terms_of_service_agreed(true);
     let account = builder.build().await?;
 
@@ -140,8 +132,7 @@ pub async fn refresh_certificate(cert_options: &CertOptions) -> Result<()> {
         &cert_options.acme_server_url,
         &cert_options.email,
         &client,
-        &cert_options.acme_eab_kid,
-        &cert_options.acme_eab_key,
+        cert_options.acme_eab_keypair.as_ref(),
     )
     .await?;
 
