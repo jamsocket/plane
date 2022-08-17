@@ -25,7 +25,7 @@ impl Nats {
 
     pub async fn connection(&self) -> Result<TypedNats> {
         let nc = NatsConnection::new(self.connection_string())?;
-        Ok(nc.connection().await?)
+        nc.connection().await
     }
 
     pub async fn new() -> Result<Nats> {

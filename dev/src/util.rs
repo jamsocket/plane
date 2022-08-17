@@ -54,7 +54,7 @@ pub async fn wait_for_url(url: &str, timeout_ms: u128) -> Result<()> {
         .build()?;
     loop {
         let result = client
-            .get(url.clone())
+            .get(url)
             .timeout(Duration::from_secs(1))
             .send()
             .await;

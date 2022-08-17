@@ -22,7 +22,7 @@ impl Pebble {
     }
 
     pub fn client(&self) -> Result<Client> {
-        let cert = reqwest::Certificate::from_pem(&self.certs.cert_pem.as_bytes())
+        let cert = reqwest::Certificate::from_pem(self.certs.cert_pem.as_bytes())
             .context("Parsing certificate")?;
 
         Ok(reqwest::Client::builder()

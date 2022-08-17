@@ -213,7 +213,7 @@ where
 }
 
 trait NatsResultExt<T> {
-    fn as_anyhow(self) -> Result<T>;
+    fn to_anyhow(self) -> Result<T>;
 
     fn with_message(self, message: &'static str) -> Result<T>;
 }
@@ -226,7 +226,7 @@ impl<T> NatsResultExt<T> for std::result::Result<T, async_nats::Error> {
         }
     }
 
-    fn as_anyhow(self) -> Result<T> {
+    fn to_anyhow(self) -> Result<T> {
         match self {
             Ok(v) => Ok(v),
             Err(err) => Err(anyhow!("NATS Error: {:?}", err)),
@@ -254,7 +254,7 @@ impl TypedNats {
                 ..Config::default()
             })
             .await
-            .as_anyhow()?;
+            .to_anyhow()?;
 
         Ok(())
     }
@@ -279,7 +279,7 @@ impl TypedNats {
     where
         T: Serialize + DeserializeOwned,
     {
-        let stream = self.jetstream.get_stream(stream_name).await.as_anyhow()?;
+        let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
 
         let consumer = stream
             .create_consumer(async_nats::jetstream::consumer::pull::Config {
@@ -288,15 +288,15 @@ impl TypedNats {
                 ..async_nats::jetstream::consumer::pull::Config::default()
             })
             .await
-            .as_anyhow()?;
+            .to_anyhow()?;
 
         let result = match timeout(
             Duration::from_secs(1),
-            consumer.stream().messages().await.as_anyhow()?.next(),
+            consumer.stream().messages().await.to_anyhow()?.next(),
         )
         .await
         {
-            Ok(Some(v)) => v.as_anyhow()?,
+            Ok(Some(v)) => v.to_anyhow()?,
             _ => return Ok(None),
         };
 
@@ -369,7 +369,7 @@ impl TypedNats {
                 Bytes::from(serde_json::to_vec(value)?),
             )
             .await
-            .as_anyhow()?;
+            .to_anyhow()?;
 
         let value: R = serde_json::from_slice(&result.payload)?;
         Ok(value)
@@ -385,7 +385,7 @@ impl TypedNats {
             .nc
             .subscribe(subject.subject().to_string())
             .await
-            .as_anyhow()?;
+            .to_anyhow()?;
         Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }
 }
