@@ -97,7 +97,6 @@ pub struct LivenessGuard {
 
 impl Drop for LivenessGuard {
     fn drop(&mut self) {
-        tracing::info!("livenessguard dropped");
         self.handle.abort();
     }
 }
