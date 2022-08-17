@@ -2,11 +2,12 @@ use anyhow::Result;
 use bollard::{
     container::{Config, StartContainerOptions},
     image::CreateImageOptions,
-    Docker,
+    Docker, models::HostConfig,
 };
-use std::{collections::HashMap, net::IpAddr, fmt::Display, ops::Deref};
+use std::{collections::HashMap, net::{IpAddr, Ipv4Addr}, fmt::Display, ops::Deref};
 use tokio_stream::StreamExt;
-use crate::TEARDOWN_TASK_MANAGER;
+
+use crate::TEST_CONTEXT;
 
 #[derive(Clone)]
 pub struct ContainerSpec {
@@ -26,18 +27,23 @@ impl ContainerSpec {
             .collect();
 
         // This is ugly but it's really the API.
-        let volumes: HashMap<String, HashMap<(), ()>> = self
-            .volumes
-            .iter()
-            .map(|(s, d)| (format!("{}:{}", s, d), HashMap::new()))
-            .collect();
+        // let volumes: HashMap<String, HashMap<(), ()>> = self
+        //     .volumes
+        //     .iter()
+        //     .map(|(s, d)| (format!("{}:{}", s, d), HashMap::new()))
+        //     .collect();
+
+        let volumes: Vec<String> = self.volumes.iter().map(|(s, d)| format!("{}:{}", s, d)).collect();
 
         Config {
             hostname: Some(self.name.to_string()),
             env: Some(env),
             cmd: Some(self.command.clone()),
             image: Some(self.image.to_string()),
-            volumes: Some(volumes),
+            host_config: Some(HostConfig {
+                binds: Some(volumes),
+                ..HostConfig::default()
+            }),
             ..Config::default()
         }
     }
@@ -76,7 +82,7 @@ impl Display for ContainerId {
 pub struct ContainerResource {
     docker: Docker,
     container_id: ContainerId,
-    pub ip: IpAddr,
+    pub ip: Ipv4Addr,
 }
 
 impl ContainerResource {
@@ -99,7 +105,7 @@ impl ContainerResource {
         };
 
         let result = docker.inspect_container(&container_id, None).await?;
-        let ip: IpAddr = result
+        let ip: Ipv4Addr = result
             .network_settings
             .unwrap()
             .ip_address
@@ -122,21 +128,21 @@ impl Drop for ContainerResource {
         let docker = self.docker.clone();
         let container_id = self.container_id.clone();
 
-        // TEARDOWN_TASK_MANAGER.with(|manager| {
-        //     manager.add_task(async move {
-        //         tracing::info!(%container_id, "Stopping container");
-        //         docker
-        //             .stop_container(&container_id, None)
-        //             .await
-        //             .expect("Error stopping container.");
-        //         tracing::info!(%container_id, "Removing container");
-        //         docker
-        //             .remove_container(&container_id, None)
-        //             .await
-        //             .expect("Error removing container.");
-        //         Ok(())
-        //     })
-        // });
+        TEST_CONTEXT.with(|manager| {
+            manager.borrow().as_ref().unwrap().add_teardown_task(async move {
+                tracing::info!(%container_id, "Stopping container");
+                docker
+                    .stop_container(&container_id, None)
+                    .await
+                    .expect("Error stopping container.");
+                tracing::info!(%container_id, "Removing container");
+                docker
+                    .remove_container(&container_id, None)
+                    .await
+                    .expect("Error removing container.");
+                Ok(())
+            })
+        });
     }
 }
 

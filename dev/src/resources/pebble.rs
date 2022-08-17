@@ -1,5 +1,5 @@
-use super::{certs::Certificates, tempdir::TemporaryDirectory};
-use crate::{container::{ContainerResource, ContainerSpec}, util::wait_for_url};
+use super::{certs::Certificates};
+use crate::{container::{ContainerResource, ContainerSpec}, util::wait_for_url, scratch_dir};
 use anyhow::{Context, Result};
 use reqwest::Client;
 use serde_json::json;
@@ -7,7 +7,6 @@ use serde_json::json;
 pub struct PebbleService {
     container: ContainerResource,
     certs: Certificates,
-    config_dir: TemporaryDirectory,
 }
 
 impl PebbleService {
@@ -21,20 +20,21 @@ impl PebbleService {
 
         Ok(reqwest::Client::builder()
             .add_root_certificate(cert)
+            .danger_accept_invalid_hostnames(true)
             .build()?)
     }
 }
 
 pub async fn pebble() -> Result<PebbleService> {
-    let certs = Certificates::new(vec!["localhost".to_string()])?;
-    let config_dir = TemporaryDirectory::new()?;
+    let certs = Certificates::new("pebble-certs", vec!["localhost".to_string()])?;
+    let config_dir = scratch_dir("pebble-config");
 
     let pebble_config = json!({
         "pebble": {
             "listenAddress": "0.0.0.0:443",
             "managementListenAddress": "0.0.0.0:15000",
-            "certificate": "/etc/auth/local-cert.pem",
-            "privateKey": "/etc/auth/local-cert.key",
+            "certificate": "/etc/auth/selfsigned.pem",
+            "privateKey": "/etc/auth/selfsigned.key",
             "httpPort": 5002,
             "tlsPort": 5001,
             "ocspResponderURL": "",
@@ -42,8 +42,8 @@ pub async fn pebble() -> Result<PebbleService> {
     });
 
     std::fs::write(
-        config_dir.path.join("config.json"),
-        serde_json::to_string(&pebble_config)?,
+        config_dir.join("config.json"),
+        serde_json::to_string_pretty(&pebble_config)?,
     )?;
 
     let spec = ContainerSpec {
@@ -58,7 +58,7 @@ pub async fn pebble() -> Result<PebbleService> {
             "/etc/pebble/config.json".into(),
         ],
         volumes: vec![
-            (config_dir.path(), "/etc/pebble".into()),
+            (config_dir.to_str().unwrap().into(), "/etc/pebble".into()),
             (certs.path(), "/etc/auth".into()),
         ],
     };
@@ -66,7 +66,6 @@ pub async fn pebble() -> Result<PebbleService> {
     let pebble = PebbleService {
         container: ContainerResource::new(&spec).await?,
         certs,
-        config_dir,
     };
 
     wait_for_url(&pebble.directory_url(), 5_000).await?;

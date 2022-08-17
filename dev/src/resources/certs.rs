@@ -1,37 +1,37 @@
-use std::{path::PathBuf, fs};
+use std::{path::PathBuf, fs::{self, create_dir_all}};
 use anyhow::Result;
 use rcgen::generate_simple_self_signed;
-use super::tempdir::TemporaryDirectory;
+
+use crate::scratch_dir;
 
 pub struct Certificates {
-    key_path: PathBuf,
-    cert_path: PathBuf,
     pub key_pem: String,
     pub cert_pem: String,
-    tmpdir: TemporaryDirectory,
+    path: PathBuf,
 }
 
 impl Certificates {
-    pub fn new(subject_alt_names: Vec<String>) -> Result<Certificates> {
-        let tmpdir = TemporaryDirectory::new()?;
+    pub fn new(name: &str, subject_alt_names: Vec<String>) -> Result<Certificates> {
+        let path = scratch_dir(name);
+        create_dir_all(&path)?;
 
-        let key_path = tmpdir.path.join("selfsigned.key");
-        let cert_path = tmpdir.path.join("selfsigned.pem");
+        let key_path = path.join("selfsigned.key");
+        let cert_path = path.join("selfsigned.pem");
 
         let cert = generate_simple_self_signed(subject_alt_names)?;
 
         let key_pem = cert.serialize_private_key_pem();
         let cert_pem = cert.serialize_pem()?;
 
-        fs::write(&cert_path, &key_pem)?;
-        fs::write(&key_path, &cert_pem)?;
+        fs::write(&cert_path, &cert_pem)?;
+        fs::write(&key_path, &key_pem)?;
 
         Ok(Certificates {
-            key_path, cert_path, tmpdir, key_pem, cert_pem
+            key_pem, cert_pem, path
         })
     }
 
     pub fn path(&self) -> String {
-        self.tmpdir.path.to_str().unwrap().to_owned()
+        self.path.to_str().unwrap().to_owned()
     }
 }

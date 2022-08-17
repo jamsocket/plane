@@ -9,23 +9,23 @@ fn integration_test_impl(item: proc_macro2::TokenStream) -> proc_macro2::TokenSt
     let mut sig = func.sig.clone();
     sig.asyncness = None;
     let block = func.block;
+    let name = func.sig.ident.to_string();
 
     quote! {
         #[test]
         #sig {
             tracing_subscriber::fmt().init();
+            dev::TEST_CONTEXT.with(|cell| cell.replace(Some(dev::TestContext::new(#name))));
 
-            let result = tokio::runtime::Runtime::new()?.block_on(async move {
+            let result = tokio::runtime::Runtime::new().unwrap().block_on(async move {
                 #block
             });
 
-            dev::TEARDOWN_TASK_MANAGER.with(|manager| {
-                tokio::runtime::Runtime::new()?.block_on(async {
-                    manager.teardown().await;
-                });
-
-                Ok::<(), anyhow::Error>(())
-            })?;
+            dev::TEST_CONTEXT.with(|cell|
+                tokio::runtime::Runtime::new().unwrap().block_on(async {
+                    cell.borrow().as_ref().unwrap().teardown().await;
+                })
+            );
 
             result
         }
