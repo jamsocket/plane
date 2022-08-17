@@ -20,7 +20,7 @@ pub struct Nats {
 }
 
 impl Nats {
-    fn connection_string(&self) -> String {
+    pub fn connection_string(&self) -> String {
         format!("nats://{}@{}", NATS_TOKEN, self.container.ip)
     }
 

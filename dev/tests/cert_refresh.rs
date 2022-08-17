@@ -40,7 +40,7 @@ impl DummyDnsHandler {
 }
 
 #[integration_test]
-async fn test_cert_refresh() -> Result<()> {
+async fn cert_refresh() -> Result<()> {
     let nats = Nats::new().await?;
     let pebble = Pebble::new().await?;
     let conn = nats.connection().await?;
@@ -69,7 +69,7 @@ async fn test_cert_refresh() -> Result<()> {
 }
 
 #[integration_test]
-async fn test_cert_refresh_eab() -> Result<()> {
+async fn cert_refresh_eab() -> Result<()> {
     let eab_keypair = EabKeypair::new(
         "kid-1",
         "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",

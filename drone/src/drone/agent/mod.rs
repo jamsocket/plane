@@ -33,7 +33,7 @@ impl Default for DockerApiTransport {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Default)]
 pub struct DockerOptions {
     pub transport: DockerApiTransport,
     pub runtime: Option<String>,
@@ -65,7 +65,7 @@ pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
     Ok(())
 }
 
-pub async fn listen_for_spawn_requests(
+async fn listen_for_spawn_requests(
     drone_id: DroneId,
     docker: DockerInterface,
     nats: TypedNats,

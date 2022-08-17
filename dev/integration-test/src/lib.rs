@@ -14,37 +14,9 @@ fn integration_test_impl(item: proc_macro2::TokenStream) -> proc_macro2::TokenSt
     quote! {
         #[test]
         #sig {
-            let context = dev::TestContext::new(#name);
-            dev::TEST_CONTEXT.with(|cell| cell.replace(Some(context)));
-            let scratch_dir = dev::scratch_dir("logs");
-
-            let file_appender = tracing_appender::rolling::RollingFileAppender::new(
-                tracing_appender::rolling::Rotation::NEVER, scratch_dir, "test-log.txt");
-            
-            let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-
-            let subscriber = tracing_subscriber::fmt()
-                .compact()
-                .with_ansi(false)
-                .with_writer(non_blocking)
-                .finish();
-            
-            let dispatcher = tracing::dispatcher::Dispatch::new(subscriber);
-            let _guard = tracing::dispatcher::set_default(&dispatcher);
-
-            let result = tokio::runtime::Runtime::new().unwrap().block_on(async move {
+            dev::run_test(#name, async move {
                 #block
-            });
-
-            if result.is_ok() {
-                dev::TEST_CONTEXT.with(|cell|
-                    tokio::runtime::Runtime::new().unwrap().block_on(async {
-                        cell.borrow().as_ref().unwrap().teardown().await;
-                    })
-                );    
-            }
-
-            result
+            })
         }
     }
 }
