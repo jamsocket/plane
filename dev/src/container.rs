@@ -1,13 +1,13 @@
-use crate::{TEST_CONTEXT, scratch_dir};
+use crate::{scratch_dir, TEST_CONTEXT};
 use anyhow::Result;
 use bollard::{
-    container::{Config, StartContainerOptions, LogsOptions},
+    container::{Config, LogsOptions, StartContainerOptions},
     image::CreateImageOptions,
     models::HostConfig,
     Docker,
 };
+use std::{collections::HashMap, fmt::Display, fs::File, io::Write, net::Ipv4Addr, ops::Deref};
 use tokio::task::JoinHandle;
-use std::{collections::HashMap, fmt::Display, net::Ipv4Addr, ops::Deref, fs::File, io::Write};
 use tokio_stream::StreamExt;
 
 #[derive(Clone)]
@@ -115,13 +115,16 @@ impl ContainerResource {
 
         tracing::info!(%container_id, %ip, "Container started.");
 
-        let mut log_stream = docker.logs(&container_id, Some(LogsOptions::<&str> {
-            follow: true,
-            stderr: true,
-            stdout: true,
-            timestamps: true,
-            ..LogsOptions::default()
-        }));
+        let mut log_stream = docker.logs(
+            &container_id,
+            Some(LogsOptions::<&str> {
+                follow: true,
+                stderr: true,
+                stdout: true,
+                timestamps: true,
+                ..LogsOptions::default()
+            }),
+        );
 
         let mut log_file = File::create(scratch_dir("logs").join(format!("{}.txt", spec.name)))?;
 

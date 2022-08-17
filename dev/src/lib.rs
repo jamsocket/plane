@@ -1,10 +1,11 @@
 use std::{
     cell::RefCell,
+    env::current_dir,
     fs::{create_dir_all, remove_dir_all},
     future::Future,
     path::PathBuf,
     pin::Pin,
-    sync::mpsc::{channel, Receiver, Sender}, env::current_dir,
+    sync::mpsc::{channel, Receiver, Sender},
 };
 
 pub mod container;
@@ -49,7 +50,9 @@ impl TestContext {
     }
 
     pub fn scratch_dir(&self) -> PathBuf {
-        current_dir().unwrap().join("test-scratch")
+        current_dir()
+            .unwrap()
+            .join("test-scratch")
             .join(&self.test_name)
     }
 

@@ -53,11 +53,7 @@ pub async fn wait_for_url(url: &str, timeout_ms: u128) -> Result<()> {
         .danger_accept_invalid_hostnames(true)
         .build()?;
     loop {
-        let result = client
-            .get(url)
-            .timeout(Duration::from_secs(1))
-            .send()
-            .await;
+        let result = client.get(url).timeout(Duration::from_secs(1)).send().await;
 
         match result {
             Ok(_) => return Ok(()),

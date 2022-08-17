@@ -521,6 +521,7 @@ dependencies = [
  "anyhow",
  "async-nats",
  "bollard",
+ "chrono",
  "dis-spawner",
  "dis-spawner-drone",
  "integration-test",

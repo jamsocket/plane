@@ -19,3 +19,4 @@ reqwest = { version = "0.11.11", features=["native-tls"] }
 openssl = "0.10.41"
 tracing-appender = "0.2.2"
 async-nats = "0.18.0"
+chrono = "0.4.22"
