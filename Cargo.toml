@@ -1,8 +1,9 @@
 [workspace]
 members = [
-    "drone",
+    "controller",
     "core",
     "dev",
     "dev/integration-test",
     "dev/test-server",
+    "drone",
 ]
