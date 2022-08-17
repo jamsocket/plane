@@ -523,6 +523,7 @@ dependencies = [
  "dis-spawner",
  "dis-spawner-drone",
  "integration-test",
+ "openssl",
  "rcgen",
  "reqwest",
  "serde_json",
