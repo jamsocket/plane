@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::certs::Certificates;
 use crate::{
     container::{ContainerResource, ContainerSpec},
@@ -5,15 +7,16 @@ use crate::{
     util::wait_for_url,
 };
 use anyhow::{Context, Result};
+use dis_spawner_drone::drone::cli::EabKeypair;
 use reqwest::Client;
 use serde_json::json;
 
-pub struct PebbleService {
+pub struct Pebble {
     container: ContainerResource,
     certs: Certificates,
 }
 
-impl PebbleService {
+impl Pebble {
     pub fn directory_url(&self) -> String {
         format!("https://{}/dir", self.container.ip)
     }
@@ -27,52 +30,68 @@ impl PebbleService {
             .danger_accept_invalid_hostnames(true)
             .build()?)
     }
-}
 
-pub async fn pebble() -> Result<PebbleService> {
-    let certs = Certificates::new("pebble-certs", vec!["localhost".to_string()])?;
-    let config_dir = scratch_dir("pebble-config");
+    pub async fn new() -> Result<Pebble> {
+        Self::new_impl(None).await
+    }
 
-    let pebble_config = json!({
-        "pebble": {
-            "listenAddress": "0.0.0.0:443",
-            "managementListenAddress": "0.0.0.0:15000",
-            "certificate": "/etc/auth/selfsigned.pem",
-            "privateKey": "/etc/auth/selfsigned.key",
-            "httpPort": 5002,
-            "tlsPort": 5001,
-            "ocspResponderURL": "",
-        }
-    });
+    pub async fn new_eab(eab_keypair: &EabKeypair) -> Result<Pebble> {
+        Self::new_impl(Some(eab_keypair)).await
+    }
 
-    std::fs::write(
-        config_dir.join("config.json"),
-        serde_json::to_string_pretty(&pebble_config)?,
-    )?;
+    async fn new_impl(eab_keypair: Option<&EabKeypair>) -> Result<Pebble> {
+        let certs = Certificates::new("pebble-certs", vec!["localhost".to_string()])?;
+        let config_dir = scratch_dir("pebble-config");
 
-    let spec = ContainerSpec {
-        name: "pebble".into(),
-        image: "docker.io/letsencrypt/pebble:latest".into(),
-        environment: vec![("PEBBLE_VA_ALWAYS_VALID".into(), "1".into())]
-            .into_iter()
-            .collect(),
-        command: vec![
-            "/usr/bin/pebble".into(),
-            "-config".into(),
-            "/etc/pebble/config.json".into(),
-        ],
-        volumes: vec![
-            (config_dir.to_str().unwrap().into(), "/etc/pebble".into()),
-            (certs.path(), "/etc/auth".into()),
-        ],
-    };
+        let external_account_mac_keys: HashMap<String, String> = eab_keypair
+            .iter()
+            .map(|keypair| (keypair.eab_kid.clone(), keypair.eab_key_b64()))
+            .collect();
+        let external_account_binding_required = !external_account_mac_keys.is_empty();
 
-    let pebble = PebbleService {
-        container: ContainerResource::new(&spec).await?,
-        certs,
-    };
+        let pebble_config = json!({
+            "pebble": {
+                "listenAddress": "0.0.0.0:443",
+                "managementListenAddress": "0.0.0.0:15000",
+                "certificate": "/etc/auth/selfsigned.pem",
+                "privateKey": "/etc/auth/selfsigned.key",
+                "httpPort": 5002,
+                "tlsPort": 5001,
+                "ocspResponderURL": "",
+                "externalAccountMacKeys": external_account_mac_keys,
+                "externalAccountBindingRequired": external_account_binding_required,
+            }
+        });
 
-    wait_for_url(&pebble.directory_url(), 5_000).await?;
+        std::fs::write(
+            config_dir.join("config.json"),
+            serde_json::to_string_pretty(&pebble_config)?,
+        )?;
 
-    Ok(pebble)
+        let spec = ContainerSpec {
+            name: "pebble".into(),
+            image: "docker.io/letsencrypt/pebble:latest".into(),
+            environment: vec![("PEBBLE_VA_ALWAYS_VALID".into(), "1".into())]
+                .into_iter()
+                .collect(),
+            command: vec![
+                "/usr/bin/pebble".into(),
+                "-config".into(),
+                "/etc/pebble/config.json".into(),
+            ],
+            volumes: vec![
+                (config_dir.to_str().unwrap().into(), "/etc/pebble".into()),
+                (certs.path(), "/etc/auth".into()),
+            ],
+        };
+
+        let pebble = Pebble {
+            container: ContainerResource::new(&spec).await?,
+            certs,
+        };
+
+        wait_for_url(&pebble.directory_url(), 5_000).await?;
+
+        Ok(pebble)
+    }
 }

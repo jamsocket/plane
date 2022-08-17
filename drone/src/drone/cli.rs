@@ -93,6 +93,21 @@ pub struct EabKeypair {
     pub eab_key: Vec<u8>,
 }
 
+impl EabKeypair {
+    pub fn new(eab_kid: &str, eab_key_b64: &str) -> Result<EabKeypair> {
+        let eab_key = base64::decode_config(&eab_key_b64, base64::URL_SAFE)?;
+
+        Ok(EabKeypair {
+            eab_key,
+            eab_kid: eab_kid.to_string(),
+        })
+    }
+
+    pub fn eab_key_b64(&self) -> String {
+        base64::encode_config(&self.eab_key, base64::URL_SAFE)
+    }
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// Migrate the database, and then exit.
@@ -203,15 +218,13 @@ impl From<Opts> for DronePlan {
 
         let acme_eab_keypair = match (opts.acme_eab_key, opts.acme_eab_kid) {
             (Some(eab_key), Some(eab_kid)) => {
-                let eab_key = base64::decode_config(&eab_key, base64::URL_SAFE)
-                    .expect("Couldn't decode --acme-eab-key value as (url-encodable) base64.");
-                
-                Some(EabKeypair {
-                    eab_key, eab_kid
-                })
-            },
+                Some(EabKeypair::new(&eab_kid, &eab_key)
+                    .expect("Couldn't decode --acme-eab-key value as (url-encodable) base64."))
+            }
             (None, None) => None,
-            _ => panic!("If one of --acme-eab-key or --acme-eab-kid is provided, the other must be too."),
+            _ => panic!(
+                "If one of --acme-eab-key or --acme-eab-kid is provided, the other must be too."
+            ),
         };
 
         match opts.command.unwrap_or_default() {

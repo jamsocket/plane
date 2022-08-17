@@ -14,18 +14,30 @@ fn integration_test_impl(item: proc_macro2::TokenStream) -> proc_macro2::TokenSt
     quote! {
         #[test]
         #sig {
-            tracing_subscriber::fmt().init();
-            dev::TEST_CONTEXT.with(|cell| cell.replace(Some(dev::TestContext::new(#name))));
+            let context = dev::TestContext::new(#name);
+            let scratch_dir = context.scratch_dir();
+            dev::TEST_CONTEXT.with(|cell| cell.replace(Some(context)));
+
+            let file_appender = tracing_appender::rolling::RollingFileAppender::new(
+                tracing_appender::rolling::Rotation::NEVER, scratch_dir, "log.txt");
+            
+            let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+            let subscriber = tracing_subscriber::fmt().with_writer(non_blocking).finish();
+            let dispatcher = tracing::dispatcher::Dispatch::new(subscriber);
+            let _guard = tracing::dispatcher::set_default(&dispatcher);
 
             let result = tokio::runtime::Runtime::new().unwrap().block_on(async move {
                 #block
             });
 
-            dev::TEST_CONTEXT.with(|cell|
-                tokio::runtime::Runtime::new().unwrap().block_on(async {
-                    cell.borrow().as_ref().unwrap().teardown().await;
-                })
-            );
+            if result.is_ok() {
+                dev::TEST_CONTEXT.with(|cell|
+                    tokio::runtime::Runtime::new().unwrap().block_on(async {
+                        cell.borrow().as_ref().unwrap().teardown().await;
+                    })
+                );    
+            }
 
             result
         }

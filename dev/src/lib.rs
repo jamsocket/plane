@@ -24,15 +24,6 @@ pub struct TestContext {
     teardown_receiver: Receiver<BoxedFuture>,
 }
 
-impl TestContext {
-    pub fn scratch_dir(&self) -> PathBuf {
-        PathBuf::from("test-scratch")
-            .canonicalize()
-            .unwrap()
-            .join(&self.test_name)
-    }
-}
-
 pub fn scratch_dir(name: &str) -> PathBuf {
     let scratch_dir = TEST_CONTEXT.with(|d| d.borrow().as_ref().unwrap().scratch_dir());
     let scratch_dir = scratch_dir.join(name);
@@ -51,10 +42,17 @@ impl TestContext {
             test_name: test_name.into(),
         };
 
-        remove_dir_all(context.scratch_dir()).unwrap();
+        let _ = remove_dir_all(context.scratch_dir());
         create_dir_all(context.scratch_dir()).unwrap();
 
         context
+    }
+
+    pub fn scratch_dir(&self) -> PathBuf {
+        PathBuf::from("test-scratch")
+            .canonicalize()
+            .unwrap()
+            .join(&self.test_name)
     }
 
     pub fn add_teardown_task<T>(&self, task: T)
