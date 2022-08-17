@@ -23,7 +23,12 @@ fn integration_test_impl(item: proc_macro2::TokenStream) -> proc_macro2::TokenSt
             
             let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-            let subscriber = tracing_subscriber::fmt().with_writer(non_blocking).finish();
+            let subscriber = tracing_subscriber::fmt()
+                .compact()
+                .with_ansi(false)
+                .with_writer(non_blocking)
+                .finish();
+            
             let dispatcher = tracing::dispatcher::Dispatch::new(subscriber);
             let _guard = tracing::dispatcher::set_default(&dispatcher);
 
