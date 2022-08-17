@@ -4,7 +4,7 @@ use std::{
     future::Future,
     path::PathBuf,
     pin::Pin,
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::mpsc::{channel, Receiver, Sender}, env::current_dir,
 };
 
 pub mod container;
@@ -49,9 +49,7 @@ impl TestContext {
     }
 
     pub fn scratch_dir(&self) -> PathBuf {
-        PathBuf::from("test-scratch")
-            .canonicalize()
-            .unwrap()
+        current_dir().unwrap().join("test-scratch")
             .join(&self.test_name)
     }
 

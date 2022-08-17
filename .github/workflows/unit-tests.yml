@@ -1,4 +1,4 @@
-name: Unit Tests
+name: Tests
 
 on:
   push:
@@ -20,3 +20,8 @@ jobs:
         cache-on-failure: true
     - name: Run tests
       run: cargo test --verbose
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: test-data
+        path: dev/test-scratch
