@@ -15,7 +15,7 @@ pub struct ContainerSpec {
     pub image: String,
     pub environment: HashMap<String, String>,
     pub command: Vec<String>,
-    pub volumes: Vec<String>,
+    pub volumes: Vec<(String, String)>,
 }
 
 impl ContainerSpec {
@@ -30,7 +30,7 @@ impl ContainerSpec {
         let volumes: HashMap<String, HashMap<(), ()>> = self
             .volumes
             .iter()
-            .map(|v| (v.clone(), HashMap::new()))
+            .map(|(s, d)| (format!("{}:{}", s, d), HashMap::new()))
             .collect();
 
         Config {
@@ -45,11 +45,18 @@ impl ContainerSpec {
 }
 
 #[derive(Clone)]
-pub struct ContainerId(String);
+pub struct ContainerId {
+    name: String,
+    hint: String,
+}
 
 impl ContainerId {
+    pub fn new(name: String, hint: String) -> ContainerId {
+        ContainerId { name, hint }
+    }
+
     pub fn short_name(&self) -> String {
-        self.0.chars().take(12).collect()
+        self.name.chars().take(12).collect()
     }
 }
 
@@ -57,13 +64,13 @@ impl Deref for ContainerId {
     type Target = str;
 
     fn deref(&self) -> &str {
-        &self.0
+        &self.name
     }
 }
 
 impl Display for ContainerId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.short_name())
+        write!(f, "{} ({})", self.short_name(), self.hint)
     }
 }
 
@@ -84,7 +91,7 @@ impl ContainerResource {
         let result = docker
             .create_container::<String, String>(None, spec.as_config())
             .await?;
-        let container_id = ContainerId(result.id);
+        let container_id = ContainerId::new(result.id, spec.name.clone());
 
         tracing::info!(%container_id, "Starting container.");
         {

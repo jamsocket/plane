@@ -1,10 +1,11 @@
 use anyhow::Result;
-use dev::{system::nats, TEARDOWN_TASK_MANAGER};
+use dev::{resources::{nats::nats, pebble::pebble}};
 use integration_test::integration_test;
 
 #[integration_test]
 async fn test_cert_refresh_inner() -> Result<()> {
-    let _c = nats().await?;
+    let nats = nats().await?;
+    let pebble = pebble().await?;
 
-    Ok(()) as anyhow::Result<_>
+    Ok(())
 }

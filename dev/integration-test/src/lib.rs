@@ -19,7 +19,7 @@ fn integration_test_impl(item: proc_macro2::TokenStream) -> proc_macro2::TokenSt
                 #block
             });
 
-            TEARDOWN_TASK_MANAGER.with(|manager| {
+            dev::TEARDOWN_TASK_MANAGER.with(|manager| {
                 tokio::runtime::Runtime::new()?.block_on(async {
                     manager.teardown().await;
                 });
