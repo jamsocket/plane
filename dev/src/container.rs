@@ -1,12 +1,13 @@
-use crate::TEST_CONTEXT;
+use crate::{TEST_CONTEXT, scratch_dir};
 use anyhow::Result;
 use bollard::{
-    container::{Config, StartContainerOptions},
+    container::{Config, StartContainerOptions, LogsOptions},
     image::CreateImageOptions,
     models::HostConfig,
     Docker,
 };
-use std::{collections::HashMap, fmt::Display, net::Ipv4Addr, ops::Deref};
+use tokio::task::JoinHandle;
+use std::{collections::HashMap, fmt::Display, net::Ipv4Addr, ops::Deref, fs::File, io::Write};
 use tokio_stream::StreamExt;
 
 #[derive(Clone)]
@@ -25,13 +26,6 @@ impl ContainerSpec {
             .iter()
             .map(|(k, v)| format!("{}={}", k, v))
             .collect();
-
-        // This is ugly but it's really the API.
-        // let volumes: HashMap<String, HashMap<(), ()>> = self
-        //     .volumes
-        //     .iter()
-        //     .map(|(s, d)| (format!("{}:{}", s, d), HashMap::new()))
-        //     .collect();
 
         let volumes: Vec<String> = self
             .volumes
@@ -87,6 +81,8 @@ pub struct ContainerResource {
     docker: Docker,
     container_id: ContainerId,
     pub ip: Ipv4Addr,
+    #[allow(unused)]
+    log_handle: JoinHandle<()>,
 }
 
 impl ContainerResource {
@@ -119,10 +115,27 @@ impl ContainerResource {
 
         tracing::info!(%container_id, %ip, "Container started.");
 
+        let mut log_stream = docker.logs(&container_id, Some(LogsOptions::<&str> {
+            follow: true,
+            stderr: true,
+            stdout: true,
+            timestamps: true,
+            ..LogsOptions::default()
+        }));
+
+        let mut log_file = File::create(scratch_dir("logs").join(format!("{}.txt", spec.name)))?;
+
+        let log_handle = tokio::spawn(async move {
+            while let Some(Ok(v)) = log_stream.next().await {
+                log_file.write_all(&v.into_bytes()).unwrap();
+            }
+        });
+
         Ok(ContainerResource {
             docker,
             container_id,
             ip,
+            log_handle,
         })
     }
 }
