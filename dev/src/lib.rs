@@ -22,7 +22,7 @@ impl TeardownTaskManager {
     }
 
     pub fn add_task<T>(&self, task: T) where T: Future<Output=Result<(), anyhow::Error>> + 'static {
-        self.sender.send(Box::pin(task));
+        self.sender.send(Box::pin(task)).unwrap();
     }
 
     pub async fn teardown(&self) {
