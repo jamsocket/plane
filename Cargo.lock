@@ -519,6 +519,7 @@ name = "dev"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-nats",
  "bollard",
  "dis-spawner",
  "dis-spawner-drone",

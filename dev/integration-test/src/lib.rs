@@ -15,11 +15,11 @@ fn integration_test_impl(item: proc_macro2::TokenStream) -> proc_macro2::TokenSt
         #[test]
         #sig {
             let context = dev::TestContext::new(#name);
-            let scratch_dir = context.scratch_dir();
             dev::TEST_CONTEXT.with(|cell| cell.replace(Some(context)));
+            let scratch_dir = dev::scratch_dir("logs");
 
             let file_appender = tracing_appender::rolling::RollingFileAppender::new(
-                tracing_appender::rolling::Rotation::NEVER, scratch_dir, "log.txt");
+                tracing_appender::rolling::Rotation::NEVER, scratch_dir, "test-log.txt");
             
             let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
