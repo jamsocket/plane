@@ -6,6 +6,8 @@ use super::tempdir::TemporaryDirectory;
 pub struct Certificates {
     key_path: PathBuf,
     cert_path: PathBuf,
+    pub key_pem: String,
+    pub cert_pem: String,
     tmpdir: TemporaryDirectory,
 }
 
@@ -18,11 +20,14 @@ impl Certificates {
 
         let cert = generate_simple_self_signed(subject_alt_names)?;
 
-        fs::write(&cert_path, cert.serialize_pem()?)?;
-        fs::write(&key_path, cert.serialize_private_key_pem())?;
+        let key_pem = cert.serialize_private_key_pem();
+        let cert_pem = cert.serialize_pem()?;
+
+        fs::write(&cert_path, &key_pem)?;
+        fs::write(&key_path, &cert_pem)?;
 
         Ok(Certificates {
-            key_path, cert_path, tmpdir
+            key_path, cert_path, tmpdir, key_pem, cert_pem
         })
     }
 

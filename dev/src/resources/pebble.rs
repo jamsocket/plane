@@ -1,6 +1,7 @@
 use super::{certs::Certificates, tempdir::TemporaryDirectory};
-use crate::container::{ContainerResource, ContainerSpec};
-use anyhow::Result;
+use crate::{container::{ContainerResource, ContainerSpec}, util::wait_for_url};
+use anyhow::{Context, Result};
+use reqwest::Client;
 use serde_json::json;
 
 pub struct PebbleService {
@@ -11,7 +12,16 @@ pub struct PebbleService {
 
 impl PebbleService {
     pub fn directory_url(&self) -> String {
-        todo!()
+        format!("https://{}/dir", self.container.ip)
+    }
+
+    pub fn client(&self) -> Result<Client> {
+        let cert = reqwest::Certificate::from_pem(&self.certs.cert_pem.as_bytes())
+            .context("Parsing certificate")?;
+
+        Ok(reqwest::Client::builder()
+            .add_root_certificate(cert)
+            .build()?)
     }
 }
 
@@ -53,9 +63,13 @@ pub async fn pebble() -> Result<PebbleService> {
         ],
     };
 
-    Ok(PebbleService {
+    let pebble = PebbleService {
         container: ContainerResource::new(&spec).await?,
         certs,
         config_dir,
-    })
+    };
+
+    wait_for_url(&pebble.directory_url(), 5_000).await?;
+
+    Ok(pebble)
 }

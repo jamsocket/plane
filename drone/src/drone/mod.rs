@@ -12,10 +12,10 @@ use futures::{future::select_all, Future};
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::{pin::Pin, thread};
 
-mod agent;
-mod cert;
+pub mod agent;
+pub mod cert;
 pub mod cli;
-mod proxy;
+pub mod proxy;
 
 async fn main() -> Result<()> {
     let mut tracing_handle = TracingHandle::init()?;

@@ -1,5 +1,7 @@
 use crate::container::{ContainerResource, ContainerSpec};
 use anyhow::Result;
+use dis_spawner::nats::TypedNats;
+use dis_spawner::nats_connection::NatsConnection;
 use std::collections::HashMap;
 
 const NATS_TOKEN: &str = "mytoken";
@@ -9,8 +11,13 @@ pub struct NatsService {
 }
 
 impl NatsService {
-    pub fn connection_string(&self) -> String {
+    fn connection_string(&self) -> String {
         format!("nats://{}@{}", NATS_TOKEN, self.container.ip)
+    }
+
+    pub async fn connection(&self) -> Result<TypedNats> {
+        let nc = NatsConnection::new(self.connection_string())?;
+        Ok(nc.connection().await?)
     }
 }
 

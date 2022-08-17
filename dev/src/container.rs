@@ -6,7 +6,6 @@ use bollard::{
 };
 use std::{collections::HashMap, net::IpAddr, fmt::Display, ops::Deref};
 use tokio_stream::StreamExt;
-
 use crate::TEARDOWN_TASK_MANAGER;
 
 #[derive(Clone)]
@@ -123,21 +122,21 @@ impl Drop for ContainerResource {
         let docker = self.docker.clone();
         let container_id = self.container_id.clone();
 
-        TEARDOWN_TASK_MANAGER.with(|manager| {
-            manager.add_task(async move {
-                tracing::info!(%container_id, "Stopping container");
-                docker
-                    .stop_container(&container_id, None)
-                    .await
-                    .expect("Error stopping container.");
-                tracing::info!(%container_id, "Removing container");
-                docker
-                    .remove_container(&container_id, None)
-                    .await
-                    .expect("Error removing container.");
-                Ok(())
-            })
-        });
+        // TEARDOWN_TASK_MANAGER.with(|manager| {
+        //     manager.add_task(async move {
+        //         tracing::info!(%container_id, "Stopping container");
+        //         docker
+        //             .stop_container(&container_id, None)
+        //             .await
+        //             .expect("Error stopping container.");
+        //         tracing::info!(%container_id, "Removing container");
+        //         docker
+        //             .remove_container(&container_id, None)
+        //             .await
+        //             .expect("Error removing container.");
+        //         Ok(())
+        //     })
+        // });
     }
 }
 
