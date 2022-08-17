@@ -1,6 +1,9 @@
-use std::{path::PathBuf, fs::{self, create_dir_all}};
 use anyhow::Result;
 use rcgen::generate_simple_self_signed;
+use std::{
+    fs::{self, create_dir_all},
+    path::PathBuf,
+};
 
 use crate::scratch_dir;
 
@@ -27,7 +30,9 @@ impl Certificates {
         fs::write(&key_path, &key_pem)?;
 
         Ok(Certificates {
-            key_pem, cert_pem, path
+            key_pem,
+            cert_pem,
+            path,
         })
     }
 

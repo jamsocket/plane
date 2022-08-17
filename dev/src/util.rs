@@ -1,22 +1,24 @@
-use std::{time::Duration, net::{IpAddr, SocketAddr, SocketAddrV4, Ipv4Addr}};
 use anyhow::{anyhow, Result};
-use rand::{distributions::Alphanumeric, Rng};
-use tokio::net::TcpSocket;
 use std::time::SystemTime;
+use std::{
+    net::{SocketAddr, SocketAddrV4},
+    time::Duration,
+};
+use tokio::net::TcpSocket;
 
 const POLL_LOOP_SLEEP: u64 = 10;
 
-pub fn random_string(len: usize) -> String {
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(len)
-        .map(char::from)
-        .collect()
-}
+// pub fn random_string(len: usize) -> String {
+//     rand::thread_rng()
+//         .sample_iter(&Alphanumeric)
+//         .take(len)
+//         .map(char::from)
+//         .collect()
+// }
 
 pub async fn wait_for_port(addr: SocketAddrV4, timeout_ms: u128) -> Result<()> {
     let initial_time = SystemTime::now();
-    
+
     loop {
         let socket = TcpSocket::new_v4()?;
         let result = socket.connect(SocketAddr::V4(addr)).await;
@@ -51,7 +53,11 @@ pub async fn wait_for_url(url: &str, timeout_ms: u128) -> Result<()> {
         .danger_accept_invalid_hostnames(true)
         .build()?;
     loop {
-        let result = client.get(url.clone()).timeout(Duration::from_secs(1)).send().await;
+        let result = client
+            .get(url.clone())
+            .timeout(Duration::from_secs(1))
+            .send()
+            .await;
 
         match result {
             Ok(_) => return Ok(()),

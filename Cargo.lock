@@ -523,7 +523,6 @@ dependencies = [
  "dis-spawner",
  "dis-spawner-drone",
  "integration-test",
- "rand",
  "rcgen",
  "reqwest",
  "serde_json",

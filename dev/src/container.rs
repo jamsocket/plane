@@ -1,13 +1,13 @@
+use crate::TEST_CONTEXT;
 use anyhow::Result;
 use bollard::{
     container::{Config, StartContainerOptions},
     image::CreateImageOptions,
-    Docker, models::HostConfig,
+    models::HostConfig,
+    Docker,
 };
-use std::{collections::HashMap, net::{IpAddr, Ipv4Addr}, fmt::Display, ops::Deref};
+use std::{collections::HashMap, fmt::Display, net::Ipv4Addr, ops::Deref};
 use tokio_stream::StreamExt;
-
-use crate::TEST_CONTEXT;
 
 #[derive(Clone)]
 pub struct ContainerSpec {
@@ -33,7 +33,11 @@ impl ContainerSpec {
         //     .map(|(s, d)| (format!("{}:{}", s, d), HashMap::new()))
         //     .collect();
 
-        let volumes: Vec<String> = self.volumes.iter().map(|(s, d)| format!("{}:{}", s, d)).collect();
+        let volumes: Vec<String> = self
+            .volumes
+            .iter()
+            .map(|(s, d)| format!("{}:{}", s, d))
+            .collect();
 
         Config {
             hostname: Some(self.name.to_string()),
@@ -129,19 +133,23 @@ impl Drop for ContainerResource {
         let container_id = self.container_id.clone();
 
         TEST_CONTEXT.with(|manager| {
-            manager.borrow().as_ref().unwrap().add_teardown_task(async move {
-                tracing::info!(%container_id, "Stopping container");
-                docker
-                    .stop_container(&container_id, None)
-                    .await
-                    .expect("Error stopping container.");
-                tracing::info!(%container_id, "Removing container");
-                docker
-                    .remove_container(&container_id, None)
-                    .await
-                    .expect("Error removing container.");
-                Ok(())
-            })
+            manager
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .add_teardown_task(async move {
+                    tracing::info!(%container_id, "Stopping container");
+                    docker
+                        .stop_container(&container_id, None)
+                        .await
+                        .expect("Error stopping container.");
+                    tracing::info!(%container_id, "Removing container");
+                    docker
+                        .remove_container(&container_id, None)
+                        .await
+                        .expect("Error removing container.");
+                    Ok(())
+                })
         });
     }
 }

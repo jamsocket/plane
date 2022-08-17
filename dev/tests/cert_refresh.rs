@@ -1,7 +1,8 @@
-use std::{future::Future, time::Duration};
-
 use anyhow::Result;
-use dev::{resources::{nats::nats, pebble::pebble}, timeout::{timeout, spawn_timeout}};
+use dev::{
+    resources::{nats::nats, pebble::pebble},
+    timeout::{spawn_timeout, timeout},
+};
 use dis_spawner::messages::cert::SetAcmeDnsRecord;
 use integration_test::integration_test;
 
@@ -19,7 +20,9 @@ async fn test_cert_refresh() -> Result<()> {
         Ok(())
     });
 
-    let result = timeout(60_000, "Getting certificate",
+    let (_, cert) = timeout(
+        60_000,
+        "Getting certificate",
         dis_spawner_drone::drone::cert::get_certificate(
             "spawner.test",
             &conn,
@@ -27,9 +30,19 @@ async fn test_cert_refresh() -> Result<()> {
             "admin@spawner.test",
             &pebble.client()?,
             None,
-        )).await?;
+        ),
+    )
+    .await?;
 
     handle.await???;
+
+    let alt_names: Vec<String> = cert
+        .subject_alt_names()
+        .iter()
+        .map(|d| format!("{:?}", d))
+        .collect();
+
+    assert_eq!(vec!["[*.spawner.test]".to_string()], alt_names);
 
     Ok(())
 }

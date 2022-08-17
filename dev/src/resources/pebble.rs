@@ -1,5 +1,9 @@
-use super::{certs::Certificates};
-use crate::{container::{ContainerResource, ContainerSpec}, util::wait_for_url, scratch_dir};
+use super::certs::Certificates;
+use crate::{
+    container::{ContainerResource, ContainerSpec},
+    scratch_dir,
+    util::wait_for_url,
+};
 use anyhow::{Context, Result};
 use reqwest::Client;
 use serde_json::json;

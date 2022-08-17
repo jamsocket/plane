@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    fs::{remove_dir_all, create_dir_all},
+    fs::{create_dir_all, remove_dir_all},
     future::Future,
     path::PathBuf,
     pin::Pin,
@@ -9,8 +9,8 @@ use std::{
 
 pub mod container;
 pub mod resources;
-mod util;
 pub mod timeout;
+mod util;
 
 thread_local! {
     pub static TEST_CONTEXT: RefCell<Option<TestContext>> = RefCell::new(None);
@@ -26,7 +26,10 @@ pub struct TestContext {
 
 impl TestContext {
     pub fn scratch_dir(&self) -> PathBuf {
-        PathBuf::from("test-scratch").canonicalize().unwrap().join(&self.test_name)
+        PathBuf::from("test-scratch")
+            .canonicalize()
+            .unwrap()
+            .join(&self.test_name)
     }
 }
 
