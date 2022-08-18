@@ -133,3 +133,30 @@ async fn simple_backend_proxy() -> Result<()> {
 
     Ok(())
 }
+
+#[integration_test]
+async fn host_header_is_set() -> Result<()> {
+    let proxy = Proxy::new().await?;
+    let server = Server::new(|req| async move {
+        req.headers()
+            .get("host")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned()
+    })
+    .await?;
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await?;
+
+    proxy
+        .db
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .await?;
+
+    let result = proxy.http_get("foobar", "/").await?;
+    assert_eq!("foobar.spawner.test:4040", result.text().await?);
+
+    Ok(())
+}
