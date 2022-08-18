@@ -7,14 +7,15 @@ use dev::{
 };
 use dis_spawner::{
     messages::agent::{
-        BackendState, BackendStateMessage, DroneConnectRequest, DroneConnectResponse,
-        DroneStatusMessage, SpawnRequest, BackendStatsMessage,
+        BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
+        DroneConnectResponse, DroneStatusMessage, SpawnRequest,
     },
     nats::{NoReply, TypedNats, TypedSubscription},
     nats_connection::NatsConnection,
     types::{BackendId, DroneId},
 };
 use dis_spawner_drone::{
+    database::DroneDatabase,
     database_connection::DatabaseConnection,
     drone::{
         agent::{AgentOptions, DockerOptions},
@@ -45,20 +46,23 @@ struct Agent {
     #[allow(unused)]
     agent_guard: LivenessGuard,
     pub ip: Ipv4Addr,
+    pub db: DroneDatabase,
 }
 
 impl Agent {
     pub async fn new(nats: &Nats) -> Result<Agent> {
         let ip = random_loopback_ip();
+        let db_connection = DatabaseConnection::new(
+            scratch_dir("agent")
+                .join("drone.db")
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
+        let db = db_connection.connection().await?;
 
         let agent_opts = AgentOptions {
-            db: DatabaseConnection::new(
-                scratch_dir("agent")
-                    .join("drone.db")
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-            ),
+            db: db_connection,
             nats: NatsConnection::new(nats.connection_string())?,
             cluster_domain: CLUSTER_DOMAIN.into(),
             ip: IpProvider::Literal(IpAddr::V4(ip)),
@@ -68,7 +72,11 @@ impl Agent {
         let agent_guard =
             expect_to_stay_alive(dis_spawner_drone::drone::agent::run_agent(agent_opts));
 
-        Ok(Agent { agent_guard, ip })
+        Ok(Agent {
+            agent_guard,
+            ip,
+            db,
+        })
     }
 }
 
@@ -257,6 +265,15 @@ async fn spawn_with_agent() -> Result<()> {
     state_subscription
         .expect_backend_status_message(BackendState::Ready, 5_000)
         .await?;
+
+    let proxy_route = agent
+        .db
+        .get_proxy_route(request.backend_id.id())
+        .await?
+        .expect("Expected proxy route.");
+    let result = reqwest::get(format!("http://{}/", proxy_route)).await?;
+    assert_eq!("Hello World!", result.text().await?);
+
     state_subscription
         .expect_backend_status_message(BackendState::Swept, 15_000)
         .await?;
@@ -285,14 +302,107 @@ async fn stats_are_acquired() -> Result<()> {
     let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
     controller_mock.spawn_backend(drone_id, &request).await?;
 
-    state_subscription.wait_for_state(BackendState::Ready, 60_000).await?;
+    state_subscription
+        .wait_for_state(BackendState::Ready, 60_000)
+        .await?;
 
-    let mut stats_subscription = nats.subscribe(BackendStatsMessage::subject(&request.backend_id)).await?;
+    let mut stats_subscription = nats
+        .subscribe(BackendStatsMessage::subject(&request.backend_id))
+        .await?;
 
-    let stat = timeout(30_000, "Waiting for stats message.", stats_subscription.next()).await?.unwrap();
+    let stat = timeout(
+        30_000,
+        "Waiting for stats message.",
+        stats_subscription.next(),
+    )
+    .await?
+    .unwrap();
     assert!(stat.value.cpu_use_percent > 0.);
     assert!(stat.value.mem_use_percent > 0.);
 
-    state_subscription.wait_for_state(BackendState::Swept, 60_000).await?;
+    state_subscription
+        .wait_for_state(BackendState::Swept, 60_000)
+        .await?;
+    Ok(())
+}
+
+#[integration_test]
+async fn handle_error_during_start() -> Result<()> {
+    let nats = Nats::new().await?;
+    let agent = Agent::new(&nats).await?;
+    let nats = nats.connection().await?;
+    let mut controller_mock = MockController::new(nats.clone()).await?;
+
+    let drone_id = DroneId::new(345);
+    controller_mock.expect_handshake(drone_id, agent.ip).await?;
+
+    controller_mock
+        .expect_status_message(drone_id, "spawner.test")
+        .await?;
+
+    let mut request = test_image_spawn_request();
+    // Exit with error code 1 after 100ms.
+    request.env.insert("EXIT_CODE".into(), "1".into());
+    request.env.insert("EXIT_TIMEOUT".into(), "100".into());
+
+    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    controller_mock.spawn_backend(drone_id, &request).await?;
+
+    state_subscription
+        .expect_backend_status_message(BackendState::Loading, 5_000)
+        .await?;
+    state_subscription
+        .expect_backend_status_message(BackendState::Starting, 30_000)
+        .await?;
+    state_subscription
+        .expect_backend_status_message(BackendState::ErrorStarting, 5_000)
+        .await?;
+
+    Ok(())
+}
+
+#[integration_test]
+async fn handle_failure_after_ready() -> Result<()> {
+    let nats = Nats::new().await?;
+    let agent = Agent::new(&nats).await?;
+    let nats = nats.connection().await?;
+    let mut controller_mock = MockController::new(nats.clone()).await?;
+
+    let drone_id = DroneId::new(345);
+    controller_mock.expect_handshake(drone_id, agent.ip).await?;
+
+    controller_mock
+        .expect_status_message(drone_id, "spawner.test")
+        .await?;
+
+    let request = test_image_spawn_request();
+
+    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    controller_mock.spawn_backend(drone_id, &request).await?;
+
+    state_subscription
+        .expect_backend_status_message(BackendState::Loading, 5_000)
+        .await?;
+    state_subscription
+        .expect_backend_status_message(BackendState::Starting, 30_000)
+        .await?;
+    state_subscription
+        .expect_backend_status_message(BackendState::Ready, 5_000)
+        .await?;
+
+    let proxy_route = agent
+        .db
+        .get_proxy_route(request.backend_id.id())
+        .await?
+        .expect("Expected proxy route.");
+    // A get request to this URL will cause the container to exit with status 1.
+    // We don't check the status, because the request itself is expected to fail
+    // (the process exits immediately, so the response is not sent).
+    let _ = reqwest::get(format!("http://{}/exit/1", proxy_route)).await;
+
+    state_subscription
+        .expect_backend_status_message(BackendState::Failed, 5_000)
+        .await?;
+
     Ok(())
 }
