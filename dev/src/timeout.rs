@@ -1,12 +1,13 @@
 use anyhow::Result;
 use std::{
+    fmt::Display,
     future::Future,
-    time::{Duration, SystemTime}, fmt::Display,
+    time::{Duration, SystemTime},
 };
 use tokio::task::JoinHandle;
 
 struct HumanDuration {
-    millis: u128
+    millis: u128,
 }
 
 const SECOND: u128 = 1_000;
@@ -30,7 +31,9 @@ impl HumanDuration {
     }
 
     pub fn from_duration(duration: Duration) -> Self {
-        HumanDuration { millis: duration.as_millis() }
+        HumanDuration {
+            millis: duration.as_millis(),
+        }
     }
 }
 
@@ -55,9 +58,7 @@ where
         Ok(t) => t,
         Err(_) => panic!("{} timed out after {}ms", message, timeout_ms),
     };
-    let elapsed = SystemTime::now()
-        .duration_since(start_time)
-        .unwrap();
+    let elapsed = SystemTime::now().duration_since(start_time).unwrap();
 
     tracing::info!(
         timeout = %HumanDuration::new(timeout_ms as _),
@@ -84,7 +85,11 @@ where
         let result = tokio::time::timeout(Duration::from_millis(timeout_ms), future).await?;
 
         match result {
-            Err(_) => panic!("{} timed out after {}", message, HumanDuration::new(timeout_ms as _)),
+            Err(_) => panic!(
+                "{} timed out after {}",
+                message,
+                HumanDuration::new(timeout_ms as _)
+            ),
             Ok(v) => Ok(v),
         }
     })

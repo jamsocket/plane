@@ -524,6 +524,7 @@ dependencies = [
  "chrono",
  "dis-spawner",
  "dis-spawner-drone",
+ "futures",
  "integration-test",
  "openssl",
  "rand",

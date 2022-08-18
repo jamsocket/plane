@@ -1,5 +1,5 @@
 use crate::{
-    nats::{NoReply, Subject, SubscribeSubject},
+    nats::{NoReply, StreamName, Subject, SubscribeSubject},
     types::{BackendId, DroneId},
 };
 use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
@@ -121,7 +121,7 @@ pub struct DroneStatusMessage {
 
 impl DroneStatusMessage {
     #[must_use]
-    pub fn subject(drone_id: &DroneId) -> Subject<DroneStatusMessage, NoReply> {
+    pub fn subject(drone_id: DroneId) -> Subject<DroneStatusMessage, NoReply> {
         Subject::new(format!("drone.{}.status", drone_id.id()))
     }
 
@@ -313,5 +313,10 @@ impl BackendStateMessage {
     #[must_use]
     pub fn subscribe_subject() -> SubscribeSubject<BackendStateMessage, NoReply> {
         SubscribeSubject::new("backend.*.status".to_string())
+    }
+
+    #[must_use]
+    pub fn stream_name() -> StreamName<BackendStateMessage, NoReply> {
+        StreamName::new("backend_status".to_string())
     }
 }

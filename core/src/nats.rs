@@ -20,6 +20,31 @@ use tokio::time::timeout;
 pub enum NoReply {}
 
 #[derive(Clone)]
+pub struct StreamName<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
+    stream_name: String,
+    _ph_m: PhantomData<M>,
+    _ph_r: PhantomData<R>,
+}
+
+impl<M, R> StreamName<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
+    pub fn new(stream_name: String) -> Self {
+        StreamName {
+            stream_name,
+            _ph_m: PhantomData::default(),
+            _ph_r: PhantomData::default(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Subject<M, R>
 where
     M: Serialize + DeserializeOwned,
@@ -241,7 +266,11 @@ pub struct TypedNats {
 }
 
 impl TypedNats {
-    pub async fn add_jetstream_stream<P, T, R>(&self, stream_name: &str, subject: P) -> Result<()>
+    pub async fn add_jetstream_stream<P, T, R>(
+        &self,
+        stream_name: &StreamName<T, R>,
+        subject: P,
+    ) -> Result<()>
     where
         P: Subscribable<T, R>,
         T: Serialize + DeserializeOwned,
@@ -249,7 +278,7 @@ impl TypedNats {
     {
         self.jetstream
             .get_or_create_stream(Config {
-                name: stream_name.to_string(),
+                name: stream_name.stream_name.to_string(),
                 subjects: vec![subject.subject().to_string()],
                 ..Config::default()
             })
@@ -305,8 +334,8 @@ impl TypedNats {
 
     pub async fn subscribe_jetstream<P, T, R>(
         &self,
-        subject: P,
-        stream_name: &str,
+        stream_name: &StreamName<T, R>,
+        subject: &P,
     ) -> impl Stream<Item = T>
     where
         P: Subscribable<T, R>,
@@ -315,10 +344,10 @@ impl TypedNats {
     {
         let jetstream = self.jetstream.clone();
         let subject = subject.subject().to_string();
-        let stream_name = stream_name.to_string();
+        let stream_name = stream_name.stream_name.to_string();
 
         let stream = stream!({
-            let stream = jetstream.get_stream(stream_name.to_string()).await.unwrap();
+            let stream = jetstream.get_stream(stream_name).await.unwrap();
 
             let consumer = stream
                 .create_consumer(async_nats::jetstream::consumer::pull::Config {

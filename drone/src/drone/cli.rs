@@ -65,11 +65,6 @@ pub struct Opts {
     #[clap(long, action)]
     pub ip_api: Option<Url>,
 
-    /// Local IP of the host (i.e. the IP published docker ports are published on),
-    /// used for proxying locally.
-    #[clap(long, action)]
-    pub host_ip: Option<IpAddr>,
-
     /// Runtime to use with docker. Default is runc; runsc is an alternative if gVisor
     /// is available.
     #[clap(long, action)]
@@ -217,10 +212,10 @@ impl From<Opts> for DronePlan {
         let db = opts.db_path.map(DatabaseConnection::new);
 
         let acme_eab_keypair = match (opts.acme_eab_key, opts.acme_eab_kid) {
-            (Some(eab_key), Some(eab_kid)) => {
-                Some(EabKeypair::new(&eab_kid, &eab_key)
-                    .expect("Couldn't decode --acme-eab-key value as (url-encodable) base64."))
-            }
+            (Some(eab_key), Some(eab_kid)) => Some(
+                EabKeypair::new(&eab_kid, &eab_key)
+                    .expect("Couldn't decode --acme-eab-key value as (url-encodable) base64."),
+            ),
             (None, None) => None,
             _ => panic!(
                 "If one of --acme-eab-key or --acme-eab-kid is provided, the other must be too."
@@ -301,8 +296,6 @@ impl From<Opts> for DronePlan {
                         },
                         nats: nats.clone().expect("Expected --nats-url for running agent."),
                         ip,
-
-                        host_ip: opts.host_ip.expect("Expected --host-ip for running agent.")
                     })
                 } else {
                     None
@@ -494,7 +487,6 @@ mod test {
                         runtime: None,
                     },
                     ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
-                    host_ip: "56.56.56.56".parse().unwrap(),
                     nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
                 }),
                 cert_options: None,
@@ -553,7 +545,6 @@ mod test {
                         runtime: None,
                     },
                     ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
-                    host_ip: "56.56.56.56".parse().unwrap(),
                     nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
                 }),
                 cert_options: Some(CertOptions {

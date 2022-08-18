@@ -11,7 +11,7 @@ use bollard::{
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, net::IpAddr};
 use tokio_stream::{Stream, StreamExt};
 
 /// The port in the container which is exposed.
@@ -252,23 +252,14 @@ impl DockerInterface {
         Ok((running, exit_code))
     }
 
-    pub async fn get_port(&self, container_name: &str) -> Option<u16> {
+    pub async fn get_ip(&self, container_name: &str) -> Option<IpAddr> {
         let inspect = self
             .docker
             .inspect_container(container_name, None)
             .await
             .ok()?;
 
-        let port = inspect
-            .network_settings
-            .as_ref()?
-            .ports
-            .as_ref()?
-            .get(&format!("{}/tcp", CONTAINER_PORT))?
-            .as_ref()?
-            .first()?
-            .host_port
-            .as_ref()?;
+        let port = inspect.network_settings?.ip_address?;
 
         port.parse().ok()
     }

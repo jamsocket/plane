@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::{
     cell::RefCell,
     env::current_dir,
@@ -7,8 +8,6 @@ use std::{
     pin::Pin,
     sync::mpsc::{channel, Receiver, Sender},
 };
-
-use anyhow::Result;
 
 pub mod container;
 pub mod resources;
@@ -74,14 +73,20 @@ impl TestContext {
     }
 }
 
-pub fn run_test<F>(name: &str, future: F) -> Result<()> where F: Future<Output = Result<()>> {
+pub fn run_test<F>(name: &str, future: F) -> Result<()>
+where
+    F: Future<Output = Result<()>>,
+{
     let context = TestContext::new(name);
     TEST_CONTEXT.with(|cell| cell.replace(Some(context)));
     let scratch_dir = scratch_dir("logs");
 
     let file_appender = tracing_appender::rolling::RollingFileAppender::new(
-        tracing_appender::rolling::Rotation::NEVER, scratch_dir, "test-log.txt");
-    
+        tracing_appender::rolling::Rotation::NEVER,
+        scratch_dir,
+        "test-log.txt",
+    );
+
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::fmt()
@@ -89,18 +94,22 @@ pub fn run_test<F>(name: &str, future: F) -> Result<()> where F: Future<Output =
         .with_ansi(false)
         .with_writer(non_blocking)
         .finish();
-    
+
     let dispatcher = tracing::dispatcher::Dispatch::new(subscriber);
     let _guard = tracing::dispatcher::set_default(&dispatcher);
 
-    let result = tokio::runtime::Runtime::new().unwrap().block_on(future);
+    let result = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?
+        .block_on(future);
 
     if result.is_ok() {
-        TEST_CONTEXT.with(|cell|
+        TEST_CONTEXT.with(|cell| {
             tokio::runtime::Runtime::new().unwrap().block_on(async {
-                cell.borrow().as_ref().unwrap().teardown().await;
+                let context = cell.borrow_mut().take().unwrap();
+                context.teardown().await;
             })
-        );    
+        });
     }
 
     result

@@ -48,9 +48,6 @@ pub struct AgentOptions {
     /// Public IP of the machine the drone is running on.
     pub ip: IpProvider,
 
-    /// Internal IP of the machine the drone is running on.
-    pub host_ip: IpAddr,
-
     pub docker_options: DockerOptions,
 }
 
@@ -69,11 +66,10 @@ async fn listen_for_spawn_requests(
     drone_id: DroneId,
     docker: DockerInterface,
     nats: TypedNats,
-    host_ip: IpAddr,
     db: DroneDatabase,
 ) -> Result<()> {
     let mut sub = nats.subscribe(&SpawnRequest::subject(drone_id)).await?;
-    let executor = Arc::new(Executor::new(docker, db, nats, host_ip));
+    let executor = Arc::new(Executor::new(docker, db, nats));
     executor.resume_backends().await?;
 
     loop {
@@ -102,7 +98,7 @@ async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: String) {
 
     loop {
         nc.publish(
-            &DroneStatusMessage::subject(&drone_id),
+            &DroneStatusMessage::subject(drone_id),
             &DroneStatusMessage {
                 drone_id,
                 capacity: 100,
@@ -120,8 +116,11 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     let nats = agent_opts.nats.connection().await?;
 
     // Ensure that status stream exists.
-    nats.add_jetstream_stream("backend_status", BackendStateMessage::subscribe_subject())
-        .await?;
+    nats.add_jetstream_stream(
+        &BackendStateMessage::stream_name(),
+        BackendStateMessage::subscribe_subject(),
+    )
+    .await?;
 
     tracing::info!("Connecting to Docker.");
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
@@ -154,7 +153,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
             }
 
             tracing::info!("Listening for spawn requests.");
-            listen_for_spawn_requests(drone_id, docker, nats, agent_opts.host_ip, db).await
+            listen_for_spawn_requests(drone_id, docker, nats, db).await
         }
         DroneConnectResponse::NoSuchCluster => Err(anyhow!(
             "The platform server did not recognize the cluster {}",
