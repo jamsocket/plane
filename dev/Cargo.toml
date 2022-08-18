@@ -11,6 +11,7 @@ chrono = "0.4.22"
 dis-spawner = {path = "../core"}
 dis-spawner-drone = {path = "../drone"}
 futures = "0.3.23"
+http = "0.2.8"
 integration-test = { path = "./integration-test" }
 openssl = "0.10.41"
 rand = "0.8.5"

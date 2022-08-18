@@ -1,13 +1,17 @@
 use super::{
     agent::{AgentOptions, DockerApiTransport, DockerOptions},
-    proxy::{ProxyHttpsOptions, ProxyOptions},
+    proxy::ProxyOptions,
 };
 use crate::{database_connection::DatabaseConnection, keys::KeyCertPathPair};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use dis_spawner::nats_connection::NatsConnection;
 use reqwest::Url;
-use std::{fmt::Debug, net::IpAddr, path::PathBuf};
+use std::{
+    fmt::Debug,
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+};
 
 #[derive(Parser)]
 pub struct Opts {
@@ -21,13 +25,9 @@ pub struct Opts {
     #[clap(long, action)]
     pub cluster_domain: Option<String>,
 
-    /// Port to listen for HTTP requests on.
-    #[clap(long, default_value = "80", action)]
-    pub http_port: u16,
-
-    /// Port to listen for HTTPS requests on.
-    #[clap(long, default_value = "443", action)]
-    pub https_port: u16,
+    /// IP:PORT pair to listen on.
+    #[clap(long, action, default_value = "0.0.0.0:8080")]
+    pub bind_address: SocketAddr,
 
     /// Path to read private key from.
     #[clap(long, action)]
@@ -59,7 +59,7 @@ pub struct Opts {
 
     /// Public IP of this drone, used for directing traffic outside the host.
     #[clap(long, action)]
-    pub ip: Option<IpAddr>,
+    pub public_ip: Option<IpAddr>,
 
     /// API endpoint which returns the requestor's IP.
     #[clap(long, action)]
@@ -251,11 +251,6 @@ impl From<Opts> for DronePlan {
                 };
 
                 let proxy_options = if proxy {
-                    let https_options = key_cert_pair.map(|key_cert_pair| ProxyHttpsOptions {
-                        key_paths: key_cert_pair,
-                        port: opts.https_port,
-                    });
-
                     Some(ProxyOptions {
                         cluster_domain: opts
                             .cluster_domain.clone()
@@ -263,8 +258,8 @@ impl From<Opts> for DronePlan {
                         db: db
                             .clone()
                             .expect("Expected --db-path for serving proxy."),
-                        http_port: opts.http_port,
-                        https_options,
+                        bind_address: opts.bind_address,
+                        key_pair: key_cert_pair,
                     })
                 } else {
                     None
@@ -279,7 +274,7 @@ impl From<Opts> for DronePlan {
                         DockerApiTransport::default()
                     };
 
-                    let ip = if let Some(ip) = opts.ip {
+                    let ip = if let Some(ip) = opts.public_ip {
                         IpProvider::Literal(ip)
                     } else if let Some(ip_api) = opts.ip_api {
                         IpProvider::Api(ip_api)
@@ -386,8 +381,8 @@ mod test {
                 proxy_options: Some(ProxyOptions {
                     db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
-                    http_port: 80,
-                    https_options: None,
+                    bind_address: "0.0.0.0:8080".parse().unwrap(),
+                    key_pair: None,
                 }),
                 agent_options: None,
                 cert_options: None,
@@ -468,13 +463,10 @@ mod test {
                 proxy_options: Some(ProxyOptions {
                     db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
-                    http_port: 80,
-                    https_options: Some(ProxyHttpsOptions {
-                        key_paths: KeyCertPathPair {
-                            private_key_path: PathBuf::from("mycert.key"),
-                            certificate_path: PathBuf::from("mycert.cert"),
-                        },
-                        port: 443
+                    bind_address: "0.0.0.0:8080".parse().unwrap(),
+                    key_pair: Some(KeyCertPathPair {
+                        private_key_path: PathBuf::from("mycert.key"),
+                        certificate_path: PathBuf::from("mycert.cert"),
                     }),
                 }),
                 agent_options: Some(AgentOptions {
@@ -524,13 +516,10 @@ mod test {
                 proxy_options: Some(ProxyOptions {
                     db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
-                    http_port: 12345,
-                    https_options: Some(ProxyHttpsOptions {
-                        key_paths: KeyCertPathPair {
-                            private_key_path: PathBuf::from("mycert.key"),
-                            certificate_path: PathBuf::from("mycert.cert"),
-                        },
-                        port: 12398
+                    bind_address: "127.1.1.1:8080".parse().unwrap(),
+                    key_pair: Some(KeyCertPathPair {
+                        private_key_path: PathBuf::from("mycert.key"),
+                        certificate_path: PathBuf::from("mycert.cert"),
                     }),
                 }),
                 agent_options: Some(AgentOptions {

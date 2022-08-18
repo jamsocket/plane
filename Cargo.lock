@@ -525,6 +525,7 @@ dependencies = [
  "dis-spawner",
  "dis-spawner-drone",
  "futures",
+ "http",
  "integration-test",
  "openssl",
  "rand",

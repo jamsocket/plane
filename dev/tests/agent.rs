@@ -30,7 +30,7 @@ use tokio::time::Instant;
 const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 const CLUSTER_DOMAIN: &str = "spawner.test";
 
-fn test_image_spawn_request() -> SpawnRequest {
+fn base_spawn_request() -> SpawnRequest {
     let backend_id = random_backend_id(&test_name());
     SpawnRequest {
         image: TEST_IMAGE.into(),
@@ -252,7 +252,7 @@ async fn spawn_with_agent() -> Result<()> {
         .expect_status_message(drone_id, "spawner.test")
         .await?;
 
-    let request = test_image_spawn_request();
+    let request = base_spawn_request();
     let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
     controller_mock.spawn_backend(drone_id, &request).await?;
 
@@ -295,7 +295,7 @@ async fn stats_are_acquired() -> Result<()> {
         .expect_status_message(drone_id, "spawner.test")
         .await?;
 
-    let mut request = test_image_spawn_request();
+    let mut request = base_spawn_request();
     // Ensure long enough life to report stats.
     request.max_idle_secs = Duration::from_secs(30);
 
@@ -340,7 +340,7 @@ async fn handle_error_during_start() -> Result<()> {
         .expect_status_message(drone_id, "spawner.test")
         .await?;
 
-    let mut request = test_image_spawn_request();
+    let mut request = base_spawn_request();
     // Exit with error code 1 after 100ms.
     request.env.insert("EXIT_CODE".into(), "1".into());
     request.env.insert("EXIT_TIMEOUT".into(), "100".into());
@@ -375,7 +375,7 @@ async fn handle_failure_after_ready() -> Result<()> {
         .expect_status_message(drone_id, "spawner.test")
         .await?;
 
-    let request = test_image_spawn_request();
+    let request = base_spawn_request();
 
     let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
     controller_mock.spawn_backend(drone_id, &request).await?;
@@ -411,15 +411,16 @@ async fn handle_agent_restart() -> Result<()> {
         let agent = Agent::new(&nats_con).await?;
         let drone_id = DroneId::new(345);
         controller_mock.expect_handshake(drone_id, agent.ip).await?;
-    
+
         controller_mock
             .expect_status_message(drone_id, "spawner.test")
             .await?;
-    
-        let request = test_image_spawn_request();
-    
-        let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
-        controller_mock.spawn_backend(drone_id, &request).await?;    
+
+        let request = base_spawn_request();
+
+        let mut state_subscription =
+            BackendStateSubscription::new(&nats, &request.backend_id).await?;
+        controller_mock.spawn_backend(drone_id, &request).await?;
         state_subscription
             .wait_for_state(BackendState::Ready, 20_000)
             .await?;

@@ -18,8 +18,15 @@ jobs:
     - uses: Swatinem/rust-cache@v1
       with:
         cache-on-failure: true
+
+    - name: Install cargo-nextest
+      run: cargo install nextest
+      with:
+        crate: cargo-nextest
+        locked: true
+
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo nextest run
 
     - uses: actions/upload-artifact@v3
       if: always()
