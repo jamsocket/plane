@@ -422,7 +422,7 @@ async fn handle_agent_restart() -> Result<()> {
             BackendStateSubscription::new(&nats, &request.backend_id).await?;
         controller_mock.spawn_backend(drone_id, &request).await?;
         state_subscription
-            .wait_for_state(BackendState::Ready, 20_000)
+            .wait_for_state(BackendState::Ready, 60_000)
             .await?;
         state_subscription
     };
