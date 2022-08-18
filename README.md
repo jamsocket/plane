@@ -1,7 +1,6 @@
 # Spawner
 
-[![Unit Tests](https://github.com/drifting-in-space/spawner/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/unit-tests.yml)
-[![Integration Tests](https://github.com/drifting-in-space/spawner/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/integration-tests.yml)
+[![Tests](https://github.com/drifting-in-space/spawner/actions/workflows/tests.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/unit-tests.yml)
 [![dependency status](https://deps.rs/repo/github/drifting-in-space/spawner/status.svg)](https://deps.rs/repo/github/drifting-in-space/spawner)
 
 **Spawner** allows web applications to create [**session-lived backends**](https://driftingin.space/posts/session-lived-application-backends),

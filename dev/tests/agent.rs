@@ -213,13 +213,16 @@ async fn spawn_with_agent() -> Result<()> {
     assert!(result, "Spawn request should result in response of _true_.");
 
     state_subscription
-        .expect_backend_status_message(BackendState::Loading, 30_000)
+        .expect_backend_status_message(BackendState::Loading, 5_000)
         .await?;
     state_subscription
-        .expect_backend_status_message(BackendState::Starting, 5_000)
+        .expect_backend_status_message(BackendState::Starting, 30_000)
         .await?;
     state_subscription
-        .expect_backend_status_message(BackendState::Ready, 50_000)
+        .expect_backend_status_message(BackendState::Ready, 5_000)
+        .await?;
+    state_subscription
+        .expect_backend_status_message(BackendState::Swept, 15_000)
         .await?;
 
     Ok(())
