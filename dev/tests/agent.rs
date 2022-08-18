@@ -381,13 +381,7 @@ async fn handle_failure_after_ready() -> Result<()> {
     controller_mock.spawn_backend(drone_id, &request).await?;
 
     state_subscription
-        .expect_backend_status_message(BackendState::Loading, 5_000)
-        .await?;
-    state_subscription
-        .expect_backend_status_message(BackendState::Starting, 30_000)
-        .await?;
-    state_subscription
-        .expect_backend_status_message(BackendState::Ready, 5_000)
+        .wait_for_state(BackendState::Ready, 60_000)
         .await?;
 
     let proxy_route = agent
@@ -403,6 +397,46 @@ async fn handle_failure_after_ready() -> Result<()> {
     state_subscription
         .expect_backend_status_message(BackendState::Failed, 5_000)
         .await?;
+
+    Ok(())
+}
+
+#[integration_test]
+async fn handle_agent_restart() -> Result<()> {
+    let nats_con = Nats::new().await?;
+    let nats = nats_con.connection().await?;
+    let mut controller_mock = MockController::new(nats.clone()).await?;
+
+    let mut state_subscription = {
+        let agent = Agent::new(&nats_con).await?;
+        let drone_id = DroneId::new(345);
+        controller_mock.expect_handshake(drone_id, agent.ip).await?;
+    
+        controller_mock
+            .expect_status_message(drone_id, "spawner.test")
+            .await?;
+    
+        let request = test_image_spawn_request();
+    
+        let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+        controller_mock.spawn_backend(drone_id, &request).await?;    
+        state_subscription
+            .wait_for_state(BackendState::Ready, 20_000)
+            .await?;
+        state_subscription
+    };
+
+    // Original agent goes away when it goes out of scope.
+
+    {
+        let agent = Agent::new(&nats_con).await?;
+        let drone_id = DroneId::new(346);
+        controller_mock.expect_handshake(drone_id, agent.ip).await?;
+
+        state_subscription
+            .wait_for_state(BackendState::Swept, 20_000)
+            .await?;
+    }
 
     Ok(())
 }
