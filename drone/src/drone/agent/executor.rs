@@ -8,7 +8,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use dis_spawner::{
     messages::agent::{
-        BackendState, BackendStateMessage, DroneLogMessage, DroneStatsMessage, SpawnRequest,
+        BackendState, BackendStateMessage, DroneLogMessage, BackendStatsMessage, SpawnRequest,
     },
     nats::TypedNats,
     types::BackendId,
@@ -174,9 +174,9 @@ impl Executor {
 
                     while let Some(v) = stream.next().await {
                         match v {
-                            Ok(v) => match DroneStatsMessage::from_stats_message(&v) {
+                            Ok(v) => match BackendStatsMessage::from_stats_message(&v) {
                                 Some(message) => {
-                                    nc.publish(&DroneStatsMessage::subject(&backend_id), &message)
+                                    nc.publish(&BackendStatsMessage::subject(&backend_id), &message)
                                         .await?;
                                 }
                                 None => {

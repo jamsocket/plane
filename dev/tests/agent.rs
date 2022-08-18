@@ -1,14 +1,14 @@
 use anyhow::Result;
 use dev::{
     resources::nats::Nats,
-    scratch_dir,
+    scratch_dir, test_name,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{random_backend_id, random_loopback_ip}, test_name,
+    util::{random_backend_id, random_loopback_ip},
 };
 use dis_spawner::{
     messages::agent::{
         BackendState, BackendStateMessage, DroneConnectRequest, DroneConnectResponse,
-        DroneStatusMessage, SpawnRequest,
+        DroneStatusMessage, SpawnRequest, BackendStatsMessage,
     },
     nats::{NoReply, TypedNats, TypedSubscription},
     nats_connection::NatsConnection,
@@ -24,6 +24,7 @@ use dis_spawner_drone::{
 use integration_test::integration_test;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
+use tokio::time::Instant;
 
 const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 const CLUSTER_DOMAIN: &str = "spawner.test";
@@ -137,7 +138,7 @@ impl MockController {
             self.nats.request(&SpawnRequest::subject(drone_id), request),
         )
         .await?;
-    
+
         assert!(result, "Spawn request should result in response of _true_.");
         Ok(())
     }
@@ -176,6 +177,34 @@ impl BackendStateSubscription {
         );
 
         Ok(())
+    }
+
+    pub async fn wait_for_state(
+        &mut self,
+        desired_state: BackendState,
+        timeout_ms: u64,
+    ) -> Result<()> {
+        let deadline = Instant::now()
+            .checked_add(Duration::from_millis(timeout_ms))
+            .unwrap();
+        let mut last_state: Option<BackendState> = None;
+
+        loop {
+            let next = tokio::time::timeout_at(deadline, self.sub.next()).await;
+
+            match next {
+                Ok(Ok(Some(v))) => {
+                    if v.value.state == desired_state {
+                        tracing::info!(?desired_state, "State became desired state.");
+                        return Ok(())
+                    } else {
+                        last_state = Some(v.value.state);
+                    }
+                },
+                Ok(_) => panic!("Stream terminated while waiting for backend state to become {:?} (last state was {:?})", desired_state, last_state),
+                Err(_) => panic!("Timed out waiting for backend state to become {:?} (last state was {:?})", desired_state, last_state),
+            };
+        }
     }
 }
 
@@ -232,5 +261,38 @@ async fn spawn_with_agent() -> Result<()> {
         .expect_backend_status_message(BackendState::Swept, 15_000)
         .await?;
 
+    Ok(())
+}
+
+#[integration_test]
+async fn stats_are_acquired() -> Result<()> {
+    let nats = Nats::new().await?;
+    let agent = Agent::new(&nats).await?;
+    let nats = nats.connection().await?;
+    let mut controller_mock = MockController::new(nats.clone()).await?;
+
+    let drone_id = DroneId::new(345);
+    controller_mock.expect_handshake(drone_id, agent.ip).await?;
+
+    controller_mock
+        .expect_status_message(drone_id, "spawner.test")
+        .await?;
+
+    let mut request = test_image_spawn_request();
+    // Ensure long enough life to report stats.
+    request.max_idle_secs = Duration::from_secs(30);
+
+    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    controller_mock.spawn_backend(drone_id, &request).await?;
+
+    state_subscription.wait_for_state(BackendState::Ready, 60_000).await?;
+
+    let mut stats_subscription = nats.subscribe(BackendStatsMessage::subject(&request.backend_id)).await?;
+
+    let stat = timeout(30_000, "Waiting for stats message.", stats_subscription.next()).await?.unwrap();
+    assert!(stat.value.cpu_use_percent > 0.);
+    assert!(stat.value.mem_use_percent > 0.);
+
+    state_subscription.wait_for_state(BackendState::Swept, 60_000).await?;
     Ok(())
 }
