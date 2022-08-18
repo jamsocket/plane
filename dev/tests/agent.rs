@@ -3,7 +3,7 @@ use dev::{
     resources::nats::Nats,
     scratch_dir,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{random_backend_id, random_loopback_ip},
+    util::{random_backend_id, random_loopback_ip}, test_name,
 };
 use dis_spawner::{
     messages::agent::{
@@ -27,6 +27,18 @@ use std::time::Duration;
 
 const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 const CLUSTER_DOMAIN: &str = "spawner.test";
+
+fn test_image_spawn_request() -> SpawnRequest {
+    let backend_id = random_backend_id(&test_name());
+    SpawnRequest {
+        image: TEST_IMAGE.into(),
+        backend_id: backend_id.clone(),
+        max_idle_secs: Duration::from_secs(10),
+        env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
+        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
+        credentials: None,
+    }
+}
 
 struct Agent {
     #[allow(unused)]
@@ -117,6 +129,18 @@ impl MockController {
 
         Ok(())
     }
+
+    pub async fn spawn_backend(&self, drone_id: DroneId, request: &SpawnRequest) -> Result<()> {
+        let result = timeout(
+            10_000,
+            "Spawn request acknowledged by agent.",
+            self.nats.request(&SpawnRequest::subject(drone_id), request),
+        )
+        .await?;
+    
+        assert!(result, "Spawn request should result in response of _true_.");
+        Ok(())
+    }
 }
 
 struct BackendStateSubscription {
@@ -191,26 +215,9 @@ async fn spawn_with_agent() -> Result<()> {
         .expect_status_message(drone_id, "spawner.test")
         .await?;
 
-    let backend_id = random_backend_id("spawn-with-agent");
-    let request = SpawnRequest {
-        image: TEST_IMAGE.into(),
-        backend_id: backend_id.clone(),
-        max_idle_secs: Duration::from_secs(10),
-        env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
-        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
-        credentials: None,
-    };
-
-    let mut state_subscription = BackendStateSubscription::new(&nats, &backend_id).await?;
-
-    let result = timeout(
-        10_000,
-        "Spawn request acknowledged by agent.",
-        nats.request(&SpawnRequest::subject(drone_id), &request),
-    )
-    .await?;
-
-    assert!(result, "Spawn request should result in response of _true_.");
+    let request = test_image_spawn_request();
+    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    controller_mock.spawn_backend(drone_id, &request).await?;
 
     state_subscription
         .expect_backend_status_message(BackendState::Loading, 5_000)

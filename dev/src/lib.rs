@@ -33,6 +33,10 @@ pub fn scratch_dir(name: &str) -> PathBuf {
     scratch_dir
 }
 
+pub fn test_name() -> String {
+    TEST_CONTEXT.with(|d| d.borrow().as_ref().unwrap().test_name.clone())
+}
+
 impl TestContext {
     pub fn new(test_name: &str) -> Self {
         tracing::info!(%test_name, "Created test context.");
