@@ -1,9 +1,9 @@
 use anyhow::Result;
 use dev::{
     resources::nats::Nats,
-    scratch_dir, test_name,
+    scratch_dir,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{random_backend_id, random_loopback_ip},
+    util::{random_loopback_ip, base_spawn_request},
 };
 use dis_spawner::{
     messages::agent::{
@@ -27,20 +27,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use tokio::time::Instant;
 
-const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 const CLUSTER_DOMAIN: &str = "spawner.test";
-
-fn base_spawn_request() -> SpawnRequest {
-    let backend_id = random_backend_id(&test_name());
-    SpawnRequest {
-        image: TEST_IMAGE.into(),
-        backend_id: backend_id.clone(),
-        max_idle_secs: Duration::from_secs(10),
-        env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
-        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
-        credentials: None,
-    }
-}
 
 struct Agent {
     #[allow(unused)]

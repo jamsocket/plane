@@ -1,16 +1,20 @@
 use anyhow::anyhow;
 use anyhow::Result;
+use dev::util::base_spawn_request;
 use dev::{
     resources::certs::Certificates,
+    resources::server::Server,
     scratch_dir,
     timeout::{expect_to_stay_alive, LivenessGuard},
     util::random_loopback_ip,
 };
+use dis_spawner_drone::database::DroneDatabase;
 use dis_spawner_drone::database_connection::DatabaseConnection;
 use dis_spawner_drone::drone::proxy::ProxyOptions;
 use http::StatusCode;
 use integration_test::integration_test;
-use reqwest::{Certificate, Client, ClientBuilder};
+use reqwest::Response;
+use reqwest::{Certificate, ClientBuilder};
 use std::{net::SocketAddr, time::Duration};
 use tokio::time::Instant;
 
@@ -22,6 +26,7 @@ struct Proxy {
     //ip: Ipv4Addr,
     bind_address: SocketAddr,
     certs: Certificates,
+    db: DroneDatabase,
 }
 
 impl Proxy {
@@ -63,6 +68,7 @@ impl Proxy {
                 .to_string(),
         );
 
+        let db = db_connection.connection().await?;
         let options = ProxyOptions {
             db: db_connection,
             bind_address,
@@ -75,19 +81,27 @@ impl Proxy {
             guard,
             bind_address,
             certs,
+            db,
         };
 
         proxy.wait_ready().await?;
         Ok(proxy)
     }
 
-    pub fn client(&self, subdomain: &str) -> Result<Client> {
+    pub async fn http_get(
+        &self,
+        subdomain: &str,
+        path: &str,
+    ) -> std::result::Result<Response, reqwest::Error> {
         let cert = Certificate::from_pem(&self.certs.cert_pem.as_bytes()).unwrap();
+        let hostname = format!("{}.{}", subdomain, CLUSTER);
         let client = ClientBuilder::new()
             .add_root_certificate(cert)
-            .resolve(&format!("{}.{}", subdomain, CLUSTER), self.bind_address)
+            .resolve(&hostname, self.bind_address)
             .build()?;
-        Ok(client)
+
+        let url = format!("https://{}:{}/{}", hostname, self.bind_address.port(), path);
+        client.get(url).send().await
     }
 }
 
@@ -95,16 +109,27 @@ impl Proxy {
 async fn backend_not_exist_404s() -> Result<()> {
     let proxy = Proxy::new().await?;
 
-    let client = proxy.client("foobar")?;
+    let result = proxy.http_get("foobar", "/").await?;
+    assert_eq!(StatusCode::NOT_FOUND, result.status());
 
-    let result = client
-        .get(format!(
-            "https://foobar.spawner.test:{}/",
-            proxy.bind_address.port()
-        ))
-        .send()
-        .await;
-    assert_eq!(StatusCode::NOT_FOUND, result.unwrap().status());
+    Ok(())
+}
+
+#[integration_test]
+async fn simple_backend_proxy() -> Result<()> {
+    let proxy = Proxy::new().await?;
+    let server = Server::new(|_| async { "Hello World".into() }).await?;
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await?;
+
+    proxy
+        .db
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .await?;
+
+    let result = proxy.http_get("foobar", "/").await?;
+    assert_eq!("Hello World", result.text().await?);
 
     Ok(())
 }

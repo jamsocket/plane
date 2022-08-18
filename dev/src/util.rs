@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use dis_spawner::messages::agent::SpawnRequest;
 use dis_spawner::types::BackendId;
 use rand::distributions::Alphanumeric;
 use rand::thread_rng;
@@ -10,6 +11,8 @@ use std::{
     time::Duration,
 };
 use tokio::net::TcpSocket;
+
+use crate::test_name;
 
 const POLL_LOOP_SLEEP: u64 = 10;
 
@@ -98,5 +101,19 @@ pub async fn wait_for_url(url: &str, timeout_ms: u128) -> Result<()> {
         }
 
         tokio::time::sleep(Duration::from_millis(POLL_LOOP_SLEEP)).await;
+    }
+}
+
+const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
+
+pub fn base_spawn_request() -> SpawnRequest {
+    let backend_id = random_backend_id(&test_name());
+    SpawnRequest {
+        image: TEST_IMAGE.into(),
+        backend_id: backend_id.clone(),
+        max_idle_secs: Duration::from_secs(10),
+        env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
+        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
+        credentials: None,
     }
 }

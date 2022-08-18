@@ -12,6 +12,7 @@ dis-spawner = {path = "../core"}
 dis-spawner-drone = {path = "../drone"}
 futures = "0.3.23"
 http = "0.2.8"
+hyper = "0.14.20"
 integration-test = { path = "./integration-test" }
 openssl = "0.10.41"
 rand = "0.8.5"
