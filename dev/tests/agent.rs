@@ -389,6 +389,46 @@ async fn handle_failure_after_ready() -> Result<()> {
 }
 
 #[integration_test]
+async fn handle_successful_termination() -> Result<()> {
+    let nats = Nats::new().await?;
+    let agent = Agent::new(&nats).await?;
+    let nats = nats.connection().await?;
+    let mut controller_mock = MockController::new(nats.clone()).await?;
+
+    let drone_id = DroneId::new(345);
+    controller_mock.expect_handshake(drone_id, agent.ip).await?;
+
+    controller_mock
+        .expect_status_message(drone_id, "spawner.test")
+        .await?;
+
+    let request = base_spawn_request();
+
+    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    controller_mock.spawn_backend(drone_id, &request).await?;
+
+    state_subscription
+        .wait_for_state(BackendState::Ready, 60_000)
+        .await?;
+
+    let proxy_route = agent
+        .db
+        .get_proxy_route(request.backend_id.id())
+        .await?
+        .expect("Expected proxy route.");
+    // A get request to this URL will cause the container to exit with status 1.
+    // We don't check the status, because the request itself is expected to fail
+    // (the process exits immediately, so the response is not sent).
+    let _ = reqwest::get(format!("http://{}/exit/0", proxy_route)).await;
+
+    state_subscription
+        .expect_backend_status_message(BackendState::Exited, 5_000)
+        .await?;
+
+    Ok(())
+}
+
+#[integration_test]
 async fn handle_agent_restart() -> Result<()> {
     let nats_con = Nats::new().await?;
     let nats = nats_con.connection().await?;

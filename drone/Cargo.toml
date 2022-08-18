@@ -4,17 +4,14 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-dis-spawner = {path = "../core"}
-tracing = "0.1.36"
-
+acme2-eab = "0.5.1"
 anyhow = "1.0.57"
-# async-nats = "0.18.0"
-# async-stream = "0.3.3"
+base64 = "0.13.0"
 bollard = "0.13.0"
-# bytes = "1.1.0"
 chrono = { version = "0.4.21", features = ["serde"] }
 clap = { version = "3.2.2", features = ["derive"] }
 dashmap = "5.3.4"
+dis-spawner = {path = "../core"}
 futures = "0.3.21"
 http = "0.2.7"
 hyper = { version = "0.14.19", features = ["server", "client", "http1", "http2", "tcp"] }
@@ -23,19 +20,13 @@ openssl = "0.10.40"
 reqwest = { version = "0.11.11", features=["native-tls"] }
 rustls = "0.20.6"
 rustls-pemfile = "1.0.0"
-# serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
-# serde_with = "2.0.0"
 signal-hook = "0.3.14"
 sqlx = { version = "0.6.1", features = ["runtime-tokio-rustls", "sqlite", "migrate", "macros", "offline"] }
 tokio = { version = "1.18.2", features = ["rt"] }
 tokio-rustls = "0.23.4"
 tokio-stream = "0.1.8"
-acme2-eab = "0.5.1"
-base64 = "0.13.0"
-# tracing-stackdriver = "0.4.1"
-# tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
-# url = "2.2.2"
+tracing = "0.1.36"
 
 [[bin]]
 name = "spawner-drone"
