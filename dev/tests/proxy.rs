@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use anyhow::Result;
+use chrono::Utc;
 use dev::util::base_spawn_request;
 use dev::{
     resources::certs::SelfSignedCert,
@@ -142,6 +143,57 @@ async fn simple_backend_proxy() -> Result<()> {
 
     Ok(())
 }
+
+#[integration_test]
+async fn connection_status_is_recorded() -> Result<()> {
+    let proxy = Proxy::new().await?;
+    let server = Server::new(|_| async { "Hello World".into() }).await?;
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await?;
+    proxy
+        .db
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .await?;
+
+    // Last active time is initially set to the time of creation.
+    let t1_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
+    assert!(
+        Utc::now().signed_duration_since(t1_last_active) < chrono::Duration::seconds(5),
+        "Last active should be close to present."
+    );
+
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    proxy.http_get("foobar", "/").await?;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let t2_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
+    assert!(
+        t1_last_active < t2_last_active,
+        "Last active should increase after activity."
+    );
+
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    let t3_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
+    assert_eq!(
+        t3_last_active, t2_last_active,
+        "Last active timestamp shouldn't change without new activity."
+    );
+
+    proxy.http_get("foobar", "/").await?;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let t4_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
+    assert!(
+        t3_last_active < t4_last_active,
+        "Last active should increase after activity."
+    );
+
+    Ok(())
+}
+
 
 #[integration_test]
 async fn host_header_is_set() -> Result<()> {
