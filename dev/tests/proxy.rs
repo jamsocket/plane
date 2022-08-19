@@ -194,7 +194,6 @@ async fn connection_status_is_recorded() -> Result<()> {
     Ok(())
 }
 
-
 #[integration_test]
 async fn host_header_is_set() -> Result<()> {
     let proxy = Proxy::new().await?;
