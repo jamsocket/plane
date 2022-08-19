@@ -1,4 +1,4 @@
-name: Integration Tests
+name: Tests
 
 on:
   push:
@@ -18,10 +18,15 @@ jobs:
     - uses: Swatinem/rust-cache@v1
       with:
         cache-on-failure: true
-    - uses: actions/setup-node@v3
+
+    - name: Install cargo-nextest
+      run: cargo install cargo-nextest
+
+    - name: Run tests
+      run: cargo nextest run -j 10
+
+    - uses: actions/upload-artifact@v3
+      if: always()
       with:
-        node-version: 18
-    - run: npm install
-      working-directory: tests
-    - run: npm test
-      working-directory: tests
+        name: test-data
+        path: dev/test-scratch

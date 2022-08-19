@@ -15,17 +15,11 @@ mod connection_tracker;
 mod service;
 mod tls;
 
-#[derive(PartialEq, Eq, Debug)]
-pub struct ProxyHttpsOptions {
-    pub port: u16,
-    pub key_paths: KeyCertPathPair,
-}
-
 #[derive(PartialEq, Debug)]
 pub struct ProxyOptions {
     pub db: DatabaseConnection,
-    pub http_port: u16,
-    pub https_options: Option<ProxyHttpsOptions>,
+    pub bind_address: SocketAddr,
+    pub key_pair: Option<KeyCertPathPair>,
     pub cluster_domain: String,
 }
 
@@ -47,8 +41,8 @@ async fn run_server(
 ) -> Result<()> {
     let make_proxy = MakeProxyService::new(db, options.cluster_domain, connection_tracker.clone());
 
-    if let Some(https_options) = options.https_options {
-        let cert_refresher = CertRefresher::new(https_options.key_paths.clone())
+    if let Some(key_pair) = options.key_pair {
+        let cert_refresher = CertRefresher::new(key_pair.clone())
             .context("Error building cert refresher.")?;
 
         let tls_cfg = {
@@ -60,13 +54,11 @@ async fn run_server(
             Arc::new(cfg)
         };
 
-        let addr = SocketAddr::from(([0, 0, 0, 0], https_options.port));
-        let incoming = AddrIncoming::bind(&addr).context("Error binding port for HTTPS.")?;
+        let incoming = AddrIncoming::bind(&options.bind_address).context("Error binding port for HTTPS.")?;
         let server = Server::builder(TlsAcceptor::new(tls_cfg, incoming)).serve(make_proxy);
         server.await.context("Error from TLS proxy.")?;
     } else {
-        let addr = SocketAddr::from(([0, 0, 0, 0], options.http_port));
-        let server = Server::bind(&addr).serve(make_proxy);
+        let server = Server::bind(&options.bind_address).serve(make_proxy);
         server.await.context("Error from non-TLS proxy.")?;
     }
 

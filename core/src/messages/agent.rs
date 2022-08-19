@@ -1,5 +1,5 @@
 use crate::{
-    nats::{NoReply, Subject, SubscribeSubject},
+    nats::{NoReply, StreamName, Subject, SubscribeSubject},
     types::{BackendId, DroneId},
 };
 use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
@@ -55,24 +55,24 @@ impl DroneLogMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct DroneStatsMessage {
+pub struct BackendStatsMessage {
     //just fractions of max for now,  go from there
     pub cpu_use_percent: f64,
     pub mem_use_percent: f64,
 }
 
-impl DroneStatsMessage {
+impl BackendStatsMessage {
     #[must_use]
-    pub fn subject(backend_id: &BackendId) -> Subject<DroneStatsMessage, NoReply> {
+    pub fn subject(backend_id: &BackendId) -> Subject<BackendStatsMessage, NoReply> {
         Subject::new(format!("backend.{}.stats", backend_id.id()))
     }
 
     #[must_use]
-    pub fn subscribe_subject() -> SubscribeSubject<DroneStatsMessage, NoReply> {
+    pub fn subscribe_subject() -> SubscribeSubject<BackendStatsMessage, NoReply> {
         SubscribeSubject::new("backend.*.stats".into())
     }
 
-    pub fn from_stats_message(stats_message: &Stats) -> Option<DroneStatsMessage> {
+    pub fn from_stats_message(stats_message: &Stats) -> Option<BackendStatsMessage> {
         // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
 
         //memory
@@ -105,7 +105,7 @@ impl DroneStatsMessage {
         //disk
         //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
-        Some(DroneStatsMessage {
+        Some(BackendStatsMessage {
             cpu_use_percent,
             mem_use_percent,
         })
@@ -121,7 +121,7 @@ pub struct DroneStatusMessage {
 
 impl DroneStatusMessage {
     #[must_use]
-    pub fn subject(drone_id: &DroneId) -> Subject<DroneStatusMessage, NoReply> {
+    pub fn subject(drone_id: DroneId) -> Subject<DroneStatusMessage, NoReply> {
         Subject::new(format!("drone.{}.status", drone_id.id()))
     }
 
@@ -313,5 +313,10 @@ impl BackendStateMessage {
     #[must_use]
     pub fn subscribe_subject() -> SubscribeSubject<BackendStateMessage, NoReply> {
         SubscribeSubject::new("backend.*.status".to_string())
+    }
+
+    #[must_use]
+    pub fn stream_name() -> StreamName<BackendStateMessage, NoReply> {
+        StreamName::new("backend_status".to_string())
     }
 }

@@ -20,6 +20,31 @@ use tokio::time::timeout;
 pub enum NoReply {}
 
 #[derive(Clone)]
+pub struct StreamName<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
+    stream_name: String,
+    _ph_m: PhantomData<M>,
+    _ph_r: PhantomData<R>,
+}
+
+impl<M, R> StreamName<M, R>
+where
+    M: Serialize + DeserializeOwned,
+    R: Serialize + DeserializeOwned,
+{
+    pub fn new(stream_name: String) -> Self {
+        StreamName {
+            stream_name,
+            _ph_m: PhantomData::default(),
+            _ph_r: PhantomData::default(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Subject<M, R>
 where
     M: Serialize + DeserializeOwned,
@@ -213,7 +238,7 @@ where
 }
 
 trait NatsResultExt<T> {
-    fn as_anyhow(self) -> Result<T>;
+    fn to_anyhow(self) -> Result<T>;
 
     fn with_message(self, message: &'static str) -> Result<T>;
 }
@@ -226,7 +251,7 @@ impl<T> NatsResultExt<T> for std::result::Result<T, async_nats::Error> {
         }
     }
 
-    fn as_anyhow(self) -> Result<T> {
+    fn to_anyhow(self) -> Result<T> {
         match self {
             Ok(v) => Ok(v),
             Err(err) => Err(anyhow!("NATS Error: {:?}", err)),
@@ -241,7 +266,11 @@ pub struct TypedNats {
 }
 
 impl TypedNats {
-    pub async fn add_jetstream_stream<P, T, R>(&self, stream_name: &str, subject: P) -> Result<()>
+    pub async fn add_jetstream_stream<P, T, R>(
+        &self,
+        stream_name: &StreamName<T, R>,
+        subject: P,
+    ) -> Result<()>
     where
         P: Subscribable<T, R>,
         T: Serialize + DeserializeOwned,
@@ -249,12 +278,12 @@ impl TypedNats {
     {
         self.jetstream
             .get_or_create_stream(Config {
-                name: stream_name.to_string(),
+                name: stream_name.stream_name.to_string(),
                 subjects: vec![subject.subject().to_string()],
                 ..Config::default()
             })
             .await
-            .as_anyhow()?;
+            .to_anyhow()?;
 
         Ok(())
     }
@@ -279,7 +308,7 @@ impl TypedNats {
     where
         T: Serialize + DeserializeOwned,
     {
-        let stream = self.jetstream.get_stream(stream_name).await.as_anyhow()?;
+        let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
 
         let consumer = stream
             .create_consumer(async_nats::jetstream::consumer::pull::Config {
@@ -288,15 +317,15 @@ impl TypedNats {
                 ..async_nats::jetstream::consumer::pull::Config::default()
             })
             .await
-            .as_anyhow()?;
+            .to_anyhow()?;
 
         let result = match timeout(
             Duration::from_secs(1),
-            consumer.stream().messages().await.as_anyhow()?.next(),
+            consumer.stream().messages().await.to_anyhow()?.next(),
         )
         .await
         {
-            Ok(Some(v)) => v.as_anyhow()?,
+            Ok(Some(v)) => v.to_anyhow()?,
             _ => return Ok(None),
         };
 
@@ -305,8 +334,8 @@ impl TypedNats {
 
     pub async fn subscribe_jetstream<P, T, R>(
         &self,
-        subject: P,
-        stream_name: &str,
+        stream_name: &StreamName<T, R>,
+        subject: &P,
     ) -> impl Stream<Item = T>
     where
         P: Subscribable<T, R>,
@@ -315,10 +344,10 @@ impl TypedNats {
     {
         let jetstream = self.jetstream.clone();
         let subject = subject.subject().to_string();
-        let stream_name = stream_name.to_string();
+        let stream_name = stream_name.stream_name.to_string();
 
         let stream = stream!({
-            let stream = jetstream.get_stream(stream_name.to_string()).await.unwrap();
+            let stream = jetstream.get_stream(stream_name).await.unwrap();
 
             let consumer = stream
                 .create_consumer(async_nats::jetstream::consumer::pull::Config {
@@ -369,7 +398,7 @@ impl TypedNats {
                 Bytes::from(serde_json::to_vec(value)?),
             )
             .await
-            .as_anyhow()?;
+            .to_anyhow()?;
 
         let value: R = serde_json::from_slice(&result.payload)?;
         Ok(value)
@@ -385,7 +414,7 @@ impl TypedNats {
             .nc
             .subscribe(subject.subject().to_string())
             .await
-            .as_anyhow()?;
+            .to_anyhow()?;
         Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }
 }

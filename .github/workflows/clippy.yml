@@ -1,4 +1,9 @@
-on: push
+on:
+  pull_request:
+    branches: [ "*" ]
+    paths:
+    - 'dev/test-server/*'
+
 name: Clippy check
 jobs:
   clippy_check:

@@ -1,13 +1,17 @@
 use super::{
     agent::{AgentOptions, DockerApiTransport, DockerOptions},
-    proxy::{ProxyHttpsOptions, ProxyOptions},
+    proxy::ProxyOptions,
 };
 use crate::{database_connection::DatabaseConnection, keys::KeyCertPathPair};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use dis_spawner::nats_connection::NatsConnection;
 use reqwest::Url;
-use std::{fmt::Debug, net::IpAddr, path::PathBuf};
+use std::{
+    fmt::Debug,
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+};
 
 #[derive(Parser)]
 pub struct Opts {
@@ -21,13 +25,9 @@ pub struct Opts {
     #[clap(long, action)]
     pub cluster_domain: Option<String>,
 
-    /// Port to listen for HTTP requests on.
-    #[clap(long, default_value = "80", action)]
-    pub http_port: u16,
-
-    /// Port to listen for HTTPS requests on.
-    #[clap(long, default_value = "443", action)]
-    pub https_port: u16,
+    /// IP:PORT pair to listen on.
+    #[clap(long, action, default_value = "0.0.0.0:8080")]
+    pub bind_address: SocketAddr,
 
     /// Path to read private key from.
     #[clap(long, action)]
@@ -59,16 +59,11 @@ pub struct Opts {
 
     /// Public IP of this drone, used for directing traffic outside the host.
     #[clap(long, action)]
-    pub ip: Option<IpAddr>,
+    pub public_ip: Option<IpAddr>,
 
     /// API endpoint which returns the requestor's IP.
     #[clap(long, action)]
     pub ip_api: Option<Url>,
-
-    /// Local IP of the host (i.e. the IP published docker ports are published on),
-    /// used for proxying locally.
-    #[clap(long, action)]
-    pub host_ip: Option<IpAddr>,
 
     /// Runtime to use with docker. Default is runc; runsc is an alternative if gVisor
     /// is available.
@@ -91,6 +86,21 @@ pub struct Opts {
 pub struct EabKeypair {
     pub eab_kid: String,
     pub eab_key: Vec<u8>,
+}
+
+impl EabKeypair {
+    pub fn new(eab_kid: &str, eab_key_b64: &str) -> Result<EabKeypair> {
+        let eab_key = base64::decode_config(&eab_key_b64, base64::URL_SAFE)?;
+
+        Ok(EabKeypair {
+            eab_key,
+            eab_kid: eab_kid.to_string(),
+        })
+    }
+
+    pub fn eab_key_b64(&self) -> String {
+        base64::encode_config(&self.eab_key, base64::URL_SAFE)
+    }
 }
 
 #[derive(Subcommand)]
@@ -202,16 +212,14 @@ impl From<Opts> for DronePlan {
         let db = opts.db_path.map(DatabaseConnection::new);
 
         let acme_eab_keypair = match (opts.acme_eab_key, opts.acme_eab_kid) {
-            (Some(eab_key), Some(eab_kid)) => {
-                let eab_key = base64::decode_config(&eab_key, base64::URL_SAFE)
-                    .expect("Couldn't decode --acme-eab-key value as (url-encodable) base64.");
-                
-                Some(EabKeypair {
-                    eab_key, eab_kid
-                })
-            },
+            (Some(eab_key), Some(eab_kid)) => Some(
+                EabKeypair::new(&eab_kid, &eab_key)
+                    .expect("Couldn't decode --acme-eab-key value as (url-encodable) base64."),
+            ),
             (None, None) => None,
-            _ => panic!("If one of --acme-eab-key or --acme-eab-kid is provided, the other must be too."),
+            _ => panic!(
+                "If one of --acme-eab-key or --acme-eab-kid is provided, the other must be too."
+            ),
         };
 
         match opts.command.unwrap_or_default() {
@@ -243,11 +251,6 @@ impl From<Opts> for DronePlan {
                 };
 
                 let proxy_options = if proxy {
-                    let https_options = key_cert_pair.map(|key_cert_pair| ProxyHttpsOptions {
-                        key_paths: key_cert_pair,
-                        port: opts.https_port,
-                    });
-
                     Some(ProxyOptions {
                         cluster_domain: opts
                             .cluster_domain.clone()
@@ -255,8 +258,8 @@ impl From<Opts> for DronePlan {
                         db: db
                             .clone()
                             .expect("Expected --db-path for serving proxy."),
-                        http_port: opts.http_port,
-                        https_options,
+                        bind_address: opts.bind_address,
+                        key_pair: key_cert_pair,
                     })
                 } else {
                     None
@@ -271,7 +274,7 @@ impl From<Opts> for DronePlan {
                         DockerApiTransport::default()
                     };
 
-                    let ip = if let Some(ip) = opts.ip {
+                    let ip = if let Some(ip) = opts.public_ip {
                         IpProvider::Literal(ip)
                     } else if let Some(ip_api) = opts.ip_api {
                         IpProvider::Api(ip_api)
@@ -288,8 +291,6 @@ impl From<Opts> for DronePlan {
                         },
                         nats: nats.clone().expect("Expected --nats-url for running agent."),
                         ip,
-
-                        host_ip: opts.host_ip.expect("Expected --host-ip for running agent.")
                     })
                 } else {
                     None
@@ -380,8 +381,8 @@ mod test {
                 proxy_options: Some(ProxyOptions {
                     db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
-                    http_port: 80,
-                    https_options: None,
+                    bind_address: "0.0.0.0:8080".parse().unwrap(),
+                    key_pair: None,
                 }),
                 agent_options: None,
                 cert_options: None,
@@ -448,10 +449,8 @@ mod test {
             "mycert.cert",
             "--https-private-key",
             "mycert.key",
-            "--ip",
+            "--public-ip",
             "123.123.123.123",
-            "--host-ip",
-            "56.56.56.56",
             "--nats-url",
             "nats://foo@bar",
             "serve",
@@ -464,13 +463,10 @@ mod test {
                 proxy_options: Some(ProxyOptions {
                     db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
-                    http_port: 80,
-                    https_options: Some(ProxyHttpsOptions {
-                        key_paths: KeyCertPathPair {
-                            private_key_path: PathBuf::from("mycert.key"),
-                            certificate_path: PathBuf::from("mycert.cert"),
-                        },
-                        port: 443
+                    bind_address: "0.0.0.0:8080".parse().unwrap(),
+                    key_pair: Some(KeyCertPathPair {
+                        private_key_path: PathBuf::from("mycert.key"),
+                        certificate_path: PathBuf::from("mycert.cert"),
                     }),
                 }),
                 agent_options: Some(AgentOptions {
@@ -481,7 +477,6 @@ mod test {
                         runtime: None,
                     },
                     ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
-                    host_ip: "56.56.56.56".parse().unwrap(),
                     nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
                 }),
                 cert_options: None,
@@ -502,14 +497,10 @@ mod test {
             "mycert.cert",
             "--https-private-key",
             "mycert.key",
-            "--http-port",
-            "12345",
-            "--https-port",
-            "12398",
-            "--ip",
+            "--bind-address",
+            "127.1.1.1:8080",
+            "--public-ip",
             "123.123.123.123",
-            "--host-ip",
-            "56.56.56.56",
             "--nats-url",
             "nats://foo@bar",
             "--acme-server",
@@ -523,13 +514,10 @@ mod test {
                 proxy_options: Some(ProxyOptions {
                     db: DatabaseConnection::new("mydatabase".to_string()),
                     cluster_domain: "mycluster.test".to_string(),
-                    http_port: 12345,
-                    https_options: Some(ProxyHttpsOptions {
-                        key_paths: KeyCertPathPair {
-                            private_key_path: PathBuf::from("mycert.key"),
-                            certificate_path: PathBuf::from("mycert.cert"),
-                        },
-                        port: 12398
+                    bind_address: "127.1.1.1:8080".parse().unwrap(),
+                    key_pair: Some(KeyCertPathPair {
+                        private_key_path: PathBuf::from("mycert.key"),
+                        certificate_path: PathBuf::from("mycert.cert"),
                     }),
                 }),
                 agent_options: Some(AgentOptions {
@@ -540,7 +528,6 @@ mod test {
                         runtime: None,
                     },
                     ip: IpProvider::Literal("123.123.123.123".parse().unwrap()),
-                    host_ip: "56.56.56.56".parse().unwrap(),
                     nats: NatsConnection::new("nats://foo@bar".to_string()).unwrap(),
                 }),
                 cert_options: Some(CertOptions {

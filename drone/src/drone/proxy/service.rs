@@ -171,6 +171,8 @@ impl ProxyService {
     async fn handle(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
         if let Some(host) = req.headers().get(http::header::HOST) {
             let host = std::str::from_utf8(host.as_bytes())?;
+            // If the host includes a port, strip it.
+            let host = host.split_once(':').map(|(host, _)| host).unwrap_or(host);
 
             // TODO: we shouldn't need to allocate a string just to strip a prefix.
             if let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) {

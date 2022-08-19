@@ -2,4 +2,7 @@
 members = [
     "drone",
     "core",
+    "dev",
+    "dev/integration-test",
+    "dev/test-server",
 ]

@@ -1,7 +1,6 @@
 # Spawner
 
-[![Unit Tests](https://github.com/drifting-in-space/spawner/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/unit-tests.yml)
-[![Integration Tests](https://github.com/drifting-in-space/spawner/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/integration-tests.yml)
+[![Tests](https://github.com/drifting-in-space/spawner/actions/workflows/tests.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/unit-tests.yml)
 [![dependency status](https://deps.rs/repo/github/drifting-in-space/spawner/status.svg)](https://deps.rs/repo/github/drifting-in-space/spawner)
 
 **Spawner** allows web applications to create [**session-lived backends**](https://driftingin.space/posts/session-lived-application-backends),
@@ -78,12 +77,13 @@ The drone consists of:
 
 ## Running Tests
 
-The spawner repository contains two types of tests: unit tests, which are embedded in the Rust codebase, and
-interface-level tests written in TypeScript.
+Tests consist of unit tests (which are located alongside the source) and integration tests located in [`dev/tests`](dev/tests). Both kinds of tests are run if you run `cargo test` in the root directory.
 
-To run the Rust tests, run `cargo test` in the root directory.
+Integration tests use Docker to spin up dependent services, so require a running install of Docker and to be run as a user with access to `/var/run/docker.sock`. They are intended to run on Linux and may not work on other systems.
 
-The TypeScript tests require nodejs and a running Docker daemon. To run these tests, change into the `tests`
-directory and run `npm install` to install the dependencies, followed by `npm test` to run the tests.
+Integration tests can be slow because they simulate entire workload lifecycles. This is compounded by the fact that the default Rust test runner only runs tests in parallel if they are in the same test file. For faster test runs, we recommend using [cargo-nextest](https://nexte.st/) as follows:
 
-NOTE: We only test the program with the docker engine install process described in https://docs.docker.com/engine/install/ubuntu/ on ubuntu 20.04 and ubuntu 22.04. The official snap from canonical does *NOT* currently pass tests. 
+```
+cargo install cargo-nextest
+cargo nextest run
+```

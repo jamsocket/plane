@@ -1,12 +1,12 @@
 use self::https_client::get_https_client;
 use super::cli::{CertOptions, EabKeypair};
-use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats};
 use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
+use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats};
 use openssl::{
     asn1::Asn1Time,
     pkey::{PKey, Private},

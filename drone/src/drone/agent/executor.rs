@@ -8,13 +8,13 @@ use chrono::Utc;
 use dashmap::DashMap;
 use dis_spawner::{
     messages::agent::{
-        BackendState, BackendStateMessage, DroneLogMessage, DroneStatsMessage, SpawnRequest,
+        BackendState, BackendStateMessage, DroneLogMessage, BackendStatsMessage, SpawnRequest,
     },
     nats::TypedNats,
     types::BackendId,
 };
 use serde_json::json;
-use std::{fmt::Debug, net::IpAddr, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 use tokio::{
     sync::mpsc::{channel, Sender},
     task::JoinHandle,
@@ -37,7 +37,6 @@ impl<T, E: Debug> LogError for Result<T, E> {
 }
 
 pub struct Executor {
-    host_ip: IpAddr,
     docker: DockerInterface,
     database: DroneDatabase,
     nc: TypedNats,
@@ -50,12 +49,7 @@ pub struct Executor {
 }
 
 impl Executor {
-    pub fn new(
-        docker: DockerInterface,
-        database: DroneDatabase,
-        nc: TypedNats,
-        host_ip: IpAddr,
-    ) -> Self {
+    pub fn new(docker: DockerInterface, database: DroneDatabase, nc: TypedNats) -> Self {
         let backend_to_listener: Arc<DashMap<BackendId, Sender<()>>> = Arc::default();
         let container_events_handle = tokio::spawn(Self::listen_for_container_events(
             docker.clone(),
@@ -63,7 +57,6 @@ impl Executor {
         ));
 
         Executor {
-            host_ip,
             docker,
             database,
             nc,
@@ -181,9 +174,9 @@ impl Executor {
 
                     while let Some(v) = stream.next().await {
                         match v {
-                            Ok(v) => match DroneStatsMessage::from_stats_message(&v) {
+                            Ok(v) => match BackendStatsMessage::from_stats_message(&v) {
                                 Some(message) => {
-                                    nc.publish(&DroneStatsMessage::subject(&backend_id), &message)
+                                    nc.publish(&BackendStatsMessage::subject(&backend_id), &message)
                                         .await?;
                                 }
                                 None => {
@@ -297,25 +290,20 @@ impl Executor {
                     return Ok(Some(BackendState::ErrorStarting));
                 }
 
-                let port = self
+                let container_ip = self
                     .docker
-                    .get_port(&spawn_request.backend_id.to_resource_name())
+                    .get_ip(&spawn_request.backend_id.to_resource_name())
                     .await
-                    .ok_or_else(|| {
-                        anyhow!(
-                            "Couldn't get port of container {}",
-                            spawn_request.backend_id.to_resource_name()
-                        )
-                    })?;
+                    .unwrap();
 
-                tracing::info!(%port, "Got port from container.");
-                wait_port_ready(port, self.host_ip).await?;
+                tracing::info!(%container_ip, "Got IP from container.");
+                wait_port_ready(8080, container_ip).await?;
 
                 self.database
                     .insert_proxy_route(
                         &spawn_request.backend_id,
                         spawn_request.backend_id.id(),
-                        &format!("{}:{}", self.host_ip, port),
+                        &format!("{}:{}", container_ip, 8080),
                     )
                     .await?;
 
