@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::certs::Certificates;
+use super::certs::SelfSignedCert;
 use crate::{
     container::{ContainerResource, ContainerSpec},
     scratch_dir,
@@ -13,7 +13,7 @@ use serde_json::json;
 
 pub struct Pebble {
     container: ContainerResource,
-    certs: Certificates,
+    certs: SelfSignedCert,
 }
 
 impl Pebble {
@@ -40,7 +40,7 @@ impl Pebble {
     }
 
     async fn new_impl(eab_keypair: Option<&EabKeypair>) -> Result<Pebble> {
-        let certs = Certificates::new("pebble-certs", vec!["localhost".to_string()])?;
+        let certs = SelfSignedCert::new("pebble-certs", vec!["localhost".to_string()])?;
         let config_dir = scratch_dir("pebble-config");
 
         let external_account_mac_keys: HashMap<String, String> = eab_keypair

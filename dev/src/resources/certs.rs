@@ -8,15 +8,15 @@ use std::{
 
 use crate::scratch_dir;
 
-pub struct Certificates {
+pub struct SelfSignedCert {
     pub key_pem: String,
     pub cert_pem: String,
     path: PathBuf,
     pub path_pair: KeyCertPathPair,
 }
 
-impl Certificates {
-    pub fn new(name: &str, subject_alt_names: Vec<String>) -> Result<Certificates> {
+impl SelfSignedCert {
+    pub fn new(name: &str, subject_alt_names: Vec<String>) -> Result<SelfSignedCert> {
         let path = scratch_dir(name);
         create_dir_all(&path)?;
 
@@ -36,7 +36,7 @@ impl Certificates {
             private_key_path: key_path,
         };
 
-        Ok(Certificates {
+        Ok(SelfSignedCert {
             key_pem,
             cert_pem,
             path,

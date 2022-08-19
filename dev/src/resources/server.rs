@@ -67,6 +67,10 @@ impl Server {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
+
+    pub fn url(&self) -> String {
+        format!("http://{}", self.address)
+    }
 }
 
 impl Drop for Server {

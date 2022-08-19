@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use anyhow::Result;
 use dev::util::base_spawn_request;
 use dev::{
-    resources::certs::Certificates,
+    resources::certs::SelfSignedCert,
     resources::server::Server,
     scratch_dir,
     timeout::{expect_to_stay_alive, LivenessGuard},
@@ -25,7 +25,7 @@ struct Proxy {
     guard: LivenessGuard,
     //ip: Ipv4Addr,
     bind_address: SocketAddr,
-    certs: Certificates,
+    certs: SelfSignedCert,
     db: DroneDatabase,
 }
 
@@ -54,7 +54,7 @@ impl Proxy {
     }
 
     pub async fn new() -> Result<Proxy> {
-        let certs = Certificates::new(
+        let certs = SelfSignedCert::new(
             "proxy",
             vec!["*.spawner.test".into(), "spawner.test".into()],
         )?;
@@ -86,6 +86,15 @@ impl Proxy {
 
         proxy.wait_ready().await?;
         Ok(proxy)
+    }
+
+    pub fn update_cert(&mut self) -> Result<()> {
+        let certs = SelfSignedCert::new(
+            "proxy",
+            vec!["*.spawner.test".into(), "spawner.test".into()],
+        )?;
+        self.certs = certs;
+        Ok(())
     }
 
     pub async fn http_get(
@@ -157,6 +166,36 @@ async fn host_header_is_set() -> Result<()> {
 
     let result = proxy.http_get("foobar", "/").await?;
     assert_eq!("foobar.spawner.test:4040", result.text().await?);
+
+    Ok(())
+}
+
+#[integration_test]
+async fn update_certificates() -> Result<()> {
+    let mut proxy = Proxy::new().await?;
+    let server = Server::new(|_| async { "Hello World".into() }).await?;
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await?;
+
+    let original_cert = proxy.certs.cert_pem.clone();
+
+    proxy
+        .db
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .await?;
+
+    let result = proxy.http_get("foobar", "/").await?;
+    assert_eq!("Hello World", result.text().await?);
+
+    proxy.update_cert()?;
+    let new_cert = proxy.certs.cert_pem.clone();
+
+    let result = proxy.http_get("foobar", "/").await?;
+    assert_eq!("Hello World", result.text().await?);
+
+    // Ensure the certs are actually different.
+    assert_ne!(original_cert, new_cert);
 
     Ok(())
 }

@@ -2,6 +2,7 @@ use anyhow::Result;
 use dev::{
     resources::nats::Nats,
     scratch_dir,
+    resources::server::Server,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
     util::{random_loopback_ip, base_spawn_request},
 };
@@ -310,6 +311,18 @@ async fn stats_are_acquired() -> Result<()> {
     state_subscription
         .wait_for_state(BackendState::Swept, 60_000)
         .await?;
+    Ok(())
+}
+
+#[integration_test]
+async fn use_ip_lookup_api() -> Result<()> {
+    let server = Server::new(|_| async { "123.11.22.33".to_string() }).await?;
+
+    let provider = IpProvider::Api(reqwest::Url::parse(&server.url())?);
+
+    let result = provider.get_ip().await?;
+    assert_eq!("123.11.22.33".parse::<IpAddr>()?, result);
+
     Ok(())
 }
 
