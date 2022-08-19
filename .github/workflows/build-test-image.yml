@@ -4,11 +4,13 @@ on:
   push:
     branches: [ "main" ]
     paths:
-    - 'dev/test-server/*'
+    - 'dev/test-server/**'
+    - '.github/workflows/build-test-image.yml'
   pull_request:
     branches: [ "main" ]
     paths:
-    - 'dev/test-server/*'
+    - 'dev/test-server/**'
+    - '.github/workflows/build-test-image.yml'
 
 env:
   REGISTRY: ghcr.io
