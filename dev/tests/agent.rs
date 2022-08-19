@@ -1,10 +1,10 @@
 use anyhow::Result;
 use dev::{
     resources::nats::Nats,
-    scratch_dir,
     resources::server::Server,
+    scratch_dir,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{random_loopback_ip, base_spawn_request},
+    util::{base_spawn_request, random_loopback_ip},
 };
 use dis_spawner::{
     messages::agent::{

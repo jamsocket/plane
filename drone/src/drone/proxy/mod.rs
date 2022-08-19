@@ -42,8 +42,8 @@ async fn run_server(
     let make_proxy = MakeProxyService::new(db, options.cluster_domain, connection_tracker.clone());
 
     if let Some(key_pair) = options.key_pair {
-        let cert_refresher = CertRefresher::new(key_pair.clone())
-            .context("Error building cert refresher.")?;
+        let cert_refresher =
+            CertRefresher::new(key_pair.clone()).context("Error building cert refresher.")?;
 
         let tls_cfg = {
             let cfg = rustls::ServerConfig::builder()
@@ -54,7 +54,8 @@ async fn run_server(
             Arc::new(cfg)
         };
 
-        let incoming = AddrIncoming::bind(&options.bind_address).context("Error binding port for HTTPS.")?;
+        let incoming =
+            AddrIncoming::bind(&options.bind_address).context("Error binding port for HTTPS.")?;
         let server = Server::builder(TlsAcceptor::new(tls_cfg, incoming)).serve(make_proxy);
         server.await.context("Error from TLS proxy.")?;
     } else {
