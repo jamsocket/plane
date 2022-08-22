@@ -1,6 +1,7 @@
 //use anyhow::Result;
 use core::future::Future;
 use core::task::Context;
+use std::net::IpAddr;
 use futures::ready;
 use hyper::server::accept::Accept;
 use hyper::server::conn::{AddrIncoming, AddrStream};
@@ -106,13 +107,16 @@ enum State {
 // TlsStream implements AsyncRead/AsyncWrite handshaking tokio_rustls::Accept first
 pub struct TlsStream {
     state: State,
+    pub remote_ip: IpAddr,
 }
 
 impl TlsStream {
     fn new(stream: AddrStream, config: Arc<ServerConfig>) -> TlsStream {
+        let remote_ip = stream.remote_addr().ip();
         let accept = tokio_rustls::TlsAcceptor::from(config).accept(stream);
         TlsStream {
             state: State::Handshaking(accept),
+            remote_ip,
         }
     }
 }
