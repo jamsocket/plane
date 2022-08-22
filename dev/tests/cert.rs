@@ -1,10 +1,16 @@
 use anyhow::Result;
 use dev::{
     resources::{nats::Nats, pebble::Pebble},
+    scratch_dir,
     timeout::{spawn_timeout, timeout},
 };
-use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats};
-use dis_spawner_drone::drone::cli::EabKeypair;
+use dis_spawner::{
+    messages::cert::SetAcmeDnsRecord, nats::TypedNats, nats_connection::NatsConnection,
+};
+use dis_spawner_drone::{
+    drone::cli::{CertOptions, EabKeypair},
+    keys::KeyCertPathPair,
+};
 use integration_test::integration_test;
 use openssl::x509::X509;
 use tokio::task::JoinHandle;
@@ -46,7 +52,7 @@ async fn cert_refresh() -> Result<()> {
     let conn = nats.connection().await?;
     let dns_handler = DummyDnsHandler::new(&conn, "spawner.test").await?;
 
-    let (_, cert) = timeout(
+    let (_, certs) = timeout(
         60_000,
         "Getting certificate",
         dis_spawner_drone::drone::cert::get_certificate(
@@ -60,10 +66,46 @@ async fn cert_refresh() -> Result<()> {
     )
     .await?;
 
+    assert_eq!(2, certs.len());
+
     dns_handler.finish().await?;
 
-    let alt_names = collect_alt_names(&cert);
+    let alt_names = collect_alt_names(&certs.first().unwrap());
     assert_eq!(vec!["[*.spawner.test]".to_string()], alt_names);
+
+    Ok(())
+}
+
+#[integration_test]
+async fn cert_refresh_full() -> Result<()> {
+    let nats = Nats::new().await?;
+    let pebble = Pebble::new().await?;
+    let conn = nats.connection().await?;
+    let dns_handler = DummyDnsHandler::new(&conn, "spawner.test").await?;
+    let output_dir = scratch_dir("output");
+    let key_paths = KeyCertPathPair {
+        private_key_path: output_dir.join("output.key"),
+        certificate_path: output_dir.join("output.pem"),
+    };
+
+    let () = timeout(
+        60_000,
+        "Getting certificate",
+        dis_spawner_drone::drone::cert::refresh_certificate(
+            &CertOptions {
+                cluster_domain: "spawner.test".into(),
+                nats: NatsConnection::new(nats.connection_string())?,
+                key_paths,
+                email: "admin@spawner.test".into(),
+                acme_server_url: pebble.directory_url(),
+                acme_eab_keypair: None,
+            },
+            &pebble.client()?,
+        ),
+    )
+    .await?;
+
+    dns_handler.finish().await?;
 
     Ok(())
 }
@@ -80,7 +122,7 @@ async fn cert_refresh_eab() -> Result<()> {
     let conn = nats.connection().await?;
     let dns_handler = DummyDnsHandler::new(&conn, "spawner.test").await?;
 
-    let (_, cert) = timeout(
+    let (_, certs) = timeout(
         60_000,
         "Getting certificate",
         dis_spawner_drone::drone::cert::get_certificate(
@@ -96,7 +138,7 @@ async fn cert_refresh_eab() -> Result<()> {
 
     dns_handler.finish().await?;
 
-    let alt_names = collect_alt_names(&cert);
+    let alt_names = collect_alt_names(&certs.first().unwrap());
     assert_eq!(vec!["[*.spawner.test]".to_string()], alt_names);
 
     Ok(())
