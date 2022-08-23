@@ -1,4 +1,3 @@
-use self::https_client::get_https_client;
 use super::cli::{CertOptions, EabKeypair};
 use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
@@ -13,9 +12,8 @@ use openssl::{
     x509::X509,
 };
 use reqwest::Client;
-use std::{path::Path, time::Duration};
-
-mod https_client;
+use std::io::Write;
+use std::{fs::File, path::Path, time::Duration};
 
 const DNS_01: &str = "dns-01";
 const REFRESH_MARGIN: Duration = Duration::from_secs(3600 * 24 * 15);
@@ -28,7 +26,7 @@ pub async fn get_certificate(
     mailto_email: &str,
     client: &Client,
     acme_eab_keypair: Option<&EabKeypair>,
-) -> Result<(PKey<Private>, X509)> {
+) -> Result<(PKey<Private>, Vec<X509>)> {
     let _span = tracing::info_span!("Getting certificate", %cluster_domain);
     let _span_guard = _span.enter();
 
@@ -112,21 +110,19 @@ pub async fn get_certificate(
         .await?
         .ok_or_else(|| anyhow!("ACME order response didn't include certificate."))?;
 
-    let cert = cert
-        .into_iter()
-        .next()
-        .ok_or_else(|| anyhow!("Certificate list is empty."))?;
+    if cert.len() == 0 {
+        return Err(anyhow!("Certificate list is empty."));
+    }
 
     tracing::info!("Got certificate from ACME.");
 
     Ok((pkey, cert))
 }
 
-pub async fn refresh_certificate(cert_options: &CertOptions) -> Result<()> {
-    let client = get_https_client()?;
+pub async fn refresh_certificate(cert_options: &CertOptions, client: &Client) -> Result<()> {
     let nats = cert_options.nats.connection().await?;
 
-    let (pkey, cert) = get_certificate(
+    let (pkey, certs) = get_certificate(
         &cert_options.cluster_domain,
         &nats,
         &cert_options.acme_server_url,
@@ -136,7 +132,17 @@ pub async fn refresh_certificate(cert_options: &CertOptions) -> Result<()> {
     )
     .await?;
 
-    std::fs::write(&cert_options.key_paths.certificate_path, cert.to_pem()?)?;
+    {
+        let mut fh = File::options()
+            .create(true)
+            .write(true)
+            .open(&cert_options.key_paths.certificate_path)?;
+
+        for cert in certs {
+            fh.write_all(&cert.to_pem()?)?;
+        }
+    }
+
     std::fs::write(
         &cert_options.key_paths.private_key_path,
         pkey.private_key_to_pem_pkcs8()?,
@@ -179,7 +185,7 @@ pub async fn refresh_if_not_valid(cert_options: &CertOptions) -> Result<Option<D
     }
 
     tracing::info!("Refreshing certificate.");
-    refresh_certificate(cert_options)
+    refresh_certificate(cert_options, &Client::new())
         .await
         .context("Error refreshing certificate.")?;
     tracing::info!("Done refreshing certificate.");

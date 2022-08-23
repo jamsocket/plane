@@ -9,6 +9,7 @@ use clap::Parser;
 use dis_spawner::logging::TracingHandle;
 use dis_spawner::retry::do_with_retry;
 use futures::{future::select_all, Future};
+use reqwest::Client;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::{pin::Pin, thread};
 
@@ -63,7 +64,7 @@ async fn main() -> Result<()> {
             db.connection().await?;
         }
         DronePlan::DoCertificateRefresh(cert_options) => {
-            refresh_certificate(&cert_options).await?;
+            refresh_certificate(&cert_options, &Client::new()).await?;
         }
     }
     Ok(())
