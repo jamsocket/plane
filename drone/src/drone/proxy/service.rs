@@ -1,12 +1,15 @@
 use super::connection_tracker::ConnectionTracker;
+use super::tls::TlsStream;
 use crate::database::DroneDatabase;
 use anyhow::{anyhow, Context, Result};
 use http::uri::{Authority, Scheme};
 use http::Uri;
 use hyper::client::HttpConnector;
+use hyper::server::conn::AddrStream;
 use hyper::Client;
 use hyper::{service::Service, Body, Request, Response, StatusCode};
 use std::io::ErrorKind;
+use std::net::IpAddr;
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::{
@@ -57,7 +60,7 @@ impl MakeProxyService {
     }
 }
 
-impl<T> Service<T> for MakeProxyService {
+impl<'a> Service<&'a AddrStream> for MakeProxyService {
     type Response = ProxyService;
     type Error = Infallible;
     type Future = Ready<Result<ProxyService, Infallible>>;
@@ -69,12 +72,38 @@ impl<T> Service<T> for MakeProxyService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, _req: T) -> Self::Future {
+    fn call(&mut self, req: &'a AddrStream) -> Self::Future {
+        let remote_ip = req.remote_addr().ip();
         ready(Ok(ProxyService {
             db: self.db.clone(),
             client: self.client.clone(),
             cluster: self.cluster.clone(),
             connection_tracker: self.connection_tracker.clone(),
+            remote_ip,
+        }))
+    }
+}
+
+impl<'a> Service<&'a TlsStream> for MakeProxyService {
+    type Response = ProxyService;
+    type Error = Infallible;
+    type Future = Ready<Result<ProxyService, Infallible>>;
+
+    fn poll_ready(
+        &mut self,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: &'a TlsStream) -> Self::Future {
+        let remote_ip = req.remote_ip;
+        ready(Ok(ProxyService {
+            db: self.db.clone(),
+            client: self.client.clone(),
+            cluster: self.cluster.clone(),
+            connection_tracker: self.connection_tracker.clone(),
+            remote_ip,
         }))
     }
 }
@@ -85,6 +114,7 @@ pub struct ProxyService {
     client: Client<HttpConnector, Body>,
     cluster: String,
     connection_tracker: ConnectionTracker,
+    remote_ip: IpAddr,
 }
 
 #[allow(unused)]
@@ -173,6 +203,8 @@ impl ProxyService {
             let host = std::str::from_utf8(host.as_bytes())?;
             // If the host includes a port, strip it.
             let host = host.split_once(':').map(|(host, _)| host).unwrap_or(host);
+
+            tracing::info!(ip=%self.remote_ip, url=%req.uri(), "Proxy Request");
 
             // TODO: we shouldn't need to allocate a string just to strip a prefix.
             if let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) {

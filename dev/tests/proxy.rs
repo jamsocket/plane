@@ -110,6 +110,12 @@ impl Proxy {
             .resolve(&hostname, self.bind_address)
             .build()?;
 
+        let path = if let Some(path) = path.strip_prefix("/") {
+            path
+        } else {
+            path
+        };
+
         let url = format!("https://{}:{}/{}", hostname, self.bind_address.port(), path);
         client.get(url).send().await
     }
