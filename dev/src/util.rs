@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use dis_spawner::messages::agent::SpawnRequest;
 use dis_spawner::types::BackendId;
+use dis_spawner::types::DroneId;
 use rand::distributions::Alphanumeric;
 use rand::thread_rng;
 use rand::Rng;
@@ -109,6 +110,7 @@ const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 pub fn base_spawn_request() -> SpawnRequest {
     let backend_id = random_backend_id(&test_name());
     SpawnRequest {
+        drone_id: DroneId::new(0),
         image: TEST_IMAGE.into(),
         backend_id: backend_id.clone(),
         max_idle_secs: Duration::from_secs(10),

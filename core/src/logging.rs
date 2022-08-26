@@ -18,9 +18,9 @@ use tracing_subscriber::{layer::SubscriberExt, registry::LookupSpan};
 const TRACE_STACKDRIVER: &str = "TRACE_STACKDRIVER";
 const LOG_DEFAULT: &str = "info,sqlx=warn";
 
-async fn do_logs(nc: &TypedNats, mut recv: tokio::sync::mpsc::Receiver<LogMessage>, subject: &str) {
+async fn do_logs(nc: &TypedNats, mut recv: tokio::sync::mpsc::Receiver<LogMessage>) {
     while let Some(msg) = recv.recv().await {
-        if let Err(err) = nc.publish(&LogMessage::subject(subject), &msg).await {
+        if let Err(err) = nc.publish(&msg).await {
             println!("{:?}", err);
         }
     }
@@ -51,12 +51,12 @@ impl TracingHandle {
         Ok(TracingHandle { recv: Some(recv) })
     }
 
-    pub fn attach_nats(&mut self, nats: TypedNats, subject: String) -> Result<()> {
+    pub fn attach_nats(&mut self, nats: TypedNats) -> Result<()> {
         let recv = self.recv.take().ok_or_else(|| {
             anyhow!("connect_nats on TracingHandle should not be called more than once.")
         })?;
         tokio::spawn(async move {
-            do_logs(&nats, recv, &subject).await;
+            do_logs(&nats, recv).await;
             tracing::error!("do_logs terminated.");
         });
 

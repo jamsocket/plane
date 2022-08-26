@@ -11,7 +11,7 @@ use dis_spawner::{
         BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
         DroneConnectResponse, DroneStatusMessage, SpawnRequest,
     },
-    nats::{NoReply, TypedNats, TypedSubscription},
+    nats::{TypedNats, TypedSubscription},
     nats_connection::NatsConnection,
     types::{BackendId, DroneId},
 };
@@ -71,13 +71,13 @@ impl Agent {
 struct MockController {
     nats: TypedNats,
     drone_connect_response_subscription:
-        TypedSubscription<DroneConnectRequest, DroneConnectResponse>,
+        TypedSubscription<DroneConnectRequest>,
 }
 
 impl MockController {
     pub async fn new(nats: TypedNats) -> Result<Self> {
         let drone_connect_response_subscription =
-            nats.subscribe(DroneConnectRequest::subject()).await?;
+            nats.subscribe(DroneConnectRequest::subscribe_subject()).await?;
 
         Ok(MockController {
             nats,
@@ -110,7 +110,7 @@ impl MockController {
     pub async fn expect_status_message(&self, drone_id: DroneId, cluster: &str) -> Result<()> {
         let mut status_sub = self
             .nats
-            .subscribe(DroneStatusMessage::subject(drone_id))
+            .subscribe(DroneStatusMessage::subscribe_subject())
             .await?;
 
         let message = timeout(
@@ -127,11 +127,11 @@ impl MockController {
         Ok(())
     }
 
-    pub async fn spawn_backend(&self, drone_id: DroneId, request: &SpawnRequest) -> Result<()> {
+    pub async fn spawn_backend(&self, request: &SpawnRequest) -> Result<()> {
         let result = timeout(
             10_000,
             "Spawn request acknowledged by agent.",
-            self.nats.request(&SpawnRequest::subject(drone_id), request),
+            self.nats.request(request),
         )
         .await?;
 
@@ -141,13 +141,13 @@ impl MockController {
 }
 
 struct BackendStateSubscription {
-    sub: TypedSubscription<BackendStateMessage, NoReply>,
+    sub: TypedSubscription<BackendStateMessage>,
 }
 
 impl BackendStateSubscription {
     pub async fn new(nats: &TypedNats, backend_id: &BackendId) -> Result<Self> {
         let sub = nats
-            .subscribe(BackendStateMessage::subject(backend_id))
+            .subscribe(BackendStateMessage::subscribe_subject(backend_id))
             .await?;
         Ok(BackendStateSubscription { sub })
     }
@@ -240,9 +240,11 @@ async fn spawn_with_agent() -> Result<()> {
         .expect_status_message(drone_id, "spawner.test")
         .await?;
 
-    let request = base_spawn_request();
+    let mut request = base_spawn_request();
+    request.drone_id = drone_id;
+
     let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
-    controller_mock.spawn_backend(drone_id, &request).await?;
+    controller_mock.spawn_backend(&request).await?;
 
     state_subscription
         .expect_backend_status_message(BackendState::Loading, 5_000)
@@ -284,18 +286,19 @@ async fn stats_are_acquired() -> Result<()> {
         .await?;
 
     let mut request = base_spawn_request();
+    request.drone_id = drone_id;
     // Ensure long enough life to report stats.
     request.max_idle_secs = Duration::from_secs(30);
 
     let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
-    controller_mock.spawn_backend(drone_id, &request).await?;
+    controller_mock.spawn_backend(&request).await?;
 
     state_subscription
         .wait_for_state(BackendState::Ready, 60_000)
         .await?;
 
     let mut stats_subscription = nats
-        .subscribe(BackendStatsMessage::subject(&request.backend_id))
+        .subscribe(BackendStatsMessage::subscribe_subject(&request.backend_id))
         .await?;
 
     let stat = timeout(
@@ -341,12 +344,13 @@ async fn handle_error_during_start() -> Result<()> {
         .await?;
 
     let mut request = base_spawn_request();
+    request.drone_id = drone_id;
     // Exit with error code 1 after 100ms.
     request.env.insert("EXIT_CODE".into(), "1".into());
     request.env.insert("EXIT_TIMEOUT".into(), "100".into());
 
     let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
-    controller_mock.spawn_backend(drone_id, &request).await?;
+    controller_mock.spawn_backend(&request).await?;
 
     state_subscription
         .expect_backend_status_message(BackendState::Loading, 5_000)
@@ -375,10 +379,11 @@ async fn handle_failure_after_ready() -> Result<()> {
         .expect_status_message(drone_id, "spawner.test")
         .await?;
 
-    let request = base_spawn_request();
+    let mut request = base_spawn_request();
+    request.drone_id = drone_id;
 
     let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
-    controller_mock.spawn_backend(drone_id, &request).await?;
+    controller_mock.spawn_backend(&request).await?;
 
     state_subscription
         .wait_for_state(BackendState::Ready, 60_000)
@@ -415,10 +420,11 @@ async fn handle_successful_termination() -> Result<()> {
         .expect_status_message(drone_id, "spawner.test")
         .await?;
 
-    let request = base_spawn_request();
+    let mut request = base_spawn_request();
+    request.drone_id = drone_id;
 
     let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
-    controller_mock.spawn_backend(drone_id, &request).await?;
+    controller_mock.spawn_backend(&request).await?;
 
     state_subscription
         .wait_for_state(BackendState::Ready, 60_000)
@@ -456,11 +462,12 @@ async fn handle_agent_restart() -> Result<()> {
             .expect_status_message(drone_id, "spawner.test")
             .await?;
 
-        let request = base_spawn_request();
+        let mut request = base_spawn_request();
+        request.drone_id = drone_id;
 
         let mut state_subscription =
             BackendStateSubscription::new(&nats, &request.backend_id).await?;
-        controller_mock.spawn_backend(drone_id, &request).await?;
+        controller_mock.spawn_backend(&request).await?;
         state_subscription
             .wait_for_state(BackendState::Ready, 60_000)
             .await?;

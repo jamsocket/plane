@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
         } => {
             if let Some(nats) = nats {
                 let nats = nats.connection().await?;
-                tracing_handle.attach_nats(nats, "logs.drone".to_string())?;
+                tracing_handle.attach_nats(nats)?;
             }
 
             let mut futs: Vec<Pin<Box<dyn Future<Output = Result<()>>>>> = vec![];

@@ -68,7 +68,7 @@ async fn listen_for_spawn_requests(
     nats: TypedNats,
     db: DroneDatabase,
 ) -> Result<()> {
-    let mut sub = nats.subscribe(&SpawnRequest::subject(drone_id)).await?;
+    let mut sub = nats.subscribe(&SpawnRequest::subscribe_subject(drone_id)).await?;
     let executor = Arc::new(Executor::new(docker, db, nats));
     executor.resume_backends().await?;
 
@@ -97,14 +97,11 @@ async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: String) {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
-        nc.publish(
-            &DroneStatusMessage::subject(drone_id),
-            &DroneStatusMessage {
-                drone_id,
-                capacity: 100,
-                cluster: cluster.to_string(),
-            },
-        )
+        nc.publish(&DroneStatusMessage {
+            drone_id,
+            capacity: 100,
+            cluster: cluster.to_string(),
+        })
         .await
         .log_error("Error in ready loop.");
 
@@ -118,7 +115,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     // Ensure that status stream exists.
     nats.add_jetstream_stream(
         &BackendStateMessage::stream_name(),
-        BackendStateMessage::subscribe_subject(),
+        BackendStateMessage::wildcard_subject(),
     )
     .await?;
 
@@ -131,13 +128,12 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
 
     tracing::info!("Requesting drone id.");
     let result = {
-        let subject = DroneConnectRequest::subject();
         let request = DroneConnectRequest {
             cluster: cluster.clone(),
             ip,
         };
         do_with_retry(
-            || nats.request(&subject, &request),
+            || nats.request(&request),
             30,
             Duration::from_secs(10),
         )

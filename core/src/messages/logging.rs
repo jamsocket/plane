@@ -6,8 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use tracing::Level;
-
-use crate::nats::{NoReply, Subject};
+use crate::nats::{NoReply, Subject, TypedMessage};
 
 #[derive(Debug)]
 pub struct SerializableLevel(pub Level);
@@ -42,9 +41,10 @@ pub struct LogMessage {
     pub fields: BTreeMap<String, serde_json::Value>,
 }
 
-impl LogMessage {
-    #[must_use]
-    pub fn subject(subject_name: &str) -> Subject<LogMessage, NoReply> {
-        Subject::new(subject_name.to_string())
+impl TypedMessage for LogMessage {
+    type Response = NoReply;
+
+    fn subject(&self) -> Subject<LogMessage> {
+        Subject::new("logs.drone".into())
     }
 }

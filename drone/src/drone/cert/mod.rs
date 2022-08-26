@@ -63,7 +63,6 @@ pub async fn get_certificate(
         tracing::info!("Requesting TXT record from platform.");
         let result = nats
             .request(
-                &SetAcmeDnsRecord::subject(),
                 &SetAcmeDnsRecord {
                     cluster: cluster_domain.to_string(),
                     value,

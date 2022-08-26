@@ -96,7 +96,6 @@ impl Executor {
 
         self.nc
             .publish(
-                &BackendStateMessage::subject(&spawn_request.backend_id),
                 &BackendStateMessage::new(BackendState::Loading, spawn_request.backend_id.clone()),
             )
             .await
@@ -142,8 +141,8 @@ impl Executor {
                     while let Some(v) = stream.next().await {
                         match v {
                             Ok(v) => {
-                                if let Some(message) = DroneLogMessage::from_log_message(&v) {
-                                    nc.publish(&DroneLogMessage::subject(&backend_id), &message)
+                                if let Some(message) = DroneLogMessage::from_log_message(&backend_id, &v) {
+                                    nc.publish(&message)
                                         .await?;
                                 }
                             }
@@ -174,10 +173,9 @@ impl Executor {
 
                     while let Some(v) = stream.next().await {
                         match v {
-                            Ok(v) => match BackendStatsMessage::from_stats_message(&v) {
+                            Ok(v) => match BackendStatsMessage::from_stats_message(&backend_id, &v) {
                                 Some(message) => {
                                     nc.publish(
-                                        &BackendStatsMessage::subject(&backend_id),
                                         &message,
                                     )
                                     .await?;
@@ -245,7 +243,6 @@ impl Executor {
                         .log_error();
                     self.nc
                         .publish(
-                            &BackendStateMessage::subject(&spawn_request.backend_id),
                             &BackendStateMessage::new(state, spawn_request.backend_id.clone()),
                         )
                         .await
