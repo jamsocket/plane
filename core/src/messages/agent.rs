@@ -1,5 +1,5 @@
 use crate::{
-    nats::{NoReply, StreamName, Subject, SubscribeSubject},
+    nats::{NoReply, StreamName, Subject, SubscribeSubject, TypedMessage},
     types::{BackendId, DroneId},
 };
 use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
@@ -17,28 +17,30 @@ pub enum DroneLogMessageKind {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DroneLogMessage {
+    pub backend_id: BackendId,
     pub kind: DroneLogMessageKind,
     pub text: String,
 }
 
+impl TypedMessage for DroneLogMessage {
+    type Response = NoReply;
+
+    fn subject(&self) -> Subject<Self> {
+        Subject::new(format!("backend.{}.log", self.backend_id.id()))
+    }
+
+}
+
 impl DroneLogMessage {
-    #[must_use]
-    pub fn subject(backend_id: &BackendId) -> Subject<DroneLogMessage, NoReply> {
-        Subject::new(format!("backend.{}.log", backend_id.id()))
-    }
-
-    #[must_use]
-    pub fn subscribe_subject() -> SubscribeSubject<DroneLogMessage, NoReply> {
-        SubscribeSubject::new("backend.*.log".into())
-    }
-
-    pub fn from_log_message(log_message: &LogOutput) -> Option<DroneLogMessage> {
+    pub fn from_log_message(backend_id: &BackendId, log_message: &LogOutput) -> Option<DroneLogMessage> {
         match log_message {
             bollard::container::LogOutput::StdErr { message } => Some(DroneLogMessage {
+                backend_id: backend_id.clone(),
                 kind: DroneLogMessageKind::Stderr,
                 text: std::str::from_utf8(message).ok()?.to_string(),
             }),
             bollard::container::LogOutput::StdOut { message } => Some(DroneLogMessage {
+                backend_id: backend_id.clone(),
                 kind: DroneLogMessageKind::Stdout,
                 text: std::str::from_utf8(message).ok()?.to_string(),
             }),
@@ -56,23 +58,28 @@ impl DroneLogMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BackendStatsMessage {
-    //just fractions of max for now,  go from there
+    //just fractions of max for now, go from there
+    backend_id: BackendId,
     pub cpu_use_percent: f64,
     pub mem_use_percent: f64,
 }
 
+impl TypedMessage for BackendStatsMessage {
+    type Response = NoReply;
+
+    fn subject(&self) -> Subject<Self> {
+        Subject::new(format!("backend.{}.stats", self.backend_id.id()))
+    }
+}
+
 impl BackendStatsMessage {
-    #[must_use]
-    pub fn subject(backend_id: &BackendId) -> Subject<BackendStatsMessage, NoReply> {
-        Subject::new(format!("backend.{}.stats", backend_id.id()))
+    pub fn subscribe_subject(backend_id: &BackendId) -> SubscribeSubject<Self> {
+        SubscribeSubject::new(format!("backend.{}.stats", backend_id.id()))
     }
+}
 
-    #[must_use]
-    pub fn subscribe_subject() -> SubscribeSubject<BackendStatsMessage, NoReply> {
-        SubscribeSubject::new("backend.*.stats".into())
-    }
-
-    pub fn from_stats_message(stats_message: &Stats) -> Option<BackendStatsMessage> {
+impl BackendStatsMessage {
+    pub fn from_stats_message(backend_id: &BackendId, stats_message: &Stats) -> Option<BackendStatsMessage> {
         // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
 
         //memory
@@ -106,6 +113,7 @@ impl BackendStatsMessage {
         //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
         Some(BackendStatsMessage {
+            backend_id: backend_id.clone(),
             cpu_use_percent,
             mem_use_percent,
         })
@@ -119,14 +127,16 @@ pub struct DroneStatusMessage {
     pub capacity: u32,
 }
 
-impl DroneStatusMessage {
-    #[must_use]
-    pub fn subject(drone_id: DroneId) -> Subject<DroneStatusMessage, NoReply> {
-        Subject::new(format!("drone.{}.status", drone_id.id()))
-    }
+impl TypedMessage for DroneStatusMessage {
+    type Response = NoReply;
 
-    #[must_use]
-    pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage, bool> {
+    fn subject(&self) -> Subject<DroneStatusMessage> {
+        Subject::new(format!("drone.{}.status", self.drone_id.id()))
+    }
+}
+
+impl DroneStatusMessage {
+    pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage> {
         SubscribeSubject::new("drone.*.status".to_string())
     }
 }
@@ -151,10 +161,17 @@ pub enum DroneConnectResponse {
     NoSuchCluster,
 }
 
-impl DroneConnectRequest {
-    #[must_use]
-    pub fn subject() -> Subject<DroneConnectRequest, DroneConnectResponse> {
+impl TypedMessage for DroneConnectRequest {
+    type Response = DroneConnectResponse;
+
+    fn subject(&self) -> Subject<Self> {
         Subject::new("drone.register".to_string())
+    }
+}
+
+impl DroneConnectRequest {
+    pub fn subscribe_subject() -> SubscribeSubject<Self> {
+        SubscribeSubject::new("drone.register".to_string())
     }
 }
 
@@ -162,6 +179,8 @@ impl DroneConnectRequest {
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SpawnRequest {
+    pub drone_id: DroneId,
+
     /// The container image to run.
     pub image: String,
 
@@ -183,12 +202,20 @@ pub struct SpawnRequest {
     pub credentials: Option<DockerCredentials>,
 }
 
-impl SpawnRequest {
-    #[must_use]
-    pub fn subject(drone_id: DroneId) -> Subject<SpawnRequest, bool> {
-        Subject::new(format!("drone.{}.spawn", drone_id.id()))
+impl TypedMessage for SpawnRequest {
+    type Response = bool;
+
+    fn subject(&self) -> Subject<Self> {
+        Subject::new(format!("drone.{}.spawn", self.drone_id.id()))
     }
 }
+
+impl SpawnRequest {
+    pub fn subscribe_subject(drone_id: DroneId) -> SubscribeSubject<Self> {
+        SubscribeSubject::new(format!("drone.{}.spawn", drone_id.id()))
+    }
+}
+
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackendState {
@@ -294,6 +321,24 @@ pub struct BackendStateMessage {
     pub time: DateTime<Utc>,
 }
 
+impl TypedMessage for BackendStateMessage {
+    type Response = NoReply;
+
+    fn subject(&self) -> Subject<Self> {
+        Subject::new(format!("backend.{}.status", self.backend.id()))
+    }
+}
+
+impl BackendStateMessage {
+    pub fn subscribe_subject(backend_id: &BackendId) -> SubscribeSubject<Self> {
+        SubscribeSubject::new(format!("backend.{}.status", backend_id.id()))
+    }
+
+    pub fn wildcard_subject() -> SubscribeSubject<Self> {
+        SubscribeSubject::new("backend.*.status".into())
+    }
+}
+
 impl BackendStateMessage {
     /// Construct a status message using the current time as its timestamp.
     #[must_use]
@@ -306,17 +351,7 @@ impl BackendStateMessage {
     }
 
     #[must_use]
-    pub fn subject(backend_id: &BackendId) -> Subject<BackendStateMessage, NoReply> {
-        Subject::new(format!("backend.{}.status", backend_id.id()))
-    }
-
-    #[must_use]
-    pub fn subscribe_subject() -> SubscribeSubject<BackendStateMessage, NoReply> {
-        SubscribeSubject::new("backend.*.status".to_string())
-    }
-
-    #[must_use]
-    pub fn stream_name() -> StreamName<BackendStateMessage, NoReply> {
+    pub fn stream_name() -> StreamName<BackendStateMessage> {
         StreamName::new("backend_status".to_string())
     }
 }
