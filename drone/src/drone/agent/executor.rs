@@ -9,6 +9,7 @@ use dashmap::DashMap;
 use dis_spawner::{
     messages::agent::{
         BackendState, BackendStateMessage, BackendStatsMessage, DroneLogMessage, SpawnRequest,
+        TerminationRequest,
     },
     nats::TypedNats,
     types::BackendId,
@@ -102,6 +103,16 @@ impl Executor {
             .log_error();
 
         self.run_backend(spawn_request, BackendState::Loading).await
+    }
+
+    pub async fn kill_backend(
+        &self,
+        termination_request: &TerminationRequest,
+    ) -> Result<(), anyhow::Error> {
+        tracing::info!("Trying to terminate!");
+        self.docker
+            .stop_container(&termination_request.backend_id.to_resource_name())
+            .await
     }
 
     pub async fn resume_backends(self: &Arc<Self>) -> Result<()> {

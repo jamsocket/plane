@@ -1,13 +1,11 @@
 use self::{docker::DockerInterface, executor::Executor};
-use crate::{
-    database::DroneDatabase, database_connection::DatabaseConnection, drone::cli::IpProvider,
-};
+use crate::{database_connection::DatabaseConnection, drone::cli::IpProvider};
 use anyhow::{anyhow, Result};
 use dis_spawner::{
     logging::LogError,
     messages::agent::{
         BackendStateMessage, DroneConnectRequest, DroneConnectResponse, DroneStatusMessage,
-        SpawnRequest,
+        SpawnRequest, TerminationRequest,
     },
     nats::TypedNats,
     nats_connection::NatsConnection,
@@ -64,12 +62,12 @@ pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
 
 async fn listen_for_spawn_requests(
     drone_id: DroneId,
-    docker: DockerInterface,
+    executor: Arc<Executor>,
     nats: TypedNats,
-    db: DroneDatabase,
 ) -> Result<()> {
-    let mut sub = nats.subscribe(&SpawnRequest::subscribe_subject(drone_id)).await?;
-    let executor = Arc::new(Executor::new(docker, db, nats));
+    let mut sub = nats
+        .subscribe(&SpawnRequest::subscribe_subject(drone_id))
+        .await?;
     executor.resume_backends().await?;
 
     loop {
@@ -92,8 +90,32 @@ async fn listen_for_spawn_requests(
     }
 }
 
+async fn listen_for_termination_requests(executor: Arc<Executor>, nats: TypedNats) -> Result<()> {
+    let mut sub = nats
+        .subscribe(TerminationRequest::subscribe_subject())
+        .await?;
+    loop {
+        let req = sub.next().await;
+        match req {
+            Ok(Some(req)) => {
+                let executor = executor.clone();
+
+                req.respond(&true).await?;
+                tokio::spawn(async move { executor.kill_backend(&req.value).await });
+            }
+            Ok(None) => return Err(anyhow!("Termination request subscription closed.")),
+            Err(error) => {
+                tracing::error!(
+                    ?error,
+                    "Non-fatal error when listening for termination requests."
+                )
+            }
+        }
+    }
+}
+
 /// Repeatedly publish a status message advertising this drone as available.
-async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: String) {
+async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: String) -> Result<()> {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
@@ -132,24 +154,19 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
             cluster: cluster.clone(),
             ip,
         };
-        do_with_retry(
-            || nats.request(&request),
-            30,
-            Duration::from_secs(10),
-        )
-        .await?
+        do_with_retry(|| nats.request(&request), 30, Duration::from_secs(10)).await?
     };
 
     match result {
         DroneConnectResponse::Success { drone_id } => {
-            {
-                let nats = nats.clone();
-                let cluster = cluster.clone();
-                tokio::spawn(ready_loop(nats, drone_id, cluster));
-            }
-
+            let executor = Arc::new(Executor::new(docker, db, nats.clone()));
+            let result = tokio::try_join!(
+                ready_loop(nats.clone(), drone_id, cluster.clone()),
+                listen_for_spawn_requests(drone_id, executor.clone(), nats.clone()),
+                listen_for_termination_requests(executor.clone(), nats.clone())
+            );
             tracing::info!("Listening for spawn requests.");
-            listen_for_spawn_requests(drone_id, docker, nats, db).await
+            result.map(|_| ())
         }
         DroneConnectResponse::NoSuchCluster => Err(anyhow!(
             "The platform server did not recognize the cluster {}",

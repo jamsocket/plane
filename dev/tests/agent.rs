@@ -9,7 +9,7 @@ use dev::{
 use dis_spawner::{
     messages::agent::{
         BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
-        DroneConnectResponse, DroneStatusMessage, SpawnRequest,
+        DroneConnectResponse, DroneStatusMessage, SpawnRequest, TerminationRequest,
     },
     nats::{TypedNats, TypedSubscription},
     nats_connection::NatsConnection,
@@ -70,14 +70,14 @@ impl Agent {
 
 struct MockController {
     nats: TypedNats,
-    drone_connect_response_subscription:
-        TypedSubscription<DroneConnectRequest>,
+    drone_connect_response_subscription: TypedSubscription<DroneConnectRequest>,
 }
 
 impl MockController {
     pub async fn new(nats: TypedNats) -> Result<Self> {
-        let drone_connect_response_subscription =
-            nats.subscribe(DroneConnectRequest::subscribe_subject()).await?;
+        let drone_connect_response_subscription = nats
+            .subscribe(DroneConnectRequest::subscribe_subject())
+            .await?;
 
         Ok(MockController {
             nats,
@@ -136,6 +136,13 @@ impl MockController {
         .await?;
 
         assert!(result, "Spawn request should result in response of _true_.");
+        Ok(())
+    }
+
+    pub async fn terminate_backend(&self, request: &TerminationRequest) -> Result<()> {
+        let result = timeout(10_000, "Termination!", self.nats.request(request)).await?;
+
+        assert!(result, "Termination should result in response of _true_.");
         Ok(())
     }
 }
@@ -486,5 +493,55 @@ async fn handle_agent_restart() -> Result<()> {
             .await?;
     }
 
+    Ok(())
+}
+
+#[integration_test]
+async fn handle_termination_request() -> Result<()> {
+    let nats = Nats::new().await?;
+    let agent = Agent::new(&nats).await?;
+    let nats = nats.connection().await?;
+    let mut controller_mock = MockController::new(nats.clone()).await?;
+
+    let mut request = base_spawn_request();
+
+    controller_mock
+        .expect_handshake(request.drone_id, agent.ip)
+        .await?;
+    controller_mock
+        .expect_status_message(request.drone_id, "spawner.test")
+        .await?;
+
+    request.max_idle_secs = Duration::from_secs(1000);
+    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+
+    controller_mock.spawn_backend(&request).await?;
+    state_subscription
+        .wait_for_state(BackendState::Ready, 60_000)
+        .await?;
+
+    let proxy_route = agent
+        .db
+        .get_proxy_route(request.backend_id.id())
+        .await?
+        .expect("Expected proxy route.");
+    tokio::spawn(async move {
+        loop {
+            let result = reqwest::get(format!("http://{}/", proxy_route)).await;
+            tracing::info!(?result);
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+    });
+
+    let termination_request = TerminationRequest {
+        backend_id: request.backend_id.clone(),
+    };
+    controller_mock
+        .terminate_backend(&termination_request)
+        .await?;
+
+    state_subscription
+        .wait_for_state(BackendState::Failed, 60_000)
+        .await?;
     Ok(())
 }
