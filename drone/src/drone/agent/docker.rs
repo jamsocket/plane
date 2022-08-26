@@ -8,6 +8,7 @@ use bollard::{
     },
     image::CreateImageOptions,
     models::{EventMessage, HostConfig, PortBinding},
+    service::ResourcesUlimits,
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
@@ -18,6 +19,8 @@ use tokio_stream::{Stream, StreamExt};
 const CONTAINER_PORT: u16 = 8080;
 const DEFAULT_DOCKER_TIMEOUT_SECONDS: u64 = 30;
 const DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SECS: u64 = 10;
+const DEFAULT_NANO_CPUS: i64 = (0.2 * 1e9) as i64; //in units of (1e-9 CPU)
+const DEFAULT_CPU_TIME_ULIMIT: i64 = 30; //in minutes
 
 #[derive(Clone)]
 pub struct DockerInterface {
@@ -304,6 +307,12 @@ impl DockerInterface {
                         .collect(),
                     ),
                     runtime: self.runtime.clone(),
+                    nano_cpus: Some(DEFAULT_NANO_CPUS),
+                    ulimits: Some(vec![ResourcesUlimits {
+                        name: Some("cpu".to_string()),
+                        soft: Some(DEFAULT_CPU_TIME_ULIMIT),
+                        hard: Some(DEFAULT_CPU_TIME_ULIMIT),
+                    }]),
                     ..HostConfig::default()
                 }),
                 ..Config::default()
