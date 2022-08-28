@@ -523,6 +523,7 @@ dependencies = [
  "bollard",
  "chrono",
  "dis-spawner",
+ "dis-spawner-controller",
  "dis-spawner-drone",
  "futures",
  "http",

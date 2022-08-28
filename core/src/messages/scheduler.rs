@@ -37,7 +37,7 @@ pub struct ScheduleRequest {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ScheduleResponse {
     /// The drone onto which the backend was scheduled.
-    drone: DroneId,
+    pub drone: DroneId,
 }
 
 impl TypedMessage for ScheduleRequest {
