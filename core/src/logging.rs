@@ -31,14 +31,14 @@ pub struct TracingHandle {
 }
 
 impl TracingHandle {
-    pub fn init() -> Result<Self> {
+    pub fn init(channel: String) -> Result<Self> {
         let (send, recv) = tokio::sync::mpsc::channel::<LogMessage>(128);
 
         let filter_layer =
             EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new(LOG_DEFAULT))?;
 
         let registry = tracing_subscriber::registry()
-            .with(LogManagerLogger::new(send))
+            .with(LogManagerLogger::new(send, channel))
             .with(filter_layer);
 
         let trace_stackdriver = std::env::var(TRACE_STACKDRIVER).is_ok();
@@ -89,11 +89,12 @@ impl<T> LogError<()> for Option<T> {
 
 pub struct LogManagerLogger {
     sender: Sender<LogMessage>,
+    channel: String,
 }
 
 impl LogManagerLogger {
-    fn new(sender: Sender<LogMessage>) -> LogManagerLogger {
-        LogManagerLogger { sender }
+    fn new(sender: Sender<LogMessage>, channel: String,) -> LogManagerLogger {
+        LogManagerLogger { sender, channel }
     }
 }
 
@@ -137,6 +138,7 @@ where
         event.record(&mut visitor);
 
         let output = LogMessage {
+            log_channel: self.channel.clone(),
             target: event.metadata().target().to_string(),
             name: event.metadata().name().to_string(),
             severity: SerializableLevel(*event.metadata().level()),
