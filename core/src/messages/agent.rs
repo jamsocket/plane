@@ -58,6 +58,10 @@ impl DroneLogMessage {
         StreamName::new("backend_log".into())
     }
 
+    pub fn subscribe_subject(backend: &BackendId) -> SubscribeSubject<Self> {
+        SubscribeSubject::new(format!("backend.{}.log", backend))
+    }
+
     pub fn wildcard_subject() -> SubscribeSubject<Self> {
         SubscribeSubject::new("backend.*.log".into())
     }
