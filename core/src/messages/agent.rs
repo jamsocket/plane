@@ -28,7 +28,6 @@ impl TypedMessage for DroneLogMessage {
     fn subject(&self) -> Subject<Self> {
         Subject::new(format!("backend.{}.log", self.backend_id.id()))
     }
-
 }
 
 impl DroneLogMessage {
@@ -53,6 +52,14 @@ impl DroneLogMessage {
                 None
             }
         }
+    }
+
+    pub fn stream_name() -> StreamName<Self> {
+        StreamName::new("backend_log".into())
+    }
+
+    pub fn wildcard_subject() -> SubscribeSubject<Self> {
+        SubscribeSubject::new("backend.*.log".into())
     }
 }
 
