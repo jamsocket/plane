@@ -34,6 +34,7 @@ impl<'de> Deserialize<'de> for SerializableLevel {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LogMessage {
+    pub log_channel: String,
     pub target: String,
     pub name: String,
     pub severity: SerializableLevel,
@@ -45,6 +46,6 @@ impl TypedMessage for LogMessage {
     type Response = NoReply;
 
     fn subject(&self) -> Subject<LogMessage> {
-        Subject::new("logs.drone".into())
+        Subject::new(format!("logs.{}", self.log_channel))
     }
 }

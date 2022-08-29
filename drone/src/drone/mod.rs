@@ -19,7 +19,7 @@ pub mod cli;
 pub mod proxy;
 
 async fn main() -> Result<()> {
-    let mut tracing_handle = TracingHandle::init()?;
+    let mut tracing_handle = TracingHandle::init("drone".into())?;
 
     let opts = Opts::parse();
     let plan = DronePlan::try_from(opts)?;
