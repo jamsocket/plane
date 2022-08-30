@@ -11,6 +11,7 @@ dashmap = "5.3.4"
 dis-spawner = {path = "../core"}
 rand = "0.8.5"
 tokio = { version = "1.20.1", features = ["macros", "rt"] }
+tracing = "0.1.36"
 
 [[bin]]
 name = "spawner-controller"

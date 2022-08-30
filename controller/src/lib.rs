@@ -29,11 +29,14 @@ pub async fn run_scheduler(nats: TypedNats) -> Result<()> {
             spawn_request = spawn_request_sub.next() => {
                 let spawn_request = spawn_request.unwrap().unwrap();
 
-                let drone_id = scheduler.schedule().unwrap();
+                let result = match scheduler.schedule() {
+                    Ok(drone_id) => ScheduleResponse::Scheduled {
+                        drone: drone_id
+                    },
+                    Err(_) => ScheduleResponse::NoDroneAvailable,
+                };
 
-                spawn_request.respond(&ScheduleResponse {
-                    drone: drone_id
-                }).await?;
+                spawn_request.respond(&result).await?;
             }
         }
     }

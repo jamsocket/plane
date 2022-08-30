@@ -1,17 +1,34 @@
 use crate::{
-    nats::{TypedMessage, Subject, SubscribeSubject},
+    nats::{Subject, SubscribeSubject, TypedMessage},
     types::{BackendId, DroneId},
 };
-use bollard::{auth::DockerCredentials};
+use bollard::auth::DockerCredentials;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
-use std::{collections::HashMap,time::Duration};
+use std::{collections::HashMap, time::Duration};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClusterId {
+    hostname: String,
+}
+
+impl ClusterId {
+    pub fn new(name: &str) -> Self {
+        ClusterId {
+            hostname: name.to_string(),
+        }
+    }
+
+    pub fn subject_name(&self) -> String {
+        self.hostname.replace('.', "_")
+    }
+}
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ScheduleRequest {
-    pub cluster: String,
+    pub cluster: ClusterId,
 
     /// The container image to run.
     pub image: String,
@@ -34,17 +51,17 @@ pub struct ScheduleRequest {
     pub credentials: Option<DockerCredentials>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ScheduleResponse {
-    /// The drone onto which the backend was scheduled.
-    pub drone: DroneId,
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum ScheduleResponse {
+    Scheduled { drone: DroneId },
+    NoDroneAvailable,
 }
 
 impl TypedMessage for ScheduleRequest {
     type Response = ScheduleResponse;
 
     fn subject(&self) -> Subject<Self> {
-        Subject::new(format!("cluster.{}.schedule", self.cluster))
+        Subject::new(format!("cluster.{}.schedule", self.cluster.subject_name()))
     }
 }
 
