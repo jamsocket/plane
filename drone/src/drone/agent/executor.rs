@@ -9,6 +9,7 @@ use dashmap::DashMap;
 use dis_spawner::{
     messages::agent::{
         BackendState, BackendStateMessage, BackendStatsMessage, DroneLogMessage, SpawnRequest,
+        TerminationRequest,
     },
     nats::TypedNats,
     types::BackendId,
@@ -36,11 +37,12 @@ impl<T, E: Debug> LogError for Result<T, E> {
     }
 }
 
+#[derive(Clone)]
 pub struct Executor {
     docker: DockerInterface,
     database: DroneDatabase,
     nc: TypedNats,
-    _container_events_handle: JoinHandle<()>,
+    _container_events_handle: Arc<JoinHandle<()>>,
     backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
     backend_to_log_loop:
         Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
@@ -60,7 +62,7 @@ impl Executor {
             docker,
             database,
             nc,
-            _container_events_handle: container_events_handle,
+            _container_events_handle: Arc::new(container_events_handle),
             backend_to_listener,
             backend_to_log_loop: Arc::default(),
             backend_to_stats_loop: Arc::default(),
@@ -95,16 +97,27 @@ impl Executor {
             .log_error();
 
         self.nc
-            .publish(
-                &BackendStateMessage::new(BackendState::Loading, spawn_request.backend_id.clone()),
-            )
+            .publish(&BackendStateMessage::new(
+                BackendState::Loading,
+                spawn_request.backend_id.clone(),
+            ))
             .await
             .log_error();
 
         self.run_backend(spawn_request, BackendState::Loading).await
     }
 
-    pub async fn resume_backends(self: &Arc<Self>) -> Result<()> {
+    pub async fn kill_backend(
+        &self,
+        termination_request: &TerminationRequest,
+    ) -> Result<(), anyhow::Error> {
+        tracing::info!(backend_id=%termination_request.backend_id, "Trying to terminate backend");
+        self.docker
+            .stop_container(&termination_request.backend_id.to_resource_name())
+            .await
+    }
+
+    pub async fn resume_backends(self: &Self) -> Result<()> {
         let backends = self.database.get_backends().await?;
 
         for backend in backends {
@@ -141,9 +154,10 @@ impl Executor {
                     while let Some(v) = stream.next().await {
                         match v {
                             Ok(v) => {
-                                if let Some(message) = DroneLogMessage::from_log_message(&backend_id, &v) {
-                                    nc.publish(&message)
-                                        .await?;
+                                if let Some(message) =
+                                    DroneLogMessage::from_log_message(&backend_id, &v)
+                                {
+                                    nc.publish(&message).await?;
                                 }
                             }
                             Err(error) => {
@@ -173,12 +187,10 @@ impl Executor {
 
                     while let Some(v) = stream.next().await {
                         match v {
-                            Ok(v) => match BackendStatsMessage::from_stats_message(&backend_id, &v) {
+                            Ok(v) => match BackendStatsMessage::from_stats_message(&backend_id, &v)
+                            {
                                 Some(message) => {
-                                    nc.publish(
-                                        &message,
-                                    )
-                                    .await?;
+                                    nc.publish(&message).await?;
                                 }
                                 None => {
                                     let message =
@@ -242,9 +254,10 @@ impl Executor {
                         .await
                         .log_error();
                     self.nc
-                        .publish(
-                            &BackendStateMessage::new(state, spawn_request.backend_id.clone()),
-                        )
+                        .publish(&BackendStateMessage::new(
+                            state,
+                            spawn_request.backend_id.clone(),
+                        ))
                         .await
                         .log_error();
                 }

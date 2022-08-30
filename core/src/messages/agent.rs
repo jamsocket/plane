@@ -31,7 +31,10 @@ impl TypedMessage for DroneLogMessage {
 }
 
 impl DroneLogMessage {
-    pub fn from_log_message(backend_id: &BackendId, log_message: &LogOutput) -> Option<DroneLogMessage> {
+    pub fn from_log_message(
+        backend_id: &BackendId,
+        log_message: &LogOutput,
+    ) -> Option<DroneLogMessage> {
         match log_message {
             bollard::container::LogOutput::StdErr { message } => Some(DroneLogMessage {
                 backend_id: backend_id.clone(),
@@ -90,7 +93,10 @@ impl BackendStatsMessage {
 }
 
 impl BackendStatsMessage {
-    pub fn from_stats_message(backend_id: &BackendId, stats_message: &Stats) -> Option<BackendStatsMessage> {
+    pub fn from_stats_message(
+        backend_id: &BackendId,
+        stats_message: &Stats,
+    ) -> Option<BackendStatsMessage> {
         // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
 
         //memory
@@ -227,6 +233,26 @@ impl SpawnRequest {
     }
 }
 
+/// A message telling a drone to terminate a backend.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TerminationRequest {
+    pub backend_id: BackendId,
+}
+
+impl TypedMessage for TerminationRequest {
+    type Response = bool;
+
+    fn subject(&self) -> Subject<Self> {
+        Subject::new(format!("backend.{}.terminate", self.backend_id.id()))
+    }
+}
+
+impl TerminationRequest {
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<TerminationRequest> {
+        SubscribeSubject::new("backend.*.terminate".into())
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackendState {

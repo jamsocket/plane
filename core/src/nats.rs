@@ -204,7 +204,7 @@ where
 
 impl<T> TypedSubscription<T>
 where
-    T: TypedMessage
+    T: TypedMessage,
 {
     fn new(subscription: Subscriber, nc: Client) -> Self {
         TypedSubscription {
@@ -288,11 +288,7 @@ impl TypedNats {
         TypedNats { nc, jetstream }
     }
 
-    pub async fn get_latest<T>(
-        &self,
-        subject: &Subject<T>,
-        stream_name: &str,
-    ) -> Result<Option<T>>
+    pub async fn get_latest<T>(&self, subject: &Subject<T>, stream_name: &str) -> Result<Option<T>>
     where
         T: TypedMessage<Response = NoReply>,
     {
