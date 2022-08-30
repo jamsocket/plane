@@ -107,7 +107,7 @@ pub async fn get_certificate(
         .await?
         .ok_or_else(|| anyhow!("ACME order response didn't include certificate."))?;
 
-    if cert.len() == 0 {
+    if cert.is_empty() {
         return Err(anyhow!("Certificate list is empty."));
     }
 
@@ -124,7 +124,7 @@ pub async fn refresh_certificate(cert_options: &CertOptions, client: &Client) ->
         &nats,
         &cert_options.acme_server_url,
         &cert_options.email,
-        &client,
+        client,
         cert_options.acme_eab_keypair.as_ref(),
     )
     .await?;

@@ -1,7 +1,8 @@
 use anyhow::Result;
 use chrono::Utc;
 use dis_spawner::{
-    messages::agent::DroneStatusMessage, messages::scheduler::{ScheduleRequest, ScheduleResponse},
+    messages::agent::DroneStatusMessage,
+    messages::scheduler::{ScheduleRequest, ScheduleResponse},
     nats::TypedNats,
 };
 use scheduler::Scheduler;

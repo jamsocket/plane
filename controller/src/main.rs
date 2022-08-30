@@ -1,8 +1,7 @@
-use dis_spawner_controller::run_scheduler;
-use tokio;
 use anyhow::Result;
 use clap::Parser;
 use dis_spawner::nats_connection::NatsConnection;
+use dis_spawner_controller::run_scheduler;
 
 #[derive(Parser)]
 struct Opts {
