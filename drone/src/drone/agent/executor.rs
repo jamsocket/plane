@@ -96,9 +96,10 @@ impl Executor {
             .log_error();
 
         self.nc
-            .publish(
-                &BackendStateMessage::new(BackendState::Loading, spawn_request.backend_id.clone()),
-            )
+            .publish(&BackendStateMessage::new(
+                BackendState::Loading,
+                spawn_request.backend_id.clone(),
+            ))
             .await
             .log_error();
 
@@ -109,7 +110,7 @@ impl Executor {
         &self,
         termination_request: &TerminationRequest,
     ) -> Result<(), anyhow::Error> {
-        tracing::info!("Trying to terminate!");
+        tracing::info!(backend_id=%termination_request.backend_id, "Trying to terminate backend");
         self.docker
             .stop_container(&termination_request.backend_id.to_resource_name())
             .await
@@ -152,9 +153,10 @@ impl Executor {
                     while let Some(v) = stream.next().await {
                         match v {
                             Ok(v) => {
-                                if let Some(message) = DroneLogMessage::from_log_message(&backend_id, &v) {
-                                    nc.publish(&message)
-                                        .await?;
+                                if let Some(message) =
+                                    DroneLogMessage::from_log_message(&backend_id, &v)
+                                {
+                                    nc.publish(&message).await?;
                                 }
                             }
                             Err(error) => {
@@ -184,12 +186,10 @@ impl Executor {
 
                     while let Some(v) = stream.next().await {
                         match v {
-                            Ok(v) => match BackendStatsMessage::from_stats_message(&backend_id, &v) {
+                            Ok(v) => match BackendStatsMessage::from_stats_message(&backend_id, &v)
+                            {
                                 Some(message) => {
-                                    nc.publish(
-                                        &message,
-                                    )
-                                    .await?;
+                                    nc.publish(&message).await?;
                                 }
                                 None => {
                                     let message =
@@ -253,9 +253,10 @@ impl Executor {
                         .await
                         .log_error();
                     self.nc
-                        .publish(
-                            &BackendStateMessage::new(state, spawn_request.backend_id.clone()),
-                        )
+                        .publish(&BackendStateMessage::new(
+                            state,
+                            spawn_request.backend_id.clone(),
+                        ))
                         .await
                         .log_error();
                 }

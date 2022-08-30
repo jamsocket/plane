@@ -504,6 +504,7 @@ async fn handle_termination_request() -> Result<()> {
     let mut controller_mock = MockController::new(nats.clone()).await?;
 
     let mut request = base_spawn_request();
+    request.max_idle_secs = Duration::from_secs(10000);
 
     controller_mock
         .expect_handshake(request.drone_id, agent.ip)
@@ -520,11 +521,14 @@ async fn handle_termination_request() -> Result<()> {
         .wait_for_state(BackendState::Ready, 60_000)
         .await?;
 
+    /*
     let proxy_route = agent
         .db
         .get_proxy_route(request.backend_id.id())
         .await?
         .expect("Expected proxy route.");
+    */
+    /*
     tokio::spawn(async move {
         loop {
             let result = reqwest::get(format!("http://{}/", proxy_route)).await;
@@ -532,6 +536,7 @@ async fn handle_termination_request() -> Result<()> {
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
     });
+    */
 
     let termination_request = TerminationRequest {
         backend_id: request.backend_id.clone(),
