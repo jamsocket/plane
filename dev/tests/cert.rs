@@ -29,7 +29,9 @@ struct DummyDnsHandler {
 impl DummyDnsHandler {
     pub async fn new(conn: &TypedNats, expect_domain: &str) -> Result<DummyDnsHandler> {
         let expect_domain = expect_domain.to_owned();
-        let mut dns_sub = conn.subscribe(SetAcmeDnsRecord::subscribe_subject()).await?;
+        let mut dns_sub = conn
+            .subscribe(SetAcmeDnsRecord::subscribe_subject())
+            .await?;
         let handle = spawn_timeout(10_000, "Should get ACME DNS request.", async move {
             let message = dns_sub.next().await.unwrap().unwrap();
             assert_eq!(expect_domain, message.value.cluster);

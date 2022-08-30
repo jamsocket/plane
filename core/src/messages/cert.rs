@@ -1,5 +1,5 @@
+use crate::nats::{Subject, SubscribeSubject, TypedMessage};
 use serde::{Deserialize, Serialize};
-use crate::nats::{Subject, TypedMessage, SubscribeSubject};
 
 /// A request from the drone to the DNS server telling it to set
 /// a TXT record on the given domain with the given value.

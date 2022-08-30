@@ -1,3 +1,4 @@
+use crate::nats::{NoReply, Subject, TypedMessage};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use core::str::FromStr;
@@ -6,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use tracing::Level;
-use crate::nats::{NoReply, Subject, TypedMessage};
 
 #[derive(Debug)]
 pub struct SerializableLevel(pub Level);
