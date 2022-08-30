@@ -14,7 +14,7 @@ use dis_spawner::{
 };
 use http::Uri;
 use hyper::Client;
-use std::{net::IpAddr, sync::Arc, time::Duration};
+use std::{net::IpAddr, time::Duration};
 
 mod docker;
 mod executor;
@@ -62,7 +62,7 @@ pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
 
 async fn listen_for_spawn_requests(
     drone_id: DroneId,
-    executor: Arc<Executor>,
+    executor: Executor,
     nats: TypedNats,
 ) -> Result<()> {
     let mut sub = nats
@@ -90,7 +90,7 @@ async fn listen_for_spawn_requests(
     }
 }
 
-async fn listen_for_termination_requests(executor: Arc<Executor>, nats: TypedNats) -> Result<()> {
+async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) -> Result<()> {
     let mut sub = nats
         .subscribe(TerminationRequest::subscribe_subject())
         .await?;
@@ -159,7 +159,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
 
     match result {
         DroneConnectResponse::Success { drone_id } => {
-            let executor = Arc::new(Executor::new(docker, db, nats.clone()));
+            let executor = Executor::new(docker, db, nats.clone());
             let result = tokio::try_join!(
                 ready_loop(nats.clone(), drone_id, cluster.clone()),
                 listen_for_spawn_requests(drone_id, executor.clone(), nats.clone()),

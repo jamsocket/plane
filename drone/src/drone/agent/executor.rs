@@ -37,11 +37,12 @@ impl<T, E: Debug> LogError for Result<T, E> {
     }
 }
 
+#[derive(Clone)]
 pub struct Executor {
     docker: DockerInterface,
     database: DroneDatabase,
     nc: TypedNats,
-    _container_events_handle: JoinHandle<()>,
+    _container_events_handle: Arc<JoinHandle<()>>,
     backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
     backend_to_log_loop:
         Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
@@ -61,7 +62,7 @@ impl Executor {
             docker,
             database,
             nc,
-            _container_events_handle: container_events_handle,
+            _container_events_handle: Arc::new(container_events_handle),
             backend_to_listener,
             backend_to_log_loop: Arc::default(),
             backend_to_stats_loop: Arc::default(),
@@ -116,7 +117,7 @@ impl Executor {
             .await
     }
 
-    pub async fn resume_backends(self: &Arc<Self>) -> Result<()> {
+    pub async fn resume_backends(self: &Self) -> Result<()> {
         let backends = self.database.get_backends().await?;
 
         for backend in backends {
