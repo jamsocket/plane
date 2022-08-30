@@ -69,6 +69,7 @@ async fn listen_for_spawn_requests(
         .subscribe(&SpawnRequest::subscribe_subject(drone_id))
         .await?;
     executor.resume_backends().await?;
+    tracing::info!("Listening for spawn requests.");
 
     loop {
         let req = sub.next().await;
@@ -94,6 +95,7 @@ async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) ->
     let mut sub = nats
         .subscribe(TerminationRequest::subscribe_subject())
         .await?;
+    tracing::info!("Listening for termination requests.");
     loop {
         let req = sub.next().await;
         match req {
@@ -165,7 +167,6 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
                 listen_for_spawn_requests(drone_id, executor.clone(), nats.clone()),
                 listen_for_termination_requests(executor.clone(), nats.clone())
             );
-            tracing::info!("Listening for spawn requests.");
             result.map(|_| ())
         }
         DroneConnectResponse::NoSuchCluster => Err(anyhow!(
