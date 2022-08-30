@@ -3,10 +3,10 @@ use crate::{database_connection::DatabaseConnection, drone::cli::IpProvider};
 use anyhow::{anyhow, Result};
 use dis_spawner::{
     logging::LogError,
-    messages::agent::{
+    messages::{agent::{
         BackendStateMessage, DroneConnectRequest, DroneConnectResponse, DroneStatusMessage,
         SpawnRequest, TerminationRequest,
-    },
+    }, scheduler::ClusterId},
     nats::TypedNats,
     nats_connection::NatsConnection,
     retry::do_with_retry,
@@ -41,7 +41,7 @@ pub struct DockerOptions {
 pub struct AgentOptions {
     pub db: DatabaseConnection,
     pub nats: NatsConnection,
-    pub cluster_domain: String,
+    pub cluster_domain: ClusterId,
 
     /// Public IP of the machine the drone is running on.
     pub ip: IpProvider,
@@ -117,14 +117,14 @@ async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) ->
 }
 
 /// Repeatedly publish a status message advertising this drone as available.
-async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: String) -> Result<()> {
+async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterId) -> Result<()> {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
         nc.publish(&DroneStatusMessage {
             drone_id,
             capacity: 100,
-            cluster: cluster.to_string(),
+            cluster: cluster.clone(),
         })
         .await
         .log_error("Error in ready loop.");
@@ -147,7 +147,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
     tracing::info!("Connecting to sqlite.");
     let db = agent_opts.db.connection().await?;
-    let cluster = agent_opts.cluster_domain.to_string();
+    let cluster = agent_opts.cluster_domain.clone();
     let ip = agent_opts.ip.get_ip().await?;
 
     tracing::info!("Requesting drone id.");

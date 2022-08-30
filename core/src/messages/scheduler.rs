@@ -6,9 +6,9 @@ use bollard::auth::DockerCredentials;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, time::Duration, fmt::Display};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ClusterId {
     hostname: String,
 }
@@ -22,6 +22,12 @@ impl ClusterId {
 
     pub fn subject_name(&self) -> String {
         self.hostname.replace('.', "_")
+    }
+}
+
+impl Display for ClusterId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.hostname.fmt(f)
     }
 }
 

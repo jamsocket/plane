@@ -9,6 +9,8 @@ use serde_with::serde_as;
 use serde_with::DurationSeconds;
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
 
+use super::scheduler::ClusterId;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DroneLogMessageKind {
     Stdout,
@@ -140,7 +142,7 @@ impl BackendStatsMessage {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
-    pub cluster: String,
+    pub cluster: ClusterId,
     pub capacity: u32,
 }
 
@@ -162,7 +164,7 @@ impl DroneStatusMessage {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DroneConnectRequest {
     /// The cluster the drone is requesting to join.
-    pub cluster: String,
+    pub cluster: ClusterId,
 
     /// The public-facing IP address of the drone.
     pub ip: IpAddr,
