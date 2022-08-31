@@ -93,7 +93,7 @@ pub struct LogManagerLogger {
 }
 
 impl LogManagerLogger {
-    fn new(sender: Sender<LogMessage>, channel: String,) -> LogManagerLogger {
+    fn new(sender: Sender<LogMessage>, channel: String) -> LogManagerLogger {
         LogManagerLogger { sender, channel }
     }
 }
