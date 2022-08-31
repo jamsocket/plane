@@ -254,7 +254,46 @@ pub struct TypedNats {
     jetstream: Context,
 }
 
+pub struct DelayedReply<T: DeserializeOwned> {
+    subscription: Subscriber,
+    _ph: PhantomData<T>,
+}
+
+impl<T: DeserializeOwned> DelayedReply<T> {
+    pub async fn response(&mut self) -> Result<T> {
+        let message = self
+            .subscription
+            .next()
+            .await
+            .ok_or_else(|| anyhow!("Expected response."))?;
+
+        Ok(serde_json::from_slice(&message.payload)?)
+    }
+}
+
 impl TypedNats {
+    /// Send a request that expects a reply, but return as soon as the request
+    /// is sent with a handle that can later be awaited for the result.
+    pub async fn split_request<T>(&self, message: &T) -> Result<DelayedReply<T::Response>>
+    where
+        T: TypedMessage,
+    {
+        let inbox = self.nc.new_inbox();
+        let subscription = self.nc.subscribe(inbox.clone()).await.to_anyhow()?;
+        self.nc
+            .publish_with_reply(
+                message.subject().subject().to_string(),
+                inbox,
+                Bytes::from(serde_json::to_vec(&message)?),
+            )
+            .await.to_anyhow()?;
+
+        Ok(DelayedReply {
+            subscription,
+            _ph: PhantomData::default(),
+        })
+    }
+
     pub async fn add_jetstream_stream<P, T>(
         &self,
         stream_name: &StreamName<T>,

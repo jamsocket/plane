@@ -6,7 +6,9 @@ use bollard::auth::DockerCredentials;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
-use std::{collections::HashMap, time::Duration, fmt::Display};
+use std::{collections::HashMap, fmt::Display, time::Duration};
+
+use super::agent::SpawnRequest;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ClusterId {
@@ -55,6 +57,20 @@ pub struct ScheduleRequest {
 
     /// Credentials used to fetch the image.
     pub credentials: Option<DockerCredentials>,
+}
+
+impl ScheduleRequest {
+    pub fn schedule(&self, drone_id: DroneId) -> SpawnRequest {
+        SpawnRequest {
+            drone_id,
+            image: self.image.clone(),
+            backend_id: self.backend_id.clone(),
+            max_idle_secs: self.max_idle_secs,
+            env: self.env.clone(),
+            metadata: self.metadata.clone(),
+            credentials: self.credentials.clone(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

@@ -31,8 +31,11 @@ pub async fn run_scheduler(nats: TypedNats) -> Result<()> {
                 let spawn_request = spawn_request.unwrap().unwrap();
 
                 let result = match scheduler.schedule() {
-                    Ok(drone_id) => ScheduleResponse::Scheduled {
-                        drone: drone_id
+                    Ok(drone_id) => {
+                        match nats.request(&spawn_request.value.schedule(drone_id)).await {
+                            Ok(false) | Err(_) => ScheduleResponse::NoDroneAvailable,
+                            Ok(true) => ScheduleResponse::Scheduled { drone: drone_id }
+                        }
                     },
                     Err(_) => ScheduleResponse::NoDroneAvailable,
                 };

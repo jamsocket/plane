@@ -196,7 +196,7 @@ impl DroneConnectRequest {
 
 /// A message telling a drone to spawn a backend.
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SpawnRequest {
     pub drone_id: DroneId,
 
