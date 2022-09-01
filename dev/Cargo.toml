@@ -10,6 +10,7 @@ bollard = "0.13.0"
 chrono = "0.4.22"
 dis-spawner = {path = "../core"}
 dis-spawner-drone = {path = "../drone"}
+dis-spawner-controller = {path = "../controller"}
 futures = "0.3.23"
 http = "0.2.8"
 hyper = "0.14.20"

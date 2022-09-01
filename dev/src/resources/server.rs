@@ -56,7 +56,7 @@ impl Server {
             .unwrap();
 
         loop {
-            let url = format!("http://{}/", self.address.to_string());
+            let url = format!("http://{}/", self.address);
             let result = tokio::time::timeout_at(deadline, reqwest::get(&url)).await;
             match result {
                 Ok(Ok(_)) => return Ok(()),

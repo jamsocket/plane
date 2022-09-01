@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use dis_spawner::messages::agent::SpawnRequest;
+use dis_spawner::messages::scheduler::{ClusterId, ScheduleRequest};
 use dis_spawner::types::BackendId;
 use dis_spawner::types::DroneId;
 use rand::distributions::Alphanumeric;
@@ -112,7 +113,20 @@ pub fn base_spawn_request() -> SpawnRequest {
     SpawnRequest {
         drone_id: DroneId::new(0),
         image: TEST_IMAGE.into(),
-        backend_id: backend_id.clone(),
+        backend_id,
+        max_idle_secs: Duration::from_secs(10),
+        env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
+        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
+        credentials: None,
+    }
+}
+
+pub fn base_scheduler_request() -> ScheduleRequest {
+    let backend_id = random_backend_id(&test_name());
+    ScheduleRequest {
+        cluster: ClusterId::new("spawner.test"),
+        image: TEST_IMAGE.into(),
+        backend_id,
         max_idle_secs: Duration::from_secs(10),
         env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
         metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
