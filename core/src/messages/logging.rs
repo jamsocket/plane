@@ -1,4 +1,4 @@
-use crate::nats::{NoReply, Subject, TypedMessage};
+use crate::nats::{NoReply, TypedMessage};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use core::str::FromStr;
@@ -45,7 +45,7 @@ pub struct LogMessage {
 impl TypedMessage for LogMessage {
     type Response = NoReply;
 
-    fn subject(&self) -> Subject<LogMessage> {
-        Subject::new(format!("logs.{}", self.log_channel))
+    fn subject(&self) -> String {
+        format!("logs.{}", self.log_channel)
     }
 }
