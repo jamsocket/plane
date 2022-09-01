@@ -1,3 +1,4 @@
+use crate::test_name;
 use anyhow::{anyhow, Result};
 use dis_spawner::messages::agent::SpawnRequest;
 use dis_spawner::messages::scheduler::{ClusterId, ScheduleRequest};
@@ -13,7 +14,6 @@ use std::{
     time::Duration,
 };
 use tokio::net::TcpSocket;
-use crate::test_name;
 
 const POLL_LOOP_SLEEP: u64 = 10;
 

@@ -18,18 +18,25 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
 
+/// Unconstructable type, used as a [TypedMessage::Response] to indicate that
+/// no response is allowed.
 #[derive(Serialize, Deserialize)]
 pub enum NoReply {}
 
 pub trait TypedMessage: Serialize + DeserializeOwned {
     type Response: Serialize + DeserializeOwned;
 
+    /// Returns the subject associated with this message.
+    /// Subjects must be deterministically generated from the message
+    /// body.
     fn subject(&self) -> String;
 }
 
 pub trait JetStreamable: TypedMessage {
+    /// Returns the name of the JetStream associated with this message type.
     fn stream_name() -> &'static str;
 
+    /// Returns the JetStream configuration associated with this message type.
     fn config() -> Config;
 }
 
@@ -42,6 +49,8 @@ where
     }
 }
 
+/// Wraps a NATS subject string with some type information about the message
+/// type expected on that subject, as well as the reply type (which may be [NoReply]).
 pub struct SubscribeSubject<M>
 where
     M: TypedMessage,
@@ -68,8 +77,11 @@ pub struct MessageWithResponseHandle<T>
 where
     T: TypedMessage,
 {
+    /// Deserialized value of the message.
     pub value: T,
+    /// Raw NATS message.
     message: Message,
+    /// Handle to NATS client, retained for responding.
     nc: Client,
 }
 
@@ -139,6 +151,12 @@ where
     }
 }
 
+/// NATS errors are not castable to anyhow::Error, because they don't
+/// implement [Sized] for some reason.
+/// 
+/// This helper trait is used to add some convenience helpers to
+/// `Result<_, async_nats::Error>` to make it easy to convert these
+/// to [anyhow::Error] errors.
 trait NatsResultExt<T> {
     fn to_anyhow(self) -> Result<T>;
 
@@ -165,6 +183,13 @@ impl<T> NatsResultExt<T> for std::result::Result<T, async_nats::Error> {
 pub struct TypedNats {
     nc: Client,
     jetstream: Context,
+    /// A set of JetStream names which have been created by this client.
+    /// JetStreams are lazily created by TypedNats the first time they
+    /// are used, and then stored here to avoid a round-trip after that.
+    /// Stream creation (with the same config) is idempotent, so it doesn't
+    /// matter if this is called multiple times, but we want to avoid
+    /// creating the same stream repeatedly because it costs a round-trip
+    /// to NATS.
     jetstream_created_streams: Arc<DashSet<String>>,
 }
 
