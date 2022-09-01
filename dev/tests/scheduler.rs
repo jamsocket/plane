@@ -7,10 +7,10 @@ use dev::{
 use dis_spawner::{
     messages::{
         agent::{DroneStatusMessage, SpawnRequest},
-        scheduler::{ClusterName, ScheduleResponse},
+        scheduler::ScheduleResponse,
     },
     nats::TypedNats,
-    types::DroneId,
+    types::{ClusterName, DroneId},
 };
 use dis_spawner_controller::run_scheduler;
 use integration_test::integration_test;

@@ -7,16 +7,13 @@ use dev::{
     util::{base_spawn_request, random_loopback_ip},
 };
 use dis_spawner::{
-    messages::{
-        agent::{
-            BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
-            DroneConnectResponse, DroneStatusMessage, SpawnRequest, TerminationRequest,
-        },
-        scheduler::ClusterName,
+    messages::agent::{
+        BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
+        DroneConnectResponse, DroneStatusMessage, SpawnRequest, TerminationRequest,
     },
     nats::{TypedNats, TypedSubscription},
     nats_connection::NatsConnection,
-    types::{BackendId, DroneId},
+    types::{BackendId, ClusterName, DroneId},
 };
 use dis_spawner_drone::{
     database::DroneDatabase,

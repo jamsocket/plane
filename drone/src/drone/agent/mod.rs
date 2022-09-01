@@ -3,17 +3,14 @@ use crate::{database_connection::DatabaseConnection, drone::cli::IpProvider};
 use anyhow::{anyhow, Result};
 use dis_spawner::{
     logging::LogError,
-    messages::{
-        agent::{
-            DroneConnectRequest, DroneConnectResponse, DroneStatusMessage, SpawnRequest,
-            TerminationRequest,
-        },
-        scheduler::ClusterName,
+    messages::agent::{
+        DroneConnectRequest, DroneConnectResponse, DroneStatusMessage, SpawnRequest,
+        TerminationRequest,
     },
     nats::TypedNats,
     nats_connection::NatsConnection,
     retry::do_with_retry,
-    types::DroneId,
+    types::{ClusterName, DroneId},
 };
 use http::Uri;
 use hyper::Client;

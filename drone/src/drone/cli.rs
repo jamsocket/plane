@@ -5,8 +5,8 @@ use super::{
 use crate::{database_connection::DatabaseConnection, keys::KeyCertPathPair};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use dis_spawner::messages::scheduler::ClusterName;
 use dis_spawner::nats_connection::NatsConnection;
+use dis_spawner::types::ClusterName;
 use reqwest::Url;
 use std::{
     fmt::Debug,

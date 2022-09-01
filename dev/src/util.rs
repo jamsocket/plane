@@ -1,8 +1,9 @@
 use crate::test_name;
 use anyhow::{anyhow, Result};
 use dis_spawner::messages::agent::SpawnRequest;
-use dis_spawner::messages::scheduler::{ClusterName, ScheduleRequest};
+use dis_spawner::messages::scheduler::ScheduleRequest;
 use dis_spawner::types::BackendId;
+use dis_spawner::types::ClusterName;
 use dis_spawner::types::DroneId;
 use rand::distributions::Alphanumeric;
 use rand::thread_rng;

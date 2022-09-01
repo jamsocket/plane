@@ -1,6 +1,6 @@
 use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
-    types::{BackendId, DroneId},
+    types::{BackendId, ClusterName, DroneId},
 };
 use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
 use chrono::{DateTime, Utc};
@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
-
-use super::scheduler::ClusterName;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DroneLogMessageKind {

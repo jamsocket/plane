@@ -55,3 +55,26 @@ impl BackendId {
             .map(|d| BackendId(d.to_string()))
     }
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ClusterName {
+    pub hostname: String,
+}
+
+impl ClusterName {
+    pub fn new(name: &str) -> Self {
+        ClusterName {
+            hostname: name.to_string(),
+        }
+    }
+
+    pub fn subject_name(&self) -> String {
+        self.hostname.replace('.', "_")
+    }
+}
+
+impl Display for ClusterName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.hostname.fmt(f)
+    }
+}
