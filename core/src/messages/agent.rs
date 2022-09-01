@@ -68,6 +68,20 @@ impl DroneLogMessage {
     }
 }
 
+impl JetStreamable for DroneLogMessage {
+    fn stream_name() -> &'static str {
+        "backend_log"
+    }
+
+    fn config() -> async_nats::jetstream::stream::Config {
+        async_nats::jetstream::stream::Config {
+            name: Self::stream_name().into(),
+            subjects: vec!["backend.*.log".into()],
+            ..async_nats::jetstream::stream::Config::default()
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BackendStatsMessage {
     //just fractions of max for now, go from there
