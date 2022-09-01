@@ -7,10 +7,13 @@ use dev::{
     util::{base_spawn_request, random_loopback_ip},
 };
 use dis_spawner::{
-    messages::{agent::{
-        BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
-        DroneConnectResponse, DroneStatusMessage, SpawnRequest, TerminationRequest,
-    }, scheduler::ClusterId},
+    messages::{
+        agent::{
+            BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
+            DroneConnectResponse, DroneStatusMessage, SpawnRequest, TerminationRequest,
+        },
+        scheduler::ClusterId,
+    },
     nats::{TypedNats, TypedSubscription},
     nats_connection::NatsConnection,
     types::{BackendId, DroneId},
@@ -26,7 +29,7 @@ use dis_spawner_drone::{
 use integration_test::integration_test;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
-use tokio::time::Instant;
+use tokio::time::{sleep, Instant};
 
 const CLUSTER_DOMAIN: &str = "spawner.test";
 
@@ -79,6 +82,8 @@ impl MockController {
             .subscribe(DroneConnectRequest::subscribe_subject())
             .await?;
 
+        sleep(Duration::from_secs(2)).await;
+
         Ok(MockController {
             nats,
             drone_connect_response_subscription,
@@ -89,7 +94,7 @@ impl MockController {
     /// platform.
     pub async fn expect_handshake(&mut self, drone_id: DroneId, expect_ip: Ipv4Addr) -> Result<()> {
         let message = timeout(
-            30_000,
+            5_000,
             "Should receive drone connect message.",
             self.drone_connect_response_subscription.next(),
         )
@@ -107,7 +112,11 @@ impl MockController {
     }
 
     /// Expect to receive a status message from a live drone.
-    pub async fn expect_status_message(&self, drone_id: DroneId, cluster: &ClusterId) -> Result<()> {
+    pub async fn expect_status_message(
+        &self,
+        drone_id: DroneId,
+        cluster: &ClusterId,
+    ) -> Result<()> {
         let mut status_sub = self
             .nats
             .subscribe(DroneStatusMessage::subscribe_subject())
@@ -214,8 +223,8 @@ impl BackendStateSubscription {
 #[integration_test]
 async fn drone_sends_status_messages() -> Result<()> {
     let nats = Nats::new().await?;
-    let agent = Agent::new(&nats).await?;
     let mut controller_mock = MockController::new(nats.connection().await?).await?;
+    let agent = Agent::new(&nats).await?;
 
     let drone_id = DroneId::new(345);
     controller_mock.expect_handshake(drone_id, agent.ip).await?;
@@ -236,21 +245,22 @@ async fn drone_sends_status_messages() -> Result<()> {
 #[integration_test]
 async fn spawn_with_agent() -> Result<()> {
     let nats = Nats::new().await?;
+    let connection = nats.connection().await?;
+    let mut controller_mock = MockController::new(connection.clone()).await?;
     let agent = Agent::new(&nats).await?;
-    let nats = nats.connection().await?;
-    let mut controller_mock = MockController::new(nats.clone()).await?;
 
     let drone_id = DroneId::new(345);
     controller_mock.expect_handshake(drone_id, agent.ip).await?;
 
     controller_mock
-        .expect_status_message(drone_id,&ClusterId::new("spawner.test"))
+        .expect_status_message(drone_id, &ClusterId::new("spawner.test"))
         .await?;
 
     let mut request = base_spawn_request();
     request.drone_id = drone_id;
 
-    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    let mut state_subscription =
+        BackendStateSubscription::new(&connection, &request.backend_id).await?;
     controller_mock.spawn_backend(&request).await?;
 
     state_subscription
@@ -281,9 +291,9 @@ async fn spawn_with_agent() -> Result<()> {
 #[integration_test]
 async fn stats_are_acquired() -> Result<()> {
     let nats = Nats::new().await?;
+    let connection = nats.connection().await?;
+    let mut controller_mock = MockController::new(connection.clone()).await?;
     let agent = Agent::new(&nats).await?;
-    let nats = nats.connection().await?;
-    let mut controller_mock = MockController::new(nats.clone()).await?;
 
     let drone_id = DroneId::new(345);
     controller_mock.expect_handshake(drone_id, agent.ip).await?;
@@ -297,14 +307,15 @@ async fn stats_are_acquired() -> Result<()> {
     // Ensure long enough life to report stats.
     request.max_idle_secs = Duration::from_secs(30);
 
-    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    let mut state_subscription =
+        BackendStateSubscription::new(&connection, &request.backend_id).await?;
     controller_mock.spawn_backend(&request).await?;
 
     state_subscription
         .wait_for_state(BackendState::Ready, 60_000)
         .await?;
 
-    let mut stats_subscription = nats
+    let mut stats_subscription = connection
         .subscribe(BackendStatsMessage::subscribe_subject(&request.backend_id))
         .await?;
 
@@ -339,9 +350,9 @@ async fn use_ip_lookup_api() -> Result<()> {
 #[integration_test]
 async fn handle_error_during_start() -> Result<()> {
     let nats = Nats::new().await?;
+    let connection = nats.connection().await?;
+    let mut controller_mock = MockController::new(connection.clone()).await?;
     let agent = Agent::new(&nats).await?;
-    let nats = nats.connection().await?;
-    let mut controller_mock = MockController::new(nats.clone()).await?;
 
     let drone_id = DroneId::new(345);
     controller_mock.expect_handshake(drone_id, agent.ip).await?;
@@ -356,7 +367,8 @@ async fn handle_error_during_start() -> Result<()> {
     request.env.insert("EXIT_CODE".into(), "1".into());
     request.env.insert("EXIT_TIMEOUT".into(), "100".into());
 
-    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    let mut state_subscription =
+        BackendStateSubscription::new(&connection, &request.backend_id).await?;
     controller_mock.spawn_backend(&request).await?;
 
     state_subscription
@@ -375,9 +387,9 @@ async fn handle_error_during_start() -> Result<()> {
 #[integration_test]
 async fn handle_failure_after_ready() -> Result<()> {
     let nats = Nats::new().await?;
+    let connection = nats.connection().await?;
+    let mut controller_mock = MockController::new(connection.clone()).await?;
     let agent = Agent::new(&nats).await?;
-    let nats = nats.connection().await?;
-    let mut controller_mock = MockController::new(nats.clone()).await?;
 
     let drone_id = DroneId::new(345);
     controller_mock.expect_handshake(drone_id, agent.ip).await?;
@@ -389,7 +401,8 @@ async fn handle_failure_after_ready() -> Result<()> {
     let mut request = base_spawn_request();
     request.drone_id = drone_id;
 
-    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    let mut state_subscription =
+        BackendStateSubscription::new(&connection, &request.backend_id).await?;
     controller_mock.spawn_backend(&request).await?;
 
     state_subscription
@@ -416,9 +429,9 @@ async fn handle_failure_after_ready() -> Result<()> {
 #[integration_test]
 async fn handle_successful_termination() -> Result<()> {
     let nats = Nats::new().await?;
+    let connection = nats.connection().await?;
+    let mut controller_mock = MockController::new(connection.clone()).await?;
     let agent = Agent::new(&nats).await?;
-    let nats = nats.connection().await?;
-    let mut controller_mock = MockController::new(nats.clone()).await?;
 
     let drone_id = DroneId::new(345);
     controller_mock.expect_handshake(drone_id, agent.ip).await?;
@@ -430,7 +443,8 @@ async fn handle_successful_termination() -> Result<()> {
     let mut request = base_spawn_request();
     request.drone_id = drone_id;
 
-    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    let mut state_subscription =
+        BackendStateSubscription::new(&connection, &request.backend_id).await?;
     controller_mock.spawn_backend(&request).await?;
 
     state_subscription
@@ -499,9 +513,9 @@ async fn handle_agent_restart() -> Result<()> {
 #[integration_test]
 async fn handle_termination_request() -> Result<()> {
     let nats = Nats::new().await?;
+    let connection = nats.connection().await?;
+    let mut controller_mock = MockController::new(connection.clone()).await?;
     let agent = Agent::new(&nats).await?;
-    let nats = nats.connection().await?;
-    let mut controller_mock = MockController::new(nats.clone()).await?;
 
     let mut request = base_spawn_request();
     //ensure spawnee lives long enough to be terminated
@@ -515,7 +529,8 @@ async fn handle_termination_request() -> Result<()> {
         .await?;
 
     request.max_idle_secs = Duration::from_secs(1000);
-    let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id).await?;
+    let mut state_subscription =
+        BackendStateSubscription::new(&connection, &request.backend_id).await?;
 
     controller_mock.spawn_backend(&request).await?;
     state_subscription

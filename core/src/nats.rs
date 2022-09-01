@@ -2,6 +2,7 @@
 //!
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
+use crate::messages::create_streams;
 use anyhow::{anyhow, Result};
 use async_nats::jetstream::consumer::DeliverPolicy;
 use async_nats::jetstream::stream::Config;
@@ -286,7 +287,8 @@ impl TypedNats {
                 inbox,
                 Bytes::from(serde_json::to_vec(&message)?),
             )
-            .await.to_anyhow()?;
+            .await
+            .to_anyhow()?;
 
         Ok(DelayedReply {
             subscription,
@@ -297,7 +299,7 @@ impl TypedNats {
     pub async fn add_jetstream_stream<P, T>(
         &self,
         stream_name: &StreamName<T>,
-        subject: P,
+        subject: &P,
     ) -> Result<()>
     where
         P: Subscribable<T>,
@@ -318,7 +320,11 @@ impl TypedNats {
     pub async fn connect(nats_url: &str, options: ConnectOptions) -> Result<Self> {
         let nc = async_nats::connect_with_options(nats_url, options).await?;
 
-        Ok(Self::new(nc))
+        let result = Self::new(nc);
+        // Ensure that streams exist.
+        create_streams(&result).await?;
+
+        Ok(result)
     }
 
     #[must_use]

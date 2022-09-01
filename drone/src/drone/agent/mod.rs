@@ -3,10 +3,13 @@ use crate::{database_connection::DatabaseConnection, drone::cli::IpProvider};
 use anyhow::{anyhow, Result};
 use dis_spawner::{
     logging::LogError,
-    messages::{agent::{
-        BackendStateMessage, DroneConnectRequest, DroneConnectResponse, DroneStatusMessage,
-        SpawnRequest, TerminationRequest,
-    }, scheduler::ClusterId},
+    messages::{
+        agent::{
+            DroneConnectRequest, DroneConnectResponse, DroneStatusMessage, SpawnRequest,
+            TerminationRequest,
+        },
+        scheduler::ClusterId,
+    },
     nats::TypedNats,
     nats_connection::NatsConnection,
     retry::do_with_retry,
@@ -135,13 +138,6 @@ async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterId) -> Res
 
 pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     let nats = agent_opts.nats.connection().await?;
-
-    // Ensure that status stream exists.
-    nats.add_jetstream_stream(
-        &BackendStateMessage::stream_name(),
-        BackendStateMessage::wildcard_subject(),
-    )
-    .await?;
 
     tracing::info!("Connecting to Docker.");
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;

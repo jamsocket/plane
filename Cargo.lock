@@ -612,6 +612,7 @@ dependencies = [
  "dis-spawner",
  "rand",
  "tokio",
+ "tokio-stream",
  "tracing",
 ]
 

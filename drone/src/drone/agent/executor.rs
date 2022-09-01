@@ -117,7 +117,7 @@ impl Executor {
             .await
     }
 
-    pub async fn resume_backends(self: &Self) -> Result<()> {
+    pub async fn resume_backends(&self) -> Result<()> {
         let backends = self.database.get_backends().await?;
 
         for backend in backends {

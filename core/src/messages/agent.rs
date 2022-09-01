@@ -158,6 +158,10 @@ impl DroneStatusMessage {
     pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage> {
         SubscribeSubject::new("drone.*.status".to_string())
     }
+
+    pub fn stream_name() -> StreamName<Self> {
+        StreamName::new("drone_status".into())
+    }
 }
 
 /// A request from a drone to connect to the platform.
