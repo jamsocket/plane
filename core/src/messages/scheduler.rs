@@ -1,5 +1,5 @@
 use crate::{
-    nats::{Subject, SubscribeSubject, TypedMessage},
+    nats::{SubscribeSubject, TypedMessage},
     types::{BackendId, DroneId},
 };
 use bollard::auth::DockerCredentials;
@@ -82,8 +82,8 @@ pub enum ScheduleResponse {
 impl TypedMessage for ScheduleRequest {
     type Response = ScheduleResponse;
 
-    fn subject(&self) -> Subject<Self> {
-        Subject::new(format!("cluster.{}.schedule", self.cluster.subject_name()))
+    fn subject(&self) -> String {
+        format!("cluster.{}.schedule", self.cluster.subject_name())
     }
 }
 

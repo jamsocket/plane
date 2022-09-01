@@ -1,5 +1,5 @@
 use crate::{
-    nats::{NoReply, StreamName, Subject, SubscribeSubject, TypedMessage},
+    nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
     types::{BackendId, DroneId},
 };
 use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
@@ -27,8 +27,8 @@ pub struct DroneLogMessage {
 impl TypedMessage for DroneLogMessage {
     type Response = NoReply;
 
-    fn subject(&self) -> Subject<Self> {
-        Subject::new(format!("backend.{}.log", self.backend_id.id()))
+    fn subject(&self) -> String {
+        format!("backend.{}.log", self.backend_id.id())
     }
 }
 
@@ -59,10 +59,6 @@ impl DroneLogMessage {
         }
     }
 
-    pub fn stream_name() -> StreamName<Self> {
-        StreamName::new("backend_log".into())
-    }
-
     pub fn subscribe_subject(backend: &BackendId) -> SubscribeSubject<Self> {
         SubscribeSubject::new(format!("backend.{}.log", backend))
     }
@@ -83,8 +79,8 @@ pub struct BackendStatsMessage {
 impl TypedMessage for BackendStatsMessage {
     type Response = NoReply;
 
-    fn subject(&self) -> Subject<Self> {
-        Subject::new(format!("backend.{}.stats", self.backend_id.id()))
+    fn subject(&self) -> String {
+        format!("backend.{}.stats", self.backend_id.id())
     }
 }
 
@@ -149,18 +145,24 @@ pub struct DroneStatusMessage {
 impl TypedMessage for DroneStatusMessage {
     type Response = NoReply;
 
-    fn subject(&self) -> Subject<DroneStatusMessage> {
-        Subject::new(format!("drone.{}.status", self.drone_id.id()))
+    fn subject(&self) -> String {
+        format!("drone.{}.status", self.drone_id.id())
+    }
+}
+
+impl JetStreamable for DroneStatusMessage {
+    fn config() -> async_nats::jetstream::stream::Config {
+        async_nats::jetstream::stream::Config {
+            name: "drone_status".into(),
+            subjects: vec!["drone.*.status".into()],
+            ..async_nats::jetstream::stream::Config::default()
+        }
     }
 }
 
 impl DroneStatusMessage {
     pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage> {
         SubscribeSubject::new("drone.*.status".to_string())
-    }
-
-    pub fn stream_name() -> StreamName<Self> {
-        StreamName::new("drone_status".into())
     }
 }
 
@@ -187,8 +189,8 @@ pub enum DroneConnectResponse {
 impl TypedMessage for DroneConnectRequest {
     type Response = DroneConnectResponse;
 
-    fn subject(&self) -> Subject<Self> {
-        Subject::new("drone.register".to_string())
+    fn subject(&self) -> String {
+        "drone.register".to_string()
     }
 }
 
@@ -228,8 +230,8 @@ pub struct SpawnRequest {
 impl TypedMessage for SpawnRequest {
     type Response = bool;
 
-    fn subject(&self) -> Subject<Self> {
-        Subject::new(format!("drone.{}.spawn", self.drone_id.id()))
+    fn subject(&self) -> String {
+        format!("drone.{}.spawn", self.drone_id.id())
     }
 }
 
@@ -248,8 +250,8 @@ pub struct TerminationRequest {
 impl TypedMessage for TerminationRequest {
     type Response = bool;
 
-    fn subject(&self) -> Subject<Self> {
-        Subject::new(format!("backend.{}.terminate", self.backend_id.id()))
+    fn subject(&self) -> String {
+        format!("backend.{}.terminate", self.backend_id.id())
     }
 }
 
@@ -364,11 +366,21 @@ pub struct BackendStateMessage {
     pub time: DateTime<Utc>,
 }
 
+impl JetStreamable for BackendStateMessage {
+    fn config() -> async_nats::jetstream::stream::Config {
+        async_nats::jetstream::stream::Config {
+            name: "backend_status".into(),
+            subjects: vec!["backend.*.status".into()],
+            ..async_nats::jetstream::stream::Config::default()
+        }
+    }
+}
+
 impl TypedMessage for BackendStateMessage {
     type Response = NoReply;
 
-    fn subject(&self) -> Subject<Self> {
-        Subject::new(format!("backend.{}.status", self.backend.id()))
+    fn subject(&self) -> String {
+        format!("backend.{}.status", self.backend.id())
     }
 }
 
@@ -391,10 +403,5 @@ impl BackendStateMessage {
             backend,
             time: Utc::now(),
         }
-    }
-
-    #[must_use]
-    pub fn stream_name() -> StreamName<BackendStateMessage> {
-        StreamName::new("backend_status".to_string())
     }
 }

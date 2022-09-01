@@ -2,7 +2,6 @@
 //!
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
-use crate::messages::create_streams;
 use anyhow::{anyhow, Result};
 use async_nats::jetstream::consumer::DeliverPolicy;
 use async_nats::jetstream::stream::Config;
@@ -17,65 +16,19 @@ use std::marker::PhantomData;
 use std::time::Duration;
 use tokio::time::timeout;
 
+use crate::messages::create_streams;
+
 #[derive(Serialize, Deserialize)]
 pub enum NoReply {}
-
-#[derive(Clone)]
-pub struct StreamName<M>
-where
-    M: TypedMessage,
-{
-    stream_name: String,
-    _ph_m: PhantomData<M>,
-}
-
-impl<M> StreamName<M>
-where
-    M: TypedMessage,
-{
-    pub fn new(stream_name: String) -> Self {
-        StreamName {
-            stream_name,
-            _ph_m: PhantomData::default(),
-        }
-    }
-}
 
 pub trait TypedMessage: Serialize + DeserializeOwned {
     type Response: Serialize + DeserializeOwned;
 
-    fn subject(&self) -> Subject<Self>;
+    fn subject(&self) -> String;
 }
 
-#[derive(Clone)]
-pub struct Subject<M>
-where
-    M: TypedMessage,
-{
-    subject: String,
-    _ph_m: PhantomData<M>,
-}
-
-impl<M> Debug for Subject<M>
-where
-    M: TypedMessage,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        self.subject.fmt(f)
-    }
-}
-
-impl<M> Subject<M>
-where
-    M: TypedMessage,
-{
-    #[must_use]
-    pub fn new(subject: String) -> Subject<M> {
-        Subject {
-            subject,
-            _ph_m: PhantomData::default(),
-        }
-    }
+pub trait JetStreamable: TypedMessage {
+    fn config() -> Config;
 }
 
 impl<M> Debug for SubscribeSubject<M>
@@ -105,49 +58,6 @@ where
             subject,
             _ph_m: PhantomData::default(),
         }
-    }
-}
-
-pub trait Subscribable<M>
-where
-    M: TypedMessage,
-{
-    fn subject(&self) -> &str;
-}
-
-impl<M> Subscribable<M> for Subject<M>
-where
-    M: TypedMessage,
-{
-    fn subject(&self) -> &str {
-        &self.subject
-    }
-}
-
-impl<M> Subscribable<M> for SubscribeSubject<M>
-where
-    M: TypedMessage,
-{
-    fn subject(&self) -> &str {
-        &self.subject
-    }
-}
-
-impl<M> Subscribable<M> for &Subject<M>
-where
-    M: TypedMessage,
-{
-    fn subject(&self) -> &str {
-        &self.subject
-    }
-}
-
-impl<M> Subscribable<M> for &SubscribeSubject<M>
-where
-    M: TypedMessage,
-{
-    fn subject(&self) -> &str {
-        &self.subject
     }
 }
 
@@ -283,7 +193,7 @@ impl TypedNats {
         let subscription = self.nc.subscribe(inbox.clone()).await.to_anyhow()?;
         self.nc
             .publish_with_reply(
-                message.subject().subject().to_string(),
+                message.subject(),
                 inbox,
                 Bytes::from(serde_json::to_vec(&message)?),
             )
@@ -296,21 +206,10 @@ impl TypedNats {
         })
     }
 
-    pub async fn add_jetstream_stream<P, T>(
-        &self,
-        stream_name: &StreamName<T>,
-        subject: &P,
-    ) -> Result<()>
-    where
-        P: Subscribable<T>,
-        T: TypedMessage,
-    {
+    pub async fn add_jetstream_stream<T: JetStreamable>(&self) -> Result<()> {
+        let config = T::config();
         self.jetstream
-            .get_or_create_stream(Config {
-                name: stream_name.stream_name.to_string(),
-                subjects: vec![subject.subject().to_string()],
-                ..Config::default()
-            })
+            .get_or_create_stream(config)
             .await
             .to_anyhow()?;
 
@@ -333,7 +232,11 @@ impl TypedNats {
         TypedNats { nc, jetstream }
     }
 
-    pub async fn get_latest<T>(&self, subject: &Subject<T>, stream_name: &str) -> Result<Option<T>>
+    pub async fn get_latest<T>(
+        &self,
+        subject: &SubscribeSubject<T>,
+        stream_name: &str,
+    ) -> Result<Option<T>>
     where
         T: TypedMessage<Response = NoReply>,
     {
@@ -342,7 +245,7 @@ impl TypedNats {
         let consumer = stream
             .create_consumer(async_nats::jetstream::consumer::pull::Config {
                 deliver_policy: DeliverPolicy::Last,
-                filter_subject: subject.subject().to_string(),
+                filter_subject: subject.subject.clone(),
                 ..async_nats::jetstream::consumer::pull::Config::default()
             })
             .await
@@ -361,18 +264,14 @@ impl TypedNats {
         Ok(Some(serde_json::from_slice(&result.payload)?))
     }
 
-    pub async fn subscribe_jetstream<P, T>(
+    pub async fn subscribe_jetstream<T: JetStreamable>(
         &self,
-        stream_name: &StreamName<T>,
-        subject: &P,
-    ) -> impl Stream<Item = T>
-    where
-        P: Subscribable<T>,
-        T: TypedMessage + Send + 'static,
-    {
+        subject: SubscribeSubject<T>,
+    ) -> impl Stream<Item = T> {
         let jetstream = self.jetstream.clone();
-        let subject = subject.subject().to_string();
-        let stream_name = stream_name.stream_name.to_string();
+        let subject = subject.subject.to_string();
+        let config = T::config();
+        let stream_name = config.name;
 
         let stream = stream!({
             let stream = jetstream.get_stream(stream_name).await.unwrap();
@@ -407,7 +306,7 @@ impl TypedNats {
     {
         self.nc
             .publish(
-                value.subject().subject.clone(),
+                value.subject().clone(),
                 Bytes::from(serde_json::to_vec(value)?),
             )
             .await?;
@@ -420,10 +319,7 @@ impl TypedNats {
     {
         let result = self
             .nc
-            .request(
-                value.subject().subject,
-                Bytes::from(serde_json::to_vec(value)?),
-            )
+            .request(value.subject(), Bytes::from(serde_json::to_vec(value)?))
             .await
             .to_anyhow()?;
 
@@ -431,16 +327,11 @@ impl TypedNats {
         Ok(value)
     }
 
-    pub async fn subscribe<P, T>(&self, subject: P) -> Result<TypedSubscription<T>>
+    pub async fn subscribe<T>(&self, subject: SubscribeSubject<T>) -> Result<TypedSubscription<T>>
     where
-        P: Subscribable<T>,
         T: TypedMessage,
     {
-        let subscription = self
-            .nc
-            .subscribe(subject.subject().to_string())
-            .await
-            .to_anyhow()?;
+        let subscription = self.nc.subscribe(subject.subject).await.to_anyhow()?;
         Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }
 }
