@@ -153,7 +153,7 @@ where
 
 /// NATS errors are not castable to anyhow::Error, because they don't
 /// implement [Sized] for some reason.
-/// 
+///
 /// This helper trait is used to add some convenience helpers to
 /// `Result<_, async_nats::Error>` to make it easy to convert these
 /// to [anyhow::Error] errors.
