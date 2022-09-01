@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr, convert::Infallible};
 
 const RESOURCE_PREFIX: &str = "spawner-";
 
@@ -59,6 +59,15 @@ impl BackendId {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ClusterName {
     pub hostname: String,
+}
+
+impl FromStr for ClusterName {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // TODO: we could ensure validity here.
+        Ok(ClusterName::new(s))
+    }
 }
 
 impl ClusterName {
