@@ -11,13 +11,13 @@ use std::{collections::HashMap, fmt::Display, time::Duration};
 use super::agent::SpawnRequest;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct ClusterId {
+pub struct ClusterName {
     hostname: String,
 }
 
-impl ClusterId {
+impl ClusterName {
     pub fn new(name: &str) -> Self {
-        ClusterId {
+        ClusterName {
             hostname: name.to_string(),
         }
     }
@@ -27,7 +27,7 @@ impl ClusterId {
     }
 }
 
-impl Display for ClusterId {
+impl Display for ClusterName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.hostname.fmt(f)
     }
@@ -36,7 +36,7 @@ impl Display for ClusterId {
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ScheduleRequest {
-    pub cluster: ClusterId,
+    pub cluster: ClusterName,
 
     /// The container image to run.
     pub image: String,

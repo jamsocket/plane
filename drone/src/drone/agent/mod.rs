@@ -8,7 +8,7 @@ use dis_spawner::{
             DroneConnectRequest, DroneConnectResponse, DroneStatusMessage, SpawnRequest,
             TerminationRequest,
         },
-        scheduler::ClusterId,
+        scheduler::ClusterName,
     },
     nats::TypedNats,
     nats_connection::NatsConnection,
@@ -44,7 +44,7 @@ pub struct DockerOptions {
 pub struct AgentOptions {
     pub db: DatabaseConnection,
     pub nats: NatsConnection,
-    pub cluster_domain: ClusterId,
+    pub cluster_domain: ClusterName,
 
     /// Public IP of the machine the drone is running on.
     pub ip: IpProvider,
@@ -120,7 +120,7 @@ async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) ->
 }
 
 /// Repeatedly publish a status message advertising this drone as available.
-async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterId) -> Result<()> {
+async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterName) -> Result<()> {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {

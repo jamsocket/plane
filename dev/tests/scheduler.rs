@@ -7,7 +7,7 @@ use dev::{
 use dis_spawner::{
     messages::{
         agent::{DroneStatusMessage, SpawnRequest},
-        scheduler::{ClusterId, ScheduleResponse},
+        scheduler::{ClusterName, ScheduleResponse},
     },
     nats::TypedNats,
     types::DroneId,
@@ -100,7 +100,7 @@ async fn one_drone_available() -> Result<()> {
     nats_conn
         .publish(&DroneStatusMessage {
             capacity: 100,
-            cluster: ClusterId::new("spawner.test"),
+            cluster: ClusterName::new("spawner.test"),
             drone_id,
         })
         .await?;
