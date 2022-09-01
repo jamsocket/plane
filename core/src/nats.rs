@@ -9,14 +9,14 @@ use async_nats::jetstream::Context;
 use async_nats::{Client, ConnectOptions, Message, Subscriber};
 use async_stream::stream;
 use bytes::Bytes;
+use dashmap::DashSet;
 use futures::{Stream, StreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
-
-use crate::messages::create_streams;
 
 #[derive(Serialize, Deserialize)]
 pub enum NoReply {}
@@ -28,6 +28,8 @@ pub trait TypedMessage: Serialize + DeserializeOwned {
 }
 
 pub trait JetStreamable: TypedMessage {
+    fn stream_name() -> &'static str;
+
     fn config() -> Config;
 }
 
@@ -163,6 +165,7 @@ impl<T> NatsResultExt<T> for std::result::Result<T, async_nats::Error> {
 pub struct TypedNats {
     nc: Client,
     jetstream: Context,
+    jetstream_created_streams: Arc<DashSet<String>>,
 }
 
 pub struct DelayedReply<T: DeserializeOwned> {
@@ -183,6 +186,17 @@ impl<T: DeserializeOwned> DelayedReply<T> {
 }
 
 impl TypedNats {
+    async fn ensure_jetstream_exists<T: JetStreamable>(&self) -> Result<()> {
+        if !self.jetstream_created_streams.contains(T::stream_name()) {
+            self.add_jetstream_stream::<T>().await?;
+
+            self.jetstream_created_streams
+                .insert(T::stream_name().to_string());
+        }
+
+        Ok(())
+    }
+
     /// Send a request that expects a reply, but return as soon as the request
     /// is sent with a handle that can later be awaited for the result.
     pub async fn split_request<T>(&self, message: &T) -> Result<DelayedReply<T::Response>>
@@ -206,7 +220,7 @@ impl TypedNats {
         })
     }
 
-    pub async fn add_jetstream_stream<T: JetStreamable>(&self) -> Result<()> {
+    async fn add_jetstream_stream<T: JetStreamable>(&self) -> Result<()> {
         let config = T::config();
         self.jetstream
             .get_or_create_stream(config)
@@ -220,8 +234,6 @@ impl TypedNats {
         let nc = async_nats::connect_with_options(nats_url, options).await?;
 
         let result = Self::new(nc);
-        // Ensure that streams exist.
-        create_streams(&result).await?;
 
         Ok(result)
     }
@@ -229,18 +241,23 @@ impl TypedNats {
     #[must_use]
     pub fn new(nc: Client) -> Self {
         let jetstream = async_nats::jetstream::new(nc.clone());
-        TypedNats { nc, jetstream }
+        TypedNats {
+            nc,
+            jetstream,
+            jetstream_created_streams: Arc::default(),
+        }
     }
 
-    pub async fn get_latest<T>(
-        &self,
-        subject: &SubscribeSubject<T>,
-        stream_name: &str,
-    ) -> Result<Option<T>>
+    pub async fn get_latest<T>(&self, subject: &SubscribeSubject<T>) -> Result<Option<T>>
     where
-        T: TypedMessage<Response = NoReply>,
+        T: TypedMessage<Response = NoReply> + JetStreamable,
     {
-        let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
+        let _ = self.ensure_jetstream_exists::<T>().await;
+        let stream = self
+            .jetstream
+            .get_stream(T::stream_name())
+            .await
+            .to_anyhow()?;
 
         let consumer = stream
             .create_consumer(async_nats::jetstream::consumer::pull::Config {
@@ -270,8 +287,8 @@ impl TypedNats {
     ) -> impl Stream<Item = T> {
         let jetstream = self.jetstream.clone();
         let subject = subject.subject.to_string();
-        let config = T::config();
-        let stream_name = config.name;
+        let _ = self.ensure_jetstream_exists::<T>().await;
+        let stream_name = T::stream_name();
 
         let stream = stream!({
             let stream = jetstream.get_stream(stream_name).await.unwrap();

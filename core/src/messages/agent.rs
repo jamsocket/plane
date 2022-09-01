@@ -153,10 +153,14 @@ impl TypedMessage for DroneStatusMessage {
 impl JetStreamable for DroneStatusMessage {
     fn config() -> async_nats::jetstream::stream::Config {
         async_nats::jetstream::stream::Config {
-            name: "drone_status".into(),
+            name: Self::stream_name().into(),
             subjects: vec!["drone.*.status".into()],
             ..async_nats::jetstream::stream::Config::default()
         }
+    }
+
+    fn stream_name() -> &'static str {
+        "drone_status"
     }
 }
 
@@ -369,10 +373,14 @@ pub struct BackendStateMessage {
 impl JetStreamable for BackendStateMessage {
     fn config() -> async_nats::jetstream::stream::Config {
         async_nats::jetstream::stream::Config {
-            name: "backend_status".into(),
+            name: Self::stream_name().into(),
             subjects: vec!["backend.*.status".into()],
             ..async_nats::jetstream::stream::Config::default()
         }
+    }
+
+    fn stream_name() -> &'static str {
+        "backend_status"
     }
 }
 

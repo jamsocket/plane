@@ -13,7 +13,6 @@ use std::{
     time::Duration,
 };
 use tokio::net::TcpSocket;
-
 use crate::test_name;
 
 const POLL_LOOP_SLEEP: u64 = 10;

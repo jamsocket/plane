@@ -94,8 +94,8 @@ async fn one_drone_available() -> Result<()> {
     let nats_conn = nats.connection().await?;
     let drone_id = DroneId::new(8);
     let mock_agent = MockAgent::new(nats_conn.clone());
-
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
+    sleep(Duration::from_millis(100)).await;
 
     nats_conn
         .publish(&DroneStatusMessage {
