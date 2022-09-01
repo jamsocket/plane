@@ -16,7 +16,8 @@ pub async fn run_scheduler(nats: TypedNats) -> Result<()> {
     let mut spawn_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
 
     let mut status_sub = Box::pin(
-        nats.subscribe_jetstream(DroneStatusMessage::subscribe_subject()).await
+        nats.subscribe_jetstream(DroneStatusMessage::subscribe_subject())
+            .await,
     );
 
     loop {

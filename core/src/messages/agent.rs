@@ -1,5 +1,5 @@
 use crate::{
-    nats::{NoReply, SubscribeSubject, TypedMessage, JetStreamable},
+    nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
     types::{BackendId, DroneId},
 };
 use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};

@@ -206,10 +206,7 @@ impl TypedNats {
         })
     }
 
-    pub async fn add_jetstream_stream<T: JetStreamable>(
-        &self
-    ) -> Result<()>
-    {
+    pub async fn add_jetstream_stream<T: JetStreamable>(&self) -> Result<()> {
         let config = T::config();
         self.jetstream
             .get_or_create_stream(config)
@@ -235,7 +232,11 @@ impl TypedNats {
         TypedNats { nc, jetstream }
     }
 
-    pub async fn get_latest<T>(&self, subject: &SubscribeSubject<T>, stream_name: &str) -> Result<Option<T>>
+    pub async fn get_latest<T>(
+        &self,
+        subject: &SubscribeSubject<T>,
+        stream_name: &str,
+    ) -> Result<Option<T>>
     where
         T: TypedMessage<Response = NoReply>,
     {
@@ -265,9 +266,8 @@ impl TypedNats {
 
     pub async fn subscribe_jetstream<T: JetStreamable>(
         &self,
-        subject: SubscribeSubject<T>
-    ) -> impl Stream<Item = T>
-    {
+        subject: SubscribeSubject<T>,
+    ) -> impl Stream<Item = T> {
         let jetstream = self.jetstream.clone();
         let subject = subject.subject.to_string();
         let config = T::config();
@@ -319,10 +319,7 @@ impl TypedNats {
     {
         let result = self
             .nc
-            .request(
-                value.subject(),
-                Bytes::from(serde_json::to_vec(value)?),
-            )
+            .request(value.subject(), Bytes::from(serde_json::to_vec(value)?))
             .await
             .to_anyhow()?;
 
@@ -334,11 +331,7 @@ impl TypedNats {
     where
         T: TypedMessage,
     {
-        let subscription = self
-            .nc
-            .subscribe(subject.subject)
-            .await
-            .to_anyhow()?;
+        let subscription = self.nc.subscribe(subject.subject).await.to_anyhow()?;
         Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }
 }
