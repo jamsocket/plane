@@ -119,6 +119,7 @@ async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) ->
 /// Repeatedly publish a status message advertising this drone as available.
 async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterName) -> Result<()> {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
+    nc.ensure_jetstream_exists::<DroneStatusMessage>().await?;
 
     loop {
         nc.publish(&DroneStatusMessage {
