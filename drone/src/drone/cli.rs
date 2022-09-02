@@ -5,8 +5,8 @@ use super::{
 use crate::{database_connection::DatabaseConnection, keys::KeyCertPathPair};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use dis_spawner::messages::scheduler::ClusterId;
 use dis_spawner::nats_connection::NatsConnection;
+use dis_spawner::types::ClusterName;
 use reqwest::Url;
 use std::{
     fmt::Debug,
@@ -284,7 +284,7 @@ impl From<Opts> for DronePlan {
                     };
 
                     Some(AgentOptions {
-                        cluster_domain: ClusterId::new(opts.cluster_domain.as_ref().expect("Expected --cluster-domain for running agent.")),
+                        cluster_domain: ClusterName::new(opts.cluster_domain.as_ref().expect("Expected --cluster-domain for running agent.")),
                         db: db.expect("Expected --db-path for running agent."),
                         docker_options: DockerOptions {
                             runtime: opts.docker_runtime.clone(),
@@ -472,7 +472,7 @@ mod test {
                 }),
                 agent_options: Some(AgentOptions {
                     db: DatabaseConnection::new("mydatabase".to_string()),
-                    cluster_domain: ClusterId::new("mycluster.test"),
+                    cluster_domain: ClusterName::new("mycluster.test"),
                     docker_options: DockerOptions {
                         transport: DockerApiTransport::Socket("/var/run/docker.sock".to_string()),
                         runtime: None,
@@ -523,7 +523,7 @@ mod test {
                 }),
                 agent_options: Some(AgentOptions {
                     db: DatabaseConnection::new("mydatabase".to_string()),
-                    cluster_domain: ClusterId::new("mycluster.test"),
+                    cluster_domain: ClusterName::new("mycluster.test"),
                     docker_options: DockerOptions {
                         transport: DockerApiTransport::Socket("/var/run/docker.sock".to_string()),
                         runtime: None,

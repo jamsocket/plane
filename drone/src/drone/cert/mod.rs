@@ -5,7 +5,7 @@ use acme2_eab::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats};
+use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName};
 use openssl::{
     asn1::Asn1Time,
     pkey::{PKey, Private},
@@ -63,7 +63,7 @@ pub async fn get_certificate(
         tracing::info!("Requesting TXT record from platform.");
         let result = nats
             .request(&SetAcmeDnsRecord {
-                cluster: cluster_domain.to_string(),
+                cluster: ClusterName::new(cluster_domain),
                 value,
             })
             .await?;

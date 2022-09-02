@@ -1,7 +1,9 @@
+use crate::test_name;
 use anyhow::{anyhow, Result};
 use dis_spawner::messages::agent::SpawnRequest;
-use dis_spawner::messages::scheduler::{ClusterId, ScheduleRequest};
+use dis_spawner::messages::scheduler::ScheduleRequest;
 use dis_spawner::types::BackendId;
+use dis_spawner::types::ClusterName;
 use dis_spawner::types::DroneId;
 use rand::distributions::Alphanumeric;
 use rand::thread_rng;
@@ -13,8 +15,6 @@ use std::{
     time::Duration,
 };
 use tokio::net::TcpSocket;
-
-use crate::test_name;
 
 const POLL_LOOP_SLEEP: u64 = 10;
 
@@ -124,7 +124,7 @@ pub fn base_spawn_request() -> SpawnRequest {
 pub fn base_scheduler_request() -> ScheduleRequest {
     let backend_id = random_backend_id(&test_name());
     ScheduleRequest {
-        cluster: ClusterId::new("spawner.test"),
+        cluster: ClusterName::new("spawner.test"),
         image: TEST_IMAGE.into(),
         backend_id,
         max_idle_secs: Duration::from_secs(10),

@@ -1,6 +1,6 @@
 use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
-    types::{BackendId, DroneId},
+    types::{BackendId, ClusterName, DroneId},
 };
 use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
 use chrono::{DateTime, Utc};
@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
-
-use super::scheduler::ClusterId;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DroneLogMessageKind {
@@ -65,6 +63,20 @@ impl DroneLogMessage {
 
     pub fn wildcard_subject() -> SubscribeSubject<Self> {
         SubscribeSubject::new("backend.*.log".into())
+    }
+}
+
+impl JetStreamable for DroneLogMessage {
+    fn stream_name() -> &'static str {
+        "backend_log"
+    }
+
+    fn config() -> async_nats::jetstream::stream::Config {
+        async_nats::jetstream::stream::Config {
+            name: Self::stream_name().into(),
+            subjects: vec!["backend.*.log".into()],
+            ..async_nats::jetstream::stream::Config::default()
+        }
     }
 }
 
@@ -138,7 +150,7 @@ impl BackendStatsMessage {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
-    pub cluster: ClusterId,
+    pub cluster: ClusterName,
     pub capacity: u32,
 }
 
@@ -153,10 +165,14 @@ impl TypedMessage for DroneStatusMessage {
 impl JetStreamable for DroneStatusMessage {
     fn config() -> async_nats::jetstream::stream::Config {
         async_nats::jetstream::stream::Config {
-            name: "drone_status".into(),
+            name: Self::stream_name().into(),
             subjects: vec!["drone.*.status".into()],
             ..async_nats::jetstream::stream::Config::default()
         }
+    }
+
+    fn stream_name() -> &'static str {
+        "drone_status"
     }
 }
 
@@ -170,7 +186,7 @@ impl DroneStatusMessage {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DroneConnectRequest {
     /// The cluster the drone is requesting to join.
-    pub cluster: ClusterId,
+    pub cluster: ClusterName,
 
     /// The public-facing IP address of the drone.
     pub ip: IpAddr,
@@ -369,10 +385,14 @@ pub struct BackendStateMessage {
 impl JetStreamable for BackendStateMessage {
     fn config() -> async_nats::jetstream::stream::Config {
         async_nats::jetstream::stream::Config {
-            name: "backend_status".into(),
+            name: Self::stream_name().into(),
             subjects: vec!["backend.*.status".into()],
             ..async_nats::jetstream::stream::Config::default()
         }
+    }
+
+    fn stream_name() -> &'static str {
+        "backend_status"
     }
 }
 

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr, convert::Infallible};
 
 const RESOURCE_PREFIX: &str = "spawner-";
 
@@ -53,5 +53,37 @@ impl BackendId {
         resource_name
             .strip_prefix(RESOURCE_PREFIX)
             .map(|d| BackendId(d.to_string()))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ClusterName(String);
+
+impl FromStr for ClusterName {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // TODO: we could ensure validity here.
+        Ok(ClusterName::new(s))
+    }
+}
+
+impl ClusterName {
+    pub fn new(name: &str) -> Self {
+        ClusterName(name.to_string())
+    }
+
+    pub fn hostname(&self) -> &str {
+        &self.0
+    }
+
+    pub fn subject_name(&self) -> String {
+        self.0.replace('.', "_")
+    }
+}
+
+impl Display for ClusterName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }

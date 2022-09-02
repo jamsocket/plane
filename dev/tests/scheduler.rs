@@ -7,10 +7,10 @@ use dev::{
 use dis_spawner::{
     messages::{
         agent::{DroneStatusMessage, SpawnRequest},
-        scheduler::{ClusterId, ScheduleResponse},
+        scheduler::ScheduleResponse,
     },
     nats::TypedNats,
-    types::DroneId,
+    types::{ClusterName, DroneId},
 };
 use dis_spawner_controller::run_scheduler;
 use integration_test::integration_test;
@@ -94,13 +94,13 @@ async fn one_drone_available() -> Result<()> {
     let nats_conn = nats.connection().await?;
     let drone_id = DroneId::new(8);
     let mock_agent = MockAgent::new(nats_conn.clone());
-
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
+    sleep(Duration::from_millis(100)).await;
 
     nats_conn
         .publish(&DroneStatusMessage {
             capacity: 100,
-            cluster: ClusterId::new("spawner.test"),
+            cluster: ClusterName::new("spawner.test"),
             drone_id,
         })
         .await?;

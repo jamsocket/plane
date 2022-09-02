@@ -57,9 +57,10 @@ impl Nats {
                 let message = std::str::from_utf8(&v.payload).unwrap();
                 output
                     .write_fmt(format_args!(
-                        "{} {}: {}\n",
+                        "{} {} {:?}: {}\n",
                         Utc::now().to_rfc3339(),
                         v.subject,
+                        v.reply,
                         message
                     ))
                     .unwrap();

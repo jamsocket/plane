@@ -1,42 +1,18 @@
+use super::agent::SpawnRequest;
 use crate::{
     nats::{SubscribeSubject, TypedMessage},
-    types::{BackendId, DroneId},
+    types::{BackendId, ClusterName, DroneId},
 };
 use bollard::auth::DockerCredentials;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
-use std::{collections::HashMap, fmt::Display, time::Duration};
-
-use super::agent::SpawnRequest;
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct ClusterId {
-    hostname: String,
-}
-
-impl ClusterId {
-    pub fn new(name: &str) -> Self {
-        ClusterId {
-            hostname: name.to_string(),
-        }
-    }
-
-    pub fn subject_name(&self) -> String {
-        self.hostname.replace('.', "_")
-    }
-}
-
-impl Display for ClusterId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.hostname.fmt(f)
-    }
-}
+use std::{collections::HashMap, time::Duration};
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ScheduleRequest {
-    pub cluster: ClusterId,
+    pub cluster: ClusterName,
 
     /// The container image to run.
     pub image: String,

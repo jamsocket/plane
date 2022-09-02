@@ -5,7 +5,7 @@ use dev::{
     timeout::{spawn_timeout, timeout},
 };
 use dis_spawner::{
-    messages::cert::SetAcmeDnsRecord, nats::TypedNats, nats_connection::NatsConnection,
+    messages::cert::SetAcmeDnsRecord, nats::TypedNats, nats_connection::NatsConnection, types::ClusterName
 };
 use dis_spawner_drone::{
     drone::cli::{CertOptions, EabKeypair},
@@ -28,7 +28,7 @@ struct DummyDnsHandler {
 
 impl DummyDnsHandler {
     pub async fn new(conn: &TypedNats, expect_domain: &str) -> Result<DummyDnsHandler> {
-        let expect_domain = expect_domain.to_owned();
+        let expect_domain = ClusterName::new(expect_domain);
         let mut dns_sub = conn
             .subscribe(SetAcmeDnsRecord::subscribe_subject())
             .await?;
