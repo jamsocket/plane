@@ -211,7 +211,7 @@ impl<T: DeserializeOwned> DelayedReply<T> {
 }
 
 impl TypedNats {
-    async fn ensure_jetstream_exists<T: JetStreamable>(&self) -> Result<()> {
+    pub async fn ensure_jetstream_exists<T: JetStreamable>(&self) -> Result<()> {
         if !self.jetstream_created_streams.contains(T::stream_name()) {
             self.add_jetstream_stream::<T>().await?;
 
@@ -247,6 +247,7 @@ impl TypedNats {
 
     async fn add_jetstream_stream<T: JetStreamable>(&self) -> Result<()> {
         let config = T::config();
+        tracing::info!(name=config.name, "Creating jetstream stream.");
         self.jetstream
             .get_or_create_stream(config)
             .await
@@ -352,6 +353,21 @@ impl TypedNats {
                 Bytes::from(serde_json::to_vec(value)?),
             )
             .await?;
+        Ok(())
+    }
+
+    pub async fn publish_jetstream<T>(&self, value: &T) -> Result<()>
+    where
+        T: TypedMessage<Response = NoReply> + JetStreamable,
+    {
+        self.ensure_jetstream_exists::<T>().await?;
+
+        self.jetstream
+            .publish(
+                value.subject().clone(),
+                Bytes::from(serde_json::to_vec(value)?),
+            )
+            .await.to_anyhow()?;
         Ok(())
     }
 
