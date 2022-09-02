@@ -310,13 +310,13 @@ impl DockerInterface {
                         .collect(),
                     ),
                     runtime: self.runtime.clone(),
-                    cpu_period: Some(DEFAULT_CPU_PERIOD),
-                    cpu_quota: Some(DEFAULT_CPU_QUOTA),
-                    ulimits: Some(vec![ResourcesUlimits {
-                        name: Some("cpu".to_string()),
-                        soft: Some(DEFAULT_CPU_TIME_ULIMIT),
-                        hard: Some(DEFAULT_CPU_TIME_ULIMIT),
-                    }]),
+                    // cpu_period: Some(DEFAULT_CPU_PERIOD),
+                    // cpu_quota: Some(DEFAULT_CPU_QUOTA),
+                    // ulimits: Some(vec![ResourcesUlimits {
+                    //     name: Some("cpu".to_string()),
+                    //     soft: Some(DEFAULT_CPU_TIME_ULIMIT),
+                    //     hard: Some(DEFAULT_CPU_TIME_ULIMIT),
+                    // }]),
                     ..HostConfig::default()
                 }),
                 ..Config::default()
