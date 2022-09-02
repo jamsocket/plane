@@ -211,7 +211,7 @@ impl<T: DeserializeOwned> DelayedReply<T> {
 }
 
 impl TypedNats {
-    async fn ensure_jetstream_exists<T: JetStreamable>(&self) -> Result<()> {
+    pub async fn ensure_jetstream_exists<T: JetStreamable>(&self) -> Result<()> {
         if !self.jetstream_created_streams.contains(T::stream_name()) {
             self.add_jetstream_stream::<T>().await?;
 
