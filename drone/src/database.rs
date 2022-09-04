@@ -8,14 +8,15 @@
 //! based on type information stored in `sqlx-data.json`. If
 //! you change a query in this file, you will likely need to
 //! run `generate-sqlx-data.mjs` to get Rust to accept it.
-use std::str::FromStr;
+use std::{path::Path, str::FromStr};
 
 use chrono::{DateTime, TimeZone, Utc};
 use dis_spawner::{
     messages::agent::{BackendState, SpawnRequest},
     types::BackendId,
 };
-use sqlx::{Result, SqlitePool};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use sqlx::{migrate, Result, SqlitePool};
 
 #[allow(unused)]
 #[derive(Clone, Debug)]
@@ -31,8 +32,15 @@ pub struct Backend {
 
 #[allow(unused)]
 impl DroneDatabase {
-    pub fn new(pool: SqlitePool) -> DroneDatabase {
-        DroneDatabase { pool }
+    pub async fn new(db_path: &Path) -> Result<DroneDatabase> {
+        let co = SqliteConnectOptions::new()
+            .filename(&db_path)
+            .create_if_missing(true);
+        let pool = SqlitePoolOptions::new().connect_with(co).await?;
+        migrate!("./migrations").run(&pool).await?;
+
+        let connection = DroneDatabase { pool };
+        Ok(connection)
     }
 
     pub async fn insert_backend(&self, spec: &SpawnRequest) -> Result<()> {

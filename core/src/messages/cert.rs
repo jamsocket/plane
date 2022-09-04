@@ -1,4 +1,7 @@
-use crate::{nats::{SubscribeSubject, TypedMessage}, types::ClusterName};
+use crate::{
+    nats::{SubscribeSubject, TypedMessage},
+    types::ClusterName,
+};
 use serde::{Deserialize, Serialize};
 
 /// A request from the drone to the DNS server telling it to set

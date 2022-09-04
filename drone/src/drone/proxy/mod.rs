@@ -2,12 +2,11 @@ use self::{
     certs::CertRefresher, connection_tracker::ConnectionTracker, service::MakeProxyService,
     tls::TlsAcceptor,
 };
-use crate::{
-    database::DroneDatabase, database_connection::DatabaseConnection, keys::KeyCertPathPair,
-};
+use crate::{database::DroneDatabase, keys::KeyCertPathPair};
 use anyhow::{Context, Result};
 use hyper::{server::conn::AddrIncoming, Server};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::net::SocketAddr;
+use std::{net::IpAddr, sync::Arc, time::Duration};
 use tokio::select;
 
 mod certs;
@@ -15,10 +14,10 @@ mod connection_tracker;
 mod service;
 mod tls;
 
-#[derive(PartialEq, Debug)]
 pub struct ProxyOptions {
-    pub db: DatabaseConnection,
-    pub bind_address: SocketAddr,
+    pub db: DroneDatabase,
+    pub bind_ip: IpAddr,
+    pub bind_port: u16,
     pub key_pair: Option<KeyCertPathPair>,
     pub cluster_domain: String,
 }
@@ -34,12 +33,13 @@ async fn record_connections(db: DroneDatabase, connection_tracker: ConnectionTra
     }
 }
 
-async fn run_server(
-    db: DroneDatabase,
-    options: ProxyOptions,
-    connection_tracker: ConnectionTracker,
-) -> Result<()> {
-    let make_proxy = MakeProxyService::new(db, options.cluster_domain, connection_tracker.clone());
+async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker) -> Result<()> {
+    let make_proxy = MakeProxyService::new(
+        options.db,
+        options.cluster_domain,
+        connection_tracker.clone(),
+    );
+    let bind_address = SocketAddr::new(options.bind_ip, options.bind_port);
 
     if let Some(key_pair) = options.key_pair {
         let cert_refresher =
@@ -55,11 +55,11 @@ async fn run_server(
         };
 
         let incoming =
-            AddrIncoming::bind(&options.bind_address).context("Error binding port for HTTPS.")?;
+            AddrIncoming::bind(&bind_address).context("Error binding port for HTTPS.")?;
         let server = Server::builder(TlsAcceptor::new(tls_cfg, incoming)).serve(make_proxy);
         server.await.context("Error from TLS proxy.")?;
     } else {
-        let server = Server::bind(&options.bind_address).serve(make_proxy);
+        let server = Server::bind(&bind_address).serve(make_proxy);
         server.await.context("Error from non-TLS proxy.")?;
     }
 
@@ -68,14 +68,13 @@ async fn run_server(
 
 pub async fn serve(options: ProxyOptions) -> Result<()> {
     let connection_tracker = ConnectionTracker::default();
-    let db = options.db.connection().await?;
 
     select! {
-        result = run_server(db.clone(), options, connection_tracker.clone()) => {
-            tracing::info!(?result, "run_server returned early.")
-        }
-        () = record_connections(db, connection_tracker) => {
+        () = record_connections(options.db.clone(), connection_tracker.clone()) => {
             tracing::info!("record_connections returned early.")
+        }
+        result = run_server(options, connection_tracker) => {
+            tracing::info!(?result, "run_server returned early.")
         }
     };
 

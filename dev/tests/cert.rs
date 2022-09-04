@@ -4,12 +4,9 @@ use dev::{
     scratch_dir,
     timeout::{spawn_timeout, timeout},
 };
-use dis_spawner::{
-    messages::cert::SetAcmeDnsRecord, nats::TypedNats, nats_connection::NatsConnection, types::ClusterName
-};
+use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName};
 use dis_spawner_drone::{
-    drone::cli::{CertOptions, EabKeypair},
-    keys::KeyCertPathPair,
+    acme::AcmeEabConfiguration, drone::cli::CertOptions, keys::KeyCertPathPair,
 };
 use integration_test::integration_test;
 use openssl::x509::X509;
@@ -86,8 +83,8 @@ async fn cert_refresh_full() -> Result<()> {
     let dns_handler = DummyDnsHandler::new(&conn, "spawner.test").await?;
     let output_dir = scratch_dir("output");
     let key_paths = KeyCertPathPair {
-        private_key_path: output_dir.join("output.key"),
-        certificate_path: output_dir.join("output.pem"),
+        key_path: output_dir.join("output.key"),
+        cert_path: output_dir.join("output.pem"),
     };
 
     let () = timeout(
@@ -96,7 +93,7 @@ async fn cert_refresh_full() -> Result<()> {
         dis_spawner_drone::drone::cert::refresh_certificate(
             &CertOptions {
                 cluster_domain: "spawner.test".into(),
-                nats: NatsConnection::new(nats.connection_string())?,
+                nats: nats.connection().await?,
                 key_paths,
                 email: "admin@spawner.test".into(),
                 acme_server_url: pebble.directory_url(),
@@ -114,7 +111,7 @@ async fn cert_refresh_full() -> Result<()> {
 
 #[integration_test]
 async fn cert_refresh_eab() -> Result<()> {
-    let eab_keypair = EabKeypair::new(
+    let eab_keypair = AcmeEabConfiguration::new(
         "kid-1",
         "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
     )?;

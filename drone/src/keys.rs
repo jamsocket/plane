@@ -3,22 +3,23 @@ use rustls::{
     sign::{any_supported_type, CertifiedKey},
     Certificate, PrivateKey,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::BufReader,
     path::{Path, PathBuf},
 };
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct KeyCertPathPair {
-    pub private_key_path: PathBuf,
-    pub certificate_path: PathBuf,
+    pub key_path: PathBuf,
+    pub cert_path: PathBuf,
 }
 
 impl KeyCertPathPair {
     pub fn load_certified_key(&self) -> Result<CertifiedKey> {
-        let certificate = load_certs(&self.certificate_path)?;
-        let private_key = load_private_key(&self.private_key_path)?;
+        let certificate = load_certs(&self.cert_path)?;
+        let private_key = load_private_key(&self.key_path)?;
         let private_key = any_supported_type(&private_key)?;
 
         Ok(CertifiedKey::new(certificate, private_key))
@@ -34,11 +35,11 @@ impl KeyCertPathPair {
     /// may not exist when the server is started.
     pub fn parent_paths(&self) -> Vec<PathBuf> {
         let key_parent_dir = self
-            .private_key_path
+            .key_path
             .parent()
             .expect("Key file should never be filesystem root.");
         let certificate_parent_dir = self
-            .private_key_path
+            .key_path
             .parent()
             .expect("Key file should never be filesystem root.");
 

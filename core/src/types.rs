@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, str::FromStr, convert::Infallible};
+use std::{convert::Infallible, fmt::Display, str::FromStr};
 
 const RESOURCE_PREFIX: &str = "spawner-";
 

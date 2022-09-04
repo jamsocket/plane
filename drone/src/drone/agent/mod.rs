@@ -1,5 +1,5 @@
 use self::{docker::DockerInterface, executor::Executor};
-use crate::{database_connection::DatabaseConnection, drone::cli::IpProvider};
+use crate::{config::DockerConfig, database::DroneDatabase, ip::IpSource};
 use anyhow::{anyhow, Result};
 use dis_spawner::{
     logging::LogError,
@@ -8,7 +8,6 @@ use dis_spawner::{
         TerminationRequest,
     },
     nats::TypedNats,
-    nats_connection::NatsConnection,
     retry::do_with_retry,
     types::{ClusterName, DroneId},
 };
@@ -19,34 +18,15 @@ use std::{net::IpAddr, time::Duration};
 mod docker;
 mod executor;
 
-#[derive(PartialEq, Eq, Debug)]
-pub enum DockerApiTransport {
-    Socket(String),
-    Http(String),
-}
-
-impl Default for DockerApiTransport {
-    fn default() -> Self {
-        DockerApiTransport::Socket("/var/run/docker.sock".to_string())
-    }
-}
-
-#[derive(PartialEq, Eq, Debug, Default)]
-pub struct DockerOptions {
-    pub transport: DockerApiTransport,
-    pub runtime: Option<String>,
-}
-
-#[derive(PartialEq, Debug)]
 pub struct AgentOptions {
-    pub db: DatabaseConnection,
-    pub nats: NatsConnection,
+    pub db: DroneDatabase,
+    pub nats: TypedNats,
     pub cluster_domain: ClusterName,
 
     /// Public IP of the machine the drone is running on.
-    pub ip: IpProvider,
+    pub ip: IpSource,
 
-    pub docker_options: DockerOptions,
+    pub docker_options: DockerConfig,
 }
 
 pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
@@ -134,12 +114,12 @@ async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterName) -> R
 }
 
 pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
-    let nats = agent_opts.nats.connection().await?;
+    let nats = &agent_opts.nats;
 
     tracing::info!("Connecting to Docker.");
     let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
     tracing::info!("Connecting to sqlite.");
-    let db = agent_opts.db.connection().await?;
+    let db = agent_opts.db;
     let cluster = agent_opts.cluster_domain.clone();
     let ip = agent_opts.ip.get_ip().await?;
 
