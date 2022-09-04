@@ -33,6 +33,7 @@ impl Default for DockerConnection {
 #[derive(Serialize, Deserialize, Default)]
 pub struct DockerConfig {
     pub runtime: Option<String>,
+    #[serde(default)]
     pub connection: DockerConnection,
 }
 
