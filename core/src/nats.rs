@@ -5,18 +5,17 @@
 use anyhow::{anyhow, Result};
 use async_nats::jetstream::consumer::DeliverPolicy;
 use async_nats::jetstream::stream::Config;
-use async_nats::jetstream::Context;
+use async_nats::jetstream::{self, Context};
 use async_nats::{Client, ConnectOptions, Message, Subscriber};
-use async_stream::stream;
 use bytes::Bytes;
 use dashmap::DashSet;
-use futures::{Stream, StreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
+use tokio_stream::StreamExt;
 
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
@@ -210,6 +209,27 @@ impl<T: DeserializeOwned> DelayedReply<T> {
     }
 }
 
+pub struct JetstreamSubscription<T: TypedMessage> {
+    stream: jetstream::consumer::push::Messages,
+    _ph: PhantomData<T>,
+}
+
+impl<T: TypedMessage> JetstreamSubscription<T> {
+    pub async fn next(&mut self) -> Result<Option<T>> {
+        if let Some(message) = self.stream.next().await {
+            let message = message.to_anyhow()?;
+            message.ack().await.to_anyhow()?;
+            let value: Result<T, _> = serde_json::from_slice(&message.payload);
+            match value {
+                Ok(value) => Ok(Some(value)),
+                Err(error) => Err(anyhow!("Parse error {:?}", error)),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 impl TypedNats {
     pub async fn ensure_jetstream_exists<T: JetStreamable>(&self) -> Result<()> {
         if !self.jetstream_created_streams.contains(T::stream_name()) {
@@ -247,7 +267,7 @@ impl TypedNats {
 
     async fn add_jetstream_stream<T: JetStreamable>(&self) -> Result<()> {
         let config = T::config();
-        tracing::info!(name=config.name, "Creating jetstream stream.");
+        tracing::info!(name = config.name, "Creating jetstream stream.");
         self.jetstream
             .get_or_create_stream(config)
             .await
@@ -310,37 +330,30 @@ impl TypedNats {
     pub async fn subscribe_jetstream<T: JetStreamable>(
         &self,
         subject: SubscribeSubject<T>,
-    ) -> impl Stream<Item = T> {
-        let jetstream = self.jetstream.clone();
+    ) -> Result<JetstreamSubscription<T>> {
         let subject = subject.subject.to_string();
         let _ = self.ensure_jetstream_exists::<T>().await;
         let stream_name = T::stream_name();
 
-        let stream = stream!({
-            let stream = jetstream.get_stream(stream_name).await.unwrap();
+        let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
+        let deliver_subject = self.nc.new_inbox();
 
-            let consumer = stream
-                .create_consumer(async_nats::jetstream::consumer::pull::Config {
-                    deliver_policy: DeliverPolicy::All,
-                    filter_subject: subject,
-                    ..async_nats::jetstream::consumer::pull::Config::default()
-                })
-                .await
-                .unwrap();
+        let consumer = stream
+            .create_consumer(async_nats::jetstream::consumer::push::Config {
+                deliver_policy: DeliverPolicy::All,
+                filter_subject: subject,
+                deliver_subject,
+                ..async_nats::jetstream::consumer::push::Config::default()
+            })
+            .await
+            .to_anyhow()?;
 
-            let mut stream = consumer.stream().messages().await.unwrap();
+        let stream = consumer.messages().await.to_anyhow()?;
 
-            while let Some(Ok(value)) = stream.next().await {
-                let _ = value.ack().await;
-                let value: Result<T, _> = serde_json::from_slice(&value.payload);
-                match value {
-                    Ok(value) => yield value,
-                    Err(error) => tracing::warn!(?error, "Parse Err"),
-                }
-            }
-        });
-
-        stream
+        Ok(JetstreamSubscription {
+            stream,
+            _ph: PhantomData::default(),
+        })
     }
 
     pub async fn publish<T>(&self, value: &T) -> Result<()>
@@ -367,7 +380,8 @@ impl TypedNats {
                 value.subject().clone(),
                 Bytes::from(serde_json::to_vec(value)?),
             )
-            .await.to_anyhow()?;
+            .await
+            .to_anyhow()?;
         Ok(())
     }
 
