@@ -32,7 +32,7 @@ const CLUSTER_DOMAIN: &str = "spawner.test";
 
 struct Agent {
     #[allow(unused)]
-    agent_guard: LivenessGuard,
+    agent_guard: LivenessGuard<Result<()>>,
     pub ip: Ipv4Addr,
     pub db: DroneDatabase,
 }
