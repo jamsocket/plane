@@ -23,7 +23,7 @@ const CLUSTER: &str = "spawner.test";
 
 struct Proxy {
     #[allow(unused)]
-    guard: LivenessGuard,
+    guard: LivenessGuard<Result<()>>,
     //ip: Ipv4Addr,
     bind_address: SocketAddr,
     certs: SelfSignedCert,

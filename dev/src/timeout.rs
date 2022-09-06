@@ -1,7 +1,10 @@
 use anyhow::Result;
+use futures::FutureExt;
 use std::{
-    fmt::Display,
+    fmt::{Debug, Display},
     future::Future,
+    pin::Pin,
+    task::Poll,
     time::{Duration, SystemTime},
 };
 use tokio::task::JoinHandle;
@@ -95,31 +98,68 @@ where
     })
 }
 
-pub struct LivenessGuard {
-    #[allow(unused)]
-    handle: JoinHandle<Result<()>>,
+struct LivenessGuardFuture<D: Debug> {
+    inner: Pin<Box<dyn Future<Output = D> + Send>>,
 }
 
-impl Drop for LivenessGuard {
-    fn drop(&mut self) {
-        self.handle.abort();
+impl<D> Future for LivenessGuardFuture<D>
+where
+    D: Debug,
+{
+    type Output = D;
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        match self.inner.poll_unpin(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(val) => {
+                panic!(
+                    "A future wrapped in a LivenessGuard should not return a value, but did: {:?}",
+                    val
+                );
+            }
+        }
     }
 }
 
-/// Takes a future that you expect to never resolve (e.g. a server that awaits
-/// messages on an infinite loop). Returns a guard. If the future resolves before
-/// the guard goes out of scope, panics.
-///
-/// The future is aborted when the guard is dropped.
-pub fn expect_to_stay_alive<F>(future: F) -> LivenessGuard
+pub struct LivenessGuard<T>
 where
-    F: Future<Output = Result<()>> + Send + 'static,
+    T: Debug + 'static,
 {
-    let handle = tokio::spawn(async {
-        future.await?;
+    handle: JoinHandle<T>,
+}
 
-        panic!("Expected future to stay alive until we killed it, but it finished on its own.");
-    });
+impl<T> Drop for LivenessGuard<T>
+where
+    T: Debug + 'static,
+{
+    fn drop(&mut self) {
+        self.handle.abort()
+    }
+}
 
-    LivenessGuard { handle }
+impl<D> LivenessGuard<D>
+where
+    D: Debug + 'static + Send,
+{
+    pub fn new<F>(future: F) -> Self
+    where
+        F: Future<Output = D> + Send + 'static,
+    {
+        let handle = tokio::spawn(LivenessGuardFuture {
+            inner: Box::pin(future),
+        });
+
+        Self { handle }
+    }
+}
+
+pub fn expect_to_stay_alive<D, F>(future: F) -> LivenessGuard<D>
+where
+    F: Future<Output = D> + Send + 'static,
+    D: Debug + Send,
+{
+    LivenessGuard::new(future)
 }

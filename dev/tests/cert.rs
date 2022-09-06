@@ -4,7 +4,10 @@ use dev::{
     scratch_dir,
     timeout::{spawn_timeout, timeout},
 };
-use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName};
+use dis_spawner::{
+    messages::cert::SetAcmeDnsRecord, nats::TypedNats,
+    types::ClusterName,
+};
 use dis_spawner_drone::{
     acme::AcmeEabConfiguration, drone::cli::CertOptions, keys::KeyCertPathPair,
 };

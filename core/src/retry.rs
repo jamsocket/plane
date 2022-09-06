@@ -1,5 +1,4 @@
-use futures::Future;
-use std::{fmt::Debug, time::Duration};
+use std::{fmt::Debug, future::Future, time::Duration};
 
 /// Run a closure until the future it returns resolves to an Ok value.
 ///

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dis_spawner::{
     messages::agent::DroneStatusMessage,
@@ -7,41 +7,50 @@ use dis_spawner::{
 };
 use scheduler::Scheduler;
 use tokio::select;
-use tokio_stream::StreamExt;
 
 mod scheduler;
 
 pub async fn run_scheduler(nats: TypedNats) -> Result<()> {
     let scheduler = Scheduler::default();
     let mut spawn_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
+    tracing::info!("Subscribed to spawn requests.");
 
-    let mut status_sub = Box::pin(
-        nats.subscribe_jetstream(DroneStatusMessage::subscribe_subject())
-            .await,
-    );
+    let mut status_sub = nats
+        .subscribe_jetstream(DroneStatusMessage::subscribe_subject())
+        .await?;
+    tracing::info!("Subscribed to drone status messages.");
 
     loop {
         select! {
             status_msg = status_sub.next() => {
-                let status_msg = status_msg.unwrap();
-
-                scheduler.update_status(Utc::now(), &status_msg);
+                tracing::info!(?status_msg, "Got drone status");
+                if let Some(status_msg) = status_msg? {
+                    scheduler.update_status(Utc::now(), &status_msg);
+                } else {
+                    tracing::info!("here22");
+                    return Err(anyhow!("status_sub.next() returned None."));
+                }
             },
 
             spawn_request = spawn_request_sub.next() => {
-                let spawn_request = spawn_request.unwrap().unwrap();
+                tracing::info!(?spawn_request, "Got spawn request");
+                match spawn_request {
+                    Ok(Some(spawn_request)) => {
+                        let result = match scheduler.schedule() {
+                            Ok(drone_id) => {
+                                match nats.request(&spawn_request.value.schedule(drone_id)).await {
+                                    Ok(false) | Err(_) => ScheduleResponse::NoDroneAvailable,
+                                    Ok(true) => ScheduleResponse::Scheduled { drone: drone_id }
+                                }
+                            },
+                            Err(_) => ScheduleResponse::NoDroneAvailable,
+                        };
 
-                let result = match scheduler.schedule() {
-                    Ok(drone_id) => {
-                        match nats.request(&spawn_request.value.schedule(drone_id)).await {
-                            Ok(false) | Err(_) => ScheduleResponse::NoDroneAvailable,
-                            Ok(true) => ScheduleResponse::Scheduled { drone: drone_id }
-                        }
+                        spawn_request.respond(&result).await?;
                     },
-                    Err(_) => ScheduleResponse::NoDroneAvailable,
-                };
-
-                spawn_request.respond(&result).await?;
+                    Ok(None) => return Err(anyhow!("spawn_request_sub.next() returned None.")),
+                    Err(err) => tracing::warn!("spawn_request_sub.next() returned error: {:?}", err)
+                }
             }
         }
     }

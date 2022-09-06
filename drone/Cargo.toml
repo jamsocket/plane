@@ -12,17 +12,11 @@ chrono = { version = "0.4.21", features = ["serde"] }
 clap = { version = "3.2.20", features = ["derive"] }
 config = { version = "0.13.2", default_features = false, features = ["toml"] }
 dashmap = "5.3.4"
-dis-spawner = { path = "../core" }
-futures = "0.3.21"
+dis-spawner = {path = "../core"}
+futures = "0.3.24"
 http = "0.2.7"
-hyper = { version = "0.14.19", features = [
-    "server",
-    "client",
-    "http1",
-    "http2",
-    "tcp",
-] }
-notify = "5.0.0-pre.15"
+hyper = { version = "0.14.19", features = ["server", "client", "http1", "http2", "tcp"] }
+notify = "5.0.0"
 openssl = "0.10.40"
 reqwest = { version = "0.11.11", features = ["native-tls"] }
 rustls = "0.20.6"
