@@ -10,12 +10,12 @@ use dev::{
     util::random_loopback_ip,
 };
 use dis_spawner_drone::database::DroneDatabase;
-use dis_spawner_drone::database_connection::DatabaseConnection;
 use dis_spawner_drone::drone::proxy::ProxyOptions;
 use http::StatusCode;
 use integration_test::integration_test;
 use reqwest::Response;
 use reqwest::{Certificate, ClientBuilder};
+use std::net::SocketAddrV4;
 use std::{net::SocketAddr, time::Duration};
 use tokio::time::Instant;
 
@@ -60,19 +60,12 @@ impl Proxy {
             vec!["*.spawner.test".into(), "spawner.test".into()],
         )?;
         let bind_ip = random_loopback_ip();
-        let bind_address = SocketAddr::new(bind_ip.into(), 4040);
-        let db_connection = DatabaseConnection::new(
-            scratch_dir("proxy")
-                .join("drone.db")
-                .to_str()
-                .unwrap()
-                .to_string(),
-        );
+        let db = DroneDatabase::new(&scratch_dir("proxy").join("drone.db")).await?;
 
-        let db = db_connection.connection().await?;
         let options = ProxyOptions {
-            db: db_connection,
-            bind_address,
+            db: db.clone(),
+            bind_ip: std::net::IpAddr::V4(bind_ip),
+            bind_port: 4040,
             key_pair: Some(certs.path_pair.clone()),
             cluster_domain: CLUSTER.into(),
         };
@@ -80,7 +73,7 @@ impl Proxy {
 
         let proxy = Proxy {
             guard,
-            bind_address,
+            bind_address: SocketAddr::V4(SocketAddrV4::new(bind_ip, 4040)),
             certs,
             db,
         };

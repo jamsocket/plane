@@ -1,4 +1,4 @@
-use super::DockerOptions;
+use crate::config::{DockerConfig, DockerConnection};
 use anyhow::{anyhow, Result};
 use bollard::{
     auth::DockerCredentials,
@@ -132,15 +132,15 @@ fn make_exposed_ports(port: u16) -> Option<HashMap<String, HashMap<(), ()>>> {
 }
 
 impl DockerInterface {
-    pub async fn try_new(config: &DockerOptions) -> Result<Self> {
-        let docker = match &config.transport {
-            super::DockerApiTransport::Socket(docker_socket) => Docker::connect_with_unix(
-                docker_socket,
+    pub async fn try_new(config: &DockerConfig) -> Result<Self> {
+        let docker = match &config.connection {
+            DockerConnection::Socket { socket } => Docker::connect_with_unix(
+                socket,
                 DEFAULT_DOCKER_TIMEOUT_SECONDS,
                 API_DEFAULT_VERSION,
             )?,
-            super::DockerApiTransport::Http(docker_http) => Docker::connect_with_http(
-                docker_http,
+            DockerConnection::Http { http } => Docker::connect_with_http(
+                http,
                 DEFAULT_DOCKER_TIMEOUT_SECONDS,
                 API_DEFAULT_VERSION,
             )?,

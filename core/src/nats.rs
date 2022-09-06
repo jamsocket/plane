@@ -4,9 +4,10 @@
 
 use anyhow::{anyhow, Result};
 use async_nats::jetstream::consumer::DeliverPolicy;
+use async_nats::jetstream::consumer::push::Messages;
 use async_nats::jetstream::stream::Config;
-use async_nats::jetstream::{self, Context};
-use async_nats::{Client, ConnectOptions, Message, Subscriber};
+use async_nats::jetstream::Context;
+use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
 use dashmap::DashSet;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -210,7 +211,7 @@ impl<T: DeserializeOwned> DelayedReply<T> {
 }
 
 pub struct JetstreamSubscription<T: TypedMessage> {
-    stream: jetstream::consumer::push::Messages,
+    stream: Messages,
     _ph: PhantomData<T>,
 }
 
@@ -231,6 +232,16 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
 }
 
 impl TypedNats {
+    #[must_use]
+    pub fn new(nc: Client) -> Self {
+        let jetstream = async_nats::jetstream::new(nc.clone());
+        TypedNats {
+            nc,
+            jetstream,
+            jetstream_created_streams: Arc::default(),
+        }
+    }
+
     pub async fn ensure_jetstream_exists<T: JetStreamable>(&self) -> Result<()> {
         if !self.jetstream_created_streams.contains(T::stream_name()) {
             self.add_jetstream_stream::<T>().await?;
@@ -274,24 +285,6 @@ impl TypedNats {
             .to_anyhow()?;
 
         Ok(())
-    }
-
-    pub async fn connect(nats_url: &str, options: ConnectOptions) -> Result<Self> {
-        let nc = async_nats::connect_with_options(nats_url, options).await?;
-
-        let result = Self::new(nc);
-
-        Ok(result)
-    }
-
-    #[must_use]
-    pub fn new(nc: Client) -> Self {
-        let jetstream = async_nats::jetstream::new(nc.clone());
-        TypedNats {
-            nc,
-            jetstream,
-            jetstream_created_streams: Arc::default(),
-        }
     }
 
     pub async fn get_latest<T>(&self, subject: &SubscribeSubject<T>) -> Result<Option<T>>

@@ -37,8 +37,8 @@ impl CertRefresher {
                     ..
                 }) = ev
                 {
-                    if paths.contains(&key_cert_path_pair.private_key_path) {
-                        match load_private_key(&key_cert_path_pair.private_key_path) {
+                    if paths.contains(&key_cert_path_pair.key_path) {
+                        match load_private_key(&key_cert_path_pair.key_path) {
                             Ok(key) => private_key = Some(key),
                             Err(err) => {
                                 tracing::warn!(?err, "Error loading private key.");
@@ -47,8 +47,8 @@ impl CertRefresher {
                         }
                     }
 
-                    if paths.contains(&key_cert_path_pair.certificate_path) {
-                        match load_certs(&key_cert_path_pair.certificate_path) {
+                    if paths.contains(&key_cert_path_pair.cert_path) {
+                        match load_certs(&key_cert_path_pair.cert_path) {
                             Ok(cert) => certificate = Some(cert),
                             Err(err) => {
                                 tracing::warn!(?err, "Error loading certificate.");

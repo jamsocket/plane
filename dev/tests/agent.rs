@@ -12,17 +12,10 @@ use dis_spawner::{
         DroneConnectResponse, DroneStatusMessage, SpawnRequest, TerminationRequest,
     },
     nats::{TypedNats, TypedSubscription},
-    nats_connection::NatsConnection,
     types::{BackendId, ClusterName, DroneId},
 };
-use dis_spawner_drone::{
-    database::DroneDatabase,
-    database_connection::DatabaseConnection,
-    drone::{
-        agent::{AgentOptions, DockerOptions},
-        cli::IpProvider,
-    },
-};
+use dis_spawner_drone::config::DockerConfig;
+use dis_spawner_drone::{database::DroneDatabase, drone::agent::AgentOptions, ip::IpSource};
 use integration_test::integration_test;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
@@ -40,21 +33,14 @@ struct Agent {
 impl Agent {
     pub async fn new(nats: &Nats) -> Result<Agent> {
         let ip = random_loopback_ip();
-        let db_connection = DatabaseConnection::new(
-            scratch_dir("agent")
-                .join("drone.db")
-                .to_str()
-                .unwrap()
-                .to_string(),
-        );
-        let db = db_connection.connection().await?;
+        let db = DroneDatabase::new(&scratch_dir("agent").join("drone.db")).await?;
 
         let agent_opts = AgentOptions {
-            db: db_connection,
-            nats: NatsConnection::new(nats.connection_string())?,
+            db: db.clone(),
+            nats: nats.connection().await?,
             cluster_domain: ClusterName::new(CLUSTER_DOMAIN),
-            ip: IpProvider::Literal(IpAddr::V4(ip)),
-            docker_options: DockerOptions::default(),
+            ip: IpSource::Literal(IpAddr::V4(ip)),
+            docker_options: DockerConfig::default(),
         };
 
         let agent_guard =
@@ -336,7 +322,7 @@ async fn stats_are_acquired() -> Result<()> {
 async fn use_ip_lookup_api() -> Result<()> {
     let server = Server::new(|_| async { "123.11.22.33".to_string() }).await?;
 
-    let provider = IpProvider::Api(reqwest::Url::parse(&server.url())?);
+    let provider = IpSource::Api { api: server.url() };
 
     let result = provider.get_ip().await?;
     assert_eq!("123.11.22.33".parse::<IpAddr>()?, result);

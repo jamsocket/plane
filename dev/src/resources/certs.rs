@@ -32,8 +32,8 @@ impl SelfSignedCert {
         fs::write(&key_path, &key_pem)?;
 
         let path_pair = KeyCertPathPair {
-            certificate_path: cert_path,
-            private_key_path: key_path,
+            cert_path,
+            key_path,
         };
 
         Ok(SelfSignedCert {
