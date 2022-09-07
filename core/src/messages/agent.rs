@@ -264,6 +264,16 @@ pub struct ResourceLimits {
     pub cpu_time_limit: Duration,
 }
 
+impl Default for ResourceLimits {
+    fn default() -> ResourceLimits {
+        ResourceLimits {
+            cpu_period: Duration::from_millis(100),
+            cpu_period_percent: 100,
+            cpu_time_limit: Duration::from_secs(30),
+        }
+    }
+}
+
 impl TypedMessage for SpawnRequest {
     type Response = bool;
 

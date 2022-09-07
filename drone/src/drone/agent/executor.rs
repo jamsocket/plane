@@ -287,7 +287,12 @@ impl Executor {
 
                 let backend_id = spawn_request.backend_id.to_resource_name();
                 self.docker
-                    .run_container(&backend_id, &spawn_request.image, &spawn_request.env)
+                    .run_container(
+                        &backend_id,
+                        &spawn_request.image,
+                        &spawn_request.env,
+                        &spawn_request.resource_limits.clone().unwrap_or_default(),
+                    )
                     .await?;
                 tracing::info!(%backend_id, "Container is running.");
 
