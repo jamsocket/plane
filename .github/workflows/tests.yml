@@ -23,7 +23,7 @@ jobs:
       run: cargo install cargo-nextest
 
     - name: Run tests
-      run: cargo nextest run -j 10
+      run: cargo nextest run simple_ws_backend_proxy --no-capture
 
     - uses: actions/upload-artifact@v3
       if: always()
