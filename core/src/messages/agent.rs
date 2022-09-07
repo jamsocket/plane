@@ -6,7 +6,7 @@ use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use serde_with::DurationSeconds;
+use serde_with::{DurationMicroSeconds, DurationSeconds};
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -241,6 +241,27 @@ pub struct SpawnRequest {
 
     /// Credentials used to fetch the image.
     pub credentials: Option<DockerCredentials>,
+
+    /// Resource limits
+    pub resource_limits: Option<ResourceLimits>,
+}
+
+// eventually, this will be generic over executors
+// currently only applies to docker
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ResourceLimits {
+    /// period of cpu time, serializes as microseconds
+    #[serde_as(as = "DurationMicroSeconds")]
+    pub cpu_period: Duration,
+
+    /// proportion of period used by container
+    pub cpu_period_percent: u8,
+
+    /// total cpu time allocated to container    
+
+    #[serde_as(as = "DurationSeconds")]
+    pub cpu_time_limit: Duration,
 }
 
 impl TypedMessage for SpawnRequest {
