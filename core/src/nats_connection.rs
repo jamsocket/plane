@@ -1,101 +1,70 @@
 use crate::{nats::TypedNats, retry::do_with_retry};
 use anyhow::Result;
-use async_nats::ConnectOptions;
-use std::{fmt::Debug, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use async_nats::{ConnectOptions, ServerAddr};
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use std::time::Duration;
 use url::Url;
 
 /// This matches NATS' Authorization struct, which is crate-private.
 /// https://github.com/nats-io/nats.rs/blob/2f53feab2eac4c01fb470309a3af2c9920f9224a/async-nats/src/lib.rs#L1249
-#[derive(Clone)]
-pub enum Authorization {
-    /// No authentication.
-    None,
-
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum NatsAuthorization {
     /// Authenticate using a token.
-    Token(String),
+    Token { token: String },
 
     /// Authenticate using a username and password.
-    UserAndPassword(String, String),
+    UserAndPassword { username: String, password: String },
     // TODO: JWT
 }
 
-impl Authorization {
-    pub fn from_url(url: &str) -> Result<Authorization> {
+#[derive(Serialize, Deserialize)]
+pub struct NatsConnectionSpec {
+    pub auth: Option<NatsAuthorization>,
+    pub hosts: Vec<String>,
+}
+
+impl NatsConnectionSpec {
+    pub fn from_url(url: &str) -> Result<Self> {
         let url = Url::parse(url)?;
 
-        if let Some(password) = url.password().as_ref() {
-            Ok(Authorization::UserAndPassword(
-                url.username().to_string(),
-                (*password).to_string(),
-            ))
+        let auth = if let Some(password) = url.password().as_ref() {
+            Some(NatsAuthorization::UserAndPassword {
+                username: url.username().to_string(),
+                password: (*password).to_string(),
+            })
         } else if !url.username().is_empty() {
-            Ok(Authorization::Token(url.username().to_string()))
+            Some(NatsAuthorization::Token {
+                token: url.username().to_string(),
+            })
         } else {
-            Ok(Authorization::None)
-        }
+            None
+        };
+
+        let hosts = vec![url.host_str().unwrap_or("localhost").into()];
+
+        Ok(NatsConnectionSpec { auth, hosts })
     }
 
-    #[must_use]
     pub fn connect_options(&self) -> ConnectOptions {
-        match self {
-            Authorization::None => ConnectOptions::new(),
-            Authorization::Token(token) => ConnectOptions::with_token(token.to_string()),
-            Authorization::UserAndPassword(user, pass) => {
-                ConnectOptions::with_user_and_password(user.to_string(), pass.to_string())
-            }
+        match &self.auth {
+            None => ConnectOptions::default(),
+            Some(NatsAuthorization::Token { token }) => ConnectOptions::with_token(token.into()),
+            _ => todo!("Unsupported authentication."),
         }
     }
-}
 
-/// Represents a shared, lazy connection to NATS.
-/// No connection is made until connection().await is first
-/// called. Once a successful connection is made, it is
-/// cached and a clone of it is returned.
-#[derive(Clone)]
-pub struct NatsConnection {
-    connection_string: String,
-    authorization: Authorization,
-    connection: Arc<Mutex<Option<TypedNats>>>,
-}
-
-impl PartialEq for NatsConnection {
-    fn eq(&self, other: &Self) -> bool {
-        self.connection_string == other.connection_string
-    }
-}
-
-impl Debug for NatsConnection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("NatsConnection")
-            .field("connection_string", &self.connection_string)
-            .finish()
-    }
-}
-
-impl NatsConnection {
-    pub fn new(connection_string: String) -> Result<Self> {
-        let authorization = Authorization::from_url(&connection_string)?;
-
-        Ok(NatsConnection {
-            connection_string,
-            authorization,
-            connection: Arc::default(),
-        })
-    }
-
-    pub async fn connection(&self) -> Result<TypedNats> {
-        let mut shared_connection = self.connection.lock().await;
-
-        if let Some(nats) = shared_connection.as_ref() {
-            return Ok(nats.clone());
-        }
+    pub async fn connect(&self) -> Result<TypedNats> {
+        let server_addrs: Result<Vec<ServerAddr>, _> =
+            self.hosts.iter().map(|d| ServerAddr::from_str(d)).collect();
+        let server_addrs = server_addrs?;
 
         let nats = do_with_retry(
             || {
-                TypedNats::connect(
-                    &self.connection_string,
-                    self.authorization.connect_options(),
+                async_nats::connect_with_options(
+                    &server_addrs as &[ServerAddr],
+                    self.connect_options(),
                 )
             },
             30,
@@ -103,8 +72,6 @@ impl NatsConnection {
         )
         .await?;
 
-        shared_connection.replace(nats.clone());
-
-        Ok(nats)
+        Ok(TypedNats::new(nats))
     }
 }

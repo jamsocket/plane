@@ -1,4 +1,4 @@
-use super::DockerOptions;
+use crate::config::{DockerConfig, DockerConnection};
 use anyhow::{anyhow, Result};
 use bollard::{
     auth::DockerCredentials,
@@ -8,7 +8,6 @@ use bollard::{
     },
     image::CreateImageOptions,
     models::{EventMessage, HostConfig, PortBinding},
-    service::ResourcesUlimits,
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
@@ -19,10 +18,10 @@ use tokio_stream::{Stream, StreamExt};
 const CONTAINER_PORT: u16 = 8080;
 const DEFAULT_DOCKER_TIMEOUT_SECONDS: u64 = 30;
 const DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SECS: u64 = 10;
-const DEFAULT_CPU_TIME_ULIMIT: i64 = 30; //in minutes
-const DEFAULT_CPU_PERIOD: i64 = (0.1 * 1e6) as i64; //0.1 second, in microseconds
-                                                    //note this 1s is MAX allowed by docker
-const DEFAULT_CPU_QUOTA: i64 = ((DEFAULT_CPU_PERIOD as f64) * 0.97) as i64;
+// const DEFAULT_CPU_TIME_ULIMIT: i64 = 30; //in minutes
+// const DEFAULT_CPU_PERIOD: i64 = (0.1 * 1e6) as i64; //0.1 second, in microseconds
+//                                                     //note this 1s is MAX allowed by docker
+// const DEFAULT_CPU_QUOTA: i64 = ((DEFAULT_CPU_PERIOD as f64) * 0.97) as i64;
 //allow some leeway in CPU_QUOTA to ensure spawner is not starved of cycles
 
 #[derive(Clone)]
@@ -133,15 +132,15 @@ fn make_exposed_ports(port: u16) -> Option<HashMap<String, HashMap<(), ()>>> {
 }
 
 impl DockerInterface {
-    pub async fn try_new(config: &DockerOptions) -> Result<Self> {
-        let docker = match &config.transport {
-            super::DockerApiTransport::Socket(docker_socket) => Docker::connect_with_unix(
-                docker_socket,
+    pub async fn try_new(config: &DockerConfig) -> Result<Self> {
+        let docker = match &config.connection {
+            DockerConnection::Socket { socket } => Docker::connect_with_unix(
+                socket,
                 DEFAULT_DOCKER_TIMEOUT_SECONDS,
                 API_DEFAULT_VERSION,
             )?,
-            super::DockerApiTransport::Http(docker_http) => Docker::connect_with_http(
-                docker_http,
+            DockerConnection::Http { http } => Docker::connect_with_http(
+                http,
                 DEFAULT_DOCKER_TIMEOUT_SECONDS,
                 API_DEFAULT_VERSION,
             )?,

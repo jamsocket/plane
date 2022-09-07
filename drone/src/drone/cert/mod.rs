@@ -1,4 +1,6 @@
-use super::cli::{CertOptions, EabKeypair};
+use crate::acme::AcmeEabConfiguration;
+
+use super::cli::CertOptions;
 use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
@@ -25,7 +27,7 @@ pub async fn get_certificate(
     acme_server_url: &str,
     mailto_email: &str,
     client: &Client,
-    acme_eab_keypair: Option<&EabKeypair>,
+    acme_eab_keypair: Option<&AcmeEabConfiguration>,
 ) -> Result<(PKey<Private>, Vec<X509>)> {
     let _span = tracing::info_span!("Getting certificate", %cluster_domain);
     let _span_guard = _span.enter();
@@ -38,8 +40,8 @@ pub async fn get_certificate(
     let mut builder = AccountBuilder::new(dir);
     builder.contact(vec![format!("mailto:{}", mailto_email)]);
     if let Some(acme_eab_keypair) = acme_eab_keypair {
-        let eab_key = PKey::hmac(&acme_eab_keypair.eab_key).unwrap();
-        builder.external_account_binding(acme_eab_keypair.eab_kid.clone(), eab_key);
+        let eab_key = PKey::hmac(&acme_eab_keypair.key).unwrap();
+        builder.external_account_binding(acme_eab_keypair.key_id.clone(), eab_key);
     }
 
     builder.terms_of_service_agreed(true);
@@ -117,11 +119,11 @@ pub async fn get_certificate(
 }
 
 pub async fn refresh_certificate(cert_options: &CertOptions, client: &Client) -> Result<()> {
-    let nats = cert_options.nats.connection().await?;
+    let nats = &cert_options.nats;
 
     let (pkey, certs) = get_certificate(
         &cert_options.cluster_domain,
-        &nats,
+        nats,
         &cert_options.acme_server_url,
         &cert_options.email,
         client,
@@ -133,7 +135,7 @@ pub async fn refresh_certificate(cert_options: &CertOptions, client: &Client) ->
         let mut fh = File::options()
             .create(true)
             .write(true)
-            .open(&cert_options.key_paths.certificate_path)?;
+            .open(&cert_options.key_paths.cert_path)?;
 
         for cert in certs {
             fh.write_all(&cert.to_pem()?)?;
@@ -141,7 +143,7 @@ pub async fn refresh_certificate(cert_options: &CertOptions, client: &Client) ->
     }
 
     std::fs::write(
-        &cert_options.key_paths.private_key_path,
+        &cert_options.key_paths.key_path,
         pkey.private_key_to_pem_pkcs8()?,
     )?;
 
@@ -161,7 +163,7 @@ pub fn cert_validity(certificate_path: &Path) -> Option<DateTime<Utc>> {
 }
 
 pub async fn refresh_if_not_valid(cert_options: &CertOptions) -> Result<Option<Duration>> {
-    if let Some(valid_until) = cert_validity(&cert_options.key_paths.certificate_path) {
+    if let Some(valid_until) = cert_validity(&cert_options.key_paths.cert_path) {
         let refresh_at = valid_until
             .checked_sub_signed(chrono::Duration::from_std(REFRESH_MARGIN)?)
             .ok_or_else(|| {

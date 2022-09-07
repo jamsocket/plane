@@ -76,6 +76,7 @@ async fn no_drone_available() -> Result<()> {
     sleep(Duration::from_millis(100)).await;
 
     let request = base_scheduler_request();
+    tracing::info!("Making spawn request.");
     let result = timeout(
         1_000,
         "Schedule request should be responded.",

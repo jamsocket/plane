@@ -4,7 +4,7 @@ use crate::util::wait_for_port;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dis_spawner::nats::TypedNats;
-use dis_spawner::nats_connection::NatsConnection;
+use dis_spawner::nats_connection::{NatsAuthorization, NatsConnectionSpec};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -20,13 +20,17 @@ pub struct Nats {
 }
 
 impl Nats {
-    pub fn connection_string(&self) -> String {
-        format!("nats://{}@{}", NATS_TOKEN, self.container.ip)
+    pub fn connection_spec(&self) -> NatsConnectionSpec {
+        NatsConnectionSpec {
+            auth: Some(NatsAuthorization::Token {
+                token: NATS_TOKEN.into(),
+            }),
+            hosts: vec![self.container.ip.to_string()],
+        }
     }
 
     pub async fn connection(&self) -> Result<TypedNats> {
-        let nc = NatsConnection::new(self.connection_string())?;
-        nc.connection().await
+        self.connection_spec().connect().await
     }
 
     pub async fn new() -> Result<Nats> {

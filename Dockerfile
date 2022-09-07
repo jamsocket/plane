@@ -6,8 +6,6 @@ COPY . .
 
 RUN cargo build --bin=spawner-drone --release
 
-RUN ls /work/target/release
-
 FROM gcr.io/distroless/cc-debian11
 
 COPY --from=build /work/target/release/spawner-drone /bin/spawner-drone

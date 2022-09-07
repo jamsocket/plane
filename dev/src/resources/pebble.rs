@@ -7,7 +7,7 @@ use crate::{
     util::wait_for_url,
 };
 use anyhow::{Context, Result};
-use dis_spawner_drone::drone::cli::EabKeypair;
+use dis_spawner_drone::acme::AcmeEabConfiguration;
 use reqwest::Client;
 use serde_json::json;
 
@@ -35,17 +35,17 @@ impl Pebble {
         Self::new_impl(None).await
     }
 
-    pub async fn new_eab(eab_keypair: &EabKeypair) -> Result<Pebble> {
+    pub async fn new_eab(eab_keypair: &AcmeEabConfiguration) -> Result<Pebble> {
         Self::new_impl(Some(eab_keypair)).await
     }
 
-    async fn new_impl(eab_keypair: Option<&EabKeypair>) -> Result<Pebble> {
+    async fn new_impl(eab_keypair: Option<&AcmeEabConfiguration>) -> Result<Pebble> {
         let certs = SelfSignedCert::new("pebble-certs", vec!["localhost".to_string()])?;
         let config_dir = scratch_dir("pebble-config");
 
         let external_account_mac_keys: HashMap<String, String> = eab_keypair
             .iter()
-            .map(|keypair| (keypair.eab_kid.clone(), keypair.eab_key_b64()))
+            .map(|keypair| (keypair.key_id.clone(), keypair.eab_key_b64()))
             .collect();
         let external_account_binding_required = !external_account_mac_keys.is_empty();
 
