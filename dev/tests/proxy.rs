@@ -119,6 +119,24 @@ impl Proxy {
         let url = format!("https://{}:{}/{}", hostname, self.bind_address.port(), path);
         client.get(url).send().await
     }
+
+    pub async fn http_websocket(&self,
+        subdomain: &str,
+        path: &str,
+    ) { 
+        let hostname = format!("{}.{}", subdomain, CLUSTER);
+        let path = if let Some(path) = path.strip_prefix("/") {
+            path
+        } else {
+            path
+        };
+
+        let url = format!("{}:{}", self.bind_address.ip(), self.bind_address.port());
+
+        // tls w/ custom root cert
+        // dns resolve
+        // connect via proxy
+    }
 }
 
 #[integration_test]
@@ -146,6 +164,24 @@ async fn simple_backend_proxy() -> Result<()> {
 
     let result = proxy.http_get("foobar", "/").await?;
     assert_eq!("Hello World", result.text().await?);
+
+    Ok(())
+}
+
+#[integration_test]
+async fn simple_ws_backend_proxy() -> Result<()> {
+    let proxy = Proxy::new().await?;
+    let server = Server::serve_web_sockets().await?;
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await?;
+
+    proxy
+        .db
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .await?;
+    
+    proxy.http_websocket("foobar", "/").await;
 
     Ok(())
 }
