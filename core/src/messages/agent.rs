@@ -269,7 +269,7 @@ impl Default for ResourceLimits {
         ResourceLimits {
             cpu_period: Duration::from_millis(100),
             cpu_period_percent: 100,
-            cpu_time_limit: Duration::from_secs(30),
+            cpu_time_limit: Duration::from_secs(30 * 60),
         }
     }
 }
