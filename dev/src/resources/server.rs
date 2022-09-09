@@ -1,17 +1,17 @@
 use crate::util::random_loopback_ip;
 use anyhow::{anyhow, Result};
 use futures::Future;
+use futures::{future, SinkExt, StreamExt, TryStreamExt};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{self, Body, Request, Response};
 use std::convert::Infallible;
-use std::net::{SocketAddr};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
-use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::{client_async, tungstenite::protocol::Message};
-use futures::{future, StreamExt, TryStreamExt, SinkExt};
 
 pub struct Server {
     server_handle: JoinHandle<()>,
@@ -53,8 +53,7 @@ impl Server {
         Ok(server)
     }
 
-    pub async fn serve_web_sockets() -> Result<Self>
-    {
+    pub async fn serve_web_sockets() -> Result<Self> {
         let ip = random_loopback_ip();
         let address = SocketAddr::new(ip.into(), 8080);
 
@@ -65,7 +64,6 @@ impl Server {
                 let ws_stream = tokio_tungstenite::accept_async(stream)
                     .await
                     .expect("Error during the websocket handshake occurred");
-            
                 let (write, read) = ws_stream.split();
                 read.try_filter(|msg| future::ready(msg.is_text() || msg.is_binary()))
                     .forward(write)
@@ -85,21 +83,30 @@ impl Server {
 
     async fn wait_ready_socket(&self) -> Result<()> {
         let url_str = format!("ws://{}", self.address.to_string());
-        let tcp = TcpStream::connect(&self.address).await.expect("failed to connect");
+        let tcp = TcpStream::connect(&self.address)
+            .await
+            .expect("failed to connect");
         let url = url::Url::parse(&url_str).unwrap();
 
-        let (stream, _) = client_async(url, tcp).await.expect("client failed to connect");
+        let (stream, _) = client_async(url, tcp)
+            .await
+            .expect("client failed to connect");
         let (mut write, read) = stream.split();
 
         let max_messages = 5;
-        for i in 1..max_messages+1 {
-            write.send(Message::Text(format!("{}", i))).await.expect("Failed to send message");
+        for i in 1..max_messages + 1 {
+            write
+                .send(Message::Text(format!("{}", i)))
+                .await
+                .expect("Failed to send message");
         }
-    
-        read.take(max_messages).for_each(|msg| {
-            println!("received: {:?}", msg);
-            future::ready(())
-        }).await;
+
+        read.take(max_messages)
+            .for_each(|msg| {
+                println!("received: {:?}", msg);
+                future::ready(())
+            })
+            .await;
 
         write.close().await.expect("Failed to close");
 
