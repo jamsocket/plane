@@ -22,14 +22,11 @@ use tokio::time::Instant;
 // websocket
 use futures::stream::{SplitSink, SplitStream};
 use futures::{future, SinkExt, StreamExt};
-use hyper::Request;
-use rustls_pemfile;
 use std::sync::Arc;
 use tokio::net::TcpStream;
-use tokio_rustls::client::TlsStream;
-use tokio_rustls::rustls::{self, client, ClientConfig};
-use tokio_rustls::TlsConnector;
-use tokio_tungstenite::{tungstenite::protocol::Message, MaybeTlsStream, WebSocketStream};
+use tokio_rustls::{client::TlsStream, TlsConnector};
+use tokio_rustls::rustls::{client as rustls_client};
+use tokio_tungstenite::{tungstenite::protocol::Message, WebSocketStream};
 
 const CLUSTER: &str = "spawner.test";
 
@@ -139,29 +136,30 @@ impl Proxy {
         let (_, conn) = hyper::client::conn::handshake(stream)
             .await
             .expect("failed tcp handshake");
-        let parts = conn.into_parts();
-        assert_eq!(parts.read_buf.len(), 0);
+        let tcp_parts = conn.into_parts();
+        assert_eq!(tcp_parts.read_buf.len(), 0);
 
-        let mut root_certs = rustls::RootCertStore::empty();
+        let mut root_certs = tokio_rustls::rustls::RootCertStore::empty();
         root_certs.add_parsable_certificates(
             &rustls_pemfile::certs(&mut self.certs.cert_pem.as_bytes()).unwrap(),
         );
         let client_config = Arc::new(
-            ClientConfig::builder()
+            tokio_rustls::rustls::ClientConfig::builder()
                 .with_safe_defaults()
                 .with_root_certificates(root_certs)
                 .with_no_client_auth(),
         );
 
         let connector = TlsConnector::from(client_config);
-        let domain = client::ServerName::try_from(hostname.as_str()).expect("invalid dns for tls");
-        let stream = connector
-            .connect(domain, parts.io)
+        let domain = rustls_client::ServerName::try_from(hostname.as_str()).expect("invalid dns for tls");
+        let tls_stream = connector
+            .connect(domain, tcp_parts.io)
             .await
             .expect("could not finish tls handshake");
 
         let ws_adr = format!("ws://{}/{}", hostname, path);
-        let req = Request::get(ws_adr)
+        let req = hyper::Request::get(ws_adr)
+            // todo: non hardcoded websocket-key
             .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
             .header("Connection", "Upgrade")
             .header("Upgrade", "websocket")
@@ -169,17 +167,18 @@ impl Proxy {
             .header("Host", hostname)
             .body(())
             .unwrap();
-        let (ws_stream, _): (
-            WebSocketStream<MaybeTlsStream<TlsStream<TcpStream>>>,
-            http::Response<()>,
-        ) = tokio_tungstenite::client_async_tls(req, stream)
-            .await
-            .expect("could not request ws from proxy");
+        let (ws_stream, ws_handshake_resp): (WebSocketStream<TlsStream<TcpStream>>, http::Response<()>) =
+            tokio_tungstenite::client_async(req, tls_stream)
+                .await
+                .expect("could not request ws from proxy");
+        
+        assert_eq!(ws_handshake_resp.status(), http::status::StatusCode::SWITCHING_PROTOCOLS);
 
         let (mut write, read): (
-            SplitSink<WebSocketStream<MaybeTlsStream<TlsStream<TcpStream>>>, Message>,
-            SplitStream<WebSocketStream<MaybeTlsStream<TlsStream<TcpStream>>>>,
+            SplitSink<WebSocketStream<TlsStream<TcpStream>>, Message>,
+            SplitStream<WebSocketStream<TlsStream<TcpStream>>>,
         ) = ws_stream.split();
+
         let max_messages = 6;
         for i in 1..max_messages + 1 {
             write
