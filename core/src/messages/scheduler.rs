@@ -45,7 +45,7 @@ impl ScheduleRequest {
             env: self.env.clone(),
             metadata: self.metadata.clone(),
             credentials: self.credentials.clone(),
-            resource_limits: None,
+            resource_limits: Default::default(),
         }
     }
 }

@@ -316,22 +316,29 @@ impl DockerInterface {
                         .collect(),
                     ),
                     runtime: self.runtime.clone(),
-                    //cpu_period: Some(DEFAULT_CPU_PERIOD),
-                    cpu_period: Some(resource_limits.cpu_period.as_micros() as i64),
-                    //cpu_quota: Some(DEFAULT_CPU_QUOTA),
-                    cpu_quota: Some(
-                        resource_limits
-                            .cpu_period
-                            .saturating_mul(resource_limits.cpu_period_percent as u32)
-                            .checked_div(100)
-                            .unwrap_or(resource_limits.cpu_period)
-                            .as_micros() as i64,
-                    ),
-                    ulimits: Some(vec![ResourcesUlimits {
-                        name: Some("cpu".to_string()),
-                        soft: Some(resource_limits.cpu_time_limit.as_minutes() as i64),
-                        hard: Some(resource_limits.cpu_time_limit.as_minutes() as i64),
-                    }]),
+                    cpu_period: resource_limits
+                        .cpu_period
+                        .and_then(|cpu_period| Some(cpu_period.as_micros() as i64)),
+                    cpu_quota: resource_limits
+                        .cpu_period_percent
+                        .and_then(|cpu_period_percent| {
+                            let cpu_period = resource_limits
+                                .cpu_period
+                                .unwrap_or(std::time::Duration::from_millis(100));
+                            cpu_period
+                                .saturating_mul(cpu_period_percent as u32)
+                                .checked_div(100)
+                                .and_then(
+                                    |cpu_period_time| Some(cpu_period_time.as_micros() as i64),
+                                )
+                        }),
+                    ulimits: resource_limits.cpu_time_limit.and_then(|cpu_time_limit| {
+                        Some(vec![ResourcesUlimits {
+                            name: Some("cpu".to_string()),
+                            soft: Some(cpu_time_limit.as_minutes() as i64),
+                            hard: Some(cpu_time_limit.as_minutes() as i64),
+                        }])
+                    }),
                     ..HostConfig::default()
                 }),
                 ..Config::default()

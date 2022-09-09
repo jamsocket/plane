@@ -291,7 +291,7 @@ impl Executor {
                         &backend_id,
                         &spawn_request.image,
                         &spawn_request.env,
-                        &spawn_request.resource_limits.clone().unwrap_or_default(),
+                        &spawn_request.resource_limits,
                     )
                     .await?;
                 tracing::info!(%backend_id, "Container is running.");

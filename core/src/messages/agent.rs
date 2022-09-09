@@ -6,7 +6,7 @@ use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use serde_with::{DurationMicroSeconds, DurationSeconds};
+use serde_with::DurationSeconds;
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -243,7 +243,8 @@ pub struct SpawnRequest {
     pub credentials: Option<DockerCredentials>,
 
     /// Resource limits
-    pub resource_limits: Option<ResourceLimits>,
+    #[serde(default = "ResourceLimits::default")]
+    pub resource_limits: ResourceLimits,
 }
 
 // eventually, this will be generic over executors
@@ -252,24 +253,23 @@ pub struct SpawnRequest {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ResourceLimits {
     /// period of cpu time, serializes as microseconds
-    #[serde_as(as = "DurationMicroSeconds")]
-    pub cpu_period: Duration,
+    #[serde_as(as = "Option<DurationSeconds>")]
+    pub cpu_period: Option<Duration>,
 
     /// proportion of period used by container
-    pub cpu_period_percent: u8,
+    pub cpu_period_percent: Option<u8>,
 
     /// total cpu time allocated to container    
-
-    #[serde_as(as = "DurationSeconds")]
-    pub cpu_time_limit: Duration,
+    #[serde_as(as = "Option<DurationSeconds>")]
+    pub cpu_time_limit: Option<Duration>,
 }
 
 impl Default for ResourceLimits {
     fn default() -> ResourceLimits {
         ResourceLimits {
-            cpu_period: Duration::from_millis(100),
-            cpu_period_percent: 100,
-            cpu_time_limit: Duration::from_secs(30 * 60),
+            cpu_period: None,
+            cpu_period_percent: None,
+            cpu_time_limit: None,
         }
     }
 }
