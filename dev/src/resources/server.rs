@@ -89,12 +89,11 @@ impl Server {
         let url = url::Url::parse(&url_str).unwrap();
 
         let (stream, _) = client_async(url, tcp).await.expect("client failed to connect");
-        let (mut tx, read) = stream.split();
+        let (mut write, read) = stream.split();
 
         let max_messages = 5;
-
         for i in 1..max_messages+1 {
-            tx.send(Message::Text(format!("{}", i))).await.expect("Failed to send message");
+            write.send(Message::Text(format!("{}", i))).await.expect("Failed to send message");
         }
     
         read.take(max_messages).for_each(|msg| {
@@ -102,7 +101,7 @@ impl Server {
             future::ready(())
         }).await;
 
-        tx.close().await.expect("Failed to close");
+        write.close().await.expect("Failed to close");
 
         Ok(())
     }
