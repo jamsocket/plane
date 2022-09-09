@@ -328,16 +328,14 @@ impl DockerInterface {
                             cpu_period
                                 .saturating_mul(cpu_period_percent as u32)
                                 .checked_div(100)
-                                .and_then(
-                                    |cpu_period_time| Some(cpu_period_time.as_micros() as i64),
-                                )
+                                .map(|cpu_period_time| cpu_period_time.as_micros() as i64)
                         }),
-                    ulimits: resource_limits.cpu_time_limit.and_then(|cpu_time_limit| {
-                        Some(vec![ResourcesUlimits {
+                    ulimits: resource_limits.cpu_time_limit.map(|cpu_time_limit| {
+                        vec![ResourcesUlimits {
                             name: Some("cpu".to_string()),
                             soft: Some(cpu_time_limit.as_minutes() as i64),
                             hard: Some(cpu_time_limit.as_minutes() as i64),
-                        }])
+                        }]
                     }),
                     ..HostConfig::default()
                 }),
