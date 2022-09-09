@@ -7,10 +7,11 @@ use bollard::{
         StatsOptions, StopContainerOptions,
     },
     image::CreateImageOptions,
-    models::{EventMessage, HostConfig, PortBinding},
+    models::{EventMessage, HostConfig, PortBinding, ResourcesUlimits},
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
+use dis_spawner::messages::agent::ResourceLimits;
 use std::{collections::HashMap, net::IpAddr};
 use tokio_stream::{Stream, StreamExt};
 
@@ -18,11 +19,6 @@ use tokio_stream::{Stream, StreamExt};
 const CONTAINER_PORT: u16 = 8080;
 const DEFAULT_DOCKER_TIMEOUT_SECONDS: u64 = 30;
 const DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SECS: u64 = 10;
-// const DEFAULT_CPU_TIME_ULIMIT: i64 = 30; //in minutes
-// const DEFAULT_CPU_PERIOD: i64 = (0.1 * 1e6) as i64; //0.1 second, in microseconds
-//                                                     //note this 1s is MAX allowed by docker
-// const DEFAULT_CPU_QUOTA: i64 = ((DEFAULT_CPU_PERIOD as f64) * 0.97) as i64;
-//allow some leeway in CPU_QUOTA to ensure spawner is not starved of cycles
 
 #[derive(Clone)]
 pub struct DockerInterface {
@@ -123,6 +119,16 @@ impl ContainerEvent {
         };
 
         Some(ContainerEvent { event, name })
+    }
+}
+
+trait MinuteExt {
+    fn as_minutes(&self) -> u128;
+}
+
+impl MinuteExt for std::time::Duration {
+    fn as_minutes(&self) -> u128 {
+        (self.as_secs() / 60).into()
     }
 }
 
@@ -275,6 +281,7 @@ impl DockerInterface {
         name: &str,
         image: &str,
         env: &HashMap<String, String>,
+        resource_limits: &ResourceLimits,
     ) -> Result<()> {
         let env: Vec<String> = env.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
 
@@ -309,13 +316,27 @@ impl DockerInterface {
                         .collect(),
                     ),
                     runtime: self.runtime.clone(),
-                    // cpu_period: Some(DEFAULT_CPU_PERIOD),
-                    // cpu_quota: Some(DEFAULT_CPU_QUOTA),
-                    // ulimits: Some(vec![ResourcesUlimits {
-                    //     name: Some("cpu".to_string()),
-                    //     soft: Some(DEFAULT_CPU_TIME_ULIMIT),
-                    //     hard: Some(DEFAULT_CPU_TIME_ULIMIT),
-                    // }]),
+                    cpu_period: resource_limits
+                        .cpu_period
+                        .and_then(|cpu_period| Some(cpu_period.as_micros() as i64)),
+                    cpu_quota: resource_limits
+                        .cpu_period_percent
+                        .and_then(|cpu_period_percent| {
+                            let cpu_period = resource_limits
+                                .cpu_period
+                                .unwrap_or(std::time::Duration::from_millis(100));
+                            cpu_period
+                                .saturating_mul(cpu_period_percent as u32)
+                                .checked_div(100)
+                                .map(|cpu_period_time| cpu_period_time.as_micros() as i64)
+                        }),
+                    ulimits: resource_limits.cpu_time_limit.map(|cpu_time_limit| {
+                        vec![ResourcesUlimits {
+                            name: Some("cpu".to_string()),
+                            soft: Some(cpu_time_limit.as_minutes() as i64),
+                            hard: Some(cpu_time_limit.as_minutes() as i64),
+                        }]
+                    }),
                     ..HostConfig::default()
                 }),
                 ..Config::default()

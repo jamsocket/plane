@@ -118,6 +118,7 @@ pub fn base_spawn_request() -> SpawnRequest {
         env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
         metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
         credentials: None,
+        resource_limits: Default::default(),
     }
 }
 
