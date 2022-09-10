@@ -2,49 +2,22 @@ use crate::config::DroneConfig;
 use crate::{
     agent::run_agent,
     cert::{refresh_if_not_valid, refresh_loop},
-    cli::DronePlan,
+    plan::DronePlan,
     proxy::serve,
 };
-use anyhow::Result;
-use clap::Parser;
+use anyhow::{anyhow, Result};
+use dis_spawner::cli::init_cli;
 use dis_spawner::logging::TracingHandle;
 use dis_spawner::retry::do_with_retry;
-use futures::{future::select_all, Future};
+use dis_spawner::NeverResult;
+use futures::future::try_join_all;
+use futures::Future;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::{pin::Pin, thread};
 
-#[derive(Parser)]
-struct CliArgs {
-    #[clap(short, long)]
-    dump_config: bool,
-
-    config_file: Option<String>,
-}
-
-async fn main() -> Result<()> {
+async fn drone_main() -> NeverResult {
     let mut tracing_handle = TracingHandle::init("drone".into())?;
-    let cli_args = CliArgs::parse();
-
-    let mut config_builder = config::Config::builder();
-    if let Some(config_file) = cli_args.config_file {
-        config_builder =
-            config_builder.add_source(config::File::new(&config_file, config::FileFormat::Toml));
-    }
-    config_builder = config_builder.add_source(
-        config::Environment::with_prefix("SPAWNER")
-            .separator("__")
-            .prefix_separator("_")
-            .try_parsing(true)
-            .list_separator(",")
-            .with_list_parse_key("nats.hosts"),
-    );
-    let config: DroneConfig = config_builder.build()?.try_deserialize()?;
-
-    if cli_args.dump_config {
-        println!("{}", serde_json::to_string_pretty(&config)?);
-        return Ok(());
-    }
-
+    let config: DroneConfig = init_cli()?;
     let plan = DronePlan::from_drone_config(config).await?;
 
     let DronePlan {
@@ -54,11 +27,11 @@ async fn main() -> Result<()> {
         nats,
     } = plan;
 
-    if let Some(nats) = nats {
-        tracing_handle.attach_nats(nats)?;
+    if let Some(nats) = &nats {
+        tracing_handle.attach_nats(nats.clone())?;
     }
 
-    let mut futs: Vec<Pin<Box<dyn Future<Output = Result<()>>>>> = vec![];
+    let mut futs: Vec<Pin<Box<dyn Future<Output = NeverResult>>>> = vec![];
 
     if let Some(cert_options) = cert_options {
         do_with_retry(
@@ -79,10 +52,12 @@ async fn main() -> Result<()> {
         futs.push(Box::pin(run_agent(agent_options)))
     }
 
-    let (result, _, _) = select_all(futs.into_iter()).await;
-    result?;
-
-    Ok(())
+    try_join_all(futs.into_iter()).await?;
+    // try_join_all either returns an Err, or Ok() with a list of Never values.
+    // Since Never values are not constructable, if we get here, we can assume that
+    // try_join_all returned an empty list. This means that no event loops ever
+    // actually ran, i.e. futs was empty.
+    Err(anyhow!("No event loops selected."))
 }
 
 pub fn run() -> Result<()> {
@@ -98,7 +73,7 @@ pub fn run() -> Result<()> {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?
-        .block_on(main())?;
+        .block_on(drone_main())?;
 
     Ok(())
 }

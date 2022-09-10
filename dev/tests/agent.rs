@@ -12,7 +12,7 @@ use dis_spawner::{
         DroneConnectResponse, DroneStatusMessage, SpawnRequest, TerminationRequest,
     },
     nats::{TypedNats, TypedSubscription},
-    types::{BackendId, ClusterName, DroneId},
+    types::{BackendId, ClusterName, DroneId}, NeverResult,
 };
 use dis_spawner_drone::config::DockerConfig;
 use dis_spawner_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
@@ -25,7 +25,7 @@ const CLUSTER_DOMAIN: &str = "spawner.test";
 
 struct Agent {
     #[allow(unused)]
-    agent_guard: LivenessGuard<Result<()>>,
+    agent_guard: LivenessGuard<NeverResult>,
     pub ip: Ipv4Addr,
     pub db: DroneDatabase,
 }

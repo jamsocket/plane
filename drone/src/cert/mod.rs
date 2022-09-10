@@ -1,4 +1,3 @@
-use super::cli::CertOptions;
 use acme::AcmeEabConfiguration;
 use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
@@ -6,7 +5,7 @@ use acme2_eab::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName};
+use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName, NeverResult};
 use openssl::{
     asn1::Asn1Time,
     pkey::{PKey, Private},
@@ -16,11 +15,22 @@ use reqwest::Client;
 use std::io::Write;
 use std::{fs::File, path::Path, time::Duration};
 
+use crate::keys::KeyCertPathPair;
+
 pub mod acme;
 
 const DNS_01: &str = "dns-01";
 const REFRESH_MARGIN: Duration = Duration::from_secs(3600 * 24 * 15);
 const MAX_SLEEP: Duration = Duration::from_secs(3600);
+
+pub struct CertOptions {
+    pub cluster_domain: String,
+    pub nats: TypedNats,
+    pub key_paths: KeyCertPathPair,
+    pub email: String,
+    pub acme_server_url: String,
+    pub acme_eab_keypair: Option<AcmeEabConfiguration>,
+}
 
 pub async fn get_certificate(
     cluster_domain: &str,
@@ -193,7 +203,7 @@ pub async fn refresh_if_not_valid(cert_options: &CertOptions) -> Result<Option<D
     Ok(None)
 }
 
-pub async fn refresh_loop(cert_options: CertOptions) -> Result<()> {
+pub async fn refresh_loop(cert_options: CertOptions) -> NeverResult {
     loop {
         match refresh_if_not_valid(&cert_options).await {
             Ok(Some(valid_until)) => tokio::time::sleep(valid_until.min(MAX_SLEEP)).await,

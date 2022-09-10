@@ -8,7 +8,10 @@ use dis_spawner::{
 use scheduler::Scheduler;
 use tokio::select;
 
+mod config;
+mod plan;
 mod scheduler;
+mod run;
 
 pub async fn run_scheduler(nats: TypedNats) -> Result<()> {
     let scheduler = Scheduler::default();

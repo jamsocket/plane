@@ -1,17 +1,8 @@
-use super::{agent::AgentOptions, proxy::ProxyOptions};
+use super::{agent::AgentOptions, cert::CertOptions, proxy::ProxyOptions};
+use crate::config::DroneConfig;
 use crate::database::DroneDatabase;
-use crate::{cert::acme::AcmeEabConfiguration, config::DroneConfig, keys::KeyCertPathPair};
 use anyhow::Result;
 use dis_spawner::{nats::TypedNats, types::ClusterName};
-
-pub struct CertOptions {
-    pub cluster_domain: String,
-    pub nats: TypedNats,
-    pub key_paths: KeyCertPathPair,
-    pub email: String,
-    pub acme_server_url: String,
-    pub acme_eab_keypair: Option<AcmeEabConfiguration>,
-}
 
 pub struct DronePlan {
     pub proxy_options: Option<ProxyOptions>,

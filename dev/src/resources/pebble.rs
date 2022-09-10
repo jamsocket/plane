@@ -7,7 +7,7 @@ use crate::{
     util::wait_for_url,
 };
 use anyhow::{Context, Result};
-use dis_spawner_drone::acme::AcmeEabConfiguration;
+use dis_spawner_drone::cert::acme::AcmeEabConfiguration;
 use reqwest::Client;
 use serde_json::json;
 

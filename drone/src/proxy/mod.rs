@@ -3,7 +3,8 @@ use self::{
     tls::TlsAcceptor,
 };
 use crate::{database::DroneDatabase, keys::KeyCertPathPair};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context};
+use dis_spawner::NeverResult;
 use hyper::{server::conn::AddrIncoming, Server};
 use std::net::SocketAddr;
 use std::{net::IpAddr, sync::Arc, time::Duration};
@@ -22,7 +23,10 @@ pub struct ProxyOptions {
     pub cluster_domain: String,
 }
 
-async fn record_connections(db: DroneDatabase, connection_tracker: ConnectionTracker) {
+async fn record_connections(
+    db: DroneDatabase,
+    connection_tracker: ConnectionTracker,
+) -> NeverResult {
     loop {
         let backends = connection_tracker.get_and_clear_active_backends();
         if let Err(error) = db.reset_last_active_times(&backends).await {
@@ -33,7 +37,7 @@ async fn record_connections(db: DroneDatabase, connection_tracker: ConnectionTra
     }
 }
 
-async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker) -> Result<()> {
+async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker) -> NeverResult {
     let make_proxy = MakeProxyService::new(
         options.db,
         options.cluster_domain,
@@ -61,22 +65,22 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
     } else {
         let server = Server::bind(&bind_address).serve(make_proxy);
         server.await.context("Error from non-TLS proxy.")?;
-    }
+    };
 
-    Ok(())
+    Err(anyhow!("Server should not have terminated, but did."))
 }
 
-pub async fn serve(options: ProxyOptions) -> Result<()> {
+pub async fn serve(options: ProxyOptions) -> NeverResult {
     let connection_tracker = ConnectionTracker::default();
 
     select! {
-        () = record_connections(options.db.clone(), connection_tracker.clone()) => {
-            tracing::info!("record_connections returned early.")
+        result = record_connections(options.db.clone(), connection_tracker.clone()) => {
+            tracing::info!("record_connections returned early.");
+            result
         }
         result = run_server(options, connection_tracker) => {
-            tracing::info!(?result, "run_server returned early.")
+            tracing::info!(?result, "run_server returned early.");
+            result
         }
-    };
-
-    Ok(())
+    }
 }

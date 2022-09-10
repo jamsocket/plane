@@ -9,6 +9,7 @@ use dev::{
     timeout::{expect_to_stay_alive, LivenessGuard},
     util::random_loopback_ip,
 };
+use dis_spawner::NeverResult;
 use dis_spawner_drone::database::DroneDatabase;
 use dis_spawner_drone::proxy::ProxyOptions;
 use http::StatusCode;
@@ -23,7 +24,7 @@ const CLUSTER: &str = "spawner.test";
 
 struct Proxy {
     #[allow(unused)]
-    guard: LivenessGuard<Result<()>>,
+    guard: LivenessGuard<NeverResult>,
     //ip: Ipv4Addr,
     bind_address: SocketAddr,
     certs: SelfSignedCert,
