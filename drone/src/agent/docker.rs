@@ -318,7 +318,7 @@ impl DockerInterface {
                     runtime: self.runtime.clone(),
                     cpu_period: resource_limits
                         .cpu_period
-                        .and_then(|cpu_period| Some(cpu_period.as_micros() as i64)),
+                        .map(|cpu_period| cpu_period.as_micros() as i64),
                     cpu_quota: resource_limits
                         .cpu_period_percent
                         .and_then(|cpu_period_percent| {

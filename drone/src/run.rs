@@ -1,10 +1,10 @@
-use self::{
+use crate::config::DroneConfig;
+use crate::{
     agent::run_agent,
     cert::{refresh_if_not_valid, refresh_loop},
     cli::DronePlan,
     proxy::serve,
 };
-use crate::config::DroneConfig;
 use anyhow::Result;
 use clap::Parser;
 use dis_spawner::logging::TracingHandle;
@@ -12,11 +12,6 @@ use dis_spawner::retry::do_with_retry;
 use futures::{future::select_all, Future};
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::{pin::Pin, thread};
-
-pub mod agent;
-pub mod cert;
-pub mod cli;
-pub mod proxy;
 
 #[derive(Parser)]
 struct CliArgs {
@@ -32,10 +27,8 @@ async fn main() -> Result<()> {
 
     let mut config_builder = config::Config::builder();
     if let Some(config_file) = cli_args.config_file {
-        config_builder = config_builder.add_source(config::File::new(
-            &config_file,
-            config::FileFormat::Toml,
-        ));
+        config_builder =
+            config_builder.add_source(config::File::new(&config_file, config::FileFormat::Toml));
     }
     config_builder = config_builder.add_source(
         config::Environment::with_prefix("SPAWNER")
@@ -43,13 +36,13 @@ async fn main() -> Result<()> {
             .prefix_separator("_")
             .try_parsing(true)
             .list_separator(",")
-            .with_list_parse_key("nats.hosts")
+            .with_list_parse_key("nats.hosts"),
     );
     let config: DroneConfig = config_builder.build()?.try_deserialize()?;
 
     if cli_args.dump_config {
         println!("{}", serde_json::to_string_pretty(&config)?);
-        return Ok(())
+        return Ok(());
     }
 
     let plan = DronePlan::from_drone_config(config).await?;

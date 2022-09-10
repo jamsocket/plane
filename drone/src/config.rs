@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{acme::AcmeConfiguration, ip::IpSource, keys::KeyCertPathPair};
+use crate::{cert::acme::AcmeConfiguration, ip::IpSource, keys::KeyCertPathPair};
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]

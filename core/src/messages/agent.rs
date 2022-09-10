@@ -250,7 +250,7 @@ pub struct SpawnRequest {
 // eventually, this will be generic over executors
 // currently only applies to docker
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct ResourceLimits {
     /// period of cpu time, serializes as microseconds
     #[serde_as(as = "Option<DurationSeconds>")]
@@ -262,16 +262,6 @@ pub struct ResourceLimits {
     /// total cpu time allocated to container    
     #[serde_as(as = "Option<DurationSeconds>")]
     pub cpu_time_limit: Option<Duration>,
-}
-
-impl Default for ResourceLimits {
-    fn default() -> ResourceLimits {
-        ResourceLimits {
-            cpu_period: None,
-            cpu_period_percent: None,
-            cpu_time_limit: None,
-        }
-    }
 }
 
 impl TypedMessage for SpawnRequest {

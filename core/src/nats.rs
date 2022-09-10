@@ -3,8 +3,8 @@
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
 use anyhow::{anyhow, Result};
-use async_nats::jetstream::consumer::DeliverPolicy;
 use async_nats::jetstream::consumer::push::Messages;
+use async_nats::jetstream::consumer::DeliverPolicy;
 use async_nats::jetstream::stream::Config;
 use async_nats::jetstream::Context;
 use async_nats::{Client, Message, Subscriber};

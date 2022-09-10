@@ -10,7 +10,7 @@ use dev::{
     util::random_loopback_ip,
 };
 use dis_spawner_drone::database::DroneDatabase;
-use dis_spawner_drone::drone::proxy::ProxyOptions;
+use dis_spawner_drone::proxy::ProxyOptions;
 use http::StatusCode;
 use integration_test::integration_test;
 use reqwest::Response;
@@ -69,7 +69,7 @@ impl Proxy {
             key_pair: Some(certs.path_pair.clone()),
             cluster_domain: CLUSTER.into(),
         };
-        let guard = expect_to_stay_alive(dis_spawner_drone::drone::proxy::serve(options));
+        let guard = expect_to_stay_alive(dis_spawner_drone::proxy::serve(options));
 
         let proxy = Proxy {
             guard,

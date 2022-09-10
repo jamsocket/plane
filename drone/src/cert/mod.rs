@@ -1,6 +1,5 @@
-use crate::acme::AcmeEabConfiguration;
-
 use super::cli::CertOptions;
+use acme::AcmeEabConfiguration;
 use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
@@ -16,6 +15,8 @@ use openssl::{
 use reqwest::Client;
 use std::io::Write;
 use std::{fs::File, path::Path, time::Duration};
+
+pub mod acme;
 
 const DNS_01: &str = "dns-01";
 const REFRESH_MARGIN: Duration = Duration::from_secs(3600 * 24 * 15);

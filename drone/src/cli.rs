@@ -1,6 +1,6 @@
 use super::{agent::AgentOptions, proxy::ProxyOptions};
 use crate::database::DroneDatabase;
-use crate::{acme::AcmeEabConfiguration, config::DroneConfig, keys::KeyCertPathPair};
+use crate::{cert::acme::AcmeEabConfiguration, config::DroneConfig, keys::KeyCertPathPair};
 use anyhow::Result;
 use dis_spawner::{nats::TypedNats, types::ClusterName};
 
