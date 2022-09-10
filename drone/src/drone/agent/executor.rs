@@ -205,6 +205,8 @@ impl Executor {
                         }
                     }
 
+                    tracing::info!(%backend_id, "Stats loop terminated.");
+
                     Ok(())
                 })
             });
