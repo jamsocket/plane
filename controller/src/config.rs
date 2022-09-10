@@ -1,5 +1,5 @@
 use dis_spawner::nats_connection::NatsConnectionSpec;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct SchedulerOptions {}
@@ -10,9 +10,9 @@ pub struct DnsOptions {}
 #[derive(Serialize, Deserialize)]
 pub struct ControllerConfig {
     /// How to connect to NATS.
-    pub nats: Option<NatsConnectionSpec>,
+    pub nats: NatsConnectionSpec,
 
     pub scheduler: Option<SchedulerOptions>,
 
-    pub dbs: Option<DnsOptions>,
+    pub dns: Option<DnsOptions>,
 }

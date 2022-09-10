@@ -619,6 +619,7 @@ dependencies = [
  "clap",
  "dashmap",
  "dis-spawner",
+ "futures",
  "rand",
  "serde",
  "signal-hook",

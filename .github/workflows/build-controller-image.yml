@@ -1,4 +1,4 @@
-name: Build Drone Image
+name: Build Controller Image
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: drifting-in-space/spawner-drone
+  IMAGE_NAME: drifting-in-space/spawner-controller
 
 jobs:
   build:
@@ -44,7 +44,7 @@ jobs:
         uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
         with:
           context: "."
-          file: "drone/Dockerfile"
+          file: "controller/Dockerfile"
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
