@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/drifting-in-space/spawner/actions/workflows/tests.yml/badge.svg)](https://github.com/drifting-in-space/spawner/actions/workflows/unit-tests.yml)
 
-**Spawner** allows web applications to create [**session-lived backends**](https://driftingin.space/posts/session-lived-application-backends),
+**Spawner** allows web applications to create [**session backends**](https://driftingin.space/posts/session-lived-application-backends),
 which are server processes dedicated to individual (or small groups of) users.
 
 The server processes can be any server that speaks HTTP, including WebSocket servers. Spawner provides
