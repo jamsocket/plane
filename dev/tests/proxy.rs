@@ -126,10 +126,13 @@ impl Proxy {
         &self,
         subdomain: &str,
         path: &str,
-    ) -> (
-        WebSocketStream<tokio_rustls::client::TlsStream<tokio::net::TcpStream>>,
-        http::Response<()>,
-    ) {
+    ) -> std::result::Result<
+        (
+            WebSocketStream<tokio_rustls::client::TlsStream<tokio::net::TcpStream>>,
+            http::Response<()>,
+        ),
+        tokio_tungstenite::tungstenite::Error,
+    > {
         let hostname = format!("{}.{}", subdomain, CLUSTER);
         let path = if let Some(path) = path.strip_prefix("/") {
             path
@@ -176,9 +179,7 @@ impl Proxy {
             .body(())
             .unwrap();
 
-        tokio_tungstenite::client_async(req, tls_stream)
-            .await
-            .expect("could not request ws from proxy")
+        tokio_tungstenite::client_async(req, tls_stream).await
     }
 }
 
@@ -224,7 +225,10 @@ async fn simple_ws_backend_proxy() -> Result<()> {
         .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
         .await?;
 
-    let (ws_stream, ws_handshake_resp) = proxy.https_websocket("foobar", "/").await;
+    let (ws_stream, ws_handshake_resp) = proxy
+        .https_websocket("foobar", "/")
+        .await
+        .expect("could not request ws from proxy");
 
     assert_eq!(
         ws_handshake_resp.status(),
@@ -244,10 +248,7 @@ async fn simple_ws_backend_proxy() -> Result<()> {
             .expect("Failed to send message via proxy ws");
     }
 
-    let read = {
-        use tokio_stream::StreamExt as TokioStreamExt;
-        TokioStreamExt::timeout(read, Duration::from_secs(10))
-    };
+    let read = tokio_stream::StreamExt::timeout(read, Duration::from_secs(10));
 
     let responses: Vec<String> = read
         .take(max_messages)
