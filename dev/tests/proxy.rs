@@ -234,7 +234,7 @@ async fn simple_ws_backend_proxy() -> Result<()> {
     let (mut write, read): (
         SplitSink<WebSocketStream<TlsStream<TcpStream>>, Message>,
         SplitStream<WebSocketStream<TlsStream<TcpStream>>>,
-    ) = ws_stream.split();
+    ) = StreamExt::split(ws_stream);
 
     let max_messages = 6;
     for i in 1..max_messages + 1 {
@@ -244,13 +244,23 @@ async fn simple_ws_backend_proxy() -> Result<()> {
             .expect("Failed to send message via proxy ws");
     }
 
-    let responses: Vec<Message> = read
+    let read = {
+        use tokio_stream::StreamExt as TokioStreamExt;
+        TokioStreamExt::timeout(read, Duration::from_secs(10))
+    };
+
+    let responses: Vec<String> = read
         .take(max_messages)
-        .map(|x| x.expect("error receiving response"))
-        .collect::<Vec<_>>()
+        .map(|x| {
+            x.expect("response failed with timeout")
+                .expect("failure while reading from stream")
+                .to_string()
+        })
+        .collect()
         .await;
 
     assert_eq!(responses.len(), max_messages);
+    assert_eq!(responses, ["1", "2", "3", "4", "5", "6"]);
 
     write.close().await.expect("Failed to close");
 
