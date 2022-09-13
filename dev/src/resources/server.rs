@@ -101,12 +101,13 @@ impl Server {
                 .expect("Failed to send message");
         }
 
-        read.take(max_messages)
-            .for_each(|msg| {
-                println!("received: {:?}", msg);
-                future::ready(())
-            })
+        let responses: Vec<Message> = read
+            .take(max_messages)
+            .map(|x| x.expect("error receiving response"))
+            .collect::<Vec<_>>()
             .await;
+
+        assert_eq!(responses.len(), max_messages);
 
         write.close().await.expect("Failed to close");
 

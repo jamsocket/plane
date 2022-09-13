@@ -21,11 +21,11 @@ use tokio::time::Instant;
 
 // websocket
 use futures::stream::{SplitSink, SplitStream};
-use futures::{future, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::net::TcpStream;
+use tokio_rustls::rustls::client as rustls_client;
 use tokio_rustls::{client::TlsStream, TlsConnector};
-use tokio_rustls::rustls::{client as rustls_client};
 use tokio_tungstenite::{tungstenite::protocol::Message, WebSocketStream};
 
 const CLUSTER: &str = "spawner.test";
@@ -122,7 +122,14 @@ impl Proxy {
         client.get(url).send().await
     }
 
-    pub async fn http_websocket(&self, subdomain: &str, path: &str) {
+    pub async fn https_websocket(
+        &self,
+        subdomain: &str,
+        path: &str,
+    ) -> (
+        WebSocketStream<tokio_rustls::client::TlsStream<tokio::net::TcpStream>>,
+        http::Response<()>,
+    ) {
         let hostname = format!("{}.{}", subdomain, CLUSTER);
         let path = if let Some(path) = path.strip_prefix("/") {
             path
@@ -151,7 +158,8 @@ impl Proxy {
         );
 
         let connector = TlsConnector::from(client_config);
-        let domain = rustls_client::ServerName::try_from(hostname.as_str()).expect("invalid dns for tls");
+        let domain =
+            rustls_client::ServerName::try_from(hostname.as_str()).expect("invalid dns for tls");
         let tls_stream = connector
             .connect(domain, tcp_parts.io)
             .await
@@ -167,33 +175,10 @@ impl Proxy {
             .header("Host", hostname)
             .body(())
             .unwrap();
-        let (ws_stream, ws_handshake_resp): (WebSocketStream<TlsStream<TcpStream>>, http::Response<()>) =
-            tokio_tungstenite::client_async(req, tls_stream)
-                .await
-                .expect("could not request ws from proxy");
-        
-        assert_eq!(ws_handshake_resp.status(), http::status::StatusCode::SWITCHING_PROTOCOLS);
 
-        let (mut write, read): (
-            SplitSink<WebSocketStream<TlsStream<TcpStream>>, Message>,
-            SplitStream<WebSocketStream<TlsStream<TcpStream>>>,
-        ) = ws_stream.split();
-
-        let max_messages = 6;
-        for i in 1..max_messages + 1 {
-            write
-                .send(Message::Text(format!("{}", i)))
-                .await
-                .expect("Failed to send message via proxy ws");
-        }
-
-        read.take(max_messages)
-            .for_each(|msg| {
-                println!("received: {:?}", msg);
-                future::ready(())
-            })
-            .await;
-        write.close().await.expect("Failed to close");
+        tokio_tungstenite::client_async(req, tls_stream)
+            .await
+            .expect("could not request ws from proxy")
     }
 }
 
@@ -238,7 +223,36 @@ async fn simple_ws_backend_proxy() -> Result<()> {
         .db
         .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
         .await?;
-    proxy.http_websocket("foobar", "/").await;
+
+    let (ws_stream, ws_handshake_resp) = proxy.https_websocket("foobar", "/").await;
+
+    assert_eq!(
+        ws_handshake_resp.status(),
+        http::status::StatusCode::SWITCHING_PROTOCOLS
+    );
+
+    let (mut write, read): (
+        SplitSink<WebSocketStream<TlsStream<TcpStream>>, Message>,
+        SplitStream<WebSocketStream<TlsStream<TcpStream>>>,
+    ) = ws_stream.split();
+
+    let max_messages = 6;
+    for i in 1..max_messages + 1 {
+        write
+            .send(Message::Text(format!("{}", i)))
+            .await
+            .expect("Failed to send message via proxy ws");
+    }
+
+    let responses: Vec<Message> = read
+        .take(max_messages)
+        .map(|x| x.expect("error receiving response"))
+        .collect::<Vec<_>>()
+        .await;
+
+    assert_eq!(responses.len(), max_messages);
+
+    write.close().await.expect("Failed to close");
 
     Ok(())
 }
