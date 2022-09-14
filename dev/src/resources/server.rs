@@ -101,9 +101,14 @@ impl Server {
                 .expect("Failed to send message");
         }
 
+        let read = tokio_stream::StreamExt::timeout(read, Duration::from_secs(10));
+
         let responses: Vec<Message> = read
             .take(max_messages)
-            .map(|x| x.expect("error receiving response"))
+            .map(|x| {
+                x.expect("response failed with timeout")
+                    .expect("failure while reading from stream")
+            })
             .collect::<Vec<_>>()
             .await;
 

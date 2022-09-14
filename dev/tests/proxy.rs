@@ -140,14 +140,9 @@ impl Proxy {
             path
         };
 
-        let stream = TcpStream::connect(self.bind_address)
+        let tcp_stream = TcpStream::connect(self.bind_address)
             .await
             .expect("failed to connect tcp");
-        let (_, conn) = hyper::client::conn::handshake(stream)
-            .await
-            .expect("failed tcp handshake");
-        let tcp_parts = conn.into_parts();
-        assert_eq!(tcp_parts.read_buf.len(), 0);
 
         let mut root_certs = tokio_rustls::rustls::RootCertStore::empty();
         root_certs.add_parsable_certificates(
@@ -164,7 +159,7 @@ impl Proxy {
         let domain =
             rustls_client::ServerName::try_from(hostname.as_str()).expect("invalid dns for tls");
         let tls_stream = connector
-            .connect(domain, tcp_parts.io)
+            .connect(domain, tcp_stream)
             .await
             .expect("could not finish tls handshake");
 
