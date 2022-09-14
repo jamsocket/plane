@@ -19,14 +19,17 @@ use std::net::SocketAddrV4;
 use std::{net::SocketAddr, time::Duration};
 use tokio::time::Instant;
 
-// websocket
-use futures::stream::{SplitSink, SplitStream};
-use futures::{SinkExt, StreamExt};
+// websocket related
+use futures::{
+    stream::{SplitSink, SplitStream},
+    SinkExt, StreamExt,
+};
 use std::sync::Arc;
 use tokio::net::TcpStream;
-use tokio_rustls::rustls::client as rustls_client;
-use tokio_rustls::{client::TlsStream, TlsConnector};
-use tokio_tungstenite::{tungstenite::protocol::Message, WebSocketStream};
+use tokio_rustls::{client::TlsStream, rustls::client as rustls_client, TlsConnector};
+use tokio_tungstenite::{
+    tungstenite::handshake::client::generate_key, tungstenite::protocol::Message, WebSocketStream,
+};
 
 const CLUSTER: &str = "spawner.test";
 
@@ -165,8 +168,7 @@ impl Proxy {
 
         let ws_adr = format!("ws://{}/{}", hostname, path);
         let req = hyper::Request::get(ws_adr)
-            // todo: non hardcoded websocket-key
-            .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+            .header("Sec-WebSocket-Key", generate_key())
             .header("Connection", "Upgrade")
             .header("Upgrade", "websocket")
             .header("Sec-WebSocket-Version", "13")
