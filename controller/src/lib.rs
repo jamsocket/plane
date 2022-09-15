@@ -1,16 +1,20 @@
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use chrono::Utc;
 use dis_spawner::{
     messages::agent::DroneStatusMessage,
     messages::scheduler::{ScheduleRequest, ScheduleResponse},
     nats::TypedNats,
+    NeverResult,
 };
 use scheduler::Scheduler;
 use tokio::select;
 
+mod config;
+mod plan;
+pub mod run;
 mod scheduler;
 
-pub async fn run_scheduler(nats: TypedNats) -> Result<()> {
+pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
     let scheduler = Scheduler::default();
     let mut spawn_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");

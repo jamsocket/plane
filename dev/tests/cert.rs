@@ -4,13 +4,8 @@ use dev::{
     scratch_dir,
     timeout::{spawn_timeout, timeout},
 };
-use dis_spawner::{
-    messages::cert::SetAcmeDnsRecord, nats::TypedNats,
-    types::ClusterName,
-};
-use dis_spawner_drone::{
-    acme::AcmeEabConfiguration, drone::cli::CertOptions, keys::KeyCertPathPair,
-};
+use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName};
+use dis_spawner_drone::{cert::acme::AcmeEabConfiguration, cert::CertOptions, keys::KeyCertPathPair};
 use integration_test::integration_test;
 use openssl::x509::X509;
 use tokio::task::JoinHandle;
@@ -57,7 +52,7 @@ async fn cert_refresh() -> Result<()> {
     let (_, certs) = timeout(
         60_000,
         "Getting certificate",
-        dis_spawner_drone::drone::cert::get_certificate(
+        dis_spawner_drone::cert::get_certificate(
             "spawner.test",
             &conn,
             &pebble.directory_url(),
@@ -93,7 +88,7 @@ async fn cert_refresh_full() -> Result<()> {
     let () = timeout(
         60_000,
         "Getting certificate",
-        dis_spawner_drone::drone::cert::refresh_certificate(
+        dis_spawner_drone::cert::refresh_certificate(
             &CertOptions {
                 cluster_domain: "spawner.test".into(),
                 nats: nats.connection().await?,
@@ -127,7 +122,7 @@ async fn cert_refresh_eab() -> Result<()> {
     let (_, certs) = timeout(
         60_000,
         "Getting certificate",
-        dis_spawner_drone::drone::cert::get_certificate(
+        dis_spawner_drone::cert::get_certificate(
             "spawner.test",
             &conn,
             &pebble.directory_url(),

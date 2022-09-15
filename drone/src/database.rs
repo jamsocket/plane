@@ -8,8 +8,6 @@
 //! based on type information stored in `sqlx-data.json`. If
 //! you change a query in this file, you will likely need to
 //! run `generate-sqlx-data.mjs` to get Rust to accept it.
-use std::{path::Path, str::FromStr};
-
 use chrono::{DateTime, TimeZone, Utc};
 use dis_spawner::{
     messages::agent::{BackendState, SpawnRequest},
@@ -17,6 +15,7 @@ use dis_spawner::{
 };
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{migrate, Result, SqlitePool};
+use std::{path::Path, str::FromStr};
 
 #[allow(unused)]
 #[derive(Clone, Debug)]

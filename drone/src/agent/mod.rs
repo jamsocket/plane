@@ -9,7 +9,7 @@ use dis_spawner::{
     },
     nats::TypedNats,
     retry::do_with_retry,
-    types::{ClusterName, DroneId},
+    types::{ClusterName, DroneId}, NeverResult,
 };
 use http::Uri;
 use hyper::Client;
@@ -44,7 +44,7 @@ async fn listen_for_spawn_requests(
     drone_id: DroneId,
     executor: Executor,
     nats: TypedNats,
-) -> Result<()> {
+) -> NeverResult {
     let mut sub = nats
         .subscribe(SpawnRequest::subscribe_subject(drone_id))
         .await?;
@@ -71,7 +71,7 @@ async fn listen_for_spawn_requests(
     }
 }
 
-async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) -> Result<()> {
+async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) -> NeverResult {
     let mut sub = nats
         .subscribe(TerminationRequest::subscribe_subject())
         .await?;
@@ -97,7 +97,7 @@ async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) ->
 }
 
 /// Repeatedly publish a status message advertising this drone as available.
-async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterName) -> Result<()> {
+async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterName) -> NeverResult {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
@@ -113,7 +113,7 @@ async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterName) -> R
     }
 }
 
-pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
+pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
     let nats = &agent_opts.nats;
 
     tracing::info!("Connecting to Docker.");
@@ -135,12 +135,11 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<()> {
     match result {
         DroneConnectResponse::Success { drone_id } => {
             let executor = Executor::new(docker, db, nats.clone());
-            let result = tokio::try_join!(
-                ready_loop(nats.clone(), drone_id, cluster.clone()),
-                listen_for_spawn_requests(drone_id, executor.clone(), nats.clone()),
-                listen_for_termination_requests(executor.clone(), nats.clone())
-            );
-            result.map(|_| ())
+            tokio::select!(
+                result = ready_loop(nats.clone(), drone_id, cluster.clone()) => result,
+                result = listen_for_spawn_requests(drone_id, executor.clone(), nats.clone()) => result,
+                result = listen_for_termination_requests(executor.clone(), nats.clone()) => result
+            )
         }
         DroneConnectResponse::NoSuchCluster => Err(anyhow!(
             "The platform server did not recognize the cluster {}",
