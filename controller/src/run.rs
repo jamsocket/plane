@@ -29,7 +29,7 @@ async fn controller_main() -> NeverResult {
     }
 
     if let Some(_) = dns_plan {
-        todo!("DNS server not let implemented.")
+        todo!("DNS server not yet implemented.")
     }
 
     try_join_all(futs.into_iter()).await?;
