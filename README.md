@@ -21,7 +21,7 @@ We are in the process of extracting code from our platform monorepo into the Spa
 - [x] Proxy
 - [x] Certificate fetcher
 - [ ] DNS server
-- [ ] Scheduler
+- [x] Scheduler
 
 _The original version of Spawner was based on Kubernetes. It's available in the [original-kubernetes-based-spawner](https://github.com/drifting-in-space/spawner/tree/original-kubernetes-based-spawner) branch._
 
