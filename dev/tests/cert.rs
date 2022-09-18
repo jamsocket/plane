@@ -5,7 +5,9 @@ use dev::{
     timeout::{spawn_timeout, timeout},
 };
 use dis_spawner::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName};
-use dis_spawner_drone::{cert::acme::AcmeEabConfiguration, cert::CertOptions, keys::KeyCertPathPair};
+use dis_spawner_drone::{
+    cert::acme::AcmeEabConfiguration, cert::CertOptions, keys::KeyCertPathPair,
+};
 use integration_test::integration_test;
 use openssl::x509::X509;
 use tokio::task::JoinHandle;

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 
 #[derive(Parser)]
 struct CliArgs {
@@ -34,5 +34,5 @@ pub fn init_cli<C: Serialize + DeserializeOwned>() -> Result<C> {
         todo!("exit gracefully");
     }
 
-    return Ok(config)
+    return Ok(config);
 }

@@ -1,6 +1,9 @@
 use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
-use dis_spawner::{messages::agent::DroneStatusMessage, types::{DroneId, ClusterName}};
+use dis_spawner::{
+    messages::agent::DroneStatusMessage,
+    types::{ClusterName, DroneId},
+};
 use rand::{seq::SliceRandom, thread_rng};
 use std::{error::Error, fmt::Display};
 
@@ -24,10 +27,17 @@ impl Error for SchedulerError {}
 
 impl Scheduler {
     pub fn update_status(&self, timestamp: DateTime<Utc>, status: &DroneStatusMessage) {
-        self.last_status.entry(status.cluster.clone()).or_default().insert(status.drone_id.clone(), timestamp);
+        self.last_status
+            .entry(status.cluster.clone())
+            .or_default()
+            .insert(status.drone_id.clone(), timestamp);
     }
 
-    pub fn schedule(&self, cluster: &ClusterName, current_timestamp: DateTime<Utc>) -> Result<DroneId, SchedulerError> {
+    pub fn schedule(
+        &self,
+        cluster: &ClusterName,
+        current_timestamp: DateTime<Utc>,
+    ) -> Result<DroneId, SchedulerError> {
         // TODO: this is a dumb placeholder scheduler.
 
         let threshold_time = current_timestamp
@@ -84,7 +94,10 @@ mod tests {
 
         assert_eq!(
             Ok(drone_id),
-            scheduler.schedule(&ClusterName::new("mycluster.test"), date("2020-01-01T05:00:03+00:00"))
+            scheduler.schedule(
+                &ClusterName::new("mycluster.test"),
+                date("2020-01-01T05:00:03+00:00")
+            )
         );
     }
 
@@ -103,7 +116,10 @@ mod tests {
 
         assert_eq!(
             Err(SchedulerError::NoDroneAvailable),
-            scheduler.schedule(&ClusterName::new("mycluster2.test"), date("2020-01-01T05:00:03+00:00"))
+            scheduler.schedule(
+                &ClusterName::new("mycluster2.test"),
+                date("2020-01-01T05:00:03+00:00")
+            )
         );
     }
 
@@ -122,7 +138,10 @@ mod tests {
 
         assert_eq!(
             Err(SchedulerError::NoDroneAvailable),
-            scheduler.schedule(&ClusterName::new("mycluster.test"), date("2020-01-01T05:00:09+00:00"))
+            scheduler.schedule(
+                &ClusterName::new("mycluster.test"),
+                date("2020-01-01T05:00:09+00:00")
+            )
         );
     }
 }
