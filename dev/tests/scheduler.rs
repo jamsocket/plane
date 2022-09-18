@@ -26,12 +26,12 @@ impl MockAgent {
         MockAgent { nats }
     }
 
-    pub async fn schedule_drone(&self, drone_id: DroneId) -> Result<ScheduleResponse> {
+    pub async fn schedule_drone(&self, drone_id: &DroneId) -> Result<ScheduleResponse> {
         // Subscribe to spawn requests for this drone, to ensure that the
         // scheduler sends them.
         let mut sub = self
             .nats
-            .subscribe(SpawnRequest::subscribe_subject(drone_id))
+            .subscribe(SpawnRequest::subscribe_subject(&drone_id))
             .await?;
         sleep(Duration::from_millis(100)).await;
 
@@ -48,7 +48,7 @@ impl MockAgent {
 
         // Ensure that the SpawnRequest is as expected.
         assert_eq!(
-            request.schedule(drone_id),
+            request.schedule(&drone_id),
             result.value,
             "Scheduled drone did not match expectation."
         );
@@ -93,7 +93,7 @@ async fn no_drone_available() -> Result<()> {
 async fn one_drone_available() -> Result<()> {
     let nats = Nats::new().await?;
     let nats_conn = nats.connection().await?;
-    let drone_id = DroneId::new(8);
+    let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone());
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
     sleep(Duration::from_millis(100)).await;
@@ -102,11 +102,11 @@ async fn one_drone_available() -> Result<()> {
         .publish(&DroneStatusMessage {
             capacity: 100,
             cluster: ClusterName::new("spawner.test"),
-            drone_id,
+            drone_id: drone_id.clone(),
         })
         .await?;
 
-    let result = mock_agent.schedule_drone(drone_id).await?;
+    let result = mock_agent.schedule_drone(&drone_id).await?;
     assert_eq!(ScheduleResponse::Scheduled { drone: drone_id }, result);
 
     Ok(())

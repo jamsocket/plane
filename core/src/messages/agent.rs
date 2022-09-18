@@ -182,9 +182,12 @@ impl DroneStatusMessage {
     }
 }
 
-/// A request from a drone to connect to the platform.
+/// A message sent when a drone first connects to a controller.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DroneConnectRequest {
+    /// The ID of the drone.
+    pub drone_id: DroneId,
+
     /// The cluster the drone is requesting to join.
     pub cluster: ClusterName,
 
@@ -192,18 +195,8 @@ pub struct DroneConnectRequest {
     pub ip: IpAddr,
 }
 
-/// A response from the platform to a drone's request to join.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum DroneConnectResponse {
-    /// The drone has joined the cluster and been given an ID.
-    Success { drone_id: DroneId },
-
-    /// The drone requested to join a cluster that does not exist.
-    NoSuchCluster,
-}
-
 impl TypedMessage for DroneConnectRequest {
-    type Response = DroneConnectResponse;
+    type Response = NoReply;
 
     fn subject(&self) -> String {
         "drone.register".to_string()
@@ -273,7 +266,7 @@ impl TypedMessage for SpawnRequest {
 }
 
 impl SpawnRequest {
-    pub fn subscribe_subject(drone_id: DroneId) -> SubscribeSubject<Self> {
+    pub fn subscribe_subject(drone_id: &DroneId) -> SubscribeSubject<Self> {
         SubscribeSubject::new(format!("drone.{}.spawn", drone_id.id()))
     }
 }

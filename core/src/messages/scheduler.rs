@@ -36,9 +36,9 @@ pub struct ScheduleRequest {
 }
 
 impl ScheduleRequest {
-    pub fn schedule(&self, drone_id: DroneId) -> SpawnRequest {
+    pub fn schedule(&self, drone_id: &DroneId) -> SpawnRequest {
         SpawnRequest {
-            drone_id,
+            drone_id: drone_id.clone(),
             image: self.image.clone(),
             backend_id: self.backend_id.clone(),
             max_idle_secs: self.max_idle_secs,

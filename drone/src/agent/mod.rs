@@ -3,13 +3,11 @@ use crate::{config::DockerConfig, database::DroneDatabase, ip::IpSource};
 use anyhow::{anyhow, Result};
 use dis_spawner::{
     logging::LogError,
-    messages::agent::{
-        DroneConnectRequest, DroneConnectResponse, DroneStatusMessage, SpawnRequest,
-        TerminationRequest,
-    },
+    messages::agent::{DroneConnectRequest, DroneStatusMessage, SpawnRequest, TerminationRequest},
     nats::TypedNats,
     retry::do_with_retry,
-    types::{ClusterName, DroneId}, NeverResult,
+    types::{ClusterName, DroneId},
+    NeverResult,
 };
 use http::Uri;
 use hyper::Client;
@@ -19,6 +17,7 @@ mod docker;
 mod executor;
 
 pub struct AgentOptions {
+    pub drone_id: Option<DroneId>,
     pub db: DroneDatabase,
     pub nats: TypedNats,
     pub cluster_domain: ClusterName,
@@ -41,7 +40,7 @@ pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
 }
 
 async fn listen_for_spawn_requests(
-    drone_id: DroneId,
+    drone_id: &DroneId,
     executor: Executor,
     nats: TypedNats,
 ) -> NeverResult {
@@ -97,12 +96,12 @@ async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) ->
 }
 
 /// Repeatedly publish a status message advertising this drone as available.
-async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterName) -> NeverResult {
+async fn ready_loop(nc: TypedNats, drone_id: &DroneId, cluster: ClusterName) -> NeverResult {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
         nc.publish(&DroneStatusMessage {
-            drone_id,
+            drone_id: drone_id.clone(),
             capacity: 100,
             cluster: cluster.clone(),
         })
@@ -123,27 +122,20 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
     let cluster = agent_opts.cluster_domain.clone();
     let ip = agent_opts.ip.get_ip().await?;
 
-    tracing::info!("Requesting drone id.");
-    let result = {
-        let request = DroneConnectRequest {
-            cluster: cluster.clone(),
-            ip,
-        };
-        do_with_retry(|| nats.request(&request), 30, Duration::from_secs(10)).await?
+    let drone_id = agent_opts.drone_id.unwrap_or_else(DroneId::new_random);
+
+    let request = DroneConnectRequest {
+        drone_id: drone_id.clone(),
+        cluster: cluster.clone(),
+        ip,
     };
 
-    match result {
-        DroneConnectResponse::Success { drone_id } => {
-            let executor = Executor::new(docker, db, nats.clone());
-            tokio::select!(
-                result = ready_loop(nats.clone(), drone_id, cluster.clone()) => result,
-                result = listen_for_spawn_requests(drone_id, executor.clone(), nats.clone()) => result,
-                result = listen_for_termination_requests(executor.clone(), nats.clone()) => result
-            )
-        }
-        DroneConnectResponse::NoSuchCluster => Err(anyhow!(
-            "The platform server did not recognize the cluster {}",
-            agent_opts.cluster_domain
-        )),
-    }
+    nats.publish(&request).await?;
+
+    let executor = Executor::new(docker, db, nats.clone());
+    tokio::select!(
+        result = ready_loop(nats.clone(), &drone_id, cluster.clone()) => result,
+        result = listen_for_spawn_requests(&drone_id, executor.clone(), nats.clone()) => result,
+        result = listen_for_termination_requests(executor.clone(), nats.clone()) => result
+    )
 }

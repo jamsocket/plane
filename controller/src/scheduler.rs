@@ -24,7 +24,7 @@ impl Error for SchedulerError {}
 
 impl Scheduler {
     pub fn update_status(&self, timestamp: DateTime<Utc>, status: &DroneStatusMessage) {
-        self.last_status.insert(status.drone_id, timestamp);
+        self.last_status.insert(status.drone_id.clone(), timestamp);
     }
 
     pub fn schedule(&self) -> Result<DroneId, SchedulerError> {
@@ -36,7 +36,7 @@ impl Scheduler {
             .last_status
             .iter()
             .filter(|d| d.value() > &threshold_time)
-            .map(|d| *d.key())
+            .map(|d| d.key().clone())
             .collect();
 
         drone_ids
