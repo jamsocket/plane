@@ -40,7 +40,7 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                 tracing::info!(?spawn_request, "Got spawn request");
                 match spawn_request {
                     Ok(Some(spawn_request)) => {
-                        let result = match scheduler.schedule() {
+                        let result = match scheduler.schedule(&spawn_request.value.cluster, Utc::now()) {
                             Ok(drone_id) => {
                                 match nats.request(&spawn_request.value.schedule(drone_id)).await {
                                     Ok(false) | Err(_) => ScheduleResponse::NoDroneAvailable,
