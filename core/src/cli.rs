@@ -34,5 +34,5 @@ pub fn init_cli<C: Serialize + DeserializeOwned>() -> Result<C> {
         todo!("exit gracefully");
     }
 
-    return Ok(config);
+    Ok(config)
 }
