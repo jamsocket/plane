@@ -24,11 +24,11 @@ async fn controller_main() -> NeverResult {
 
     let mut futs: Vec<Pin<Box<dyn Future<Output = NeverResult>>>> = vec![];
 
-    if let Some(_) = scheduler_plan {
+    if scheduler_plan.is_some() {
         futs.push(Box::pin(run_scheduler(nats.clone())))
     }
 
-    if let Some(_) = dns_plan {
+    if dns_plan.is_some() {
         todo!("DNS server not yet implemented.")
     }
 

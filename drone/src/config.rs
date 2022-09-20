@@ -1,4 +1,4 @@
-use dis_spawner::nats_connection::NatsConnectionSpec;
+use dis_spawner::{nats_connection::NatsConnectionSpec, types::DroneId};
 use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, Ipv4Addr},
@@ -64,6 +64,8 @@ pub struct AgentOptions {
     pub docker: DockerConfig,
 
     pub ip: IpSource,
+
+    pub drone_id: Option<DroneId>,
 }
 
 #[derive(Serialize, Deserialize)]

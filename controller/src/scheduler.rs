@@ -1,6 +1,9 @@
 use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
-use dis_spawner::{messages::agent::DroneStatusMessage, types::{DroneId, ClusterName}};
+use dis_spawner::{
+    messages::agent::DroneStatusMessage,
+    types::{ClusterName, DroneId},
+};
 use rand::{seq::SliceRandom, thread_rng};
 use std::{error::Error, fmt::Display};
 
@@ -24,10 +27,17 @@ impl Error for SchedulerError {}
 
 impl Scheduler {
     pub fn update_status(&self, timestamp: DateTime<Utc>, status: &DroneStatusMessage) {
-        self.last_status.entry(status.cluster.clone()).or_default().insert(status.drone_id, timestamp);
+        self.last_status
+            .entry(status.cluster.clone())
+            .or_default()
+            .insert(status.drone_id.clone(), timestamp);
     }
 
-    pub fn schedule(&self, cluster: &ClusterName, current_timestamp: DateTime<Utc>) -> Result<DroneId, SchedulerError> {
+    pub fn schedule(
+        &self,
+        cluster: &ClusterName,
+        current_timestamp: DateTime<Utc>,
+    ) -> Result<DroneId, SchedulerError> {
         // TODO: this is a dumb placeholder scheduler.
 
         let threshold_time = current_timestamp
@@ -40,7 +50,7 @@ impl Scheduler {
             .ok_or(SchedulerError::NoDroneAvailable)?
             .iter()
             .filter(|d| d.value() > &threshold_time)
-            .map(|d| *d.key())
+            .map(|d| d.key().clone())
             .collect();
 
         drone_ids
@@ -71,19 +81,23 @@ mod tests {
     #[test]
     fn test_one_drone() {
         let scheduler = Scheduler::default();
+        let drone_id = DroneId::new_random();
 
         scheduler.update_status(
             date("2020-01-01T05:00:00+00:00"),
             &DroneStatusMessage {
-                drone_id: DroneId::new(3),
+                drone_id: drone_id.clone(),
                 cluster: ClusterName::new("mycluster.test"),
                 capacity: 100,
             },
         );
 
         assert_eq!(
-            Ok(DroneId::new(3)),
-            scheduler.schedule(&ClusterName::new("mycluster.test"), date("2020-01-01T05:00:03+00:00"))
+            Ok(drone_id),
+            scheduler.schedule(
+                &ClusterName::new("mycluster.test"),
+                date("2020-01-01T05:00:03+00:00")
+            )
         );
     }
 
@@ -94,7 +108,7 @@ mod tests {
         scheduler.update_status(
             date("2020-01-01T05:00:00+00:00"),
             &DroneStatusMessage {
-                drone_id: DroneId::new(3),
+                drone_id: DroneId::new_random(),
                 cluster: ClusterName::new("mycluster1.test"),
                 capacity: 100,
             },
@@ -102,7 +116,10 @@ mod tests {
 
         assert_eq!(
             Err(SchedulerError::NoDroneAvailable),
-            scheduler.schedule(&ClusterName::new("mycluster2.test"), date("2020-01-01T05:00:03+00:00"))
+            scheduler.schedule(
+                &ClusterName::new("mycluster2.test"),
+                date("2020-01-01T05:00:03+00:00")
+            )
         );
     }
 
@@ -113,7 +130,7 @@ mod tests {
         scheduler.update_status(
             date("2020-01-01T05:00:00+00:00"),
             &DroneStatusMessage {
-                drone_id: DroneId::new(3),
+                drone_id: DroneId::new_random(),
                 cluster: ClusterName::new("mycluster.test"),
                 capacity: 100,
             },
@@ -121,7 +138,10 @@ mod tests {
 
         assert_eq!(
             Err(SchedulerError::NoDroneAvailable),
-            scheduler.schedule(&ClusterName::new("mycluster.test"), date("2020-01-01T05:00:09+00:00"))
+            scheduler.schedule(
+                &ClusterName::new("mycluster.test"),
+                date("2020-01-01T05:00:09+00:00")
+            )
         );
     }
 }

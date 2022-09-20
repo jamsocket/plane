@@ -111,7 +111,7 @@ const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 pub fn base_spawn_request() -> SpawnRequest {
     let backend_id = random_backend_id(&test_name());
     SpawnRequest {
-        drone_id: DroneId::new(0),
+        drone_id: DroneId::new_random(),
         image: TEST_IMAGE.into(),
         backend_id,
         max_idle_secs: Duration::from_secs(10),

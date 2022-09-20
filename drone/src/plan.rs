@@ -52,6 +52,7 @@ impl DronePlan {
         let agent_options = if let Some(agent_config) = config.agent {
             Some(AgentOptions {
                 cluster_domain: ClusterName::new(&config.cluster_domain),
+                drone_id: agent_config.drone_id,
                 db,
                 docker_options: agent_config.docker,
                 nats: nats
