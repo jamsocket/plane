@@ -63,6 +63,8 @@ pub struct AgentOptions {
     pub docker: DockerConfig,
 
     pub ip: IpSource,
+
+    pub drone_id: Option<DroneId>,
 }
 
 #[derive(Serialize, Deserialize)]
