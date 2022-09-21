@@ -2,17 +2,22 @@ use super::{agent::AgentOptions, cert::CertOptions, proxy::ProxyOptions};
 use crate::config::DroneConfig;
 use crate::database::DroneDatabase;
 use anyhow::Result;
-use dis_spawner::{nats::TypedNats, types::ClusterName};
+use dis_spawner::{
+    nats::TypedNats,
+    types::{ClusterName, DroneId},
+};
 
 pub struct DronePlan {
     pub proxy_options: Option<ProxyOptions>,
     pub agent_options: Option<AgentOptions>,
     pub cert_options: Option<CertOptions>,
     pub nats: Option<TypedNats>,
+    pub drone_id: DroneId,
 }
 
 impl DronePlan {
     pub async fn from_drone_config(config: DroneConfig) -> Result<Self> {
+        let drone_id = config.drone_id.unwrap_or_else(DroneId::new_random);
         let nats = if let Some(nats) = config.nats {
             Some(nats.connect().await?)
         } else {
@@ -52,7 +57,7 @@ impl DronePlan {
         let agent_options = if let Some(agent_config) = config.agent {
             Some(AgentOptions {
                 cluster_domain: ClusterName::new(&config.cluster_domain),
-                drone_id: agent_config.drone_id,
+                drone_id: drone_id.clone(),
                 db,
                 docker_options: agent_config.docker,
                 nats: nats
@@ -68,6 +73,7 @@ impl DronePlan {
             agent_options,
             cert_options,
             nats,
+            drone_id,
             proxy_options,
         })
     }

@@ -17,7 +17,7 @@ mod docker;
 mod executor;
 
 pub struct AgentOptions {
-    pub drone_id: Option<DroneId>,
+    pub drone_id: DroneId,
     pub db: DroneDatabase,
     pub nats: TypedNats,
     pub cluster_domain: ClusterName,
@@ -122,10 +122,8 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
     let cluster = agent_opts.cluster_domain.clone();
     let ip = agent_opts.ip.get_ip().await?;
 
-    let drone_id = agent_opts.drone_id.unwrap_or_else(DroneId::new_random);
-
     let request = DroneConnectRequest {
-        drone_id: drone_id.clone(),
+        drone_id: agent_opts.drone_id.clone(),
         cluster: cluster.clone(),
         ip,
     };
@@ -134,8 +132,8 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     let executor = Executor::new(docker, db, nats.clone());
     tokio::select!(
-        result = ready_loop(nats.clone(), &drone_id, cluster.clone()) => result,
-        result = listen_for_spawn_requests(&drone_id, executor.clone(), nats.clone()) => result,
+        result = ready_loop(nats.clone(), &agent_opts.drone_id, cluster.clone()) => result,
+        result = listen_for_spawn_requests(&agent_opts.drone_id, executor.clone(), nats.clone()) => result,
         result = listen_for_termination_requests(executor.clone(), nats.clone()) => result
     )
 }

@@ -2,6 +2,7 @@ use crate::config::ControllerConfig;
 use crate::plan::ControllerPlan;
 use crate::run_scheduler;
 use anyhow::{anyhow, Result};
+use dis_spawner::messages::logging::Component;
 use dis_spawner::{cli::init_cli, logging::TracingHandle, NeverResult};
 use futures::future::try_join_all;
 use signal_hook::{consts::SIGINT, iterator::Signals};
@@ -10,7 +11,7 @@ use std::pin::Pin;
 use std::thread;
 
 async fn controller_main() -> NeverResult {
-    let mut tracing_handle = TracingHandle::init("controller".into())?;
+    let mut tracing_handle = TracingHandle::init(Component::Controller)?;
     let config: ControllerConfig = init_cli()?;
 
     let plan = ControllerPlan::from_controller_config(config).await?;

@@ -1,11 +1,10 @@
+use crate::{cert::acme::AcmeConfiguration, ip::IpSource, keys::KeyCertPathPair};
 use dis_spawner::{nats_connection::NatsConnectionSpec, types::DroneId};
 use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, Ipv4Addr},
     path::PathBuf,
 };
-
-use crate::{cert::acme::AcmeConfiguration, ip::IpSource, keys::KeyCertPathPair};
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
@@ -70,6 +69,10 @@ pub struct AgentOptions {
 
 #[derive(Serialize, Deserialize)]
 pub struct DroneConfig {
+    /// Unique string used to identify this drone. If not provided, a
+    /// UUID is generated.
+    pub drone_id: Option<DroneId>,
+
     /// Path to use for the sqlite3 database through which the agent and
     /// proxy share a persisted state.
     #[serde(default = "default_db_path")]
