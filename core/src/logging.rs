@@ -1,5 +1,5 @@
 use crate::{
-    messages::logging::{LogMessage, SerializableLevel, Component},
+    messages::logging::{Component, LogMessage, SerializableLevel},
     nats::TypedNats,
 };
 use anyhow::{anyhow, Result};

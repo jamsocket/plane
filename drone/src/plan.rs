@@ -2,7 +2,10 @@ use super::{agent::AgentOptions, cert::CertOptions, proxy::ProxyOptions};
 use crate::config::DroneConfig;
 use crate::database::DroneDatabase;
 use anyhow::Result;
-use dis_spawner::{nats::TypedNats, types::{ClusterName, DroneId}};
+use dis_spawner::{
+    nats::TypedNats,
+    types::{ClusterName, DroneId},
+};
 
 pub struct DronePlan {
     pub proxy_options: Option<ProxyOptions>,
