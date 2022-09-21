@@ -38,7 +38,7 @@ impl Agent {
 
         let agent_opts = AgentOptions {
             db: db.clone(),
-            drone_id: Some(drone_id.clone()),
+            drone_id: drone_id.clone(),
             nats: nats.connection().await?,
             cluster_domain: ClusterName::new(CLUSTER_DOMAIN),
             ip: IpSource::Literal(IpAddr::V4(ip)),

@@ -8,6 +8,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use dis_spawner::cli::init_cli;
 use dis_spawner::logging::TracingHandle;
+use dis_spawner::messages::logging::Component;
 use dis_spawner::retry::do_with_retry;
 use dis_spawner::NeverResult;
 use futures::future::try_join_all;
@@ -16,7 +17,6 @@ use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::{pin::Pin, thread};
 
 async fn drone_main() -> NeverResult {
-    let mut tracing_handle = TracingHandle::init("drone".into())?;
     let config: DroneConfig = init_cli()?;
     let plan = DronePlan::from_drone_config(config).await?;
 
@@ -25,7 +25,10 @@ async fn drone_main() -> NeverResult {
         agent_options,
         cert_options,
         nats,
+        drone_id,
     } = plan;
+
+    let mut tracing_handle = TracingHandle::init(Component::Drone(drone_id))?;
 
     if let Some(nats) = &nats {
         tracing_handle.attach_nats(nats.clone())?;

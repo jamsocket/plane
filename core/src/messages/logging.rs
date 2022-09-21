@@ -1,4 +1,5 @@
 use crate::nats::{NoReply, TypedMessage};
+use crate::types::DroneId;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use core::str::FromStr;
@@ -32,9 +33,16 @@ impl<'de> Deserialize<'de> for SerializableLevel {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum Component {
+    Controller,
+    Drone(DroneId),
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LogMessage {
-    pub log_channel: String,
+    pub component: Component,
     pub target: String,
     pub name: String,
     pub severity: SerializableLevel,
@@ -46,6 +54,9 @@ impl TypedMessage for LogMessage {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        format!("logs.{}", self.log_channel)
+        match &self.component {
+            Component::Controller => "logs.controller".into(),
+            Component::Drone(drone_id) => format!("logs.drone.{}", drone_id.id()),
+        }
     }
 }
