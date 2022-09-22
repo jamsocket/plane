@@ -20,5 +20,6 @@ tokio-stream = "0.1.9"
 tracing = "0.1.36"
 tracing-stackdriver = "0.5.0"
 tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
+trust-dns-server = "0.22.0"
 url = "2.2.2"
 uuid = { version = "1.1.2", features = ["v4"] }
