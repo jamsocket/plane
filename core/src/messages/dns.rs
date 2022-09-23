@@ -5,7 +5,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum LocalDnsRecordType {
+pub enum DnsRecordType {
     A,
     TXT,
     AAAA,
@@ -14,7 +14,7 @@ pub enum LocalDnsRecordType {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SetDnsRecord {
     pub cluster: ClusterName,
-    pub kind: LocalDnsRecordType,
+    pub kind: DnsRecordType,
     pub name: String,
     pub value: String,
 }
