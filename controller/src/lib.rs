@@ -31,7 +31,6 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                 if let Some(status_msg) = status_msg? {
                     scheduler.update_status(Utc::now(), &status_msg);
                 } else {
-                    tracing::info!("here22");
                     return Err(anyhow!("status_sub.next() returned None."));
                 }
             },
