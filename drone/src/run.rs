@@ -28,7 +28,7 @@ async fn drone_main() -> NeverResult {
         drone_id,
     } = plan;
 
-    let mut tracing_handle = TracingHandle::init(Component::Drone(drone_id))?;
+    let mut tracing_handle = TracingHandle::init(Component::Drone { drone_id })?;
 
     if let Some(nats) = &nats {
         tracing_handle.attach_nats(nats.clone())?;

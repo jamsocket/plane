@@ -37,7 +37,7 @@ impl<'de> Deserialize<'de> for SerializableLevel {
 #[serde(tag = "type")]
 pub enum Component {
     Controller,
-    Drone(DroneId),
+    Drone { drone_id: DroneId },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,7 +56,27 @@ impl TypedMessage for LogMessage {
     fn subject(&self) -> String {
         match &self.component {
             Component::Controller => "logs.controller".into(),
-            Component::Drone(drone_id) => format!("logs.drone.{}", drone_id.id()),
+            Component::Drone { drone_id } => format!("logs.drone.{}", drone_id.id()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serialize_component() {
+        assert_eq!(
+            r#"{"type":"Controller"}"#,
+            &serde_json::to_string(&Component::Controller).unwrap()
+        );
+        assert_eq!(
+            r#"{"type":"Drone","drone_id":"foo"}"#,
+            &serde_json::to_string(&Component::Drone {
+                drone_id: DroneId::new("foo".into())
+            })
+            .unwrap()
+        );
     }
 }
