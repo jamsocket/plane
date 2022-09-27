@@ -134,8 +134,11 @@ impl BackendStatsMessage {
         }
         let sys_cpu_delta = (cpu_stats.system_cpu_usage.unwrap_or_default() as f64)
             - (precpu_stats.system_cpu_usage.unwrap_or_default() as f64);
-        let num_cpus = cpu_stats.online_cpus.unwrap_or_default();
-        let cpu_use_percent = (cpu_delta as f64 / sys_cpu_delta) * (num_cpus as f64) * 100.0;
+        //NOTE: we deviate from docker's formula here by not multiplying by num_cpus
+        //      This is because what we actually want to know from this stat
+        //      is what proportion of total cpu resource is consumed, and not knowing
+        //      the top bound makes that impossible
+        let cpu_use_percent = (cpu_delta as f64 / sys_cpu_delta) * 100.0;
         //disk
         //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
