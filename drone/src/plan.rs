@@ -18,6 +18,8 @@ pub struct DronePlan {
 impl DronePlan {
     pub async fn from_drone_config(config: DroneConfig) -> Result<Self> {
         let drone_id = config.drone_id.unwrap_or_else(DroneId::new_random);
+        tracing::info!(?drone_id, "Starting drone.");
+
         let nats = if let Some(nats) = config.nats {
             Some(nats.connect().await?)
         } else {
