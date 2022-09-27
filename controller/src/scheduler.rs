@@ -44,14 +44,28 @@ impl Scheduler {
             .checked_sub_signed(Duration::seconds(5))
             .unwrap();
 
-        let drone_ids: Vec<DroneId> = self
-            .last_status
-            .get(cluster)
-            .ok_or(SchedulerError::NoDroneAvailable)?
+        let cluster_drones = if let Some(cluster_drones) = self.last_status.get(cluster) {
+            cluster_drones
+        } else {
+            tracing::warn!(
+                ?cluster,
+                "Cluster requested for spawn has never been seen by this controller."
+            );
+            return Err(SchedulerError::NoDroneAvailable);
+        };
+
+        let drone_ids: Vec<DroneId> = cluster_drones
             .iter()
             .filter(|d| d.value() > &threshold_time)
             .map(|d| d.key().clone())
             .collect();
+
+        tracing::info!(
+            total_num_candidates=%cluster_drones.len(),
+            num_live_candidates=%drone_ids.len(),
+            %cluster,
+            "Found cluster state to schedule."
+        );
 
         drone_ids
             .choose(&mut thread_rng())
