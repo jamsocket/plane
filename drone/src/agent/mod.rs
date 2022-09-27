@@ -100,7 +100,7 @@ async fn ready_loop(nc: TypedNats, drone_id: &DroneId, cluster: ClusterName) -> 
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
-        nc.publish(&DroneStatusMessage {
+        nc.publish_jetstream(&DroneStatusMessage {
             drone_id: drone_id.clone(),
             capacity: 100,
             cluster: cluster.clone(),
