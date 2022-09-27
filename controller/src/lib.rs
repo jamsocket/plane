@@ -42,11 +42,21 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                         let result = match scheduler.schedule(&spawn_request.value.cluster, Utc::now()) {
                             Ok(drone_id) => {
                                 match nats.request(&spawn_request.value.schedule(&drone_id)).await {
-                                    Ok(false) | Err(_) => ScheduleResponse::NoDroneAvailable,
+                                    Ok(false) => {
+                                        tracing::warn!("No drone available.");
+                                        ScheduleResponse::NoDroneAvailable
+                                    },
+                                    Err(error) => {
+                                        tracing::warn!(?error, "Scheduler returned error.");
+                                        ScheduleResponse::NoDroneAvailable
+                                    },
                                     Ok(true) => ScheduleResponse::Scheduled { drone: drone_id }
                                 }
                             },
-                            Err(_) => ScheduleResponse::NoDroneAvailable,
+                            Err(error) => {
+                                tracing::warn!(?error, "Communication error during scheduling.");
+                                ScheduleResponse::NoDroneAvailable
+                            },
                         };
 
                         spawn_request.respond(&result).await?;
