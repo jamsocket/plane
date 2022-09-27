@@ -11,7 +11,7 @@ cluster_domain = "spawner.dev"
 # The drone connects to the controller over NATS, which can be configured
 # here.
 [nats]
-hosts = ["nats.spawner.dev"]
+hosts = ["nats"]
 
 # An optional token is allowed for token authentication.
 auth = { token = "my-secret-token" }
@@ -24,23 +24,23 @@ auth = { token = "my-secret-token" }
 # these automatically. Either way, it needs to know where to
 # find/store them on disk. This section can be omitted, in which
 # case the proxy serves HTTP only.
-[cert]
-key_path = "/path/to/private.key"
-cert_path = "/path/to/cert.pem"
+# [cert]
+# key_path = "/path/to/private.key"
+# cert_path = "/path/to/cert.pem"
 
 # Configures how certificates are obtained from an ACME server.
-[acme]
-server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+# [acme]
+# server = "https://acme-staging-v02.api.letsencrypt.org/directory"
 
 # An admin email is required to use ACME servers.
-admin_email = "admin@spawner.dev"
+# admin_email = "admin@spawner.dev"
 
 # The drone can optionally use External Account Binding. This is
 # not necessary for Let's Encrypt, but is required by other
 # ACME providers that require authentication.
-[acme.eab]
-key_id = "my-key-id"
-key = "bXkgYmFzZTY0IGtleQ=="
+# [acme.eab]
+# key_id = "my-key-id"
+# key = "bXkgYmFzZTY0IGtleQ=="
 
 # If this section is present, the drone instance acts as an agent,
 # advertising its availability to the controller and spawning new
@@ -48,7 +48,7 @@ key = "bXkgYmFzZTY0IGtleQ=="
 [agent]
 # This is the public IP that the drone is running on. When backends
 # are scheduled to this drone, their DNS will resolve to this IP.
-ip = "123.123.123.123"
+ip = "127.0.0.1"
 
 # Instead of a static IP, you can pass a URL of an API server which
 # is expected to return the public IP address of the requestor in
@@ -58,7 +58,7 @@ ip = "123.123.123.123"
 # Optional Docker settings for the agent.
 [agent.docker]
 # The runtime to use (defaults to "runc")
-runtime = "runsc"
+runtime = "runc"
 
 # The method of connecting to Docker. {socket=""} and {http=""} are
 # supported.
