@@ -14,7 +14,7 @@ cluster_domain = "spawner.dev"
 hosts = ["nats"]
 
 # An optional token is allowed for token authentication.
-auth = { token = "my-secret-token" }
+# auth = { token = "my-secret-token" }
 
 # Alternatively, username/password authentication is allowed.
 # auth = { username = "jane", password = "foobar" }
