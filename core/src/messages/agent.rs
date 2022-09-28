@@ -107,10 +107,12 @@ impl BackendStatsMessage {
         backend_id: &BackendId,
         prev_stats_message: &Stats,
         cur_stats_message: &Stats,
-    ) -> Option<BackendStatsMessage> {
+    ) -> BackendStatsMessage {
         // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
 
         //memory
+        tracing::warn!(?prev_stats_message, "yeet");
+        tracing::warn!(?cur_stats_message, "deet");
         let mem_naive_usage = cur_stats_message.memory_stats.usage.unwrap_or_default();
         let mem_available = cur_stats_message.memory_stats.limit.unwrap_or(u64::MAX);
         let mem_stats = cur_stats_message.memory_stats.stats;
@@ -130,9 +132,6 @@ impl BackendStatsMessage {
         let precpu_stats = &prev_stats_message.cpu_stats;
         //NOTE: total_usage gives clock cycles, this is monotonically increasing
         let cpu_delta = cpu_stats.cpu_usage.total_usage - precpu_stats.cpu_usage.total_usage;
-        if cpu_delta == 0 {
-            return None;
-        }
         let sys_cpu_delta = (cpu_stats.system_cpu_usage.unwrap_or_default() as f64)
             - (precpu_stats.system_cpu_usage.unwrap_or_default() as f64);
         //NOTE: we deviate from docker's formula here by not multiplying by num_cpus
@@ -143,11 +142,11 @@ impl BackendStatsMessage {
         //disk
         //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
-        Some(BackendStatsMessage {
+        BackendStatsMessage {
             backend_id: backend_id.clone(),
             cpu_use_percent,
             mem_use_percent,
-        })
+        }
     }
 }
 

@@ -187,24 +187,17 @@ impl Executor {
                     let prev_stats = stream
                         .next()
                         .await
-                        .ok_or_else(|| anyhow!("failed to get first stats"))??;
+                        .ok_or(anyhow!("failed to get first stats"))??;
                     while let Some(cur_stats) = stream.next().await {
                         match cur_stats {
-                            Ok(cur_stats) => match BackendStatsMessage::from_stats_message(
-                                &backend_id,
-                                &prev_stats,
-                                &cur_stats,
-                            ) {
-                                Some(message) => {
-                                    nc.publish(&message).await?;
-                                }
-                                None => {
-                                    let message =
-                                        "failed to get stats (container may have been swept)";
-                                    tracing::info!(%backend_id, message);
-                                    return Err(anyhow::Error::msg(message));
-                                }
-                            },
+                            Ok(cur_stats) => {
+                                nc.publish(&BackendStatsMessage::from_stats_message(
+                                    &backend_id,
+                                    &prev_stats,
+                                    &cur_stats,
+                                ))
+                                .await?
+                            }
                             Err(error) => {
                                 tracing::warn!(?error, "Error encountered sending stats.")
                             }
