@@ -13,6 +13,7 @@ use dis_spawner::retry::do_with_retry;
 use dis_spawner::NeverResult;
 use futures::future::try_join_all;
 use futures::Future;
+use signal_hook::consts::SIGTERM;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::{pin::Pin, thread};
 
@@ -64,7 +65,7 @@ async fn drone_main() -> NeverResult {
 }
 
 pub fn run() -> Result<()> {
-    let mut signals = Signals::new(&[SIGINT])?;
+    let mut signals = Signals::new(&[SIGINT, SIGTERM])?;
 
     thread::spawn(move || {
         for _ in signals.forever() {

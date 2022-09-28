@@ -5,6 +5,7 @@ use anyhow::{anyhow, Result};
 use dis_spawner::messages::logging::Component;
 use dis_spawner::{cli::init_cli, logging::TracingHandle, NeverResult};
 use futures::future::try_join_all;
+use signal_hook::consts::SIGTERM;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::future::Future;
 use std::pin::Pin;
@@ -42,7 +43,7 @@ async fn controller_main() -> NeverResult {
 }
 
 pub fn run() -> Result<()> {
-    let mut signals = Signals::new(&[SIGINT])?;
+    let mut signals = Signals::new(&[SIGINT, SIGTERM])?;
 
     thread::spawn(move || {
         for _ in signals.forever() {
