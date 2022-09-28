@@ -111,8 +111,6 @@ impl BackendStatsMessage {
         // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
 
         //memory
-        tracing::warn!(?prev_stats_message, "yeet");
-        tracing::warn!(?cur_stats_message, "deet");
         let mem_naive_usage = cur_stats_message.memory_stats.usage.unwrap_or_default();
         let mem_available = cur_stats_message.memory_stats.limit.unwrap_or(u64::MAX);
         let mem_stats = cur_stats_message.memory_stats.stats;
