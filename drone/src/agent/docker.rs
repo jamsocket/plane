@@ -202,10 +202,13 @@ impl DockerInterface {
             one_shot: true,
         };
 
-        IntervalStream::new(
-            // call stats once for every INTERVAL
-            tokio::time::interval(Duration::from_secs(DEFAULT_DOCKER_STATS_INTERVAL_SECONDS)),
-        )
+        IntervalStream::new({
+            let mut ticker =
+                tokio::time::interval(Duration::from_secs(DEFAULT_DOCKER_STATS_INTERVAL_SECONDS));
+            // this prevents the stream from getting too big in case the ticker interval <1s
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            ticker
+        })
         .then(move |_tick| async move {
             self.docker
                 .stats(container_name, Some(options))
