@@ -184,7 +184,7 @@ impl Executor {
                     let container_name = backend_id.to_resource_name();
                     tracing::info!(%backend_id, "Stats recording loop started.");
                     let mut stream = Box::pin(docker.get_stats(&container_name));
-                    let prev_stats = stream
+                    let mut prev_stats = stream
                         .next()
                         .await
                         .ok_or(anyhow!("failed to get first stats"))??;
@@ -196,7 +196,8 @@ impl Executor {
                                     &prev_stats,
                                     &cur_stats,
                                 ))
-                                .await?
+                                .await?;
+                                prev_stats = cur_stats;
                             }
                             Err(error) => {
                                 tracing::warn!(?error, "Error encountered sending stats.")
