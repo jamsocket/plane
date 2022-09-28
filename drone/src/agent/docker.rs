@@ -18,7 +18,7 @@ use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 /// The port in the container which is exposed.
 const CONTAINER_PORT: u16 = 8080;
 const DEFAULT_DOCKER_TIMEOUT_SECONDS: u64 = 30;
-const DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SECS: u64 = 10;
+const DEFAULT_DOCKER_STATS_INTERVAL_SECONDS: u64 = 10;
 
 #[derive(Clone)]
 pub struct DockerInterface {
@@ -204,9 +204,7 @@ impl DockerInterface {
 
         IntervalStream::new(
             // call stats once for every INTERVAL
-            tokio::time::interval(Duration::from_secs(
-                DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SECS,
-            )),
+            tokio::time::interval(Duration::from_secs(DEFAULT_DOCKER_STATS_INTERVAL_SECONDS)),
         )
         .then(move |_tick| async move {
             self.docker
