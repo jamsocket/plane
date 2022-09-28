@@ -10,6 +10,7 @@ use dis_spawner::cli::init_cli;
 use dis_spawner::logging::TracingHandle;
 use dis_spawner::messages::logging::Component;
 use dis_spawner::retry::do_with_retry;
+use dis_spawner::types::DroneId;
 use dis_spawner::NeverResult;
 use futures::future::try_join_all;
 use futures::Future;
@@ -17,18 +18,29 @@ use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::{pin::Pin, thread};
 
 async fn drone_main() -> NeverResult {
-    let config: DroneConfig = init_cli()?;
-    let plan = DronePlan::from_drone_config(config).await?;
+    let mut config: DroneConfig = init_cli()?;
 
+    // Extract drone ID, or generate one if necessary.
+    // DronePlan::from_drone_config will do this if we don't do it here,
+    // but we want to initialize tracing now, so we ensure the value
+    // exists before calling from_drone_config.
+    let drone_id = if let Some(drone_id) = &config.drone_id {
+        drone_id.clone()
+    } else {
+        let drone_id = DroneId::new_random();
+        config.drone_id = Some(drone_id.clone());
+        drone_id
+    };
+    let mut tracing_handle = TracingHandle::init(Component::Drone { drone_id })?;
+
+    let plan = DronePlan::from_drone_config(config).await?;
     let DronePlan {
         proxy_options,
         agent_options,
         cert_options,
         nats,
-        drone_id,
+        ..
     } = plan;
-
-    let mut tracing_handle = TracingHandle::init(Component::Drone { drone_id })?;
 
     if let Some(nats) = &nats {
         tracing_handle.attach_nats(nats.clone())?;
