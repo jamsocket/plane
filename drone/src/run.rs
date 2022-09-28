@@ -13,8 +13,7 @@ use dis_spawner::retry::do_with_retry;
 use dis_spawner::NeverResult;
 use futures::future::try_join_all;
 use futures::Future;
-use signal_hook::consts::SIGTERM;
-use signal_hook::{consts::SIGINT, iterator::Signals};
+use signal_hook::{consts::{SIGINT, SIGTERM}, iterator::Signals};
 use std::{pin::Pin, thread};
 
 async fn drone_main() -> NeverResult {
