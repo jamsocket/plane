@@ -184,11 +184,17 @@ impl Executor {
                     let container_name = backend_id.to_resource_name();
                     tracing::info!(%backend_id, "Stats recording loop started.");
                     let mut stream = Box::pin(docker.get_stats(&container_name));
-
-                    while let Some(v) = stream.next().await {
-                        match v {
-                            Ok(v) => match BackendStatsMessage::from_stats_message(&backend_id, &v)
-                            {
+                    let prev_stats = stream
+                        .next()
+                        .await
+                        .ok_or_else(|| anyhow!("failed to get first stats"))??;
+                    while let Some(cur_stats) = stream.next().await {
+                        match cur_stats {
+                            Ok(cur_stats) => match BackendStatsMessage::from_stats_message(
+                                &backend_id,
+                                &prev_stats,
+                                &cur_stats,
+                            ) {
                                 Some(message) => {
                                     nc.publish(&message).await?;
                                 }

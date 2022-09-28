@@ -12,8 +12,8 @@ use bollard::{
     Docker, API_DEFAULT_VERSION,
 };
 use dis_spawner::messages::agent::ResourceLimits;
-use std::{collections::HashMap, net::IpAddr};
-use tokio_stream::{Stream, StreamExt};
+use std::{collections::HashMap, net::IpAddr, time::Duration};
+use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
 /// The port in the container which is exposed.
 const CONTAINER_PORT: u16 = 8080;
@@ -193,19 +193,28 @@ impl DockerInterface {
         )
     }
 
-    pub fn get_stats(
-        &self,
-        container_name: &str,
-    ) -> impl Stream<Item = Result<Stats, bollard::errors::Error>> {
+    pub fn get_stats<'a>(
+        &'a self,
+        container_name: &'a str,
+    ) -> impl Stream<Item = Result<Stats, bollard::errors::Error>> + 'a {
         let options = StatsOptions {
-            stream: true,
-            one_shot: false,
+            stream: false,
+            one_shot: true,
         };
-        self.docker
-            .stats(container_name, Some(options))
-            .throttle(std::time::Duration::from_secs(
+
+        IntervalStream::new(
+            // call stats once for every INTERVAL
+            tokio::time::interval(Duration::from_secs(
                 DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SECS,
-            ))
+            )),
+        )
+        .then(move |_tick| async move {
+            self.docker
+                .stats(container_name, Some(options))
+                .next()
+                .await
+                .expect("docker should always return a stat")
+        })
     }
 
     #[allow(unused)]

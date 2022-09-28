@@ -105,14 +105,15 @@ impl BackendStatsMessage {
 impl BackendStatsMessage {
     pub fn from_stats_message(
         backend_id: &BackendId,
-        stats_message: &Stats,
+        prev_stats_message: &Stats,
+        cur_stats_message: &Stats,
     ) -> Option<BackendStatsMessage> {
         // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
 
         //memory
-        let mem_naive_usage = stats_message.memory_stats.usage.unwrap_or_default();
-        let mem_available = stats_message.memory_stats.limit.unwrap_or(u64::MAX);
-        let mem_stats = stats_message.memory_stats.stats;
+        let mem_naive_usage = cur_stats_message.memory_stats.usage.unwrap_or_default();
+        let mem_available = cur_stats_message.memory_stats.limit.unwrap_or(u64::MAX);
+        let mem_stats = cur_stats_message.memory_stats.stats;
         let cache_mem = match mem_stats {
             Some(stats) => match stats {
                 bollard::container::MemoryStatsStats::V1(stats) => stats.cache,
@@ -125,8 +126,8 @@ impl BackendStatsMessage {
 
         //REF: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
         //cpu
-        let cpu_stats = &stats_message.cpu_stats;
-        let precpu_stats = &stats_message.precpu_stats;
+        let cpu_stats = &cur_stats_message.cpu_stats;
+        let precpu_stats = &prev_stats_message.cpu_stats;
         //NOTE: total_usage gives clock cycles, this is monotonically increasing
         let cpu_delta = cpu_stats.cpu_usage.total_usage - precpu_stats.cpu_usage.total_usage;
         if cpu_delta == 0 {
