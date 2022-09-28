@@ -193,6 +193,8 @@ impl DockerInterface {
         )
     }
 
+    /// The docker api (as of docker version 20.10.18) blocks for ~1s before returning
+    /// from self.docker.stats, hence the effective minimal interval is a second
     pub fn get_stats<'a>(
         &'a self,
         container_name: &'a str,
