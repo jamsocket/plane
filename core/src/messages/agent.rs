@@ -137,8 +137,9 @@ impl BackendStatsMessage {
         //      is what proportion of total cpu resource is consumed, and not knowing
         //      the top bound makes that impossible
         let cpu_use_percent = (cpu_delta as f64 / sys_cpu_delta) * 100.0;
-        //disk
-        //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
+
+        //TODO: implement disk stats from
+        //      stream at https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
         BackendStatsMessage {
             backend_id: backend_id.clone(),
