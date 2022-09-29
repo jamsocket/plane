@@ -3,10 +3,10 @@
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
 use anyhow::{anyhow, Result};
+use async_nats::jetstream::Context;
 use async_nats::jetstream::consumer::push::Messages;
 use async_nats::jetstream::consumer::DeliverPolicy;
 use async_nats::jetstream::stream::Config;
-use async_nats::jetstream::Context;
 use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
 use dashmap::DashSet;
@@ -14,9 +14,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::timeout;
-use tokio_stream::StreamExt;
+use tokio_stream::{StreamExt};
 
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
@@ -287,10 +285,8 @@ impl TypedNats {
         Ok(())
     }
 
-    pub async fn get_latest<T>(&self, subject: &SubscribeSubject<T>) -> Result<Option<T>>
-    where
-        T: TypedMessage<Response = NoReply> + JetStreamable,
-    {
+    pub async fn get_all<T>(&self, subject: &SubscribeSubject<T>, deliver_policy: DeliverPolicy) -> Result<Vec<T>> where
+    T: TypedMessage<Response = NoReply> + JetStreamable {
         let _ = self.ensure_jetstream_exists::<T>().await;
         let stream = self
             .jetstream
@@ -300,24 +296,46 @@ impl TypedNats {
 
         let consumer = stream
             .create_consumer(async_nats::jetstream::consumer::pull::Config {
-                deliver_policy: DeliverPolicy::Last,
+                deliver_policy,
                 filter_subject: subject.subject.clone(),
                 ..async_nats::jetstream::consumer::pull::Config::default()
             })
             .await
             .to_anyhow()?;
 
-        let result = match timeout(
-            Duration::from_secs(1),
-            consumer.stream().messages().await.to_anyhow()?.next(),
-        )
-        .await
-        {
-            Ok(Some(v)) => v.to_anyhow()?,
-            _ => return Ok(None),
-        };
+        let mut result: Vec<T> = Vec::new();
 
-        Ok(Some(serde_json::from_slice(&result.payload)?))
+        loop {
+            let mut messages = consumer.fetch().messages().await.to_anyhow()?;
+            let mut done = true;
+
+            while let Some(v) = messages.next().await {
+                let v = v.to_anyhow()?;
+                done = false;
+
+                result.push(serde_json::from_slice(&v.payload)?);
+
+                if v.info().to_anyhow()?.pending == 0 {
+                    done = true;
+                    break
+                }                
+            }
+
+            if done {
+                break;
+            }
+        }
+
+        Ok(result)
+    }
+
+    pub async fn get_latest<T>(&self, subject: &SubscribeSubject<T>) -> Result<Option<T>>
+    where
+        T: TypedMessage<Response = NoReply> + JetStreamable,
+    {
+        let mut result = self.get_all(subject, DeliverPolicy::Last).await?;
+
+        Ok(result.pop())
     }
 
     pub async fn subscribe_jetstream<T: JetStreamable>(

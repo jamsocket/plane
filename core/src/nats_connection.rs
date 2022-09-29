@@ -55,7 +55,7 @@ impl NatsConnectionSpec {
         }
     }
 
-    pub async fn connect(&self) -> Result<TypedNats> {
+    pub async fn connect_with_retry(&self) -> Result<TypedNats> {
         let server_addrs: Result<Vec<ServerAddr>, _> =
             self.hosts.iter().map(|d| ServerAddr::from_str(d)).collect();
         let server_addrs = server_addrs?;
@@ -69,6 +69,20 @@ impl NatsConnectionSpec {
             },
             30,
             Duration::from_secs(10),
+        )
+        .await?;
+
+        Ok(TypedNats::new(nats))
+    }
+
+    pub async fn connect(&self) -> Result<TypedNats> {
+        let server_addrs: Result<Vec<ServerAddr>, _> =
+            self.hosts.iter().map(|d| ServerAddr::from_str(d)).collect();
+        let server_addrs = server_addrs?;
+
+        let nats = async_nats::connect_with_options(
+            &server_addrs as &[ServerAddr],
+            self.connect_options(),
         )
         .await?;
 

@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.61"
-async-nats = "0.19.0"
+async-nats = "0.20.0"
 bollard = "0.13.0"
 bytes = "1.2.1"
 chrono = { version = "0.4.22", features = ["serde"] }
