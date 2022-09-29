@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_nats::jetstream::consumer::DeliverPolicy;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use dis_spawner::{nats_connection::NatsConnectionSpec, messages::agent::DroneStatusMessage};
+use dis_spawner::{messages::agent::DroneStatusMessage, nats_connection::NatsConnectionSpec};
 
 #[derive(Parser)]
 struct Opts {
@@ -29,14 +29,23 @@ async fn main() -> Result<()> {
 
     match opts.command {
         Command::ListDrones => {
-            let drones = nats.get_all(&DroneStatusMessage::subscribe_subject(), DeliverPolicy::LastPerSubject).await?;
+            let drones = nats
+                .get_all(
+                    &DroneStatusMessage::subscribe_subject(),
+                    DeliverPolicy::LastPerSubject,
+                )
+                .await?;
 
             println!("Found {} drones:", drones.len());
 
             for drone in drones {
-                println!("{}\t{}", drone.drone_id.to_string().bright_green(), drone.cluster.to_string().bright_cyan());
+                println!(
+                    "{}\t{}",
+                    drone.drone_id.to_string().bright_green(),
+                    drone.cluster.to_string().bright_cyan()
+                );
             }
-        },
+        }
     }
 
     Ok(())
