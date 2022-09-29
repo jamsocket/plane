@@ -195,7 +195,7 @@ impl Executor {
                                     &backend_id,
                                     &prev_stats,
                                     &cur_stats,
-                                ))
+                                )?)
                                 .await?;
                                 prev_stats = cur_stats;
                             }
