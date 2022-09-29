@@ -200,25 +200,32 @@ impl DockerInterface {
     pub fn get_stats<'a>(
         &'a self,
         container_name: &'a str,
-    ) -> impl Stream<Item = Result<Stats, bollard::errors::Error>> + 'a {
+    ) -> impl Stream<Item = Result<Stats, anyhow::Error>> + 'a {
         let options = StatsOptions {
             stream: false,
             one_shot: true,
         };
 
-        IntervalStream::new({
+        let ticker = IntervalStream::new({
             let mut ticker =
                 tokio::time::interval(Duration::from_secs(DEFAULT_DOCKER_STATS_INTERVAL_SECONDS));
             // this prevents the stream from getting too big in case the ticker interval <1s
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             ticker
+        });
+
+        futures::StreamExt::take_while(ticker, move |_| async move {
+            self.is_running(container_name)
+                .await
+                .map_or(false, |res| res.0)
         })
         .then(move |_tick| async move {
             self.docker
                 .stats(container_name, Some(options))
                 .next()
                 .await
-                .expect("docker should always return a stat")
+                .ok_or(anyhow!("docker.stats failed"))?
+                .map_err(|e| e.into())
         })
     }
 
