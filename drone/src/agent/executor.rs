@@ -184,21 +184,21 @@ impl Executor {
                     let container_name = backend_id.to_resource_name();
                     tracing::info!(%backend_id, "Stats recording loop started.");
                     let mut stream = Box::pin(docker.get_stats(&container_name));
-
-                    while let Some(v) = stream.next().await {
-                        match v {
-                            Ok(v) => match BackendStatsMessage::from_stats_message(&backend_id, &v)
-                            {
-                                Some(message) => {
-                                    nc.publish(&message).await?;
-                                }
-                                None => {
-                                    let message =
-                                        "failed to get stats (container may have been swept)";
-                                    tracing::info!(%backend_id, message);
-                                    return Err(anyhow::Error::msg(message));
-                                }
-                            },
+                    let mut prev_stats = stream
+                        .next()
+                        .await
+                        .ok_or(anyhow!("failed to get first stats"))??;
+                    while let Some(cur_stats) = stream.next().await {
+                        match cur_stats {
+                            Ok(cur_stats) => {
+                                nc.publish(&BackendStatsMessage::from_stats_messages(
+                                    &backend_id,
+                                    &prev_stats,
+                                    &cur_stats,
+                                )?)
+                                .await?;
+                                prev_stats = cur_stats;
+                            }
                             Err(error) => {
                                 tracing::warn!(?error, "Error encountered sending stats.")
                             }
