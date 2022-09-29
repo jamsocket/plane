@@ -191,7 +191,7 @@ impl Executor {
                     while let Some(cur_stats) = stream.next().await {
                         match cur_stats {
                             Ok(cur_stats) => {
-                                nc.publish(&BackendStatsMessage::from_stats_message(
+                                nc.publish(&BackendStatsMessage::from_stats_messages(
                                     &backend_id,
                                     &prev_stats,
                                     &cur_stats,

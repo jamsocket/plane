@@ -104,7 +104,7 @@ impl BackendStatsMessage {
 }
 
 impl BackendStatsMessage {
-    pub fn from_stats_message(
+    pub fn from_stats_messages(
         backend_id: &BackendId,
         prev_stats_message: &Stats,
         cur_stats_message: &Stats,
