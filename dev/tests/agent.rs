@@ -314,8 +314,8 @@ async fn stats_are_acquired() -> Result<()> {
     )
     .await?
     .unwrap();
-    assert!(stat.value.cpu_use_percent > 0.);
-    assert!(stat.value.mem_use_percent > 0.);
+    assert!(stat.value.cpu_use_percent >= 0.);
+    assert!(stat.value.mem_use_percent >= 0.);
 
     state_subscription
         .wait_for_state(BackendState::Swept, 60_000)

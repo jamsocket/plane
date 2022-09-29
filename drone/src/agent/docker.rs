@@ -12,13 +12,15 @@ use bollard::{
     Docker, API_DEFAULT_VERSION,
 };
 use dis_spawner::messages::agent::ResourceLimits;
-use std::{collections::HashMap, net::IpAddr};
-use tokio_stream::{Stream, StreamExt};
+use std::{collections::HashMap, net::IpAddr, time::Duration};
+use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
 /// The port in the container which is exposed.
 const CONTAINER_PORT: u16 = 8080;
 const DEFAULT_DOCKER_TIMEOUT_SECONDS: u64 = 30;
-const DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SECS: u64 = 10;
+/// Interval between reporting stats of a running backend.
+/// NOTE: the minimum possible interval is 1 second.
+const DEFAULT_DOCKER_STATS_INTERVAL_SECONDS: u64 = 10;
 
 #[derive(Clone)]
 pub struct DockerInterface {
@@ -193,19 +195,38 @@ impl DockerInterface {
         )
     }
 
-    pub fn get_stats(
-        &self,
-        container_name: &str,
-    ) -> impl Stream<Item = Result<Stats, bollard::errors::Error>> {
+    /// The docker api (as of docker version 20.10.18) blocks for ~1s before returning
+    /// from self.docker.stats, hence the effective minimal interval is a second
+    pub fn get_stats<'a>(
+        &'a self,
+        container_name: &'a str,
+    ) -> impl Stream<Item = Result<Stats, anyhow::Error>> + 'a {
         let options = StatsOptions {
-            stream: true,
-            one_shot: false,
+            stream: false,
+            one_shot: true,
         };
-        self.docker
-            .stats(container_name, Some(options))
-            .throttle(std::time::Duration::from_secs(
-                DEFAULT_DOCKER_THROTTLED_STATS_INTERVAL_SECS,
-            ))
+
+        let ticker = IntervalStream::new({
+            let mut ticker =
+                tokio::time::interval(Duration::from_secs(DEFAULT_DOCKER_STATS_INTERVAL_SECONDS));
+            // this prevents the stream from getting too big in case the ticker interval <1s
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            ticker
+        });
+
+        futures::StreamExt::take_while(ticker, move |_| async move {
+            self.is_running(container_name)
+                .await
+                .map_or(false, |res| res.0)
+        })
+        .then(move |_tick| async move {
+            self.docker
+                .stats(container_name, Some(options))
+                .next()
+                .await
+                .ok_or(anyhow!("docker.stats failed"))?
+                .map_err(|e| e.into())
+        })
     }
 
     #[allow(unused)]
