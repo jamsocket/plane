@@ -18,6 +18,8 @@ use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 /// The port in the container which is exposed.
 const CONTAINER_PORT: u16 = 8080;
 const DEFAULT_DOCKER_TIMEOUT_SECONDS: u64 = 30;
+/// Interval between reporting stats of a running backend.
+/// NOTE: the minimum possible interval is 1 second.
 const DEFAULT_DOCKER_STATS_INTERVAL_SECONDS: u64 = 10;
 
 #[derive(Clone)]
