@@ -6,7 +6,7 @@
 # backends are assigned their hostnames. For example, a backend with the id
 # "abcde" on the cluster "spawner.dev" would have the hostname
 # "abcde.spawner.dev".
-cluster_domain = "spawner.dev"
+cluster_domain = "spawner.test"
 
 # The drone connects to the controller over NATS, which can be configured
 # here.

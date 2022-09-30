@@ -11,17 +11,6 @@ services:
     command:
       /etc/spawner/drone.toml
 
-  drone1:
-    build:
-      context: .
-      dockerfile: drone/Dockerfile
-    # image: ghcr.io/drifting-in-space/spawner-drone:sha-19997e7
-    volumes:
-      - ./sample-config:/etc/spawner
-      - /var/run/docker.sock:/var/run/docker.sock
-    command:
-      /etc/spawner/drone.toml
-
   controller:
     build:
       context: .
@@ -39,5 +28,5 @@ services:
     ports:
       - "127.0.0.1:4222:4222"
 
-  ubuntu:
-    image: ubuntu:latest
+  # ubuntu:
+  #   image: ubuntu:latest

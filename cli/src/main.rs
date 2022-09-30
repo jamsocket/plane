@@ -1,13 +1,23 @@
+use std::{time::Duration, collections::HashMap};
+
 use anyhow::Result;
 use async_nats::jetstream::consumer::DeliverPolicy;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use dis_spawner::{messages::agent::DroneStatusMessage, nats_connection::NatsConnectionSpec};
+use dis_spawner::{
+    messages::{agent::DroneStatusMessage, scheduler::ScheduleRequest},
+    nats_connection::NatsConnectionSpec,
+    types::{BackendId, ClusterName},
+};
+use uuid::Uuid;
 
 #[derive(Parser)]
 struct Opts {
     #[clap(long)]
     nats: Option<String>,
+
+    #[clap(long, default_value="spawner.test")]
+    cluster: String,
 
     #[command(subcommand)]
     command: Command,
@@ -16,6 +26,9 @@ struct Opts {
 #[derive(Subcommand)]
 enum Command {
     ListDrones,
+    Spawn {
+        image: String,
+    },
 }
 
 #[tokio::main]
@@ -45,6 +58,22 @@ async fn main() -> Result<()> {
                     drone.cluster.to_string().bright_cyan()
                 );
             }
+        }
+        Command::Spawn { image } => {
+            let backend_id = Uuid::new_v4().to_string();
+            let result = nats
+                .request(&ScheduleRequest {
+                    backend_id: BackendId::new(backend_id),
+                    cluster: ClusterName::new(&opts.cluster),
+                    image,
+                    max_idle_secs: Duration::from_secs(30),
+                    env: HashMap::new(),
+                    metadata: HashMap::new(),
+                    credentials: None,
+                })
+                .await?;
+
+            println!("Spawn result: {:?}", result);
         }
     }
 

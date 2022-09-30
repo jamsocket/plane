@@ -703,6 +703,7 @@ dependencies = [
  "dis-spawner",
  "tokio",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

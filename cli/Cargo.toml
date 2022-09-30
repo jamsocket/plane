@@ -11,3 +11,4 @@ tokio = { version = "1.21.2", features = ["macros", "rt", "rt-multi-thread"] }
 tracing-subscriber = "0.3.15"
 async-nats = "0.20.0"
 colored = "2.0.0"
+uuid = { version = "1.1.2", features = ["v4"] }
