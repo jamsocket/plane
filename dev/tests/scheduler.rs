@@ -48,8 +48,7 @@ impl MockAgent {
 
         // Ensure that the SpawnRequest is as expected.
         assert_eq!(
-            request.schedule(&drone_id),
-            result.value,
+            drone_id, &result.value.drone_id,
             "Scheduled drone did not match expectation."
         );
 
@@ -107,7 +106,7 @@ async fn one_drone_available() -> Result<()> {
         .await?;
 
     let result = mock_agent.schedule_drone(&drone_id).await?;
-    assert_eq!(ScheduleResponse::Scheduled { drone: drone_id }, result);
+    assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));
 
     Ok(())
 }

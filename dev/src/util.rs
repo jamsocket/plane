@@ -1,4 +1,3 @@
-use crate::test_name;
 use anyhow::{anyhow, Result};
 use dis_spawner::messages::agent::SpawnRequest;
 use dis_spawner::messages::scheduler::ScheduleRequest;
@@ -38,10 +37,6 @@ pub fn random_loopback_ip() -> Ipv4Addr {
     let v3 = rng.gen_range(1..254);
 
     Ipv4Addr::new(127, v1, v2, v3)
-}
-
-pub fn random_backend_id(hint: &str) -> BackendId {
-    BackendId::new(random_prefix(hint))
 }
 
 pub async fn wait_for_port(addr: SocketAddrV4, timeout_ms: u128) -> Result<()> {
@@ -109,11 +104,10 @@ pub async fn wait_for_url(url: &str, timeout_ms: u128) -> Result<()> {
 const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 
 pub fn base_spawn_request() -> SpawnRequest {
-    let backend_id = random_backend_id(&test_name());
     SpawnRequest {
         drone_id: DroneId::new_random(),
         image: TEST_IMAGE.into(),
-        backend_id,
+        backend_id: BackendId::new_random(),
         max_idle_secs: Duration::from_secs(10),
         env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
         metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
@@ -123,11 +117,10 @@ pub fn base_spawn_request() -> SpawnRequest {
 }
 
 pub fn base_scheduler_request() -> ScheduleRequest {
-    let backend_id = random_backend_id(&test_name());
     ScheduleRequest {
         cluster: ClusterName::new("spawner.test"),
         image: TEST_IMAGE.into(),
-        backend_id,
+        backend_id: None,
         max_idle_secs: Duration::from_secs(10),
         env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
         metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),

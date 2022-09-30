@@ -1,5 +1,3 @@
-use std::{collections::HashMap, time::Duration};
-
 use anyhow::Result;
 use async_nats::jetstream::consumer::DeliverPolicy;
 use clap::{Parser, Subcommand};
@@ -7,9 +5,9 @@ use colored::Colorize;
 use dis_spawner::{
     messages::{agent::DroneStatusMessage, scheduler::ScheduleRequest},
     nats_connection::NatsConnectionSpec,
-    types::{BackendId, ClusterName},
+    types::ClusterName,
 };
-use uuid::Uuid;
+use std::{collections::HashMap, time::Duration};
 
 #[derive(Parser)]
 struct Opts {
@@ -58,10 +56,9 @@ async fn main() -> Result<()> {
             }
         }
         Command::Spawn { image } => {
-            let backend_id = Uuid::new_v4().to_string();
             let result = nats
                 .request(&ScheduleRequest {
-                    backend_id: BackendId::new(backend_id),
+                    backend_id: None,
                     cluster: ClusterName::new(&opts.cluster),
                     image,
                     max_idle_secs: Duration::from_secs(30),
