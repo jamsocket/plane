@@ -45,7 +45,7 @@ impl ScheduleRequest {
         SpawnRequest {
             drone_id: drone_id.clone(),
             image: self.image.clone(),
-            backend_id: backend_id,
+            backend_id,
             max_idle_secs: self.max_idle_secs,
             env: self.env.clone(),
             metadata: self.metadata.clone(),
