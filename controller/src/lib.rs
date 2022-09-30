@@ -37,11 +37,12 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
 
             spawn_request = spawn_request_sub.next() => {
                 match spawn_request {
-                    Ok(Some(spawn_request)) => {
-                        tracing::info!(spawn_request=?spawn_request.value, "Got spawn request");
-                        let result = match scheduler.schedule(&spawn_request.value.cluster, Utc::now()) {
+                    Ok(Some(schedule_request)) => {
+                        tracing::info!(spawn_request=?schedule_request.value, "Got spawn request");
+                        let result = match scheduler.schedule(&schedule_request.value.cluster, Utc::now()) {
                             Ok(drone_id) => {
-                                match nats.request(&spawn_request.value.schedule(&drone_id)).await {
+                                let spawn_request = schedule_request.value.schedule(&drone_id);
+                                match nats.request(&spawn_request).await {
                                     Ok(false) => {
                                         tracing::warn!("No drone available.");
                                         ScheduleResponse::NoDroneAvailable
@@ -50,7 +51,7 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                                         tracing::warn!(?error, "Scheduler returned error.");
                                         ScheduleResponse::NoDroneAvailable
                                     },
-                                    Ok(true) => ScheduleResponse::Scheduled { drone: drone_id }
+                                    Ok(true) => ScheduleResponse::Scheduled { drone: drone_id, backend_id: spawn_request.backend_id }
                                 }
                             },
                             Err(error) => {
@@ -59,7 +60,7 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                             },
                         };
 
-                        spawn_request.respond(&result).await?;
+                        schedule_request.respond(&result).await?;
                     },
                     Ok(None) => return Err(anyhow!("spawn_request_sub.next() returned None.")),
                     Err(err) => tracing::warn!("spawn_request_sub.next() returned error: {:?}", err)

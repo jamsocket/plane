@@ -62,6 +62,12 @@ impl BackendId {
             .strip_prefix(RESOURCE_PREFIX)
             .map(|d| BackendId(d.to_string()))
     }
+
+    #[must_use]
+    pub fn new_random() -> Self {
+        let id = Uuid::new_v4();
+        BackendId(id.to_string())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
