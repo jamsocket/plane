@@ -343,15 +343,6 @@ impl TypedNats {
         Ok(result)
     }
 
-    pub async fn get_latest<T>(&self, subject: &SubscribeSubject<T>) -> Result<Option<T>>
-    where
-        T: TypedMessage<Response = NoReply> + JetStreamable,
-    {
-        let mut result = self.get_all(subject, DeliverPolicy::Last).await?;
-
-        Ok(result.pop())
-    }
-
     pub async fn subscribe_jetstream<T: JetStreamable>(
         &self,
         subject: SubscribeSubject<T>,
