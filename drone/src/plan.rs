@@ -21,7 +21,7 @@ impl DronePlan {
         tracing::info!(?drone_id, "Starting drone.");
 
         let nats = if let Some(nats) = config.nats {
-            Some(nats.connect().await?)
+            Some(nats.connect_with_retry().await?)
         } else {
             None
         };
