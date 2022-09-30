@@ -1,4 +1,4 @@
-use std::{time::Duration, collections::HashMap};
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::Result;
 use async_nats::jetstream::consumer::DeliverPolicy;
@@ -16,7 +16,7 @@ struct Opts {
     #[clap(long)]
     nats: Option<String>,
 
-    #[clap(long, default_value="spawner.test")]
+    #[clap(long, default_value = "spawner.test")]
     cluster: String,
 
     #[command(subcommand)]
@@ -26,9 +26,7 @@ struct Opts {
 #[derive(Subcommand)]
 enum Command {
     ListDrones,
-    Spawn {
-        image: String,
-    },
+    Spawn { image: String },
 }
 
 #[tokio::main]

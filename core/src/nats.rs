@@ -3,11 +3,11 @@
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
 use anyhow::{anyhow, Result};
-use async_nats::jetstream::Context;
+use async_nats::jetstream;
 use async_nats::jetstream::consumer::push::Messages;
 use async_nats::jetstream::consumer::DeliverPolicy;
 use async_nats::jetstream::stream::Config;
-use async_nats::jetstream;
+use async_nats::jetstream::Context;
 use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
 use dashmap::DashSet;
@@ -16,7 +16,7 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use tokio_stream::{StreamExt};
+use tokio_stream::StreamExt;
 
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
@@ -233,18 +233,22 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
 
 /// async_nats returns an Ok(Err(_)) when a stream is empty instead of None, this replaces that specific error
 /// with None.
-/// 
+///
 /// This will not be necessary once async_nats has concrete error types, which is coming.
-fn nats_error_hack(message_result: Option<Result<jetstream::Message, Box<dyn Error + Send + Sync>>>) -> anyhow::Result<Option<jetstream::Message>> {
+fn nats_error_hack(
+    message_result: Option<Result<jetstream::Message, Box<dyn Error + Send + Sync>>>,
+) -> anyhow::Result<Option<jetstream::Message>> {
     match message_result {
         Some(Ok(v)) => Ok(Some(v)),
         Some(Err(err)) => {
             // If we update async_nats to a version that includes https://github.com/nats-io/nats.rs/pull/652, correct the typo below.
-            if err.to_string() == r#"eror while processing messages from the stream: 404, Some("No Messages")"# {
-                return Ok(None)
+            if err.to_string()
+                == r#"eror while processing messages from the stream: 404, Some("No Messages")"#
+            {
+                return Ok(None);
             }
             Err(anyhow!("NATS Error: {:?}", err))
-        },
+        }
         None => Ok(None),
     }
 }
@@ -305,8 +309,14 @@ impl TypedNats {
         Ok(())
     }
 
-    pub async fn get_all<T>(&self, subject: &SubscribeSubject<T>, deliver_policy: DeliverPolicy) -> Result<Vec<T>> where
-    T: TypedMessage<Response = NoReply> + JetStreamable {
+    pub async fn get_all<T>(
+        &self,
+        subject: &SubscribeSubject<T>,
+        deliver_policy: DeliverPolicy,
+    ) -> Result<Vec<T>>
+    where
+        T: TypedMessage<Response = NoReply> + JetStreamable,
+    {
         let _ = self.ensure_jetstream_exists::<T>().await;
         let stream = self
             .jetstream
