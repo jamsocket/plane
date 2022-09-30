@@ -27,7 +27,7 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
     loop {
         select! {
             status_msg = status_sub.next() => {
-                tracing::info!(?status_msg, "Got drone status");
+                tracing::debug!(?status_msg, "Got drone status");
                 if let Some(status_msg) = status_msg? {
                     scheduler.update_status(Utc::now(), &status_msg);
                 } else {

@@ -3,6 +3,7 @@
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
 use anyhow::{anyhow, Result};
+use async_nats::jetstream;
 use async_nats::jetstream::consumer::push::Messages;
 use async_nats::jetstream::consumer::DeliverPolicy;
 use async_nats::jetstream::stream::Config;
@@ -11,11 +12,10 @@ use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
 use dashmap::DashSet;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::error::Error;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::timeout;
 use tokio_stream::StreamExt;
 
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
@@ -231,6 +231,28 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
     }
 }
 
+/// async_nats returns an Ok(Err(_)) when a stream is empty instead of None, this replaces that specific error
+/// with None.
+///
+/// This will not be necessary once async_nats has concrete error types, which is coming.
+fn nats_error_hack(
+    message_result: Option<Result<jetstream::Message, Box<dyn Error + Send + Sync>>>,
+) -> anyhow::Result<Option<jetstream::Message>> {
+    match message_result {
+        Some(Ok(v)) => Ok(Some(v)),
+        Some(Err(err)) => {
+            // If we update async_nats to a version that includes https://github.com/nats-io/nats.rs/pull/652, correct the typo below.
+            if err.to_string()
+                == r#"eror while processing messages from the stream: 404, Some("No Messages")"#
+            {
+                return Ok(None);
+            }
+            Err(anyhow!("NATS Error: {:?}", err))
+        }
+        None => Ok(None),
+    }
+}
+
 impl TypedNats {
     #[must_use]
     pub fn new(nc: Client) -> Self {
@@ -287,7 +309,11 @@ impl TypedNats {
         Ok(())
     }
 
-    pub async fn get_latest<T>(&self, subject: &SubscribeSubject<T>) -> Result<Option<T>>
+    pub async fn get_all<T>(
+        &self,
+        subject: &SubscribeSubject<T>,
+        deliver_policy: DeliverPolicy,
+    ) -> Result<Vec<T>>
     where
         T: TypedMessage<Response = NoReply> + JetStreamable,
     {
@@ -300,24 +326,31 @@ impl TypedNats {
 
         let consumer = stream
             .create_consumer(async_nats::jetstream::consumer::pull::Config {
-                deliver_policy: DeliverPolicy::Last,
+                deliver_policy,
                 filter_subject: subject.subject.clone(),
                 ..async_nats::jetstream::consumer::pull::Config::default()
             })
             .await
             .to_anyhow()?;
 
-        let result = match timeout(
-            Duration::from_secs(1),
-            consumer.stream().messages().await.to_anyhow()?.next(),
-        )
-        .await
-        {
-            Ok(Some(v)) => v.to_anyhow()?,
-            _ => return Ok(None),
-        };
+        let mut result: Vec<T> = Vec::new();
 
-        Ok(Some(serde_json::from_slice(&result.payload)?))
+        loop {
+            let mut messages = consumer.fetch().messages().await.to_anyhow()?;
+            let mut done = true;
+
+            while let Some(v) = nats_error_hack(messages.next().await)? {
+                done = false;
+
+                result.push(serde_json::from_slice(&v.payload)?);
+            }
+
+            if done {
+                break;
+            }
+        }
+
+        Ok(result)
     }
 
     pub async fn subscribe_jetstream<T: JetStreamable>(

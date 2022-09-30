@@ -7,6 +7,12 @@ const RESOURCE_PREFIX: &str = "spawner-";
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct DroneId(String);
 
+impl Display for DroneId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 impl DroneId {
     #[must_use]
     pub fn new(id: String) -> Self {

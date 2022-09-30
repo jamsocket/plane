@@ -14,7 +14,7 @@ pub struct ControllerPlan {
 
 impl ControllerPlan {
     pub async fn from_controller_config(config: ControllerConfig) -> Result<Self> {
-        let nats = config.nats.connect().await?;
+        let nats = config.nats.connect_with_retry().await?;
 
         let scheduler_plan = config.scheduler.map(|_| SchedulerPlan);
         let dns_plan = config.dns.map(|_| DnsPlan);

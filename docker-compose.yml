@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: drone/Dockerfile
+    # image: ghcr.io/drifting-in-space/spawner-drone:sha-19997e7
     volumes:
       - ./sample-config:/etc/spawner
       - /var/run/docker.sock:/var/run/docker.sock
@@ -14,6 +15,7 @@ services:
     build:
       context: .
       dockerfile: controller/Dockerfile
+    # image: ghcr.io/drifting-in-space/spawner-controller:sha-19997e7
     volumes:
       - ./sample-config:/etc/spawner
     command:
@@ -23,3 +25,8 @@ services:
     image: nats:latest
     command:
       "--jetstream"
+    ports:
+      - "127.0.0.1:4222:4222"
+
+  # ubuntu:
+  #   image: ubuntu:latest
