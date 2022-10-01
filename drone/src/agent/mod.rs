@@ -13,6 +13,7 @@ use http::Uri;
 use hyper::Client;
 use std::{net::IpAddr, time::Duration};
 
+mod backend;
 mod docker;
 mod executor;
 

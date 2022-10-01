@@ -1,4 +1,7 @@
-use super::docker::{ContainerEventType, DockerInterface};
+use super::{
+    backend::BackendMonitor,
+    docker::{ContainerEventType, DockerInterface},
+};
 use crate::{
     agent::wait_port_ready,
     database::{Backend, DroneDatabase},
@@ -7,10 +10,7 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use dis_spawner::{
-    messages::agent::{
-        BackendState, BackendStateMessage, BackendStatsMessage, DroneLogMessage, SpawnRequest,
-        TerminationRequest,
-    },
+    messages::agent::{BackendState, BackendStateMessage, SpawnRequest, TerminationRequest},
     nats::TypedNats,
     types::BackendId,
 };
@@ -43,11 +43,12 @@ pub struct Executor {
     database: DroneDatabase,
     nc: TypedNats,
     _container_events_handle: Arc<JoinHandle<()>>,
+    backend_to_monitor: Arc<DashMap<BackendId, BackendMonitor>>,
     backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
-    backend_to_log_loop:
-        Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
-    backend_to_stats_loop:
-        Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
+    // backend_to_log_loop:
+    //     Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
+    // backend_to_stats_loop:
+    //     Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
 }
 
 impl Executor {
@@ -63,9 +64,8 @@ impl Executor {
             database,
             nc,
             _container_events_handle: Arc::new(container_events_handle),
+            backend_to_monitor: Arc::default(),
             backend_to_listener,
-            backend_to_log_loop: Arc::default(),
-            backend_to_stats_loop: Arc::default(),
         }
     }
 
@@ -130,84 +130,15 @@ impl Executor {
             tracing::info!(%backend_id, ?state, "Resuming backend");
 
             if state.running() {
-                self.start_log_loop(&backend_id);
-                self.start_stats_loop(&backend_id);
+                self.backend_to_monitor.insert(
+                    backend_id.clone(),
+                    BackendMonitor::new(&backend_id, &self.docker, &self.nc),
+                );
             }
             tokio::spawn(async move { executor.run_backend(&spec, state).await });
         }
 
         Ok(())
-    }
-
-    fn start_log_loop(&self, backend_id: &BackendId) {
-        let docker = self.docker.clone();
-        let nc = self.nc.clone();
-        let backend_id = backend_id.clone();
-        self.backend_to_log_loop
-            .entry(backend_id.clone())
-            .or_insert_with(move || {
-                tokio::spawn(async move {
-                    let container_name = backend_id.to_resource_name();
-                    tracing::info!(%backend_id, "Log recording loop started.");
-                    let mut stream = docker.get_logs(&container_name);
-
-                    while let Some(v) = stream.next().await {
-                        match v {
-                            Ok(v) => {
-                                if let Some(message) =
-                                    DroneLogMessage::from_log_message(&backend_id, &v)
-                                {
-                                    nc.publish(&message).await?;
-                                }
-                            }
-                            Err(error) => {
-                                tracing::warn!(?error, "Error encountered forwarding log.");
-                            }
-                        }
-                    }
-
-                    tracing::info!(%backend_id, "Log loop terminated.");
-
-                    Ok::<(), anyhow::Error>(())
-                })
-            });
-    }
-
-    fn start_stats_loop(&self, backend_id: &BackendId) {
-        let docker = self.docker.clone();
-        let nc = self.nc.clone();
-        let backend_id = backend_id.clone();
-        self.backend_to_stats_loop
-            .entry(backend_id.clone())
-            .or_insert_with(|| {
-                tokio::spawn(async move {
-                    let container_name = backend_id.to_resource_name();
-                    tracing::info!(%backend_id, "Stats recording loop started.");
-                    let mut stream = Box::pin(docker.get_stats(&container_name));
-                    let mut prev_stats = stream
-                        .next()
-                        .await
-                        .ok_or(anyhow!("failed to get first stats"))??;
-                    while let Some(cur_stats) = stream.next().await {
-                        match cur_stats {
-                            Ok(cur_stats) => {
-                                nc.publish(&BackendStatsMessage::from_stats_messages(
-                                    &backend_id,
-                                    &prev_stats,
-                                    &cur_stats,
-                                )?)
-                                .await?;
-                                prev_stats = cur_stats;
-                            }
-                            Err(error) => {
-                                tracing::warn!(?error, "Error encountered sending stats.")
-                            }
-                        }
-                    }
-
-                    Ok(())
-                })
-            });
     }
 
     async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
@@ -245,8 +176,10 @@ impl Executor {
                     state = new_state;
 
                     if state.running() {
-                        self.start_log_loop(&spawn_request.backend_id);
-                        self.start_stats_loop(&spawn_request.backend_id);
+                        self.backend_to_monitor.insert(
+                            spawn_request.backend_id.clone(),
+                            BackendMonitor::new(&spawn_request.backend_id, &self.docker, &self.nc),
+                        );
                     }
 
                     self.database
