@@ -7,4 +7,3 @@ hosts = ["nats"]
 [scheduler]
 
 [dns]
-port = 5353

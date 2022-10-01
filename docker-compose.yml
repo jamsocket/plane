@@ -31,5 +31,9 @@ services:
   ip-api:
     image: ghcr.io/drifting-in-space/ip-api:latest
 
-  # ubuntu:
-  #   image: ubuntu:latest
+  firefox:
+    build:
+      context: sample-config/firefox
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:3000:3000"
