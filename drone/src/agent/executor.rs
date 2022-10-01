@@ -215,6 +215,8 @@ impl Executor {
                 Ok(None) => {
                     // Successful termination.
                     tracing::info!("Terminated successfully.");
+                    self.backend_to_monitor.remove(&spawn_request.backend_id);
+                    self.backend_to_listener.remove(&spawn_request.backend_id);
                     break;
                 }
                 Err(error) => {
