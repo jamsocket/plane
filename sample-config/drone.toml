@@ -70,6 +70,9 @@ connection = { socket = "/var/run/docker.sock" }
 [proxy]
 # Port to listen for HTTPS requests on.
 https_port = 4040
-
 # IP to listen for connections on.
 bind_ip = "0.0.0.0"
+
+[cert]
+key_path = "/etc/spawner/auth/key.pem"
+cert_path = "/etc/spawner/auth/cert.pem"
