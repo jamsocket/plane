@@ -10,6 +10,7 @@ use scheduler::Scheduler;
 use tokio::select;
 
 mod config;
+mod dns;
 mod plan;
 pub mod run;
 mod scheduler;

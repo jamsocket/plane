@@ -6,11 +6,10 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum DnsRecordType {
     A,
     TXT,
-    AAAA,
 }
 
 impl Display for DnsRecordType {

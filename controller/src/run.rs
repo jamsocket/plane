@@ -1,4 +1,5 @@
 use crate::config::ControllerConfig;
+use crate::dns::serve_dns;
 use crate::plan::ControllerPlan;
 use crate::run_scheduler;
 use anyhow::{anyhow, Result};
@@ -32,8 +33,8 @@ async fn controller_main() -> NeverResult {
         futs.push(Box::pin(run_scheduler(nats.clone())))
     }
 
-    if dns_plan.is_some() {
-        todo!("DNS server not yet implemented.")
+    if let Some(dns_plan) = dns_plan {
+        futs.push(Box::pin(serve_dns(dns_plan)))
     }
 
     try_join_all(futs.into_iter()).await?;

@@ -5,3 +5,6 @@ hosts = ["nats"]
 # auth = { token = "my-secret-token" }
 
 [scheduler]
+
+[dns]
+port = 5353
