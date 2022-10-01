@@ -1,11 +1,16 @@
+use std::{net::IpAddr, time::Duration};
+
 use super::docker::DockerInterface;
 use anyhow::{anyhow, Result};
 use dis_spawner::{
-    messages::agent::{BackendStatsMessage, DroneLogMessage},
+    messages::{
+        agent::{BackendStatsMessage, DroneLogMessage},
+        dns::{DnsRecordType, SetDnsRecord},
+    },
     nats::TypedNats,
-    types::BackendId,
+    types::{BackendId, ClusterName},
 };
-use tokio::task::JoinHandle;
+use tokio::{task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
 
 /// JoinHandle does not abort when it is dropped; this wrapper does.
@@ -20,17 +25,51 @@ impl<T> Drop for AbortOnDrop<T> {
 pub struct BackendMonitor {
     _log_loop: AbortOnDrop<Result<(), anyhow::Error>>,
     _stats_loop: AbortOnDrop<Result<(), anyhow::Error>>,
+    _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
 }
 
 impl BackendMonitor {
-    pub fn new(backend_id: &BackendId, docker: &DockerInterface, nc: &TypedNats) -> Self {
+    pub fn new(
+        backend_id: &BackendId,
+        cluster: &ClusterName,
+        ip: IpAddr,
+        docker: &DockerInterface,
+        nc: &TypedNats,
+    ) -> Self {
         let log_loop = Self::log_loop(backend_id, docker, nc);
         let stats_loop = Self::stats_loop(backend_id, docker, nc);
+        let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
         BackendMonitor {
             _log_loop: AbortOnDrop(log_loop),
             _stats_loop: AbortOnDrop(stats_loop),
+            _dns_loop: AbortOnDrop(dns_loop),
         }
+    }
+
+    fn dns_loop(
+        backend_id: &BackendId,
+        ip: IpAddr,
+        nc: &TypedNats,
+        cluster: &ClusterName,
+    ) -> JoinHandle<Result<(), anyhow::Error>> {
+        let backend_id = backend_id.clone();
+        let nc = nc.clone();
+        let cluster = cluster.clone();
+
+        tokio::spawn(async move {
+            loop {
+                nc.publish_jetstream(&SetDnsRecord {
+                    cluster: cluster.clone(),
+                    kind: DnsRecordType::A,
+                    name: backend_id.to_string(),
+                    value: ip.to_string(),
+                })
+                .await?;
+
+                sleep(Duration::from_secs(50)).await;
+            }
+        })
     }
 
     fn log_loop(

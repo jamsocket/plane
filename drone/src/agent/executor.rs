@@ -12,10 +12,10 @@ use dashmap::DashMap;
 use dis_spawner::{
     messages::agent::{BackendState, BackendStateMessage, SpawnRequest, TerminationRequest},
     nats::TypedNats,
-    types::BackendId,
+    types::{BackendId, ClusterName},
 };
 use serde_json::json;
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
     sync::mpsc::{channel, Sender},
     task::JoinHandle,
@@ -45,14 +45,18 @@ pub struct Executor {
     _container_events_handle: Arc<JoinHandle<()>>,
     backend_to_monitor: Arc<DashMap<BackendId, BackendMonitor>>,
     backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
-    // backend_to_log_loop:
-    //     Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
-    // backend_to_stats_loop:
-    //     Arc<DashMap<BackendId, tokio::task::JoinHandle<Result<(), anyhow::Error>>>>,
+    ip: IpAddr,
+    cluster: ClusterName,
 }
 
 impl Executor {
-    pub fn new(docker: DockerInterface, database: DroneDatabase, nc: TypedNats) -> Self {
+    pub fn new(
+        docker: DockerInterface,
+        database: DroneDatabase,
+        nc: TypedNats,
+        ip: IpAddr,
+        cluster: ClusterName,
+    ) -> Self {
         let backend_to_listener: Arc<DashMap<BackendId, Sender<()>>> = Arc::default();
         let container_events_handle = tokio::spawn(Self::listen_for_container_events(
             docker.clone(),
@@ -66,6 +70,8 @@ impl Executor {
             _container_events_handle: Arc::new(container_events_handle),
             backend_to_monitor: Arc::default(),
             backend_to_listener,
+            ip,
+            cluster,
         }
     }
 
@@ -132,7 +138,13 @@ impl Executor {
             if state.running() {
                 self.backend_to_monitor.insert(
                     backend_id.clone(),
-                    BackendMonitor::new(&backend_id, &self.docker, &self.nc),
+                    BackendMonitor::new(
+                        &backend_id,
+                        &self.cluster,
+                        self.ip,
+                        &self.docker,
+                        &self.nc,
+                    ),
                 );
             }
             tokio::spawn(async move { executor.run_backend(&spec, state).await });
@@ -178,7 +190,13 @@ impl Executor {
                     if state.running() {
                         self.backend_to_monitor.insert(
                             spawn_request.backend_id.clone(),
-                            BackendMonitor::new(&spawn_request.backend_id, &self.docker, &self.nc),
+                            BackendMonitor::new(
+                                &spawn_request.backend_id,
+                                &self.cluster,
+                                self.ip,
+                                &self.docker,
+                                &self.nc,
+                            ),
                         );
                     }
 

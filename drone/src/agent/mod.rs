@@ -131,7 +131,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     nats.publish(&request).await?;
 
-    let executor = Executor::new(docker, db, nats.clone());
+    let executor = Executor::new(docker, db, nats.clone(), ip, cluster.clone());
     tokio::select!(
         result = ready_loop(nats.clone(), &agent_opts.drone_id, cluster.clone()) => result,
         result = listen_for_spawn_requests(&agent_opts.drone_id, executor.clone(), nats.clone()) => result,
