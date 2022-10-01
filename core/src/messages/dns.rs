@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{time::Duration, fmt::Display};
 
 use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
@@ -11,6 +11,12 @@ pub enum DnsRecordType {
     A,
     TXT,
     AAAA,
+}
+
+impl Display for DnsRecordType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
