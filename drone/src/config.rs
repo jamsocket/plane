@@ -34,6 +34,8 @@ pub struct DockerConfig {
     pub runtime: Option<String>,
     #[serde(default)]
     pub connection: DockerConnection,
+
+    pub network: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]

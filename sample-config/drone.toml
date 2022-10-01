@@ -59,6 +59,7 @@ ip = "127.0.0.1"
 [agent.docker]
 # The runtime to use (defaults to "runc")
 runtime = "runc"
+network = "spawner_default"
 
 # The method of connecting to Docker. {socket=""} and {http=""} are
 # supported.
