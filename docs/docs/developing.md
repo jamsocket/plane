@@ -2,7 +2,7 @@
 
 ## Running Tests
 
-Tests consist of unit tests (which are located alongside the source) and integration tests located in [`dev/tests`](dev/tests). Both kinds of tests are run if you run `cargo test` in the root directory.
+Tests consist of unit tests (which are located alongside the source) and integration tests located in `dev/tests`. Both kinds of tests are run if you run `cargo test` in the root directory.
 
 Integration tests use Docker to spin up dependent services, so require a running install of Docker and to be run as a user with access to `/var/run/docker.sock`. They are intended to run on Linux and may not work on other systems.
 
