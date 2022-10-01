@@ -46,14 +46,10 @@ hosts = ["nats"]
 # advertising its availability to the controller and spawning new
 # backends.
 [agent]
-# This is the public IP that the drone is running on. When backends
-# are scheduled to this drone, their DNS will resolve to this IP.
-ip = "127.0.0.1"
-
 # Instead of a static IP, you can pass a URL of an API server which
 # is expected to return the public IP address of the requestor in
 # plaintext.
-# ip = { api = "https://api.ipify.org/" }
+ip = { api = "http://ip-api:8080/" }
 
 # Optional Docker settings for the agent.
 [agent.docker]

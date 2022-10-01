@@ -121,7 +121,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
     tracing::info!("Connecting to sqlite.");
     let db = agent_opts.db;
     let cluster = agent_opts.cluster_domain.clone();
-    let ip = agent_opts.ip.get_ip().await?;
+    let ip = do_with_retry(|| agent_opts.ip.get_ip(), 10, Duration::from_secs(10)).await?;
 
     let request = DroneConnectRequest {
         drone_id: agent_opts.drone_id.clone(),
