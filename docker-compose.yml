@@ -6,7 +6,7 @@ services:
       dockerfile: drone/Dockerfile
     # image: ghcr.io/drifting-in-space/spawner-drone:sha-19997e7
     volumes:
-      - ./sample-config:/etc/spawner
+      - ./sample-config:/etc/spawner:ro
       - /var/run/docker.sock:/var/run/docker.sock
     command:
       /etc/spawner/drone.toml
@@ -17,7 +17,7 @@ services:
       dockerfile: controller/Dockerfile
     # image: ghcr.io/drifting-in-space/spawner-controller:sha-19997e7
     volumes:
-      - ./sample-config:/etc/spawner
+      - ./sample-config:/etc/spawner:ro
     command:
       /etc/spawner/controller.toml
 

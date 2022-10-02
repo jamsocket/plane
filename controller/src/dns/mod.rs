@@ -196,15 +196,19 @@ impl RequestHandler for ClusterDnsServer {
 pub async fn serve_dns(plan: DnsPlan) -> anyhow::Result<Never> {
     let mut fut = ServerFuture::new(ClusterDnsServer::new(&plan.nc).await);
 
-    let sock = UdpSocket::bind((plan.options.ip, plan.options.port))
+    let ip_port_pair = (plan.options.bind_ip, plan.options.port);
+
+    let sock = UdpSocket::bind(ip_port_pair)
         .await
         .context("Binding UDP port for DNS server.")?;
     fut.register_socket(sock);
 
-    let listener = TcpListener::bind((plan.options.ip, plan.options.port))
+    let listener = TcpListener::bind(ip_port_pair)
         .await
         .context("Binding TCP port for DNS server.")?;
     fut.register_listener(listener, Duration::from_secs(10));
+
+    tracing::info!(ip=%plan.options.bind_ip, port=%plan.options.port, "Listening for DNS queries.");
 
     fut.block_until_done()
         .await

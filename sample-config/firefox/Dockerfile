@@ -1,6 +1,6 @@
 FROM lscr.io/linuxserver/firefox:latest
 
 RUN apk add bind-tools
+RUN apk add dnsmasq
 
-COPY init-container.sh /custom-cont-init.d/init-container.sh
-RUN chmod +x /custom-cont-init.d/init-container.sh
+COPY custom-cont-init.d /custom-cont-init.d

@@ -64,8 +64,6 @@ connection = { socket = "/var/run/docker.sock" }
 # Proxy configuration. If this section is present, the proxy is
 # served.
 [proxy]
-# Port to listen for HTTPS requests on.
-https_port = 4040
 # IP to listen for connections on.
 bind_ip = "0.0.0.0"
 

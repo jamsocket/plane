@@ -12,7 +12,7 @@ pub struct DnsOptions {
     pub port: u16,
 
     #[serde(default="default_bind_ip")]
-    pub ip: IpAddr,
+    pub bind_ip: IpAddr,
 }
 
 fn default_port() -> u16 {
@@ -20,7 +20,7 @@ fn default_port() -> u16 {
 }
 
 fn default_bind_ip() -> IpAddr {
-    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
+    IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))
 }
 
 #[derive(Serialize, Deserialize)]
