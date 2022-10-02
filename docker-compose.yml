@@ -33,7 +33,7 @@ services:
 
   firefox:
     build:
-      context: sample-config/firefox
-      dockerfile: Dockerfile
+      context: sample-config
+      dockerfile: firefox.Dockerfile
     ports:
       - "127.0.0.1:3000:3000"

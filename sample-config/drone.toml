@@ -68,5 +68,5 @@ connection = { socket = "/var/run/docker.sock" }
 bind_ip = "0.0.0.0"
 
 [cert]
-key_path = "/etc/spawner/auth/key.pem"
-cert_path = "/etc/spawner/auth/cert.pem"
+key_path = "/etc/spawner/auth/site-key.pem"
+cert_path = "/etc/spawner/auth/site-cert.pem"
