@@ -1,4 +1,4 @@
-use std::{time::Duration, fmt::Display};
+use std::{fmt::Display, time::Duration};
 
 use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},

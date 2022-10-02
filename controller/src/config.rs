@@ -8,10 +8,10 @@ pub struct SchedulerOptions {}
 
 #[derive(Serialize, Deserialize)]
 pub struct DnsOptions {
-    #[serde(default="default_port")]
+    #[serde(default = "default_port")]
     pub port: u16,
 
-    #[serde(default="default_bind_ip")]
+    #[serde(default = "default_bind_ip")]
     pub bind_ip: IpAddr,
 }
 
