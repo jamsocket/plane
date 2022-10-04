@@ -1,10 +1,12 @@
-use chrono::{DateTime, Duration, Utc};
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    time::{Duration, SystemTime},
+};
 
 pub struct TtlList<V> {
-    items: VecDeque<(DateTime<Utc>, V)>,
+    items: VecDeque<(SystemTime, V)>,
     ttl: Duration,
-    last_time: DateTime<Utc>,
+    last_time: SystemTime,
 }
 
 impl<V> TtlList<V> {
@@ -12,31 +14,31 @@ impl<V> TtlList<V> {
         TtlList {
             ttl,
             items: VecDeque::new(),
-            last_time: DateTime::<Utc>::MIN_UTC,
+            last_time: SystemTime::UNIX_EPOCH,
         }
     }
 
-    pub fn iter(&mut self, time: DateTime<Utc>) -> impl Iterator<Item = &V> {
+    pub fn iter(&mut self, time: SystemTime) -> impl Iterator<Item = &V> {
         self.compact(time);
 
         self.items.iter().map(|d| &d.1)
     }
 
-    pub fn push(&mut self, value: V, time: DateTime<Utc>) {
+    pub fn push(&mut self, value: V, time: SystemTime) {
         if time < self.last_time {
             tracing::info!(
-                %time,
-                last_time=%self.last_time,
+                ?time,
+                last_time=?self.last_time,
                 "TtlStore received insertion request out of order."
             );
         }
         let expiry = time
-            .checked_add_signed(self.ttl)
+            .checked_add(self.ttl)
             .expect("Adding ttl should never fail.");
         self.items.push_back((expiry, value));
     }
 
-    fn compact(&mut self, time: DateTime<Utc>) {
+    fn compact(&mut self, time: SystemTime) {
         while let Some((t, _)) = self.items.front() {
             if *t > time {
                 return;
@@ -54,7 +56,7 @@ mod test {
 
     #[test]
     fn test_list() {
-        let mut list: TtlList<u32> = TtlList::new(Duration::seconds(10));
+        let mut list: TtlList<u32> = TtlList::new(Duration::from_secs(10));
 
         list.push(4, ts(100));
         list.push(5, ts(101));

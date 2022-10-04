@@ -6,7 +6,6 @@ use crate::ttl_store::ttl_map::TtlMap;
 use crate::ttl_store::ttl_multistore::TtlMultistore;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
 use dis_spawner::messages::dns::SetDnsRecord;
 use dis_spawner::types::ClusterName;
 use dis_spawner::Never;
@@ -14,6 +13,7 @@ use dis_spawner::{messages::dns::DnsRecordType, nats::TypedNats};
 use error::Result;
 use std::net::Ipv4Addr;
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 use tokio::task::JoinHandle;
 use tokio::{
     self,
@@ -32,6 +32,12 @@ use trust_dns_server::{
     ServerFuture,
 };
 
+const TCP_TIMEOUT_SECONDS: u64 = 10;
+
+/// Time-to-live value set on records returned from the DNS server.
+/// Not related to TTL of records used internally.
+const DNS_RECORD_TTL: u32 = 60;
+
 #[derive(PartialEq, Eq, Hash, Clone)]
 struct RecordKey {
     cluster: ClusterName,
@@ -48,9 +54,9 @@ impl ClusterDnsServer {
     pub async fn new(nc: &TypedNats) -> Self {
         let nc = nc.clone();
         let a_record_map: Arc<Mutex<TtlMap<RecordKey, RData>>> =
-            Arc::new(Mutex::new(TtlMap::new(Duration::seconds(60))));
+            Arc::new(Mutex::new(TtlMap::new(SetDnsRecord::ttl())));
         let txt_record_map: Arc<Mutex<TtlMultistore<RecordKey, RData>>> =
-            Arc::new(Mutex::new(TtlMultistore::new(Duration::seconds(60))));
+            Arc::new(Mutex::new(TtlMultistore::new(SetDnsRecord::ttl())));
 
         let handle = {
             let a_record_map = a_record_map.clone();
@@ -85,7 +91,7 @@ impl ClusterDnsServer {
                                         name: v.name.clone(),
                                     },
                                     value,
-                                    Utc::now(),
+                                    SystemTime::now(),
                                 )
                         }
                         DnsRecordType::TXT => {
@@ -99,7 +105,7 @@ impl ClusterDnsServer {
                                         name: v.name.clone(),
                                     },
                                     value,
-                                    Utc::now(),
+                                    SystemTime::now(),
                                 );
                         }
                     }
@@ -142,14 +148,13 @@ impl ClusterDnsServer {
                             cluster: cluster_name,
                             name: hostname.into(),
                         },
-                        Utc::now(),
+                        SystemTime::now(),
                     )
                 {
                     let name: Name = request.query().name().clone().into();
-                    let ttl = 60;
-
                     for rdata in v {
-                        let record = Record::from_rdata(name.clone(), ttl, rdata.clone());
+                        let record =
+                            Record::from_rdata(name.clone(), DNS_RECORD_TTL, rdata.clone());
                         responses.push(record);
                     }
                 }
@@ -168,13 +173,12 @@ impl ClusterDnsServer {
                             cluster: cluster_name,
                             name: hostname.into(),
                         },
-                        Utc::now(),
+                        SystemTime::now(),
                     )
                 {
                     let name = request.query().name().clone();
                     let rdata = v.clone();
-                    let ttl = 60;
-                    let record = Record::from_rdata(name.into(), ttl, rdata);
+                    let record = Record::from_rdata(name.into(), DNS_RECORD_TTL, rdata);
                     responses.push(record);
                 }
 
@@ -256,7 +260,10 @@ pub async fn serve_dns(plan: DnsPlan) -> anyhow::Result<Never> {
     let listener = TcpListener::bind(ip_port_pair)
         .await
         .context("Binding TCP port for DNS server.")?;
-    fut.register_listener(listener, std::time::Duration::from_secs(10));
+    fut.register_listener(
+        listener,
+        std::time::Duration::from_secs(TCP_TIMEOUT_SECONDS),
+    );
 
     tracing::info!(ip=%plan.options.bind_ip, port=%plan.options.port, "Listening for DNS queries.");
 

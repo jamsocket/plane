@@ -1,7 +1,7 @@
-use chrono::{DateTime, Duration, Utc};
 use std::{
     collections::{HashMap, VecDeque},
     hash::Hash,
+    time::{Duration, SystemTime},
 };
 
 /// A HashMap which enforces a time-to-live of records inserted
@@ -15,9 +15,9 @@ use std::{
 /// be mutable.
 pub struct TtlMap<K: Hash + Eq + Clone, V> {
     ttl: Duration,
-    inner_map: HashMap<K, (DateTime<Utc>, V)>,
-    queue: VecDeque<(DateTime<Utc>, K)>,
-    last_time: DateTime<Utc>,
+    inner_map: HashMap<K, (SystemTime, V)>,
+    queue: VecDeque<(SystemTime, K)>,
+    last_time: SystemTime,
 }
 
 impl<K: Hash + Eq + Clone, V> TtlMap<K, V> {
@@ -26,48 +26,46 @@ impl<K: Hash + Eq + Clone, V> TtlMap<K, V> {
             ttl,
             inner_map: HashMap::new(),
             queue: VecDeque::new(),
-            last_time: DateTime::<Utc>::MIN_UTC,
+            last_time: SystemTime::UNIX_EPOCH,
         }
     }
 
-    pub fn insert(&mut self, key: K, value: V, time: DateTime<Utc>) {
+    pub fn insert(&mut self, key: K, value: V, time: SystemTime) {
         if time < self.last_time {
             tracing::info!(
-                %time,
-                last_time=%self.last_time,
+                ?time,
+                last_time=?self.last_time,
                 "TtlStore received insertion request out of order."
             );
         }
-        let expiry = time
-            .checked_add_signed(self.ttl)
-            .expect("Adding ttl should never fail.");
+        let expiry = time + self.ttl;
         self.inner_map.insert(key.clone(), (expiry, value));
         self.queue.push_back((expiry, key));
     }
 
     pub fn get_or_insert<F: FnOnce() -> V>(&mut self, key: K, func: F) -> &mut V {
-        let now = Utc::now();
+        let now = SystemTime::now();
         let result = self.inner_map.entry(key).or_insert_with(|| (now, func()));
         &mut result.1
     }
 
-    pub fn get(&mut self, key: &K, time: DateTime<Utc>) -> Option<&V> {
+    pub fn get(&mut self, key: &K, time: SystemTime) -> Option<&V> {
         self.compact(time);
 
         self.inner_map.get(key).map(|d| &d.1)
     }
 
-    pub fn get_mut(&mut self, key: &K, time: DateTime<Utc>) -> Option<&mut V> {
+    pub fn get_mut(&mut self, key: &K, time: SystemTime) -> Option<&mut V> {
         self.compact(time);
 
         self.inner_map.get_mut(key).map(|d| &mut d.1)
     }
 
-    fn compact(&mut self, time: DateTime<Utc>) {
+    fn compact(&mut self, time: SystemTime) {
         if time < self.last_time {
             tracing::info!(
-                %time,
-                last_time=%self.last_time,
+                ?time,
+                last_time=?self.last_time,
                 "TtlStore received compaction request out of order."
             );
         }
@@ -98,7 +96,7 @@ mod test {
 
     #[test]
     fn test_ttl_store() {
-        let mut store: TtlMap<String, String> = TtlMap::new(Duration::seconds(10));
+        let mut store: TtlMap<String, String> = TtlMap::new(Duration::from_secs(10));
 
         assert_eq!(0, store.inner_map.len());
         store.insert("foo".into(), "bar".into(), ts(10));
@@ -115,7 +113,7 @@ mod test {
 
     #[test]
     fn test_ttl_store_ignores_overwrite() {
-        let mut store: TtlMap<String, String> = TtlMap::new(Duration::seconds(10));
+        let mut store: TtlMap<String, String> = TtlMap::new(Duration::from_secs(10));
 
         assert_eq!(0, store.inner_map.len());
         store.insert("foo".into(), "bar".into(), ts(10));
@@ -139,7 +137,7 @@ mod test {
 
     #[test]
     fn test_multiple_keys() {
-        let mut store: TtlMap<String, String> = TtlMap::new(Duration::seconds(10));
+        let mut store: TtlMap<String, String> = TtlMap::new(Duration::from_secs(10));
 
         assert_eq!(0, store.inner_map.len());
         store.insert("foo1".into(), "bar1".into(), ts(10));

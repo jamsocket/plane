@@ -1,6 +1,8 @@
 use super::{ttl_list::TtlList, ttl_map::TtlMap};
-use chrono::{DateTime, Duration, Utc};
-use std::hash::Hash;
+use std::{
+    hash::Hash,
+    time::{Duration, SystemTime},
+};
 
 pub struct TtlMultistore<K: Hash + Eq + Clone, V> {
     inner: TtlMap<K, TtlList<V>>,
@@ -15,12 +17,12 @@ impl<K: Hash + Eq + Clone, V> TtlMultistore<K, V> {
         }
     }
 
-    pub fn insert(&mut self, key: K, value: V, time: DateTime<Utc>) {
+    pub fn insert(&mut self, key: K, value: V, time: SystemTime) {
         let list = self.inner.get_or_insert(key, || TtlList::new(self.ttl));
         list.push(value, time);
     }
 
-    pub fn iter(&mut self, key: &K, time: DateTime<Utc>) -> Option<impl Iterator<Item = &V>> {
+    pub fn iter(&mut self, key: &K, time: SystemTime) -> Option<impl Iterator<Item = &V>> {
         if let Some(v) = self.inner.get_mut(key, time) {
             Some(v.iter(time))
         } else {
@@ -36,7 +38,7 @@ mod test {
 
     #[test]
     fn test_multistore() {
-        let mut store: TtlMultistore<u32, u32> = TtlMultistore::new(Duration::seconds(10));
+        let mut store: TtlMultistore<u32, u32> = TtlMultistore::new(Duration::from_secs(10));
 
         store.insert(4, 10, ts(200));
         store.insert(4, 11, ts(201));

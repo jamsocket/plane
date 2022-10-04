@@ -4,9 +4,9 @@ pub mod ttl_multistore;
 
 #[cfg(test)]
 mod test {
-    use chrono::{DateTime, NaiveDateTime, Utc};
+    use std::time::{Duration, SystemTime};
 
-    pub fn ts(timestamp: i64) -> DateTime<Utc> {
-        DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp, 0), Utc)
+    pub fn ts(timestamp: u64) -> SystemTime {
+        SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp)
     }
 }
