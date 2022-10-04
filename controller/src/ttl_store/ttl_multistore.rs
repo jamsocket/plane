@@ -18,7 +18,9 @@ impl<K: Hash + Eq + Clone, V> TtlMultistore<K, V> {
     }
 
     pub fn insert(&mut self, key: K, value: V, time: SystemTime) {
-        let list = self.inner.get_or_insert(key, || TtlList::new(self.ttl));
+        let list = self
+            .inner
+            .get_or_insert_with(key, || TtlList::new(self.ttl));
         list.push(value, time);
     }
 

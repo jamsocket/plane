@@ -43,7 +43,7 @@ impl<K: Hash + Eq + Clone, V> TtlMap<K, V> {
         self.queue.push_back((expiry, key));
     }
 
-    pub fn get_or_insert<F: FnOnce() -> V>(&mut self, key: K, func: F) -> &mut V {
+    pub fn get_or_insert_with<F: FnOnce() -> V>(&mut self, key: K, func: F) -> &mut V {
         let now = SystemTime::now();
         let result = self.inner_map.entry(key).or_insert_with(|| (now, func()));
         &mut result.1
