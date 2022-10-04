@@ -1,7 +1,9 @@
 use self::{docker::DockerInterface, executor::Executor};
 use crate::{config::DockerConfig, database::DroneDatabase, ip::IpSource};
 use anyhow::{anyhow, Result};
-use dis_plane::{
+use http::Uri;
+use hyper::Client;
+use plane_core::{
     logging::LogError,
     messages::agent::{DroneConnectRequest, DroneStatusMessage, SpawnRequest, TerminationRequest},
     nats::TypedNats,
@@ -9,8 +11,6 @@ use dis_plane::{
     types::{ClusterName, DroneId},
     NeverResult,
 };
-use http::Uri;
-use hyper::Client;
 use std::{net::IpAddr, time::Duration};
 
 mod backend;

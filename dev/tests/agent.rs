@@ -1,12 +1,6 @@
 use anyhow::{anyhow, Result};
-use dev::{
-    resources::nats::Nats,
-    resources::server::Server,
-    scratch_dir,
-    timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{base_spawn_request, random_loopback_ip},
-};
-use dis_plane::{
+use integration_test::integration_test;
+use plane_core::{
     messages::{
         agent::{
             BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
@@ -18,9 +12,15 @@ use dis_plane::{
     types::{BackendId, ClusterName, DroneId},
     NeverResult,
 };
-use dis_plane_drone::config::DockerConfig;
-use dis_plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
-use integration_test::integration_test;
+use plane_dev::{
+    resources::nats::Nats,
+    resources::server::Server,
+    scratch_dir,
+    timeout::{expect_to_stay_alive, timeout, LivenessGuard},
+    util::{base_spawn_request, random_loopback_ip},
+};
+use plane_drone::config::DockerConfig;
+use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use tokio::time::{sleep, Instant};
@@ -48,7 +48,7 @@ impl Agent {
             docker_options: DockerConfig::default(),
         };
 
-        let agent_guard = expect_to_stay_alive(dis_plane_drone::agent::run_agent(agent_opts));
+        let agent_guard = expect_to_stay_alive(plane_drone::agent::run_agent(agent_opts));
 
         Ok(Agent {
             agent_guard,

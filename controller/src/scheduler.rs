@@ -1,6 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
-use dis_plane::{
+use plane_core::{
     messages::agent::DroneStatusMessage,
     types::{ClusterName, DroneId},
 };

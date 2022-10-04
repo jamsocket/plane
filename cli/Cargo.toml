@@ -1,10 +1,10 @@
 [package]
-name = "dis-plane-cli"
+name = "plane-cli"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-dis-plane = {path = "../core"}
+plane-core = {path = "../core"}
 clap = { version = "4.0.4", features = ["derive"] }
 anyhow = "1.0.65"
 tokio = { version = "1.21.2", features = ["macros", "rt", "rt-multi-thread"] }

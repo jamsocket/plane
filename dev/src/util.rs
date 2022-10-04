@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
-use dis_plane::messages::agent::SpawnRequest;
-use dis_plane::messages::scheduler::ScheduleRequest;
-use dis_plane::types::BackendId;
-use dis_plane::types::ClusterName;
-use dis_plane::types::DroneId;
+use plane_core::messages::agent::SpawnRequest;
+use plane_core::messages::scheduler::ScheduleRequest;
+use plane_core::types::BackendId;
+use plane_core::types::ClusterName;
+use plane_core::types::DroneId;
 use rand::distributions::Alphanumeric;
 use rand::thread_rng;
 use rand::Rng;

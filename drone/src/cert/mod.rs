@@ -5,13 +5,13 @@ use acme2_eab::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use dis_plane::{
-    messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName, NeverResult,
-};
 use openssl::{
     asn1::Asn1Time,
     pkey::{PKey, Private},
     x509::X509,
+};
+use plane_core::{
+    messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName, NeverResult,
 };
 use reqwest::Client;
 use std::io::Write;

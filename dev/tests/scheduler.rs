@@ -1,10 +1,7 @@
 use anyhow::Result;
-use dev::{
-    resources::nats::Nats,
-    timeout::{expect_to_stay_alive, timeout},
-    util::base_scheduler_request,
-};
-use dis_plane::{
+use integration_test::integration_test;
+use plane_controller::run_scheduler;
+use plane_core::{
     messages::{
         agent::{DroneStatusMessage, SpawnRequest},
         scheduler::ScheduleResponse,
@@ -12,8 +9,11 @@ use dis_plane::{
     nats::TypedNats,
     types::{ClusterName, DroneId},
 };
-use dis_plane_controller::run_scheduler;
-use integration_test::integration_test;
+use plane_dev::{
+    resources::nats::Nats,
+    timeout::{expect_to_stay_alive, timeout},
+    util::base_scheduler_request,
+};
 use std::time::Duration;
 use tokio::time::sleep;
 

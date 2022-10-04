@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_nats::jetstream::consumer::DeliverPolicy;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use dis_plane::{
+use plane_core::{
     messages::{agent::DroneStatusMessage, dns::SetDnsRecord, scheduler::ScheduleRequest},
     nats_connection::NatsConnectionSpec,
     types::ClusterName,

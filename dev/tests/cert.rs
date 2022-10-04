@@ -1,15 +1,13 @@
 use anyhow::Result;
-use dev::{
+use integration_test::integration_test;
+use openssl::x509::X509;
+use plane_core::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName};
+use plane_dev::{
     resources::{nats::Nats, pebble::Pebble},
     scratch_dir,
     timeout::{spawn_timeout, timeout},
 };
-use dis_plane::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName};
-use dis_plane_drone::{
-    cert::acme::AcmeEabConfiguration, cert::CertOptions, keys::KeyCertPathPair,
-};
-use integration_test::integration_test;
-use openssl::x509::X509;
+use plane_drone::{cert::acme::AcmeEabConfiguration, cert::CertOptions, keys::KeyCertPathPair};
 use tokio::task::JoinHandle;
 
 fn collect_alt_names(cert: &X509) -> Vec<String> {
@@ -54,7 +52,7 @@ async fn cert_refresh() -> Result<()> {
     let (_, certs) = timeout(
         60_000,
         "Getting certificate",
-        dis_plane_drone::cert::get_certificate(
+        plane_drone::cert::get_certificate(
             "plane.test",
             &conn,
             &pebble.directory_url(),
@@ -90,7 +88,7 @@ async fn cert_refresh_full() -> Result<()> {
     let () = timeout(
         60_000,
         "Getting certificate",
-        dis_plane_drone::cert::refresh_certificate(
+        plane_drone::cert::refresh_certificate(
             &CertOptions {
                 cluster_domain: "plane.test".into(),
                 nats: nats.connection().await?,
@@ -124,7 +122,7 @@ async fn cert_refresh_eab() -> Result<()> {
     let (_, certs) = timeout(
         60_000,
         "Getting certificate",
-        dis_plane_drone::cert::get_certificate(
+        plane_drone::cert::get_certificate(
             "plane.test",
             &conn,
             &pebble.directory_url(),

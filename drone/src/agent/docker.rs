@@ -11,7 +11,7 @@ use bollard::{
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
-use dis_plane::messages::agent::ResourceLimits;
+use plane_core::messages::agent::ResourceLimits;
 use std::{collections::HashMap, net::IpAddr, time::Duration};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 

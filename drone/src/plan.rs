@@ -2,7 +2,7 @@ use super::{agent::AgentOptions, cert::CertOptions, proxy::ProxyOptions};
 use crate::config::DroneConfig;
 use crate::database::DroneDatabase;
 use anyhow::Result;
-use dis_plane::{
+use plane_core::{
     nats::TypedNats,
     types::{ClusterName, DroneId},
 };

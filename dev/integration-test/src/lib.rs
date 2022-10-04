@@ -17,7 +17,7 @@ fn integration_test_impl(item: proc_macro2::TokenStream) -> proc_macro2::TokenSt
     quote! {
         #[test]
         #sig {
-            dev::run_test(#name, async move {
+            plane_dev::run_test(#name, async move {
                 #block
             })
         }
