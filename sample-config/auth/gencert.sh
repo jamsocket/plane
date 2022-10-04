@@ -9,7 +9,7 @@ openssl req \
     -out ca-cert.pem \
     -sha256 \
     -days 3650 \
-    -subj "/C=US/ST=NY/L=New York/O=Spawner/OU=Org/CN=spawner.test"
+    -subj "/C=US/ST=NY/L=New York/O=Plane/OU=Org/CN=plane.test"
 
 # Create a certificate signing request.
 openssl req \
@@ -18,9 +18,9 @@ openssl req \
     -newkey rsa:4096 \
     -keyout site-key.pem \
     -out site-cert.csr \
-    -subj "/C=US/ST=NY/L=New York/O=Spawner/OU=Org/CN=spawner.test"
+    -subj "/C=US/ST=NY/L=New York/O=Plane/OU=Org/CN=plane.test"
 
-echo "subjectAltName = DNS:*.spawner.test" > extfile
+echo "subjectAltName = DNS:*.plane.test" > extfile
 
 # Sign the certificate.
 openssl x509 \

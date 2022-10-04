@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_nats::jetstream::consumer::DeliverPolicy;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use dis_spawner::{
+use dis_plane::{
     messages::{agent::DroneStatusMessage, dns::SetDnsRecord, scheduler::ScheduleRequest},
     nats_connection::NatsConnectionSpec,
     types::ClusterName,
@@ -14,7 +14,7 @@ struct Opts {
     #[clap(long)]
     nats: Option<String>,
 
-    #[clap(long, default_value = "spawner.test")]
+    #[clap(long, default_value = "plane.test")]
     cluster: String,
 
     #[command(subcommand)]

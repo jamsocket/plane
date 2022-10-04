@@ -610,9 +610,9 @@ dependencies = [
  "async-nats 0.19.0",
  "bollard",
  "chrono",
- "dis-spawner",
- "dis-spawner-controller",
- "dis-spawner-drone",
+ "dis-plane",
+ "dis-plane-controller",
+ "dis-plane-drone",
  "futures",
  "http",
  "hyper",
@@ -669,7 +669,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dis-spawner"
+name = "dis-plane"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -693,20 +693,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "dis-spawner-cli"
+name = "dis-plane-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-nats 0.20.0",
  "clap 4.0.4",
  "colored",
- "dis-spawner",
+ "dis-plane",
  "tokio",
  "tracing-subscriber",
 ]
 
 [[package]]
-name = "dis-spawner-controller"
+name = "dis-plane-controller"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -714,7 +714,7 @@ dependencies = [
  "chrono",
  "clap 4.0.4",
  "dashmap",
- "dis-spawner",
+ "dis-plane",
  "futures",
  "rand",
  "serde",
@@ -726,7 +726,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dis-spawner-drone"
+name = "dis-plane-drone"
 version = "0.2.0"
 dependencies = [
  "acme2-eab",
@@ -737,7 +737,7 @@ dependencies = [
  "clap 4.0.4",
  "config",
  "dashmap",
- "dis-spawner",
+ "dis-plane",
  "futures",
  "http",
  "hyper",

@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
-use dis_spawner::messages::agent::SpawnRequest;
-use dis_spawner::messages::scheduler::ScheduleRequest;
-use dis_spawner::types::BackendId;
-use dis_spawner::types::ClusterName;
-use dis_spawner::types::DroneId;
+use dis_plane::messages::agent::SpawnRequest;
+use dis_plane::messages::scheduler::ScheduleRequest;
+use dis_plane::types::BackendId;
+use dis_plane::types::ClusterName;
+use dis_plane::types::DroneId;
 use rand::distributions::Alphanumeric;
 use rand::thread_rng;
 use rand::Rng;
@@ -118,7 +118,7 @@ pub fn base_spawn_request() -> SpawnRequest {
 
 pub fn base_scheduler_request() -> ScheduleRequest {
     ScheduleRequest {
-        cluster: ClusterName::new("spawner.test"),
+        cluster: ClusterName::new("plane.test"),
         image: TEST_IMAGE.into(),
         backend_id: None,
         max_idle_secs: Duration::from_secs(10),

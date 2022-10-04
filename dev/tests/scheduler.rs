@@ -4,7 +4,7 @@ use dev::{
     timeout::{expect_to_stay_alive, timeout},
     util::base_scheduler_request,
 };
-use dis_spawner::{
+use dis_plane::{
     messages::{
         agent::{DroneStatusMessage, SpawnRequest},
         scheduler::ScheduleResponse,
@@ -12,7 +12,7 @@ use dis_spawner::{
     nats::TypedNats,
     types::{ClusterName, DroneId},
 };
-use dis_spawner_controller::run_scheduler;
+use dis_plane_controller::run_scheduler;
 use integration_test::integration_test;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -100,7 +100,7 @@ async fn one_drone_available() -> Result<()> {
     nats_conn
         .publish(&DroneStatusMessage {
             capacity: 100,
-            cluster: ClusterName::new("spawner.test"),
+            cluster: ClusterName::new("plane.test"),
             drone_id: drone_id.clone(),
         })
         .await?;

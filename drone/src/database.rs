@@ -9,7 +9,7 @@
 //! you change a query in this file, you will likely need to
 //! run `generate-sqlx-data.mjs` to get Rust to accept it.
 use chrono::{DateTime, TimeZone, Utc};
-use dis_spawner::{
+use dis_plane::{
     messages::agent::{BackendState, SpawnRequest},
     types::BackendId,
 };

@@ -6,9 +6,9 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Spawner Docs',
+  title: 'Plane Docs',
   tagline: 'Session backend orchestrator for ambitious browser-based apps.',
-  url: 'https://docs.spawner.dev',
+  url: 'https://docs.plane.dev',
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -17,7 +17,7 @@ const config = {
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: 'drifting-in-space', // Usually your GitHub org/user name.
-  projectName: 'spawner', // Usually your repo name.
+  projectName: 'plane', // Usually your repo name.
 
   // Even if you don't use internalization, you can use this field to set useful
   // metadata like html lang. For example, if your site is Chinese, you may want
@@ -50,9 +50,9 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: 'Spawner',
+        title: 'Plane',
         logo: {
-          alt: 'Spawner Logo',
+          alt: 'Plane Logo',
           src: 'img/logo.svg',
         },
         // items: [
@@ -63,7 +63,7 @@ const config = {
         //     label: 'Tutorial',
         //   },
         //   {
-        //     href: 'https://github.com/drifting-in-space/spawner',
+        //     href: 'https://github.com/drifting-in-space/plane',
         //     label: 'GitHub',
         //     position: 'right',
         //   },
@@ -94,7 +94,7 @@ const config = {
               },
               {
                 label: 'GitHub',
-                href: 'https://github.com/drifting-in-space/spawner',
+                href: 'https://github.com/drifting-in-space/plane',
               },
             ],
           },

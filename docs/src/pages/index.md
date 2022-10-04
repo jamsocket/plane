@@ -1,4 +1,4 @@
-# Spawner
+# Plane
 
-Spawner is a container orchestrator for session backends.
+Plane is a container orchestrator for session backends.
 

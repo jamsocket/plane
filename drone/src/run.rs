@@ -6,12 +6,12 @@ use crate::{
     proxy::serve,
 };
 use anyhow::{anyhow, Result};
-use dis_spawner::cli::init_cli;
-use dis_spawner::logging::TracingHandle;
-use dis_spawner::messages::logging::Component;
-use dis_spawner::retry::do_with_retry;
-use dis_spawner::types::DroneId;
-use dis_spawner::NeverResult;
+use dis_plane::cli::init_cli;
+use dis_plane::logging::TracingHandle;
+use dis_plane::messages::logging::Component;
+use dis_plane::retry::do_with_retry;
+use dis_plane::types::DroneId;
+use dis_plane::NeverResult;
 use futures::future::try_join_all;
 use futures::Future;
 use signal_hook::{

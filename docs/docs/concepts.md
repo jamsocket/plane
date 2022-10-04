@@ -2,7 +2,7 @@
 
 ## Session Backends
 
-Spawner is an orchestrator for **session backends**. You can think of session backends as ephemeral
+Plane is an orchestrator for **session backends**. You can think of session backends as ephemeral
 processes (specifically, instances of a Docker container).
 
 The term “backend” refers to the fact that you can connect to these containers from a frontend, i.e.
@@ -13,17 +13,17 @@ the backend is terminated.
 ## Clusters
 
 Clusters refer to pools of servers that are capable of running backends. Each cluster is uniquely
-referred to by a hostname (e.g. `spawner.dev`). Every backend that belongs to a cluster is given
-a unique subdomain under that cluster’s hostname (e.g. `302d996a-6b3a-433b-a1ad-c0ad47ba1575.spawner.dev`).
+referred to by a hostname (e.g. `plane.dev`). Every backend that belongs to a cluster is given
+a unique subdomain under that cluster’s hostname (e.g. `302d996a-6b3a-433b-a1ad-c0ad47ba1575.plane.dev`).
 
-Spawner is capable of supporting multiple clusters at once, but servers that run backends (**drones**,
+Plane is capable of supporting multiple clusters at once, but servers that run backends (**drones**,
 see below) are only capable of belonging to one cluster at a time.
 
 ## Controller and Drone
 
-Functionally, Spawner is divided into two parts: the **controller**, and the **drone**.
+Functionally, Plane is divided into two parts: the **controller**, and the **drone**.
 
-The drones are the workers that run the actual backends. The Spawner drone codebase runs on each
+The drones are the workers that run the actual backends. The Plane drone codebase runs on each
 drone machine and is responsible for coordinating with a local Docker instance to run backends, as
 well as dispatching inbound traffic to the appropriate container.
 

@@ -1,5 +1,5 @@
 [package]
-name = "dis-spawner-controller"
+name = "dis-plane-controller"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,7 +9,7 @@ async-trait = "0.1.57"
 chrono = "0.4.22"
 clap = { version = "4.0.4", features = ["derive"] }
 dashmap = "5.3.4"
-dis-spawner = {path = "../core"}
+dis-plane = {path = "../core"}
 futures = "0.3.24"
 rand = "0.8.5"
 serde = { version = "1.0.144", features = ["derive"] }
@@ -20,5 +20,5 @@ tracing = "0.1.36"
 trust-dns-server = "0.22.0"
 
 [[bin]]
-name = "spawner-controller"
+name = "plane-controller"
 path = "src/main.rs"

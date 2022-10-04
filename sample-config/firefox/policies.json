@@ -3,7 +3,7 @@
         "ImportEnterpriseRoots": true,
         "Certificates": {
             "Install": [
-                "spawner.crt"
+                "plane.crt"
             ]
        }
     }

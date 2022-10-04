@@ -2,12 +2,12 @@
 
 set -e
 
-# Obtain the IP of the controller, which serves DNS for the Spawner cluster.
+# Obtain the IP of the controller, which serves DNS for the Plane cluster.
 DNS_IP=$(dig +short controller)
 echo "Controller IP: ${DNS_IP}"
 
 # Write the IP to the dnsmasq config file.
-echo "server=/spawner.test/${DNS_IP}" >> /etc/dnsmasq.conf
+echo "server=/plane.test/${DNS_IP}" >> /etc/dnsmasq.conf
 
 # Prepend localhost DNS server (powered by dnsmasq) to resolv.conf.
 echo "nameserver 127.0.0.1" > /tmp/resolv.conf

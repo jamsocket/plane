@@ -11,7 +11,7 @@ use bollard::{
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
-use dis_spawner::messages::agent::ResourceLimits;
+use dis_plane::messages::agent::ResourceLimits;
 use std::{collections::HashMap, net::IpAddr, time::Duration};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
@@ -344,8 +344,8 @@ impl DockerInterface {
                 exposed_ports: make_exposed_ports(CONTAINER_PORT),
                 labels: Some(
                     vec![
-                        ("dev.spawner.managed".to_string(), "true".to_string()),
-                        ("dev.spawner.backend".to_string(), name.to_string()),
+                        ("dev.plane.managed".to_string(), "true".to_string()),
+                        ("dev.plane.backend".to_string(), name.to_string()),
                     ]
                     .into_iter()
                     .collect(),

@@ -6,10 +6,10 @@ use crate::ttl_store::ttl_map::TtlMap;
 use crate::ttl_store::ttl_multistore::TtlMultistore;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
-use dis_spawner::messages::dns::SetDnsRecord;
-use dis_spawner::types::ClusterName;
-use dis_spawner::Never;
-use dis_spawner::{messages::dns::DnsRecordType, nats::TypedNats};
+use dis_plane::messages::dns::SetDnsRecord;
+use dis_plane::types::ClusterName;
+use dis_plane::Never;
+use dis_plane::{messages::dns::DnsRecordType, nats::TypedNats};
 use error::Result;
 use std::net::Ipv4Addr;
 use std::sync::{Arc, Mutex};
@@ -187,9 +187,9 @@ impl ClusterDnsServer {
             // RecordType::SOA => {
             //     let name = request.query().name();
             //     let rdata = RData::SOA(SOA::new(
-            //         Name::from_ascii(&self.spawner.nameserver)
+            //         Name::from_ascii(&self.plane.nameserver)
             //             .or_dns_error(ResponseCode::ServFail, || {
-            //                 format!("Failed to encode nameserver {}.", self.spawner.nameserver)
+            //                 format!("Failed to encode nameserver {}.", self.plane.nameserver)
             //             })?,
             //         Name::from_ascii("paul.driftingin.space")
             //             .or_dns_error(ResponseCode::ServFail, || {

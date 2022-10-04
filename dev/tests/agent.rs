@@ -6,7 +6,7 @@ use dev::{
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
     util::{base_spawn_request, random_loopback_ip},
 };
-use dis_spawner::{
+use dis_plane::{
     messages::{
         agent::{
             BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
@@ -18,14 +18,14 @@ use dis_spawner::{
     types::{BackendId, ClusterName, DroneId},
     NeverResult,
 };
-use dis_spawner_drone::config::DockerConfig;
-use dis_spawner_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
+use dis_plane_drone::config::DockerConfig;
+use dis_plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
 use integration_test::integration_test;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use tokio::time::{sleep, Instant};
 
-const CLUSTER_DOMAIN: &str = "spawner.test";
+const CLUSTER_DOMAIN: &str = "plane.test";
 
 struct Agent {
     #[allow(unused)]
@@ -48,7 +48,7 @@ impl Agent {
             docker_options: DockerConfig::default(),
         };
 
-        let agent_guard = expect_to_stay_alive(dis_spawner_drone::agent::run_agent(agent_opts));
+        let agent_guard = expect_to_stay_alive(dis_plane_drone::agent::run_agent(agent_opts));
 
         Ok(Agent {
             agent_guard,
@@ -235,13 +235,13 @@ async fn drone_sends_status_messages() -> Result<()> {
         .await?;
 
     controller_mock
-        .expect_status_message(&drone_id, &ClusterName::new("spawner.test"))
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"))
         .await?;
     controller_mock
-        .expect_status_message(&drone_id, &ClusterName::new("spawner.test"))
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"))
         .await?;
     controller_mock
-        .expect_status_message(&drone_id, &ClusterName::new("spawner.test"))
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"))
         .await?;
 
     Ok(())
@@ -259,7 +259,7 @@ async fn spawn_with_agent() -> Result<()> {
         .await?;
 
     controller_mock
-        .expect_status_message(&drone_id, &ClusterName::new("spawner.test"))
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"))
         .await?;
 
     let mut request = base_spawn_request();
@@ -282,7 +282,7 @@ async fn spawn_with_agent() -> Result<()> {
     let dns_record = controller_mock.next_dns_record().await?;
     assert_eq!(
         SetDnsRecord {
-            cluster: ClusterName::new("spawner.test"),
+            cluster: ClusterName::new("plane.test"),
             kind: DnsRecordType::A,
             name: request.backend_id.to_string(),
             value: agent.ip.to_string(),
@@ -316,7 +316,7 @@ async fn stats_are_acquired() -> Result<()> {
         .expect_handshake(&drone_id, agent.ip)
         .await?;
     controller_mock
-        .expect_status_message(&drone_id, &ClusterName::new("spawner.test"))
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"))
         .await?;
 
     let mut request = base_spawn_request();
@@ -376,7 +376,7 @@ async fn handle_error_during_start() -> Result<()> {
         .await?;
 
     controller_mock
-        .expect_status_message(&drone_id, &ClusterName::new("spawner.test"))
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"))
         .await?;
 
     let mut request = base_spawn_request();
@@ -414,7 +414,7 @@ async fn handle_failure_after_ready() -> Result<()> {
         .await?;
 
     controller_mock
-        .expect_status_message(&drone_id, &ClusterName::new("spawner.test"))
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"))
         .await?;
 
     let mut request = base_spawn_request();
@@ -457,7 +457,7 @@ async fn handle_successful_termination() -> Result<()> {
         .await?;
 
     controller_mock
-        .expect_status_message(&drone_id, &ClusterName::new("spawner.test"))
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"))
         .await?;
 
     let mut request = base_spawn_request();
@@ -502,7 +502,7 @@ async fn handle_agent_restart() -> Result<()> {
             .await?;
 
         controller_mock
-            .expect_status_message(&drone_id, &ClusterName::new("spawner.test"))
+            .expect_status_message(&drone_id, &ClusterName::new("plane.test"))
             .await?;
 
         let mut request = base_spawn_request();
@@ -550,7 +550,7 @@ async fn handle_termination_request() -> Result<()> {
         .expect_handshake(&drone_id, agent.ip)
         .await?;
     controller_mock
-        .expect_status_message(&request.drone_id, &ClusterName::new("spawner.test"))
+        .expect_status_message(&request.drone_id, &ClusterName::new("plane.test"))
         .await?;
 
     request.max_idle_secs = Duration::from_secs(1000);

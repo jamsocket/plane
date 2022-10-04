@@ -8,9 +8,9 @@ anyhow = "1.0.62"
 async-nats = "0.19.0"
 bollard = "0.13.0"
 chrono = "0.4.22"
-dis-spawner = {path = "../core"}
-dis-spawner-drone = {path = "../drone"}
-dis-spawner-controller = {path = "../controller"}
+dis-plane = {path = "../core"}
+dis-plane-drone = {path = "../drone"}
+dis-plane-controller = {path = "../controller"}
 futures = "0.3.24"
 http = "0.2.8"
 hyper = "0.14.20"

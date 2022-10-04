@@ -1,5 +1,5 @@
 use crate::{cert::acme::AcmeConfiguration, ip::IpSource, keys::KeyCertPathPair};
-use dis_spawner::{nats_connection::NatsConnectionSpec, types::DroneId};
+use dis_plane::{nats_connection::NatsConnectionSpec, types::DroneId};
 use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, Ipv4Addr},

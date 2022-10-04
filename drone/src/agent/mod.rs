@@ -1,7 +1,7 @@
 use self::{docker::DockerInterface, executor::Executor};
 use crate::{config::DockerConfig, database::DroneDatabase, ip::IpSource};
 use anyhow::{anyhow, Result};
-use dis_spawner::{
+use dis_plane::{
     logging::LogError,
     messages::agent::{DroneConnectRequest, DroneStatusMessage, SpawnRequest, TerminationRequest},
     nats::TypedNats,

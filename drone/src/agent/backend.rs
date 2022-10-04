@@ -2,7 +2,7 @@ use std::{net::IpAddr, time::Duration};
 
 use super::docker::DockerInterface;
 use anyhow::{anyhow, Result};
-use dis_spawner::{
+use dis_plane::{
     messages::{
         agent::{BackendStatsMessage, DroneLogMessage},
         dns::{DnsRecordType, SetDnsRecord},

@@ -5,7 +5,7 @@ use acme2_eab::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use dis_spawner::{
+use dis_plane::{
     messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName, NeverResult,
 };
 use openssl::{
