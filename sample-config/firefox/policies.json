@@ -1,0 +1,10 @@
+{
+    "policies": {
+        "ImportEnterpriseRoots": true,
+        "Certificates": {
+            "Install": [
+                "spawner.crt"
+            ]
+       }
+    }
+}

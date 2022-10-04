@@ -1,10 +1,13 @@
-use crate::config::ControllerConfig;
+use crate::config::{ControllerConfig, DnsOptions};
 use anyhow::Result;
 use dis_spawner::nats::TypedNats;
 
 pub struct SchedulerPlan;
 
-pub struct DnsPlan;
+pub struct DnsPlan {
+    pub options: DnsOptions,
+    pub nc: TypedNats,
+}
 
 pub struct ControllerPlan {
     pub nats: TypedNats,
@@ -17,7 +20,10 @@ impl ControllerPlan {
         let nats = config.nats.connect_with_retry().await?;
 
         let scheduler_plan = config.scheduler.map(|_| SchedulerPlan);
-        let dns_plan = config.dns.map(|_| DnsPlan);
+        let dns_plan = config.dns.map(|options| DnsPlan {
+            options: options,
+            nc: nats.clone(),
+        });
 
         Ok(ControllerPlan {
             nats,

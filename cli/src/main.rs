@@ -3,7 +3,7 @@ use async_nats::jetstream::consumer::DeliverPolicy;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use dis_spawner::{
-    messages::{agent::DroneStatusMessage, scheduler::ScheduleRequest},
+    messages::{agent::DroneStatusMessage, dns::SetDnsRecord, scheduler::ScheduleRequest},
     nats_connection::NatsConnectionSpec,
     types::ClusterName,
 };
@@ -24,6 +24,7 @@ struct Opts {
 #[derive(Subcommand)]
 enum Command {
     ListDrones,
+    ListDns,
     Spawn { image: String },
 }
 
@@ -69,6 +70,26 @@ async fn main() -> Result<()> {
                 .await?;
 
             println!("Spawn result: {:?}", result);
+        }
+        Command::ListDns => {
+            let results = nats
+                .get_all(
+                    &SetDnsRecord::subscribe_subject(),
+                    DeliverPolicy::LastPerSubject,
+                )
+                .await?;
+
+            println!("Found {} DNS records:", results.len());
+
+            for result in results {
+                println!(
+                    "{}.{}\t{}\t{}",
+                    result.name.to_string().bright_magenta(),
+                    result.cluster.to_string().bright_blue(),
+                    result.kind.to_string().bright_cyan(),
+                    result.value.to_string().bold()
+                );
+            }
         }
     }
 

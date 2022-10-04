@@ -5,3 +5,5 @@ hosts = ["nats"]
 # auth = { token = "my-secret-token" }
 
 [scheduler]
+
+[dns]

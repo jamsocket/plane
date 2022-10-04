@@ -13,6 +13,7 @@ use http::Uri;
 use hyper::Client;
 use std::{net::IpAddr, time::Duration};
 
+mod backend;
 mod docker;
 mod executor;
 
@@ -120,7 +121,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
     tracing::info!("Connecting to sqlite.");
     let db = agent_opts.db;
     let cluster = agent_opts.cluster_domain.clone();
-    let ip = agent_opts.ip.get_ip().await?;
+    let ip = do_with_retry(|| agent_opts.ip.get_ip(), 10, Duration::from_secs(10)).await?;
 
     let request = DroneConnectRequest {
         drone_id: agent_opts.drone_id.clone(),
@@ -130,7 +131,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     nats.publish(&request).await?;
 
-    let executor = Executor::new(docker, db, nats.clone());
+    let executor = Executor::new(docker, db, nats.clone(), ip, cluster.clone());
     tokio::select!(
         result = ready_loop(nats.clone(), &agent_opts.drone_id, cluster.clone()) => result,
         result = listen_for_spawn_requests(&agent_opts.drone_id, executor.clone(), nats.clone()) => result,

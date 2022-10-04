@@ -26,6 +26,7 @@ const DEFAULT_DOCKER_STATS_INTERVAL_SECONDS: u64 = 10;
 pub struct DockerInterface {
     docker: Docker,
     runtime: Option<String>,
+    network: Option<String>,
 }
 
 /// Helper trait for swallowing Docker not found errors.
@@ -157,6 +158,7 @@ impl DockerInterface {
         Ok(DockerInterface {
             docker,
             runtime: config.runtime.clone(),
+            network: config.network.clone(),
         })
     }
 
@@ -284,16 +286,40 @@ impl DockerInterface {
         Ok((running, exit_code))
     }
 
-    pub async fn get_ip(&self, container_name: &str) -> Option<IpAddr> {
-        let inspect = self
-            .docker
-            .inspect_container(container_name, None)
-            .await
-            .ok()?;
+    pub async fn get_ip(&self, container_name: &str) -> Result<IpAddr> {
+        let inspect = self.docker.inspect_container(container_name, None).await?;
 
-        let port = inspect.network_settings?.ip_address?;
+        let network_settings = inspect
+            .network_settings
+            .ok_or_else(|| anyhow!("Inspect did not return network settings."))?;
 
-        port.parse().ok()
+        if let Some(ip_addr) = network_settings.ip_address {
+            if !ip_addr.is_empty() {
+                return Ok(ip_addr.parse()?);
+            }
+        }
+
+        let networks = network_settings
+            .networks
+            .ok_or_else(|| anyhow!("Inspect did not return an IP or networks."))?;
+        if networks.len() != 1 {
+            return Err(anyhow!(
+                "Expected exactly one network, got {}",
+                networks.len()
+            ));
+        }
+
+        let network = networks
+            .values()
+            .into_iter()
+            .next()
+            .expect("next() should never fail after length check.");
+        let ip = network
+            .ip_address
+            .as_ref()
+            .ok_or_else(|| anyhow!("One network found, but did not have IP address."))?;
+
+        Ok(ip.parse()?)
     }
 
     /// Run the specified image and return the name of the created container.
@@ -336,6 +362,7 @@ impl DockerInterface {
                         .into_iter()
                         .collect(),
                     ),
+                    network_mode: self.network.clone(),
                     runtime: self.runtime.clone(),
                     cpu_period: resource_limits
                         .cpu_period

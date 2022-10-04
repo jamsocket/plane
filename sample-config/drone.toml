@@ -46,19 +46,16 @@ hosts = ["nats"]
 # advertising its availability to the controller and spawning new
 # backends.
 [agent]
-# This is the public IP that the drone is running on. When backends
-# are scheduled to this drone, their DNS will resolve to this IP.
-ip = "127.0.0.1"
-
 # Instead of a static IP, you can pass a URL of an API server which
 # is expected to return the public IP address of the requestor in
 # plaintext.
-# ip = { api = "https://api.ipify.org/" }
+ip = { api = "http://ip-api:8080/" }
 
 # Optional Docker settings for the agent.
 [agent.docker]
 # The runtime to use (defaults to "runc")
 runtime = "runc"
+network = "spawner_default"
 
 # The method of connecting to Docker. {socket=""} and {http=""} are
 # supported.
@@ -67,8 +64,9 @@ connection = { socket = "/var/run/docker.sock" }
 # Proxy configuration. If this section is present, the proxy is
 # served.
 [proxy]
-# Port to listen for HTTPS requests on.
-https_port = 4040
-
 # IP to listen for connections on.
 bind_ip = "0.0.0.0"
+
+[cert]
+key_path = "/etc/spawner/auth/site-key.pem"
+cert_path = "/etc/spawner/auth/site-cert.pem"
