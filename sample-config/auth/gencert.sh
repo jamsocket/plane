@@ -33,9 +33,6 @@ openssl x509 \
     -out site-cert.pem \
     -extfile extfile
 
-# cat ca-cert.pem site-cert.pem > site-cert-tmp.pem
-# mv site-cert-tmp.pem site-cert.pem
-
 # Clean up
 rm \
     extfile \

@@ -2,23 +2,25 @@ mod error;
 
 use self::error::OrDnsError;
 use crate::plan::DnsPlan;
+use crate::ttl_store::ttl_map::TtlMap;
+use crate::ttl_store::ttl_multistore::TtlMultistore;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
-use dashmap::DashMap;
+use chrono::{Duration, Utc};
 use dis_spawner::messages::dns::SetDnsRecord;
 use dis_spawner::types::ClusterName;
 use dis_spawner::Never;
 use dis_spawner::{messages::dns::DnsRecordType, nats::TypedNats};
 use error::Result;
 use std::net::Ipv4Addr;
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 use tokio::{
     self,
     net::{TcpListener, UdpSocket},
 };
 use trust_dns_server::client::rr::rdata::TXT;
+use trust_dns_server::client::rr::Name;
 use trust_dns_server::{
     authority::MessageResponseBuilder,
     client::{
@@ -30,18 +32,29 @@ use trust_dns_server::{
     ServerFuture,
 };
 
+#[derive(PartialEq, Eq, Hash, Clone)]
+struct RecordKey {
+    cluster: ClusterName,
+    name: String,
+}
+
 struct ClusterDnsServer {
-    name_map: Arc<DashMap<(ClusterName, String, DnsRecordType), RData>>,
+    a_record_map: Arc<Mutex<TtlMap<RecordKey, RData>>>,
+    txt_record_map: Arc<Mutex<TtlMultistore<RecordKey, RData>>>,
     _handle: JoinHandle<anyhow::Result<()>>,
 }
 
 impl ClusterDnsServer {
     pub async fn new(nc: &TypedNats) -> Self {
         let nc = nc.clone();
-        let name_map: Arc<DashMap<(ClusterName, String, DnsRecordType), RData>> = Arc::default();
+        let a_record_map: Arc<Mutex<TtlMap<RecordKey, RData>>> =
+            Arc::new(Mutex::new(TtlMap::new(Duration::seconds(60))));
+        let txt_record_map: Arc<Mutex<TtlMultistore<RecordKey, RData>>> =
+            Arc::new(Mutex::new(TtlMultistore::new(Duration::seconds(60))));
 
         let handle = {
-            let name_map = name_map.clone();
+            let a_record_map = a_record_map.clone();
+            let txt_record_map = txt_record_map.clone();
 
             tokio::spawn(async move {
                 let mut stream = nc
@@ -51,7 +64,6 @@ impl ClusterDnsServer {
                 while let Some(v) = stream.next().await? {
                     match v.kind {
                         DnsRecordType::A => {
-                            let key = (v.cluster.clone(), v.name.clone(), DnsRecordType::A);
                             let ip: Ipv4Addr = match v.value.parse() {
                                 Ok(v) => v,
                                 Err(error) => {
@@ -64,12 +76,31 @@ impl ClusterDnsServer {
                                 }
                             };
                             let value = RData::A(ip);
-                            name_map.insert(key, value);
+                            a_record_map
+                                .lock()
+                                .expect("a_record_map was poisoned")
+                                .insert(
+                                    RecordKey {
+                                        cluster: v.cluster.clone(),
+                                        name: v.name.clone(),
+                                    },
+                                    value,
+                                    Utc::now(),
+                                )
                         }
                         DnsRecordType::TXT => {
-                            let key = (v.cluster.clone(), v.name.clone(), DnsRecordType::TXT);
                             let value = RData::TXT(TXT::new(vec![v.value]));
-                            name_map.insert(key, value);
+                            txt_record_map
+                                .lock()
+                                .expect("txt_record_map was poisoned")
+                                .insert(
+                                    RecordKey {
+                                        cluster: v.cluster.clone(),
+                                        name: v.name.clone(),
+                                    },
+                                    value,
+                                    Utc::now(),
+                                );
                         }
                     }
                 }
@@ -79,7 +110,8 @@ impl ClusterDnsServer {
         };
 
         ClusterDnsServer {
-            name_map,
+            a_record_map,
+            txt_record_map,
             _handle: handle,
         }
     }
@@ -101,15 +133,25 @@ impl ClusterDnsServer {
             RecordType::TXT => {
                 let mut responses = Vec::new();
 
-                if let Some(v) =
-                    self.name_map
-                        .get(&(cluster_name, hostname.into(), DnsRecordType::TXT))
+                if let Some(v) = self
+                    .txt_record_map
+                    .lock()
+                    .expect("txt_record_map was poisoned")
+                    .iter(
+                        &RecordKey {
+                            cluster: cluster_name,
+                            name: hostname.into(),
+                        },
+                        Utc::now(),
+                    )
                 {
-                    let name = request.query().name().clone();
-                    let rdata = v.value().clone();
+                    let name: Name = request.query().name().clone().into();
                     let ttl = 60;
-                    let record = Record::from_rdata(name.into(), ttl, rdata);
-                    responses.push(record);
+
+                    for rdata in v {
+                        let record = Record::from_rdata(name.clone(), ttl, rdata.clone());
+                        responses.push(record);
+                    }
                 }
 
                 Ok(responses)
@@ -117,12 +159,20 @@ impl ClusterDnsServer {
             RecordType::A => {
                 let mut responses = Vec::new();
 
-                if let Some(v) =
-                    self.name_map
-                        .get(&(cluster_name, hostname.into(), DnsRecordType::A))
+                if let Some(v) = self
+                    .a_record_map
+                    .lock()
+                    .expect("a_record_map was poisoned")
+                    .get(
+                        &RecordKey {
+                            cluster: cluster_name,
+                            name: hostname.into(),
+                        },
+                        Utc::now(),
+                    )
                 {
                     let name = request.query().name().clone();
-                    let rdata = v.value().clone();
+                    let rdata = v.clone();
                     let ttl = 60;
                     let record = Record::from_rdata(name.into(), ttl, rdata);
                     responses.push(record);
@@ -206,7 +256,7 @@ pub async fn serve_dns(plan: DnsPlan) -> anyhow::Result<Never> {
     let listener = TcpListener::bind(ip_port_pair)
         .await
         .context("Binding TCP port for DNS server.")?;
-    fut.register_listener(listener, Duration::from_secs(10));
+    fut.register_listener(listener, std::time::Duration::from_secs(10));
 
     tracing::info!(ip=%plan.options.bind_ip, port=%plan.options.port, "Listening for DNS queries.");
 
