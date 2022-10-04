@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: drifting-in-space/spawner-drone
+  IMAGE_NAME: drifting-in-space/plane-drone
 
 jobs:
   build:

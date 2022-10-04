@@ -19,7 +19,7 @@ pub fn init_cli<C: Serialize + DeserializeOwned>() -> Result<C> {
             config_builder.add_source(config::File::new(&config_file, config::FileFormat::Toml));
     }
     config_builder = config_builder.add_source(
-        config::Environment::with_prefix("SPAWNER")
+        config::Environment::with_prefix("PLANE")
             .separator("__")
             .prefix_separator("_")
             .try_parsing(true)

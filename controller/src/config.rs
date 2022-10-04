@@ -1,4 +1,4 @@
-use dis_spawner::nats_connection::NatsConnectionSpec;
+use plane_core::nats_connection::NatsConnectionSpec;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 

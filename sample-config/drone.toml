@@ -4,9 +4,9 @@
 # The cluster domain serves as a namespace for backends. Each drone belongs
 # to exactly one cluster. The cluster_domain is the domain under which
 # backends are assigned their hostnames. For example, a backend with the id
-# "abcde" on the cluster "spawner.dev" would have the hostname
-# "abcde.spawner.dev".
-cluster_domain = "spawner.test"
+# "abcde" on the cluster "plane.dev" would have the hostname
+# "abcde.plane.dev".
+cluster_domain = "plane.test"
 
 # The drone connects to the controller over NATS, which can be configured
 # here.
@@ -33,7 +33,7 @@ hosts = ["nats"]
 # server = "https://acme-staging-v02.api.letsencrypt.org/directory"
 
 # An admin email is required to use ACME servers.
-# admin_email = "admin@spawner.dev"
+# admin_email = "admin@plane.dev"
 
 # The drone can optionally use External Account Binding. This is
 # not necessary for Let's Encrypt, but is required by other
@@ -55,7 +55,7 @@ ip = { api = "http://ip-api:8080/" }
 [agent.docker]
 # The runtime to use (defaults to "runc")
 runtime = "runc"
-network = "spawner_default"
+network = "plane_default"
 
 # The method of connecting to Docker. {socket=""} and {http=""} are
 # supported.
@@ -68,5 +68,5 @@ connection = { socket = "/var/run/docker.sock" }
 bind_ip = "0.0.0.0"
 
 [cert]
-key_path = "/etc/spawner/auth/site-key.pem"
-cert_path = "/etc/spawner/auth/site-cert.pem"
+key_path = "/etc/plane/auth/site-key.pem"
+cert_path = "/etc/plane/auth/site-cert.pem"

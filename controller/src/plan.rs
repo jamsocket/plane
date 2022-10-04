@@ -1,6 +1,6 @@
 use crate::config::{ControllerConfig, DnsOptions};
 use anyhow::Result;
-use dis_spawner::nats::TypedNats;
+use plane_core::nats::TypedNats;
 
 pub struct SchedulerPlan;
 

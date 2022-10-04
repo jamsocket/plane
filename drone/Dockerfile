@@ -4,10 +4,10 @@ WORKDIR /work
 
 COPY . .
 
-RUN cargo build --bin=spawner-drone --release
+RUN cargo build --bin=plane-drone --release
 
 FROM gcr.io/distroless/cc-debian11
 
-COPY --from=build /work/target/release/spawner-drone /bin/spawner-drone
+COPY --from=build /work/target/release/plane-drone /bin/plane-drone
 
-ENTRYPOINT ["/bin/spawner-drone"]
+ENTRYPOINT ["/bin/plane-drone"]

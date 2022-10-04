@@ -1,26 +1,26 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use chrono::Utc;
-use dev::util::base_spawn_request;
-use dev::{
+use http::StatusCode;
+use integration_test::integration_test;
+use plane_core::NeverResult;
+use plane_dev::{
     resources::certs::SelfSignedCert,
     resources::server::Server,
     scratch_dir,
     timeout::{expect_to_stay_alive, LivenessGuard},
+    util::base_spawn_request,
     util::random_loopback_ip,
 };
-use dis_spawner::NeverResult;
-use dis_spawner_drone::database::DroneDatabase;
-use dis_spawner_drone::proxy::ProxyOptions;
-use http::StatusCode;
-use integration_test::integration_test;
+use plane_drone::database::DroneDatabase;
+use plane_drone::proxy::ProxyOptions;
 use reqwest::Response;
 use reqwest::{Certificate, ClientBuilder};
 use std::net::SocketAddrV4;
 use std::{net::SocketAddr, time::Duration};
 use tokio::time::Instant;
 
-const CLUSTER: &str = "spawner.test";
+const CLUSTER: &str = "plane.test";
 
 struct Proxy {
     #[allow(unused)]
@@ -56,10 +56,7 @@ impl Proxy {
     }
 
     pub async fn new() -> Result<Proxy> {
-        let certs = SelfSignedCert::new(
-            "proxy",
-            vec!["*.spawner.test".into(), "spawner.test".into()],
-        )?;
+        let certs = SelfSignedCert::new("proxy", vec!["*.plane.test".into(), "plane.test".into()])?;
         let bind_ip = random_loopback_ip();
         let db = DroneDatabase::new(&scratch_dir("proxy").join("drone.db")).await?;
 
@@ -70,7 +67,7 @@ impl Proxy {
             key_pair: Some(certs.path_pair.clone()),
             cluster_domain: CLUSTER.into(),
         };
-        let guard = expect_to_stay_alive(dis_spawner_drone::proxy::serve(options));
+        let guard = expect_to_stay_alive(plane_drone::proxy::serve(options));
 
         let proxy = Proxy {
             guard,
@@ -84,10 +81,7 @@ impl Proxy {
     }
 
     pub fn update_cert(&mut self) -> Result<()> {
-        let certs = SelfSignedCert::new(
-            "proxy",
-            vec!["*.spawner.test".into(), "spawner.test".into()],
-        )?;
+        let certs = SelfSignedCert::new("proxy", vec!["*.plane.test".into(), "plane.test".into()])?;
         self.certs = certs;
         Ok(())
     }
@@ -216,7 +210,7 @@ async fn host_header_is_set() -> Result<()> {
         .await?;
 
     let result = proxy.http_get("foobar", "/").await?;
-    assert_eq!("foobar.spawner.test:4040", result.text().await?);
+    assert_eq!("foobar.plane.test:4040", result.text().await?);
 
     Ok(())
 }

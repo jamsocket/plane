@@ -3,9 +3,9 @@ use crate::dns::serve_dns;
 use crate::plan::ControllerPlan;
 use crate::run_scheduler;
 use anyhow::{anyhow, Result};
-use dis_spawner::messages::logging::Component;
-use dis_spawner::{cli::init_cli, logging::TracingHandle, NeverResult};
 use futures::future::try_join_all;
+use plane_core::messages::logging::Component;
+use plane_core::{cli::init_cli, logging::TracingHandle, NeverResult};
 use signal_hook::{
     consts::{SIGINT, SIGTERM},
     iterator::Signals,

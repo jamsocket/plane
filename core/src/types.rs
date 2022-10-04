@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, fmt::Display, str::FromStr};
 use uuid::Uuid;
 
-const RESOURCE_PREFIX: &str = "spawner-";
+const RESOURCE_PREFIX: &str = "plane-";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct DroneId(String);

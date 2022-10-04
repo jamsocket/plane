@@ -9,7 +9,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dashmap::DashMap;
-use dis_spawner::{
+use plane_core::{
     messages::agent::{BackendState, BackendStateMessage, SpawnRequest, TerminationRequest},
     nats::TypedNats,
     types::{BackendId, ClusterName},
