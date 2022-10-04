@@ -6,7 +6,7 @@ use std::{
 pub struct TtlList<V> {
     items: VecDeque<(SystemTime, V)>,
     ttl: Duration,
-    last_time: SystemTime,
+    last_compaction: SystemTime,
 }
 
 impl<V> TtlList<V> {
@@ -14,7 +14,7 @@ impl<V> TtlList<V> {
         TtlList {
             ttl,
             items: VecDeque::new(),
-            last_time: SystemTime::UNIX_EPOCH,
+            last_compaction: SystemTime::UNIX_EPOCH,
         }
     }
 
@@ -25,10 +25,10 @@ impl<V> TtlList<V> {
     }
 
     pub fn push(&mut self, value: V, time: SystemTime) {
-        if time < self.last_time {
+        if time < self.last_compaction {
             tracing::info!(
                 ?time,
-                last_time=?self.last_time,
+                last_compaction=?self.last_compaction,
                 "TtlStore received insertion request out of order."
             );
         }
@@ -41,11 +41,13 @@ impl<V> TtlList<V> {
     fn compact(&mut self, time: SystemTime) {
         while let Some((t, _)) = self.items.front() {
             if *t > time {
-                return;
+                break;
             }
 
             self.items.pop_front();
         }
+
+        self.last_compaction = time;
     }
 }
 

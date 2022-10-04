@@ -17,7 +17,7 @@ pub struct TtlMap<K: Hash + Eq + Clone, V> {
     ttl: Duration,
     inner_map: HashMap<K, (SystemTime, V)>,
     queue: VecDeque<(SystemTime, K)>,
-    last_time: SystemTime,
+    last_compaction: SystemTime,
 }
 
 impl<K: Hash + Eq + Clone, V> TtlMap<K, V> {
@@ -26,15 +26,15 @@ impl<K: Hash + Eq + Clone, V> TtlMap<K, V> {
             ttl,
             inner_map: HashMap::new(),
             queue: VecDeque::new(),
-            last_time: SystemTime::UNIX_EPOCH,
+            last_compaction: SystemTime::UNIX_EPOCH,
         }
     }
 
     pub fn insert(&mut self, key: K, value: V, time: SystemTime) {
-        if time < self.last_time {
+        if time < self.last_compaction {
             tracing::info!(
                 ?time,
-                last_time=?self.last_time,
+                last_compaction=?self.last_compaction,
                 "TtlStore received insertion request out of order."
             );
         }
@@ -62,17 +62,17 @@ impl<K: Hash + Eq + Clone, V> TtlMap<K, V> {
     }
 
     fn compact(&mut self, time: SystemTime) {
-        if time < self.last_time {
+        if time < self.last_compaction {
             tracing::info!(
                 ?time,
-                last_time=?self.last_time,
+                last_compaction=?self.last_compaction,
                 "TtlStore received compaction request out of order."
             );
         }
 
         while let Some((t, _)) = self.queue.front() {
             if *t >= time {
-                return;
+                break;
             }
 
             let (_, key) = self
@@ -86,6 +86,8 @@ impl<K: Hash + Eq + Clone, V> TtlMap<K, V> {
                 }
             }
         }
+
+        self.last_compaction = time;
     }
 }
 
