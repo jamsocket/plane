@@ -23,10 +23,10 @@ see below) are only capable of belonging to one cluster at a time.
 
 Functionally, Spawner is divided into two parts: the **controller**, and the **drone**.
 
-The controler is the dispatch center, responsible for accepting external requests for backends and
-deciding which drone to run them on. The controller is also responsible for routing traffic to the
-appropriate drone by serving DNS, and vouching for drones when they need to request HTTPS certificates.
-
 The drones are the workers that run the actual backends. The Spawner drone codebase runs on each
 drone machine and is responsible for coordinating with a local Docker instance to run backends, as
 well as dispatching inbound traffic to the appropriate container.
+
+The controller is the dispatch center, responsible for accepting external requests for backends and
+deciding which drone to run them on. The controller is also responsible for routing traffic to the
+appropriate drone by serving DNS, and vouching for drones when they need to request HTTPS certificates.
