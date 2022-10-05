@@ -1,0 +1,19 @@
+import Button from '@site/src/components/button';
+import GitHubButton from '@site/src/components/github-button';
+import PlaneLogo from '@site/src/components/plane-logo';
+
+<PlaneLogo />
+
+[![Plane GitHub Repo](https://img.shields.io/github/stars/drifting-in-space/plane?style=social)](https://github.com/drifting-in-space/plane)
+[![Chat on Discord](https://img.shields.io/static/v1?label=chat&message=discord&color=404eed)](https://discord.gg/N5sEpsuhh9)
+[![Tests](https://github.com/drifting-in-space/plane/actions/workflows/tests.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/unit-tests.yml)
+
+Plane is a **container orchestrator for ambitious browser-based applications**. Plane implements an architecture we call [session backends](https://driftingin.space/posts/session-lived-application-backends).
+
+**tl;dr:** Plane lets you spin up instances of any HTTP-speaking container via an API. Plane assigns a unique subdomain to each instance, through which HTTPS/WebSocket connections are proxied. When all inbound connections to a container are dropped, Plane shuts it down. Plane is MIT-licensed and written in Rust.
+
+<div style={{marginTop: 30}}>
+    <Button text="Get Started" url="/docs/getting-started" primary={true} />
+    <GitHubButton url="https://github.com/drifting-in-space/plane" text="Plane on GitHub" />
+</div>
+

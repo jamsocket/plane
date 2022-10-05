@@ -1,0 +1,37 @@
+.button {
+    align-items: center;
+    font-size: 18px;
+    padding: 13px 15px;
+    border: 1px solid #bbb;
+    color: #444;
+    background-color: #f6f6f6;
+    transition: all .1s linear;
+    border-radius: 10px;
+    text-decoration: none;
+    margin-right: 10px;
+}
+
+.button svg {
+    position: relative;
+    top: 4px;
+    margin-right: 10px;
+    height: 25px;
+    width: 25px;
+}
+
+.button:hover {
+    border: 1px solid rgb(185, 35, 185);
+    color: rgb(185, 35, 185);
+    text-decoration: none;
+}
+
+.primary {
+    background-color: rgb(185, 35, 185);
+    color: white;
+}
+
+.button.primary:hover {
+    background-color: rgb(92, 9, 92);
+    border: 1px solid rgb(248, 248, 248);
+    color: white;
+}

@@ -1,3 +1,7 @@
+---
+sidebar_position: 3
+---
+
 # Deploying
 
 Plane is meant to be more of an ingredient than a recipe -- the specifics of
