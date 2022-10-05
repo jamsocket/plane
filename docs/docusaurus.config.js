@@ -53,7 +53,6 @@ const config = {
         defaultMode: 'dark',
       },
       navbar: {
-        //title: 'Plane',
         logo: {
           alt: 'Plane Logo',
           src: 'img/plane-logo-light.svg',
