@@ -3,7 +3,11 @@ use async_nats::jetstream::consumer::DeliverPolicy;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
-    messages::{agent::DroneStatusMessage, dns::SetDnsRecord, scheduler::{ScheduleRequest, ScheduleResponse}},
+    messages::{
+        agent::DroneStatusMessage,
+        dns::SetDnsRecord,
+        scheduler::{ScheduleRequest, ScheduleResponse},
+    },
     nats_connection::NatsConnectionSpec,
     types::ClusterName,
 };
@@ -22,10 +26,7 @@ struct Opts {
 enum Command {
     ListDrones,
     ListDns,
-    Spawn {
-        cluster: String,
-        image: String,
-    },
+    Spawn { cluster: String, image: String },
 }
 
 #[tokio::main]
@@ -73,13 +74,8 @@ async fn main() -> Result<()> {
                 ScheduleResponse::Scheduled { drone, backend_id } => {
                     let url = format!("https://{}.{}", backend_id, cluster);
 
-                    tracing::info!(
-                        ?url,
-                        ?drone,
-                        ?backend_id,
-                        "Backend scheduled."
-                    );
-                },
+                    tracing::info!(?url, ?drone, ?backend_id, "Backend scheduled.");
+                }
                 ScheduleResponse::NoDroneAvailable => tracing::error!(
                     %cluster,
                     "Could not schedule backend because no drone was available for cluster."
