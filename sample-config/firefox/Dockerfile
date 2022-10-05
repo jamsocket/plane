@@ -3,6 +3,9 @@ FROM lscr.io/linuxserver/firefox:latest
 RUN apk add bind-tools
 RUN apk add dnsmasq
 
+# Set home page.
+RUN echo "firefox https://plane.dev" > defaults/autostart
+
 COPY firefox/custom-cont-init.d /custom-cont-init.d
 
 # This adds the certificate to Alpine's certificate store, where

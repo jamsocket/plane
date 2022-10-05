@@ -1,0 +1,25 @@
+.button {
+    align-items: center;
+    font-size: 18px;
+    padding: 13px 15px;
+    border: 1px solid #bbb;
+    color: #444;
+    background-color: #f6f6f6;
+    transition: all .1s linear;
+    border-radius: 10px;
+    text-decoration: none;
+    margin-right: 10px;
+}
+
+.button svg {
+    position: relative;
+    top: 4px;
+    margin-right: 10px;
+    height: 25px;
+    width: 25px;
+}
+
+.button:hover {
+    border: 1px solid black;
+    color: black;
+}

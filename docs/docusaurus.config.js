@@ -12,7 +12,7 @@ const config = {
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/favicon.png',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -49,11 +49,15 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      colorMode: {
+        defaultMode: 'dark',
+      },
       navbar: {
-        title: 'Plane',
+        //title: 'Plane',
         logo: {
           alt: 'Plane Logo',
-          src: 'img/logo.svg',
+          src: 'img/plane-logo-light.svg',
+          srcDark: 'img/plane-logo-dark.svg'
         },
         // items: [
         //   {
@@ -99,13 +103,16 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} Drifting in Space, Corp. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} Drifting in Space, Corp.`,
       },
       prism: {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
       },
     }),
+  scripts: [
+    { src: 'https://plausible.io/js/plausible.js', defer: true, 'data-domain': 'plane.dev' }
+  ]
 };
 
 module.exports = config;
