@@ -3,7 +3,11 @@ use async_nats::jetstream::consumer::DeliverPolicy;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
-    messages::{agent::DroneStatusMessage, dns::SetDnsRecord, scheduler::ScheduleRequest},
+    messages::{
+        agent::DroneStatusMessage,
+        dns::SetDnsRecord,
+        scheduler::{ScheduleRequest, ScheduleResponse},
+    },
     nats_connection::NatsConnectionSpec,
     types::ClusterName,
 };
@@ -14,9 +18,6 @@ struct Opts {
     #[clap(long)]
     nats: Option<String>,
 
-    #[clap(long, default_value = "plane.test")]
-    cluster: String,
-
     #[command(subcommand)]
     command: Command,
 }
@@ -25,7 +26,7 @@ struct Opts {
 enum Command {
     ListDrones,
     ListDns,
-    Spawn { image: String },
+    Spawn { cluster: String, image: String },
 }
 
 #[tokio::main]
@@ -56,11 +57,11 @@ async fn main() -> Result<()> {
                 );
             }
         }
-        Command::Spawn { image } => {
+        Command::Spawn { image, cluster } => {
             let result = nats
                 .request(&ScheduleRequest {
                     backend_id: None,
-                    cluster: ClusterName::new(&opts.cluster),
+                    cluster: ClusterName::new(&cluster),
                     image,
                     max_idle_secs: Duration::from_secs(30),
                     env: HashMap::new(),
@@ -69,7 +70,20 @@ async fn main() -> Result<()> {
                 })
                 .await?;
 
-            println!("Spawn result: {:?}", result);
+            match result {
+                ScheduleResponse::Scheduled { drone, backend_id } => {
+                    let url = format!("https://{}.{}", backend_id, cluster);
+
+                    println!("Backend scheduled.");
+                    println!("URL: {}", url.bright_green());
+                    println!("Drone: {}", drone.to_string().bright_blue());
+                    println!("Backend ID: {}", backend_id.to_string().bright_blue());
+                }
+                ScheduleResponse::NoDroneAvailable => tracing::error!(
+                    %cluster,
+                    "Could not schedule backend because no drone was available for cluster."
+                ),
+            }
         }
         Command::ListDns => {
             let results = nats

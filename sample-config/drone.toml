@@ -55,7 +55,7 @@ ip = { api = "http://ip-api:8080/" }
 [agent.docker]
 # The runtime to use (defaults to "runc")
 runtime = "runc"
-network = "plane_default"
+network = "plane"
 
 # The method of connecting to Docker. {socket=""} and {http=""} are
 # supported.

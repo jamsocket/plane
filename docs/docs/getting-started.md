@@ -44,5 +44,41 @@ A full production Plane installation requires configuring DNS records and hostin
 try it out, so our sample configuration includes an instance of Firefox configured with DNS and certificate settings for testing it out. This instance
 of Firefox runs within Docker and is accessible through your regular browser by opening [http://localhost:3000](http://localhost:3000).
 
+### Spawning a backend
 
+Once you have the special instance of Firefox open, the next step is to “spawn” a backend. For this demo, we’ll spawn a simple browser-based game
+called _Drop Four_.
 
+To spawn an instance of the game, 
+
+```bash
+docker run --network plane ghcr.io/drifting-in-space/plane-cli --nats=nats://nats spawn ghcr.io/drifting-in-space/demo-image-drop-four
+```
+
+Here's a breakdown of what the command does:
+
+```bash
+docker run\                                     # We're running a docker command
+--network plane\                                # ...in the network we created by "docker compose up"
+ghcr.io/drifting-in-space/plane-cli\            # ...to run the Plane CLI
+--nats=nats://nats\                             # ...pointed to the NATS server we started earlier
+spawn\                                          # ...and running the "spawn" subcommand
+plane.test\                                     # ...on the "plane.test" cluster
+ghcr.io/drifting-in-space/demo-image-drop-four  # ...with the argument of the container we want to spawn.
+```
+
+### Inspecting the DNS records
+
+Once you’ve spawned a backend, Plane’s DNS server will serve a route for it. To list DNS records being served by plane, run:
+
+```bash
+docker run --network plane ghcr.io/drifting-in-space/plane-cli --nats=nats://nats list-dns
+```
+
+The result should be 1 DNS record, corresponding to the backend you spawned (if there isn’t, run `docker logs plane-controller` and
+`docker logs plane-drone` to see the logs of the controller and drone, respectively. It may just be taking a while to pull the image
+the first time.)
+
+### Opening the app
+
+The `list-dns` command above should return a 
