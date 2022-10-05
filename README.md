@@ -9,9 +9,10 @@ Plane is a **container orchestrator for ambitious browser-based applications**.
 
 ## Documentation
 
-- [Getting started guide](https://plane.dev/docs/getting-started)
-- [Concepts](https://plane.dev/docs/concepts)
-- [Deploying Plane](https://plane.dev/docs/deploying)
+- [Docs Home](https://plane.dev/)
+  - [Getting started guide](https://plane.dev/docs/getting-started)
+  - [Concepts](https://plane.dev/docs/concepts)
+  - [Deploying Plane](https://plane.dev/docs/deploying)
 
 ## Architecture
 
