@@ -5,7 +5,7 @@
 
 Plane is a **container orchestrator for ambitious browser-based applications**. Plane implements an architecture we call [session backends](https://driftingin.space/posts/session-lived-application-backends).
 
-**tl;dr:** Plane lets you spin up instances of any HTTP-speaking container via an API. Plane assigns a unique subdomain to each instance, through which HTTPS/WebSocket connections are proxied. When all inbound connections to a container are dropped, Plane shuts it down. Plane is MIT-licensed and written in Rust.
+**tl;dr:** Plane lets you spin up instances of any HTTP-speaking container via an API. Plane assigns a unique subdomain to each instance, through which it proxies HTTPS/WebSocket connections. When all inbound connections to a container are dropped, Plane shuts it down. Plane is MIT-licensed and written in Rust.
 
 ## Documentation
 
