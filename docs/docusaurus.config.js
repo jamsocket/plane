@@ -83,15 +83,23 @@ const config = {
                 label: 'Getting Started',
                 to: '/docs/getting-started',
               },
+              {
+                label: 'Concepts',
+                to: '/docs/concepts',
+              },
+              {
+                label: 'Deploying',
+                to: '/docs/deploying',
+              },
             ],
           },
           {
-            title: 'Community',
+            title: 'Links',
             items: [
-              // {
-              //   label: 'Discord',
-              //   href: 'https://discordapp.com/invite/docusaurus',
-              // },
+              {
+                label: 'Discord',
+                href: 'https://discord.gg/N5sEpsuhh9',
+              },
               {
                 label: 'Twitter',
                 href: 'https://twitter.com/drifting_corp',
@@ -99,6 +107,10 @@ const config = {
               {
                 label: 'GitHub',
                 href: 'https://github.com/drifting-in-space/plane',
+              },
+              {
+                label: 'Drifting in Space',
+                href: 'https://driftingin.space/'
               },
             ],
           },

@@ -20,6 +20,18 @@
 }
 
 .button:hover {
-    border: 1px solid black;
-    color: black;
+    border: 1px solid rgb(185, 35, 185);
+    color: rgb(185, 35, 185);
+    text-decoration: none;
+}
+
+.primary {
+    background-color: rgb(185, 35, 185);
+    color: white;
+}
+
+.button.primary:hover {
+    background-color: rgb(92, 9, 92);
+    border: 1px solid rgb(248, 248, 248);
+    color: white;
 }
