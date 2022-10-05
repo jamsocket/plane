@@ -74,7 +74,10 @@ async fn main() -> Result<()> {
                 ScheduleResponse::Scheduled { drone, backend_id } => {
                     let url = format!("https://{}.{}", backend_id, cluster);
 
-                    tracing::info!(?url, ?drone, ?backend_id, "Backend scheduled.");
+                    println!("Backend scheduled.");
+                    println!("URL: {}", url.bright_green());
+                    println!("Drone: {}", drone.to_string().bright_blue());
+                    println!("Backend ID: {}", backend_id.to_string().bright_blue());
                 }
                 ScheduleResponse::NoDroneAvailable => tracing::error!(
                     %cluster,
