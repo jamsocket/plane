@@ -1,9 +1,9 @@
-![Plane logo](resources/plane-logo-blue.svg)
+<img src="resources/plane-logo-blue.svg" style="width: 100%" />
 
 [![Tests](https://github.com/drifting-in-space/plane/actions/workflows/tests.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/unit-tests.yml)
 [![Chat on Discord](https://img.shields.io/static/v1?label=chat&message=discord&color=404eed)](https://discord.gg/N5sEpsuhh9)
 
-Plane is a **container orchestrator for ambitious browser-based applications**.
+Plane is a **container orchestrator for ambitious browser-based applications**. Plane implements an architecture we call [session backends](https://driftingin.space/posts/session-lived-application-backends).
 
 **tl;dr:** Plane lets you spin up instances of any HTTP-speaking container via an API. Plane assigns a unique subdomain to each instance, through which HTTPS/WebSocket connections are proxied. When all inbound connections to a container are dropped, Plane shuts it down. Plane is MIT-licensed and written in Rust.
 
