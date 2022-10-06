@@ -6,6 +6,8 @@ RUN apk add dnsmasq
 # Set home page.
 RUN echo "firefox https://plane.dev" > defaults/autostart
 
+RUN echo 'pref("datareporting.policy.firstRunURL","");' > /usr/lib/firefox/browser/defaults/preferences/firstrun.js
+
 COPY firefox/custom-cont-init.d /custom-cont-init.d
 
 # This adds the certificate to Alpine's certificate store, where
