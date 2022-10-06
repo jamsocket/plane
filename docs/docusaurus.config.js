@@ -8,7 +8,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 const config = {
   title: 'Plane Docs',
   tagline: 'Session backend orchestrator for ambitious browser-based apps.',
-  url: 'https://docs.plane.dev',
+  url: 'https://plane.dev',
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
