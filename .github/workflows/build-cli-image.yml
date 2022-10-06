@@ -4,6 +4,11 @@ on:
   push:
     branches: [ "main" ]
     tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ "main" ]
+    paths:
+    - '.github/workflows/build-cli-image.yml'
+
 
 env:
   REGISTRY: ghcr.io
