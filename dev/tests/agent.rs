@@ -263,10 +263,10 @@ async fn spawn_with_agent() -> Result<()> {
         .await?;
 
     let mut request = base_spawn_request();
-    request.drone_id = drone_id.clone();
+    request.router.drone_id = drone_id.clone();
 
     let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
+        BackendStateSubscription::new(&connection, &request.router.backend_id).await?;
     controller_mock.spawn_backend(&request).await?;
 
     state_subscription
@@ -284,7 +284,7 @@ async fn spawn_with_agent() -> Result<()> {
         SetDnsRecord {
             cluster: ClusterName::new("plane.test"),
             kind: DnsRecordType::A,
-            name: request.backend_id.to_string(),
+            name: request.router.backend_id.to_string(),
             value: agent.ip.to_string(),
         },
         dns_record
@@ -292,7 +292,7 @@ async fn spawn_with_agent() -> Result<()> {
 
     let proxy_route = agent
         .db
-        .get_proxy_route(request.backend_id.id())
+        .get_proxy_route(request.router.backend_id.id())
         .await?
         .expect("Expected proxy route.");
     let result = reqwest::get(format!("http://{}/", proxy_route)).await?;
@@ -320,12 +320,12 @@ async fn stats_are_acquired() -> Result<()> {
         .await?;
 
     let mut request = base_spawn_request();
-    request.drone_id = drone_id;
+    request.router.drone_id = drone_id;
     // Ensure long enough life to report stats.
-    request.max_idle_secs = Duration::from_secs(30);
+    request.executable.max_idle_secs = Duration::from_secs(30);
 
     let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
+        BackendStateSubscription::new(&connection, &request.router.backend_id).await?;
     controller_mock.spawn_backend(&request).await?;
 
     state_subscription
@@ -333,7 +333,9 @@ async fn stats_are_acquired() -> Result<()> {
         .await?;
 
     let mut stats_subscription = connection
-        .subscribe(BackendStatsMessage::subscribe_subject(&request.backend_id))
+        .subscribe(BackendStatsMessage::subscribe_subject(
+            &request.router.backend_id,
+        ))
         .await?;
 
     let stat = timeout(
@@ -380,13 +382,19 @@ async fn handle_error_during_start() -> Result<()> {
         .await?;
 
     let mut request = base_spawn_request();
-    request.drone_id = drone_id;
+    request.router.drone_id = drone_id;
     // Exit with error code 1 after 100ms.
-    request.env.insert("EXIT_CODE".into(), "1".into());
-    request.env.insert("EXIT_TIMEOUT".into(), "100".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_CODE".into(), "1".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_TIMEOUT".into(), "100".into());
 
     let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
+        BackendStateSubscription::new(&connection, &request.router.backend_id).await?;
     controller_mock.spawn_backend(&request).await?;
 
     state_subscription
@@ -418,10 +426,10 @@ async fn handle_failure_after_ready() -> Result<()> {
         .await?;
 
     let mut request = base_spawn_request();
-    request.drone_id = drone_id;
+    request.router.drone_id = drone_id;
 
     let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
+        BackendStateSubscription::new(&connection, &request.router.backend_id).await?;
     controller_mock.spawn_backend(&request).await?;
 
     state_subscription
@@ -430,7 +438,7 @@ async fn handle_failure_after_ready() -> Result<()> {
 
     let proxy_route = agent
         .db
-        .get_proxy_route(request.backend_id.id())
+        .get_proxy_route(request.router.backend_id.id())
         .await?
         .expect("Expected proxy route.");
     // A get request to this URL will cause the container to exit with status 1.
@@ -461,10 +469,10 @@ async fn handle_successful_termination() -> Result<()> {
         .await?;
 
     let mut request = base_spawn_request();
-    request.drone_id = drone_id;
+    request.router.drone_id = drone_id;
 
     let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
+        BackendStateSubscription::new(&connection, &request.router.backend_id).await?;
     controller_mock.spawn_backend(&request).await?;
 
     state_subscription
@@ -473,7 +481,7 @@ async fn handle_successful_termination() -> Result<()> {
 
     let proxy_route = agent
         .db
-        .get_proxy_route(request.backend_id.id())
+        .get_proxy_route(request.router.backend_id.id())
         .await?
         .expect("Expected proxy route.");
     // A get request to this URL will cause the container to exit with status 1.
@@ -506,10 +514,10 @@ async fn handle_agent_restart() -> Result<()> {
             .await?;
 
         let mut request = base_spawn_request();
-        request.drone_id = drone_id;
+        request.router.drone_id = drone_id;
 
         let mut state_subscription =
-            BackendStateSubscription::new(&nats, &request.backend_id).await?;
+            BackendStateSubscription::new(&nats, &request.router.backend_id).await?;
         controller_mock.spawn_backend(&request).await?;
         state_subscription
             .wait_for_state(BackendState::Ready, 60_000)
@@ -543,19 +551,19 @@ async fn handle_termination_request() -> Result<()> {
 
     let mut request = base_spawn_request();
     //ensure spawnee lives long enough to be terminated
-    request.drone_id = drone_id.clone();
-    request.max_idle_secs = Duration::from_secs(10000);
+    request.router.drone_id = drone_id.clone();
+    request.executable.max_idle_secs = Duration::from_secs(10000);
 
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
         .await?;
     controller_mock
-        .expect_status_message(&request.drone_id, &ClusterName::new("plane.test"))
+        .expect_status_message(&request.router.drone_id, &ClusterName::new("plane.test"))
         .await?;
 
-    request.max_idle_secs = Duration::from_secs(1000);
+    request.executable.max_idle_secs = Duration::from_secs(1000);
     let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
+        BackendStateSubscription::new(&connection, &request.router.backend_id).await?;
 
     controller_mock.spawn_backend(&request).await?;
     state_subscription
@@ -563,7 +571,7 @@ async fn handle_termination_request() -> Result<()> {
         .await?;
 
     let termination_request = TerminationRequest {
-        backend_id: request.backend_id.clone(),
+        backend_id: request.router.backend_id.clone(),
     };
     controller_mock
         .terminate_backend(&termination_request)
