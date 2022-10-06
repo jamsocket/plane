@@ -4,7 +4,6 @@ services:
     build:
       context: .
       dockerfile: drone/Dockerfile
-    # image: ghcr.io/drifting-in-space/plane-drone:sha-19997e7
     volumes:
       - ./sample-config:/etc/plane:ro
       - /var/run/docker.sock:/var/run/docker.sock
@@ -15,12 +14,11 @@ services:
     build:
       context: .
       dockerfile: controller/Dockerfile
-    # image: ghcr.io/drifting-in-space/plane-controller:sha-19997e7
-    volumes:
-      - ./sample-config:/etc/plane:ro
     networks:
       default:
-        ipv4_address: 172.16.238.10
+        ipv4_address: 172.16.238.11
+    volumes:
+      - ./sample-config:/etc/plane:ro
     command:
       /etc/plane/controller.toml
 
@@ -42,7 +40,16 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix
     dns:
       - 172.16.238.10
-
+  
+  dnsmasq:
+    image: dnsmasq
+    networks:
+      default:
+        ipv4_address: 172.16.238.10
+    build: sample-config/dnsmasq-linux
+    volumes:
+      - ./sample-config/dnsmasq-linux/dnsmasq.conf:/etc/dnsmasq.conf
+    
   ip-api:
     image: ghcr.io/drifting-in-space/ip-api:latest
 
