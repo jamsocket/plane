@@ -1,0 +1,58 @@
+version: "3.9"
+services:
+  drone:
+    build:
+      context: .
+      dockerfile: drone/Dockerfile
+    volumes:
+      - ./sample-config:/etc/plane:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      /etc/plane/drone.toml
+
+  controller:
+    build:
+      context: .
+      dockerfile: controller/Dockerfile
+    networks:
+      default:
+        ipv4_address: 172.16.238.11
+    volumes:
+      - ./sample-config:/etc/plane:ro
+    command:
+      /etc/plane/controller.toml
+
+  nats:
+    image: nats:latest
+    command:
+      "-DV --jetstream"
+    ports:
+      - "127.0.0.1:4222:4222"
+
+  firefox:
+    image: jess/firefox
+    environment:
+      DISPLAY: host.docker.internal${DISPLAY}
+    dns:
+      - 172.16.238.10
+  
+  dnsmasq:
+    image: dnsmasq
+    networks:
+      default:
+        ipv4_address: 172.16.238.10
+    build: sample-config/dnsmasq-linux
+    volumes:
+      - ./sample-config/dnsmasq-linux/dnsmasq.conf:/etc/dnsmasq.conf
+    
+  ip-api:
+    image: ghcr.io/drifting-in-space/ip-api:latest
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.238.0/24
+          gateway: 172.16.238.1
