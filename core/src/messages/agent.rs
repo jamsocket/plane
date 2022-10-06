@@ -225,6 +225,7 @@ impl DroneConnectRequest {
 }
 
 /// A message telling a drone to spawn a backend.
+/*
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SpawnRequest {
@@ -254,43 +255,48 @@ pub struct SpawnRequest {
     #[serde(default = "ResourceLimits::default")]
     pub resource_limits: ResourceLimits,
 }
+*/
 
-// enum of supported executors
-pub enum Executors {
-    Docker(Box<dyn Executor>),
-}
-
-pub struct ExecutableConfig<E: Executor> {}
-
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DockerExecutableConfig {
-    pub backend_id: BackendId,
+    /// The container image to run.
+    pub image: String,
+
+    /// The timeout after which the drone is shut down if no connections are made.
+    #[serde_as(as = "DurationSeconds")]
     pub max_idle_secs: Duration,
+
+    /// Environment variables to pass in to the container.
     pub env: HashMap<String, String>,
-    pub metadata: HashMap<String, String>,
+
+    /// Credentials used to fetch the image.
     pub credentials: Option<DockerCredentials>,
+
+    /// Resource limits
+    #[serde(default = "ResourceLimits::default")]
     pub resource_limits: ResourceLimits,
 }
 
-pub trait Executor {
-    fn initialize(&self) -> Result<(), anyhow::Error>;
-    fn execute(&self, executable_cfg: ExecutableConfig) -> Result<(), anyhow::Error>;
-}
-
-pub trait Executable<A: Executor> {
-    fn new(&self, a: ExecutableConfig<A>) -> Self;
-}
-
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RouterConfig {
     pub drone_id: DroneId,
+    /// The name of the backend. This forms part of the hostname used to
+    /// connect to the drone.
     pub backend_id: BackendId,
+    /// Metadata for the spawn. Typically added to log messages for debugging and observability.
+    pub metadata: HashMap<String, String>,
 }
 
-pub struct _SpawnRequest<A: Executor> {
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct SpawnRequest {
     /// describes where incoming requests will be routed to
     pub router: RouterConfig,
 
     ///configuration of executor (ie. image to run, executor being used etc)
-    pub executable: ExecutableConfig<A>,
+    pub executable: DockerExecutableConfig,
 }
 
 // eventually, this will be generic over executors
@@ -314,7 +320,7 @@ impl TypedMessage for SpawnRequest {
     type Response = bool;
 
     fn subject(&self) -> String {
-        format!("drone.{}.spawn", self.drone_id.id())
+        format!("drone.{}.spawn", self.router.drone_id.id())
     }
 }
 
