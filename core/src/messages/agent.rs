@@ -260,6 +260,8 @@ pub enum Executors {
     Docker(Box<dyn Executor>),
 }
 
+pub struct ExecutableConfig<E: Executor> {}
+
 pub struct DockerExecutableConfig {
     pub backend_id: BackendId,
     pub max_idle_secs: Duration,
@@ -271,9 +273,12 @@ pub struct DockerExecutableConfig {
 
 pub trait Executor {
     fn initialize(&self) -> Result<(), anyhow::Error>;
+    fn execute(&self, executable_cfg: ExecutableConfig) -> Result<(), anyhow::Error>;
 }
 
-pub trait Executable<A: Executor> {}
+pub trait Executable<A: Executor> {
+    fn new(&self, a: ExecutableConfig<A>) -> Self;
+}
 
 pub struct RouterConfig {
     pub drone_id: DroneId,
@@ -285,7 +290,7 @@ pub struct _SpawnRequest<A: Executor> {
     pub router: RouterConfig,
 
     ///configuration of executor (ie. image to run, executor being used etc)
-    pub executable: ExecutableConfig<Executors>,
+    pub executable: ExecutableConfig<A>,
 }
 
 // eventually, this will be generic over executors
