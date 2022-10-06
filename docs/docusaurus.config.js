@@ -49,6 +49,7 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      image: "/img/plane-logo-blue.png",
       colorMode: {
         defaultMode: 'dark',
       },

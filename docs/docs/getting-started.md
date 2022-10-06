@@ -44,6 +44,25 @@ A full production Plane installation requires configuring DNS records and hostin
 try it out, so our sample configuration includes an instance of Firefox configured with DNS and certificate settings for testing it out. This instance
 of Firefox runs within Docker and is accessible through your regular browser by opening [http://localhost:3000](http://localhost:3000).
 
+### Using the CLI
+
+Although Plane is primarily used via its NATS API, it also includes a small CLI tool that's useful for testing and debugging.
+
+If you have Rust, you can build and install the CLI by running:
+
+```bash
+cd cli
+cargo install --path=.
+```
+
+If you don't, or just want a temporary way to try out Plane, you can create a temporary alias that uses a pre-built Docker image of the cli:
+
+```bash
+alias plane-cli="docker run --init --network plane ghcr.io/drifting-in-space/plane-cli --nats=nats://nats"
+```
+
+Whichever approach you choose, the below commands should work.
+
 ### Spawning a backend
 
 Once you have the special instance of Firefox open, the next step is to “spawn” a backend. For this demo, we’ll spawn a simple browser-based game
@@ -52,33 +71,57 @@ called _Drop Four_.
 To spawn an instance of the game, 
 
 ```bash
-docker run --network plane ghcr.io/drifting-in-space/plane-cli --nats=nats://nats spawn ghcr.io/drifting-in-space/demo-image-drop-four
+plane-cli spawn plane.test ghcr.io/drifting-in-space/demo-image-drop-four
 ```
 
-Here's a breakdown of what the command does:
+The first argument is the “cluster”, which refers both to a pool of machines able to run backends (“drones”), and a domain under which these backends will be given hostnames. The drone we are running locally is set up for a cluster called `plane.test` (see `sample-config/drone.toml`). Attempting to spawn on another cluster will return an error stating that no drones are running on that cluster.
+
+If everything worked, you'll get back a response like this:
+
+```
+Backend scheduled.
+URL: https://4dea4037-3d2d-4e12-95f9-a2864d9ba8dd.plane.test
+Drone: b2cdfb71-b2a8-4d89-9dcd-bb7a4cbbddd4
+Backend ID: 4dea4037-3d2d-4e12-95f9-a2864d9ba8dd
+```
+
+The URL is the URL that the container will be accessible on. Note that plane.test is not a real domain,
+so you won't be able to access it in a real browser. The Firefox bundled with Plane is specially configured
+to use Plane's DNS server, so that `*.plane.test` domains work in it.
+
+The Drone is a unique ID associated with the machine which the backend was scheduled to. In this local
+test cluster, we are only running one “Drone”, since we are running everything on the same machine.
+
+The backend ID is a unique identifier for the backend we just created.
+
+### Waiting until the backend is ready
+
+Although Plane allocates and returns a hostname immediately, it does not mean that the backend is ready to
+receive traffic. To determine when the backend is ready, we can observe the status:
 
 ```bash
-docker run\                                     # We're running a docker command
---network plane\                                # ...in the network we created by "docker compose up"
-ghcr.io/drifting-in-space/plane-cli\            # ...to run the Plane CLI
---nats=nats://nats\                             # ...pointed to the NATS server we started earlier
-spawn\                                          # ...and running the "spawn" subcommand
-plane.test\                                     # ...on the "plane.test" cluster
-ghcr.io/drifting-in-space/demo-image-drop-four  # ...with the argument of the container we want to spawn.
+plane-cli status
 ```
 
-### Inspecting the DNS records
-
-Once you’ve spawned a backend, Plane’s DNS server will serve a route for it. To list DNS records being served by plane, run:
-
-```bash
-docker run --network plane ghcr.io/drifting-in-space/plane-cli --nats=nats://nats list-dns
-```
-
-The result should be 1 DNS record, corresponding to the backend you spawned (if there isn’t, run `docker logs plane-controller` and
-`docker logs plane-drone` to see the logs of the controller and drone, respectively. It may just be taking a while to pull the image
-the first time.)
+This will stream status changes from all backends. You can also pass the backend ID (returned in the last
+step) as an additional argument to stream only status updates about a specific backend.
 
 ### Opening the app
 
-The `list-dns` command above should return a 
+Open the included Firefox instance by visiting [http://localhost:3000](http://localhost:3000) in your regular browser.
+
+We want to visit the URL that `plane-cli spawn` returned, but because the embedded Firefox browser runs in a containerized window system, we can't paste it the usual way. Instead, copy the URL from the `plane-cli spawn` output as you normally would, but then in the browser look for a black circle on the left edge of the screen. Clicking it will reveal a text box. Paste the URL into that text box, and then click the black circle again to close it.
+
+Now, the URL will be on the clipboard within the container. Right click on the URL bar and click “Paste and Go”.
+
+If everything worked, you should see a page loaded from the container you spawned.
+
+### Inspecting the DNS records
+
+Once the backend is ready, Plane’s DNS server will serve a route for it. To list DNS records being served by plane, run:
+
+```bash
+plane-cli list-dns
+```
+
+The result should be 1 DNS record, corresponding to the backend you spawned.
