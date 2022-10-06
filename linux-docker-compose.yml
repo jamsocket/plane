@@ -31,7 +31,7 @@ services:
 
   firefox:
     image: firefox
-    build: firelinux
+    build: sample-config/linux-firefox
     environment:
       DISPLAY: ${DISPLAY}
     ipc: host
