@@ -255,6 +255,39 @@ pub struct SpawnRequest {
     pub resource_limits: ResourceLimits,
 }
 
+// enum of supported executors
+pub enum Executors {
+    Docker(Box<dyn Executor>),
+}
+
+pub struct DockerExecutableConfig {
+    pub backend_id: BackendId,
+    pub max_idle_secs: Duration,
+    pub env: HashMap<String, String>,
+    pub metadata: HashMap<String, String>,
+    pub credentials: Option<DockerCredentials>,
+    pub resource_limits: ResourceLimits,
+}
+
+pub trait Executor {
+    fn initialize(&self) -> Result<(), anyhow::Error>;
+}
+
+pub trait Executable<A: Executor> {}
+
+pub struct RouterConfig {
+    pub drone_id: DroneId,
+    pub backend_id: BackendId,
+}
+
+pub struct _SpawnRequest<A: Executor> {
+    /// describes where incoming requests will be routed to
+    pub router: RouterConfig,
+
+    ///configuration of executor (ie. image to run, executor being used etc)
+    pub executable: ExecutableConfig<Executors>,
+}
+
 // eventually, this will be generic over executors
 // currently only applies to docker
 #[serde_as]
