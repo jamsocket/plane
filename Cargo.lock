@@ -107,9 +107,9 @@ dependencies = [
 
 [[package]]
 name = "async-nats"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5154e462bcf5f4cc81e06ad51486abf307b77b9515116a960f7bda2b29652502"
+checksum = "a5788cd6eb396656c504ad4b2b7fd384715a4c188c03490a9d68f75931a1b182"
 dependencies = [
  "base64",
  "base64-url",
@@ -123,6 +123,7 @@ dependencies = [
  "nuid",
  "once_cell",
  "regex",
+ "ring",
  "rustls-native-certs",
  "rustls-pemfile 0.3.0",
  "serde",
@@ -1602,7 +1603,7 @@ name = "plane-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-nats 0.20.0",
+ "async-nats 0.21.0",
  "clap 4.0.4",
  "colored",
  "plane-core",
@@ -1636,7 +1637,7 @@ name = "plane-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-nats 0.20.0",
+ "async-nats 0.21.0",
  "bollard",
  "bytes",
  "chrono",

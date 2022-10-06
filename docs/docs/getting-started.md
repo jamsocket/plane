@@ -121,10 +121,7 @@ If everything worked, you should see a page loaded from the container you spawne
 Once the backend is ready, Plane’s DNS server will serve a route for it. To list DNS records being served by plane, run:
 
 ```bash
-docker run \
-    --network plane ghcr.io/drifting-in-space/plane-cli \
-    --nats=nats://nats \
-    list-dns
+plane-cli list-dns
 ```
 
 The result should be 1 DNS record, corresponding to the backend you spawned.
