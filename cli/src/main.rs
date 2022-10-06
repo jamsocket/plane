@@ -4,12 +4,12 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
     messages::{
-        agent::DroneStatusMessage,
+        agent::{BackendStateMessage, DroneStatusMessage},
         dns::SetDnsRecord,
         scheduler::{ScheduleRequest, ScheduleResponse},
     },
     nats_connection::NatsConnectionSpec,
-    types::ClusterName,
+    types::{BackendId, ClusterName},
 };
 use std::{collections::HashMap, time::Duration};
 
@@ -26,7 +26,16 @@ struct Opts {
 enum Command {
     ListDrones,
     ListDns,
-    Spawn { cluster: String, image: String },
+    Spawn {
+        cluster: String,
+        image: String,
+        /// Grace period with no connections before shutting down the drone.
+        #[clap(long, default_value = "300")]
+        timeout: u64,
+    },
+    Status {
+        backend: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -39,6 +48,26 @@ async fn main() -> Result<()> {
         .await?;
 
     match opts.command {
+        Command::Status { backend } => {
+            let mut sub = if let Some(backend) = backend {
+                nats.subscribe_jetstream(BackendStateMessage::subscribe_subject(&BackendId::new(
+                    backend,
+                )))
+                .await?
+            } else {
+                nats.subscribe_jetstream(BackendStateMessage::wildcard_subject())
+                    .await?
+            };
+
+            while let Some(message) = sub.next().await? {
+                println!(
+                    "{}\t{}\t{}",
+                    message.backend.to_string().bright_cyan(),
+                    message.state.to_string().bright_magenta(),
+                    message.time.to_string().blue()
+                );
+            }
+        }
         Command::ListDrones => {
             let drones = nats
                 .get_all(
@@ -57,13 +86,17 @@ async fn main() -> Result<()> {
                 );
             }
         }
-        Command::Spawn { image, cluster } => {
+        Command::Spawn {
+            image,
+            cluster,
+            timeout,
+        } => {
             let result = nats
                 .request(&ScheduleRequest {
                     backend_id: None,
                     cluster: ClusterName::new(&cluster),
                     image,
-                    max_idle_secs: Duration::from_secs(30),
+                    max_idle_secs: Duration::from_secs(timeout),
                     env: HashMap::new(),
                     metadata: HashMap::new(),
                     credentials: None,
