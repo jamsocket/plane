@@ -1,4 +1,4 @@
-use super::agent::SpawnRequest;
+use super::agent::{DockerExecutableConfig, RouterConfig, SpawnRequest};
 use crate::{
     nats::{SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
@@ -43,14 +43,18 @@ impl ScheduleRequest {
             .unwrap_or_else(BackendId::new_random);
 
         SpawnRequest {
-            drone_id: drone_id.clone(),
-            image: self.image.clone(),
-            backend_id,
-            max_idle_secs: self.max_idle_secs,
-            env: self.env.clone(),
-            metadata: self.metadata.clone(),
-            credentials: self.credentials.clone(),
-            resource_limits: Default::default(),
+            router: RouterConfig {
+                drone_id: drone_id.clone(),
+                backend_id,
+                metadata: self.metadata.clone(),
+            },
+            executable: DockerExecutableConfig {
+                image: self.image.clone(),
+                max_idle_secs: self.max_idle_secs,
+                env: self.env.clone(),
+                credentials: self.credentials.clone(),
+                resource_limits: Default::default(),
+            },
         }
     }
 }
