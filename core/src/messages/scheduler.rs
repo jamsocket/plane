@@ -13,9 +13,6 @@ use std::{collections::HashMap, time::Duration};
 pub struct ScheduleRequest {
     pub cluster: ClusterName,
 
-    /// The container image to run.
-    pub image: String,
-
     /// The name of the backend. This forms part of the hostname used to
     /// connect to the drone.
     pub backend_id: Option<BackendId>,
@@ -27,7 +24,7 @@ pub struct ScheduleRequest {
     /// Metadata for the spawn. Typically added to log messages for debugging and observability.
     pub metadata: HashMap<String, String>,
 
-    /// Configuration for docker (creds, env vars etc.)
+    /// Configuration for docker run (image, creds, env vars etc.)
     pub executable: DockerExecutableConfig,
 }
 
