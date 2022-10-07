@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use plane_core::messages::agent::{DockerExecutableConfig, RouterConfig, SpawnRequest};
+use plane_core::messages::agent::{DockerExecutableConfig, SpawnRequest};
 use plane_core::messages::scheduler::ScheduleRequest;
 use plane_core::types::BackendId;
 use plane_core::types::ClusterName;
@@ -105,14 +105,12 @@ const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 
 pub fn base_spawn_request() -> SpawnRequest {
     SpawnRequest {
-        router: RouterConfig {
-            backend_id: BackendId::new_random(),
-            drone_id: DroneId::new_random(),
-            metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
-        },
+        backend_id: BackendId::new_random(),
+        drone_id: DroneId::new_random(),
+        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
+        max_idle_secs: Duration::from_secs(10),
         executable: DockerExecutableConfig {
             image: TEST_IMAGE.into(),
-            max_idle_secs: Duration::from_secs(10),
             env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
             credentials: None,
             resource_limits: Default::default(),
@@ -123,11 +121,14 @@ pub fn base_spawn_request() -> SpawnRequest {
 pub fn base_scheduler_request() -> ScheduleRequest {
     ScheduleRequest {
         cluster: ClusterName::new("plane.test"),
-        image: TEST_IMAGE.into(),
+        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
         backend_id: None,
         max_idle_secs: Duration::from_secs(10),
-        env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
-        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
-        credentials: None,
+        executable: DockerExecutableConfig {
+            env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
+            image: TEST_IMAGE.into(),
+            credentials: None,
+            resource_limits: Default::default(),
+        },
     }
 }

@@ -48,7 +48,7 @@ impl MockAgent {
 
         // Ensure that the SpawnRequest is as expected.
         assert_eq!(
-            drone_id, &result.value.router.drone_id,
+            drone_id, &result.value.drone_id,
             "Scheduled drone did not match expectation."
         );
 

@@ -129,7 +129,7 @@ async fn simple_backend_proxy() -> Result<()> {
 
     proxy
         .db
-        .insert_proxy_route(&sr.router.backend_id, "foobar", &server.address.to_string())
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
         .await?;
 
     let result = proxy.http_get("foobar", "/").await?;
@@ -147,14 +147,11 @@ async fn connection_status_is_recorded() -> Result<()> {
     proxy.db.insert_backend(&sr).await?;
     proxy
         .db
-        .insert_proxy_route(&sr.router.backend_id, "foobar", &server.address.to_string())
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
         .await?;
 
     // Last active time is initially set to the time of creation.
-    let t1_last_active = proxy
-        .db
-        .get_backend_last_active(&sr.router.backend_id)
-        .await?;
+    let t1_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
     assert!(
         Utc::now().signed_duration_since(t1_last_active) < chrono::Duration::seconds(5),
         "Last active should be close to present."
@@ -165,10 +162,7 @@ async fn connection_status_is_recorded() -> Result<()> {
     proxy.http_get("foobar", "/").await?;
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let t2_last_active = proxy
-        .db
-        .get_backend_last_active(&sr.router.backend_id)
-        .await?;
+    let t2_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
     assert!(
         t1_last_active < t2_last_active,
         "Last active should increase after activity."
@@ -176,10 +170,7 @@ async fn connection_status_is_recorded() -> Result<()> {
 
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    let t3_last_active = proxy
-        .db
-        .get_backend_last_active(&sr.router.backend_id)
-        .await?;
+    let t3_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
     assert_eq!(
         t3_last_active, t2_last_active,
         "Last active timestamp shouldn't change without new activity."
@@ -188,10 +179,7 @@ async fn connection_status_is_recorded() -> Result<()> {
     proxy.http_get("foobar", "/").await?;
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let t4_last_active = proxy
-        .db
-        .get_backend_last_active(&sr.router.backend_id)
-        .await?;
+    let t4_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
     assert!(
         t3_last_active < t4_last_active,
         "Last active should increase after activity."
@@ -218,7 +206,7 @@ async fn host_header_is_set() -> Result<()> {
 
     proxy
         .db
-        .insert_proxy_route(&sr.router.backend_id, "foobar", &server.address.to_string())
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
         .await?;
 
     let result = proxy.http_get("foobar", "/").await?;
@@ -239,7 +227,7 @@ async fn update_certificates() -> Result<()> {
 
     proxy
         .db
-        .insert_proxy_route(&sr.router.backend_id, "foobar", &server.address.to_string())
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
         .await?;
 
     let result = proxy.http_get("foobar", "/").await?;
