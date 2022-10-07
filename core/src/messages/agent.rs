@@ -263,10 +263,6 @@ pub struct DockerExecutableConfig {
     /// The container image to run.
     pub image: String,
 
-    /// The timeout after which the drone is shut down if no connections are made.
-    #[serde_as(as = "DurationSeconds")]
-    pub max_idle_secs: Duration,
-
     /// Environment variables to pass in to the container.
     pub env: HashMap<String, String>,
 
@@ -280,20 +276,19 @@ pub struct DockerExecutableConfig {
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct RouterConfig {
+pub struct SpawnRequest {
     pub drone_id: DroneId,
+
+    /// The timeout after which the drone is shut down if no connections are made.
+    #[serde_as(as = "DurationSeconds")]
+    pub max_idle_secs: Duration,
+
     /// The name of the backend. This forms part of the hostname used to
     /// connect to the drone.
     pub backend_id: BackendId,
+
     /// Metadata for the spawn. Typically added to log messages for debugging and observability.
     pub metadata: HashMap<String, String>,
-}
-
-#[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct SpawnRequest {
-    /// describes where incoming requests will be routed to
-    pub router: RouterConfig,
 
     ///configuration of executor (ie. image to run, executor being used etc)
     pub executable: DockerExecutableConfig,
