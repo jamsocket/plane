@@ -105,7 +105,7 @@ impl Executor {
         self.nc
             .publish_jetstream(&BackendStateMessage::new(
                 BackendState::Loading,
-                spawn_request.router.backend_id.clone(),
+                spawn_request.backend_id.clone(),
             ))
             .await
             .log_error();
@@ -156,13 +156,13 @@ impl Executor {
     async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
         let (send, mut recv) = channel(1);
         self.backend_to_listener
-            .insert(spawn_request.router.backend_id.clone(), send);
+            .insert(spawn_request.backend_id.clone(), send);
 
         loop {
             tracing::info!(
                 ?state,
-                backend_id = spawn_request.router.backend_id.id(),
-                metadata = %json!(spawn_request.router.metadata),
+                backend_id = spawn_request.backend_id.id(),
+                metadata = %json!(spawn_request.metadata),
                 "Executing state."
             );
 
@@ -189,9 +189,9 @@ impl Executor {
 
                     if state.running() {
                         self.backend_to_monitor.insert(
-                            spawn_request.router.backend_id.clone(),
+                            spawn_request.backend_id.clone(),
                             BackendMonitor::new(
-                                &spawn_request.router.backend_id,
+                                &spawn_request.backend_id,
                                 &self.cluster,
                                 self.ip,
                                 &self.docker,
@@ -201,13 +201,13 @@ impl Executor {
                     }
 
                     self.database
-                        .update_backend_state(&spawn_request.router.backend_id, state)
+                        .update_backend_state(&spawn_request.backend_id, state)
                         .await
                         .log_error();
                     self.nc
                         .publish_jetstream(&BackendStateMessage::new(
                             state,
-                            spawn_request.router.backend_id.clone(),
+                            spawn_request.backend_id.clone(),
                         ))
                         .await
                         .log_error();
@@ -215,10 +215,8 @@ impl Executor {
                 Ok(None) => {
                     // Successful termination.
                     tracing::info!("Terminated successfully.");
-                    self.backend_to_monitor
-                        .remove(&spawn_request.router.backend_id);
-                    self.backend_to_listener
-                        .remove(&spawn_request.router.backend_id);
+                    self.backend_to_monitor.remove(&spawn_request.backend_id);
+                    self.backend_to_listener.remove(&spawn_request.backend_id);
                     break;
                 }
                 Err(error) => {
@@ -243,7 +241,7 @@ impl Executor {
                     )
                     .await?;
 
-                let backend_id = spawn_request.router.backend_id.to_resource_name();
+                let backend_id = spawn_request.backend_id.to_resource_name();
                 self.docker
                     .run_container(
                         &backend_id,
@@ -259,7 +257,7 @@ impl Executor {
             BackendState::Starting => {
                 if !self
                     .docker
-                    .is_running(&spawn_request.router.backend_id.to_resource_name())
+                    .is_running(&spawn_request.backend_id.to_resource_name())
                     .await?
                     .0
                 {
@@ -268,7 +266,7 @@ impl Executor {
 
                 let container_ip = self
                     .docker
-                    .get_ip(&spawn_request.router.backend_id.to_resource_name())
+                    .get_ip(&spawn_request.backend_id.to_resource_name())
                     .await
                     .unwrap();
 
@@ -277,8 +275,8 @@ impl Executor {
 
                 self.database
                     .insert_proxy_route(
-                        &spawn_request.router.backend_id,
-                        spawn_request.router.backend_id.id(),
+                        &spawn_request.backend_id,
+                        spawn_request.backend_id.id(),
                         &format!("{}:{}", container_ip, 8080),
                     )
                     .await?;
@@ -288,7 +286,7 @@ impl Executor {
             BackendState::Ready => {
                 if let (false, exit_code) = self
                     .docker
-                    .is_running(&spawn_request.router.backend_id.to_resource_name())
+                    .is_running(&spawn_request.backend_id.to_resource_name())
                     .await?
                 {
                     if exit_code == Some(0) {
@@ -302,11 +300,11 @@ impl Executor {
                 loop {
                     let last_active = self
                         .database
-                        .get_backend_last_active(&spawn_request.router.backend_id)
+                        .get_backend_last_active(&spawn_request.backend_id)
                         .await?;
                     let next_check = last_active
                         .checked_add_signed(chrono::Duration::from_std(
-                            spawn_request.executable.max_idle_secs,
+                            spawn_request.max_idle_secs,
                         )?)
                         .ok_or_else(|| anyhow!("Checked add error."))?;
 
@@ -326,7 +324,7 @@ impl Executor {
             | BackendState::Failed
             | BackendState::Exited
             | BackendState::Swept => {
-                let container_name = spawn_request.router.backend_id.to_resource_name();
+                let container_name = spawn_request.backend_id.to_resource_name();
 
                 self.docker
                     .stop_container(&container_name)

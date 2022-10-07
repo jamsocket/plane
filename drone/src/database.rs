@@ -43,7 +43,7 @@ impl DroneDatabase {
     }
 
     pub async fn insert_backend(&self, spec: &SpawnRequest) -> Result<()> {
-        let backend_id = spec.router.backend_id.id().to_string();
+        let backend_id = spec.backend_id.id().to_string();
         let spec =
             serde_json::to_string(&spec).expect("SpawnRequest serialization should never fail.");
 

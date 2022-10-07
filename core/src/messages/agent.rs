@@ -315,7 +315,7 @@ impl TypedMessage for SpawnRequest {
     type Response = bool;
 
     fn subject(&self) -> String {
-        format!("drone.{}.spawn", self.router.drone_id.id())
+        format!("drone.{}.spawn", self.drone_id.id())
     }
 }
 
