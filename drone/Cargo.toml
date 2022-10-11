@@ -1,5 +1,5 @@
 [package]
-name = "dis-spawner-drone"
+name = "plane-drone"
 version = "0.2.0"
 edition = "2021"
 
@@ -9,10 +9,10 @@ anyhow = "1.0.57"
 base64 = "0.13.0"
 bollard = "0.13.0"
 chrono = { version = "0.4.21", features = ["serde"] }
-clap = { version = "3.2.20", features = ["derive"] }
+clap = { version = "4.0.4", features = ["derive"] }
 config = { version = "0.13.2", default_features = false, features = ["toml"] }
 dashmap = "5.3.4"
-dis-spawner = {path = "../core"}
+plane-core = {path = "../core"}
 futures = "0.3.24"
 http = "0.2.7"
 hyper = { version = "0.14.19", features = ["server", "client", "http1", "http2", "tcp"] }
@@ -37,5 +37,5 @@ tokio-stream = "0.1.8"
 tracing = "0.1.36"
 
 [[bin]]
-name = "spawner-drone"
+name = "plane-drone"
 path = "src/main.rs"

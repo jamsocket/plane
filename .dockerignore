@@ -3,3 +3,5 @@ target
 .github
 tests
 Dockerfile
+docker-compose.yml
+sample-config

@@ -1,18 +1,13 @@
 use anyhow::Result;
-use dev::{
+use integration_test::integration_test;
+use openssl::x509::X509;
+use plane_core::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName};
+use plane_dev::{
     resources::{nats::Nats, pebble::Pebble},
     scratch_dir,
     timeout::{spawn_timeout, timeout},
 };
-use dis_spawner::{
-    messages::cert::SetAcmeDnsRecord, nats::TypedNats,
-    types::ClusterName,
-};
-use dis_spawner_drone::{
-    acme::AcmeEabConfiguration, drone::cli::CertOptions, keys::KeyCertPathPair,
-};
-use integration_test::integration_test;
-use openssl::x509::X509;
+use plane_drone::{cert::acme::AcmeEabConfiguration, cert::CertOptions, keys::KeyCertPathPair};
 use tokio::task::JoinHandle;
 
 fn collect_alt_names(cert: &X509) -> Vec<String> {
@@ -52,16 +47,16 @@ async fn cert_refresh() -> Result<()> {
     let nats = Nats::new().await?;
     let pebble = Pebble::new().await?;
     let conn = nats.connection().await?;
-    let dns_handler = DummyDnsHandler::new(&conn, "spawner.test").await?;
+    let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await?;
 
     let (_, certs) = timeout(
         60_000,
         "Getting certificate",
-        dis_spawner_drone::drone::cert::get_certificate(
-            "spawner.test",
+        plane_drone::cert::get_certificate(
+            "plane.test",
             &conn,
             &pebble.directory_url(),
-            "admin@spawner.test",
+            "admin@plane.test",
             &pebble.client()?,
             None,
         ),
@@ -73,7 +68,7 @@ async fn cert_refresh() -> Result<()> {
     dns_handler.finish().await?;
 
     let alt_names = collect_alt_names(&certs.first().unwrap());
-    assert_eq!(vec!["[*.spawner.test]".to_string()], alt_names);
+    assert_eq!(vec!["[*.plane.test]".to_string()], alt_names);
 
     Ok(())
 }
@@ -83,7 +78,7 @@ async fn cert_refresh_full() -> Result<()> {
     let nats = Nats::new().await?;
     let pebble = Pebble::new().await?;
     let conn = nats.connection().await?;
-    let dns_handler = DummyDnsHandler::new(&conn, "spawner.test").await?;
+    let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await?;
     let output_dir = scratch_dir("output");
     let key_paths = KeyCertPathPair {
         key_path: output_dir.join("output.key"),
@@ -93,12 +88,12 @@ async fn cert_refresh_full() -> Result<()> {
     let () = timeout(
         60_000,
         "Getting certificate",
-        dis_spawner_drone::drone::cert::refresh_certificate(
+        plane_drone::cert::refresh_certificate(
             &CertOptions {
-                cluster_domain: "spawner.test".into(),
+                cluster_domain: "plane.test".into(),
                 nats: nats.connection().await?,
                 key_paths,
-                email: "admin@spawner.test".into(),
+                email: "admin@plane.test".into(),
                 acme_server_url: pebble.directory_url(),
                 acme_eab_keypair: None,
             },
@@ -122,16 +117,16 @@ async fn cert_refresh_eab() -> Result<()> {
     let nats = Nats::new().await?;
     let pebble = Pebble::new_eab(&eab_keypair).await?;
     let conn = nats.connection().await?;
-    let dns_handler = DummyDnsHandler::new(&conn, "spawner.test").await?;
+    let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await?;
 
     let (_, certs) = timeout(
         60_000,
         "Getting certificate",
-        dis_spawner_drone::drone::cert::get_certificate(
-            "spawner.test",
+        plane_drone::cert::get_certificate(
+            "plane.test",
             &conn,
             &pebble.directory_url(),
-            "admin@spawner.test",
+            "admin@plane.test",
             &pebble.client()?,
             Some(&eab_keypair),
         ),
@@ -141,7 +136,7 @@ async fn cert_refresh_eab() -> Result<()> {
     dns_handler.finish().await?;
 
     let alt_names = collect_alt_names(&certs.first().unwrap());
-    assert_eq!(vec!["[*.spawner.test]".to_string()], alt_names);
+    assert_eq!(vec!["[*.plane.test]".to_string()], alt_names);
 
     Ok(())
 }

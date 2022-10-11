@@ -2,6 +2,7 @@ use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
+use anyhow::anyhow;
 use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -103,43 +104,55 @@ impl BackendStatsMessage {
 }
 
 impl BackendStatsMessage {
-    pub fn from_stats_message(
+    pub fn from_stats_messages(
         backend_id: &BackendId,
-        stats_message: &Stats,
-    ) -> Option<BackendStatsMessage> {
+        prev_stats_message: &Stats,
+        cur_stats_message: &Stats,
+    ) -> Result<BackendStatsMessage, anyhow::Error> {
         // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
 
         //memory
-        let mem_naive_usage = stats_message.memory_stats.usage.unwrap_or_default();
-        let mem_available = stats_message.memory_stats.limit.unwrap_or(u64::MAX);
-        let mem_stats = stats_message.memory_stats.stats;
+        let mem_naive_usage = cur_stats_message
+            .memory_stats
+            .usage
+            .ok_or(anyhow!("no memory stats.usage"))?;
+        let mem_available = cur_stats_message
+            .memory_stats
+            .limit
+            .ok_or(anyhow!("no memory stats.limit"))?;
+        let mem_stats = cur_stats_message
+            .memory_stats
+            .stats
+            .ok_or(anyhow!("no memory stats.stats"))?;
         let cache_mem = match mem_stats {
-            Some(stats) => match stats {
-                bollard::container::MemoryStatsStats::V1(stats) => stats.cache,
-                bollard::container::MemoryStatsStats::V2(stats) => stats.inactive_file,
-            },
-            None => 0,
+            bollard::container::MemoryStatsStats::V1(stats) => stats.cache,
+            bollard::container::MemoryStatsStats::V2(stats) => stats.inactive_file,
         };
         let used_memory = mem_naive_usage - cache_mem;
         let mem_use_percent = ((used_memory as f64) / (mem_available as f64)) * 100.0;
 
         //REF: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
         //cpu
-        let cpu_stats = &stats_message.cpu_stats;
-        let precpu_stats = &stats_message.precpu_stats;
+        let cpu_stats = &cur_stats_message.cpu_stats;
+        let prev_cpu_stats = &prev_stats_message.cpu_stats;
         //NOTE: total_usage gives clock cycles, this is monotonically increasing
-        let cpu_delta = cpu_stats.cpu_usage.total_usage - precpu_stats.cpu_usage.total_usage;
-        if cpu_delta == 0 {
-            return None;
-        }
-        let sys_cpu_delta = (cpu_stats.system_cpu_usage.unwrap_or_default() as f64)
-            - (precpu_stats.system_cpu_usage.unwrap_or_default() as f64);
-        let num_cpus = cpu_stats.online_cpus.unwrap_or_default();
-        let cpu_use_percent = (cpu_delta as f64 / sys_cpu_delta) * (num_cpus as f64) * 100.0;
-        //disk
-        //TODO: stream https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
+        let cpu_delta = cpu_stats.cpu_usage.total_usage - prev_cpu_stats.cpu_usage.total_usage;
+        let sys_cpu_delta = (cpu_stats
+            .system_cpu_usage
+            .ok_or(anyhow!("no cpu_stats.system_cpu_usage"))? as f64)
+            - (prev_cpu_stats
+                .system_cpu_usage
+                .ok_or(anyhow!("no cpu_stats.system_cpu_usage"))? as f64);
+        //NOTE: we deviate from docker's formula here by not multiplying by num_cpus
+        //      This is because what we actually want to know from this stat
+        //      is what proportion of total cpu resource is consumed, and not knowing
+        //      the top bound makes that impossible
+        let cpu_use_percent = (cpu_delta as f64 / sys_cpu_delta) * 100.0;
 
-        Some(BackendStatsMessage {
+        //TODO: implement disk stats from
+        //      stream at https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
+
+        Ok(BackendStatsMessage {
             backend_id: backend_id.clone(),
             cpu_use_percent,
             mem_use_percent,
@@ -167,6 +180,8 @@ impl JetStreamable for DroneStatusMessage {
         async_nats::jetstream::stream::Config {
             name: Self::stream_name().into(),
             subjects: vec!["drone.*.status".into()],
+            max_messages_per_subject: 1,
+            max_age: Duration::from_secs(5),
             ..async_nats::jetstream::stream::Config::default()
         }
     }
@@ -182,9 +197,12 @@ impl DroneStatusMessage {
     }
 }
 
-/// A request from a drone to connect to the platform.
+/// A message sent when a drone first connects to a controller.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DroneConnectRequest {
+    /// The ID of the drone.
+    pub drone_id: DroneId,
+
     /// The cluster the drone is requesting to join.
     pub cluster: ClusterName,
 
@@ -192,18 +210,8 @@ pub struct DroneConnectRequest {
     pub ip: IpAddr,
 }
 
-/// A response from the platform to a drone's request to join.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum DroneConnectResponse {
-    /// The drone has joined the cluster and been given an ID.
-    Success { drone_id: DroneId },
-
-    /// The drone requested to join a cluster that does not exist.
-    NoSuchCluster,
-}
-
 impl TypedMessage for DroneConnectRequest {
-    type Response = DroneConnectResponse;
+    type Response = NoReply;
 
     fn subject(&self) -> String {
         "drone.register".to_string()
@@ -241,6 +249,27 @@ pub struct SpawnRequest {
 
     /// Credentials used to fetch the image.
     pub credentials: Option<DockerCredentials>,
+
+    /// Resource limits
+    #[serde(default = "ResourceLimits::default")]
+    pub resource_limits: ResourceLimits,
+}
+
+// eventually, this will be generic over executors
+// currently only applies to docker
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+pub struct ResourceLimits {
+    /// period of cpu time, serializes as microseconds
+    #[serde_as(as = "Option<DurationSeconds>")]
+    pub cpu_period: Option<Duration>,
+
+    /// proportion of period used by container
+    pub cpu_period_percent: Option<u8>,
+
+    /// total cpu time allocated to container    
+    #[serde_as(as = "Option<DurationSeconds>")]
+    pub cpu_time_limit: Option<Duration>,
 }
 
 impl TypedMessage for SpawnRequest {
@@ -252,7 +281,7 @@ impl TypedMessage for SpawnRequest {
 }
 
 impl SpawnRequest {
-    pub fn subscribe_subject(drone_id: DroneId) -> SubscribeSubject<Self> {
+    pub fn subscribe_subject(drone_id: &DroneId) -> SubscribeSubject<Self> {
         SubscribeSubject::new(format!("drone.{}.spawn", drone_id.id()))
     }
 }

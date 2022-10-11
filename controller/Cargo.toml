@@ -1,19 +1,24 @@
 [package]
-name = "dis-spawner-controller"
+name = "plane-controller"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0.64"
+async-trait = "0.1.57"
 chrono = "0.4.22"
-clap = { version = "3.2.20", features = ["derive"] }
+clap = { version = "4.0.4", features = ["derive"] }
 dashmap = "5.3.4"
-dis-spawner = {path = "../core"}
+plane-core = {path = "../core"}
+futures = "0.3.24"
 rand = "0.8.5"
+serde = { version = "1.0.144", features = ["derive"] }
+signal-hook = "0.3.14"
 tokio = { version = "1.21.0", features = ["macros", "rt"] }
 tokio-stream = "0.1.9"
 tracing = "0.1.36"
+trust-dns-server = "0.22.0"
 
 [[bin]]
-name = "spawner-controller"
+name = "plane-controller"
 path = "src/main.rs"

@@ -19,7 +19,7 @@ pub struct ScheduleRequest {
 
     /// The name of the backend. This forms part of the hostname used to
     /// connect to the drone.
-    pub backend_id: BackendId,
+    pub backend_id: Option<BackendId>,
 
     /// The timeout after which the drone is shut down if no connections are made.
     #[serde_as(as = "DurationSeconds")]
@@ -36,22 +36,31 @@ pub struct ScheduleRequest {
 }
 
 impl ScheduleRequest {
-    pub fn schedule(&self, drone_id: DroneId) -> SpawnRequest {
+    pub fn schedule(&self, drone_id: &DroneId) -> SpawnRequest {
+        let backend_id = self
+            .backend_id
+            .clone()
+            .unwrap_or_else(BackendId::new_random);
+
         SpawnRequest {
-            drone_id,
+            drone_id: drone_id.clone(),
             image: self.image.clone(),
-            backend_id: self.backend_id.clone(),
+            backend_id,
             max_idle_secs: self.max_idle_secs,
             env: self.env.clone(),
             metadata: self.metadata.clone(),
             credentials: self.credentials.clone(),
+            resource_limits: Default::default(),
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum ScheduleResponse {
-    Scheduled { drone: DroneId },
+    Scheduled {
+        drone: DroneId,
+        backend_id: BackendId,
+    },
     NoDroneAvailable,
 }
 

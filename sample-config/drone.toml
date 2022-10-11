@@ -1,0 +1,72 @@
+# This file contains some examples of Drone configuration.
+# You can run the drone with --dump-config to validate a configuration.
+
+# The cluster domain serves as a namespace for backends. Each drone belongs
+# to exactly one cluster. The cluster_domain is the domain under which
+# backends are assigned their hostnames. For example, a backend with the id
+# "abcde" on the cluster "plane.dev" would have the hostname
+# "abcde.plane.dev".
+cluster_domain = "plane.test"
+
+# The drone connects to the controller over NATS, which can be configured
+# here.
+[nats]
+hosts = ["nats"]
+
+# An optional token is allowed for token authentication.
+# auth = { token = "my-secret-token" }
+
+# Alternatively, username/password authentication is allowed.
+# auth = { username = "jane", password = "foobar" }
+
+# To serve HTTPS, the drone needs a certificate and key. If the
+# [acme] section is defined, the drone will attempt to obtain
+# these automatically. Either way, it needs to know where to
+# find/store them on disk. This section can be omitted, in which
+# case the proxy serves HTTP only.
+# [cert]
+# key_path = "/path/to/private.key"
+# cert_path = "/path/to/cert.pem"
+
+# Configures how certificates are obtained from an ACME server.
+# [acme]
+# server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+
+# An admin email is required to use ACME servers.
+# admin_email = "admin@plane.dev"
+
+# The drone can optionally use External Account Binding. This is
+# not necessary for Let's Encrypt, but is required by other
+# ACME providers that require authentication.
+# [acme.eab]
+# key_id = "my-key-id"
+# key = "bXkgYmFzZTY0IGtleQ=="
+
+# If this section is present, the drone instance acts as an agent,
+# advertising its availability to the controller and spawning new
+# backends.
+[agent]
+# Instead of a static IP, you can pass a URL of an API server which
+# is expected to return the public IP address of the requestor in
+# plaintext.
+ip = { api = "http://ip-api:8080/" }
+
+# Optional Docker settings for the agent.
+[agent.docker]
+# The runtime to use (defaults to "runc")
+runtime = "runc"
+network = "plane"
+
+# The method of connecting to Docker. {socket=""} and {http=""} are
+# supported.
+connection = { socket = "/var/run/docker.sock" }
+
+# Proxy configuration. If this section is present, the proxy is
+# served.
+[proxy]
+# IP to listen for connections on.
+bind_ip = "0.0.0.0"
+
+[cert]
+key_path = "/etc/plane/auth/site-key.pem"
+cert_path = "/etc/plane/auth/site-cert.pem"

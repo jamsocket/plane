@@ -70,9 +70,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.64"
+version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9a8f622bcf6ff3df478e9deba3e03e4e04b300f8e6a139e192c05fa3490afc7"
+checksum = "98161a4e3e2184da77bb14f02184cdd111e83bbbcc9979dfee3c44b9a85f5602"
 
 [[package]]
 name = "async-nats"
@@ -90,6 +90,40 @@ dependencies = [
  "nuid",
  "once_cell",
  "regex",
+ "rustls-native-certs",
+ "rustls-pemfile 0.3.0",
+ "serde",
+ "serde_json",
+ "serde_nanos",
+ "serde_repr",
+ "subslice",
+ "time 0.3.14",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "async-nats"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5788cd6eb396656c504ad4b2b7fd384715a4c188c03490a9d68f75931a1b182"
+dependencies = [
+ "base64",
+ "base64-url",
+ "bytes",
+ "futures",
+ "http",
+ "itertools",
+ "itoa",
+ "lazy_static",
+ "nkeys",
+ "nuid",
+ "once_cell",
+ "regex",
+ "ring",
  "rustls-native-certs",
  "rustls-pemfile 0.3.0",
  "serde",
@@ -279,13 +313,28 @@ checksum = "23b71c3ce99b7611011217b366d923f1d0a7e07a92bb2dbf1e84508c673ca3bd"
 dependencies = [
  "atty",
  "bitflags",
- "clap_derive",
- "clap_lex",
+ "clap_derive 3.2.18",
+ "clap_lex 0.2.4",
  "indexmap",
  "once_cell",
  "strsim",
  "termcolor",
  "textwrap",
+]
+
+[[package]]
+name = "clap"
+version = "4.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f78ad8e84aa8e8aa3e821857be40eb4b925ff232de430d4dd2ae6aa058cbd92"
+dependencies = [
+ "atty",
+ "bitflags",
+ "clap_derive 4.0.1",
+ "clap_lex 0.3.0",
+ "once_cell",
+ "strsim",
+ "termcolor",
 ]
 
 [[package]]
@@ -302,12 +351,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_derive"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca689d7434ce44517a12a89456b2be4d1ea1cafcd8f581978c03d45f5a5c12a7"
+dependencies = [
+ "heck",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "clap_lex"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
 dependencies = [
  "os_str_bytes",
+]
+
+[[package]]
+name = "clap_lex"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d4198f73e42b4936b35b5bb248d81d2b595ecb170da0bac7655c54eedfa8da8"
+dependencies = [
+ "os_str_bytes",
+]
+
+[[package]]
+name = "colored"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3616f750b84d8f0de8a58bda93e08e2a81ad3f523089b05f1dffecab48c6cbd"
+dependencies = [
+ "atty",
+ "lazy_static",
+ "winapi",
 ]
 
 [[package]]
@@ -522,37 +604,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dev"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-nats",
- "bollard",
- "chrono",
- "dis-spawner",
- "dis-spawner-controller",
- "dis-spawner-drone",
- "futures",
- "http",
- "hyper",
- "integration-test",
- "openssl",
- "rand",
- "rcgen",
- "reqwest",
- "rustls-pemfile 1.0.1",
- "serde_json",
- "tokio",
- "tokio-rustls",
- "tokio-stream",
- "tokio-tungstenite",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -589,73 +640,6 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi",
-]
-
-[[package]]
-name = "dis-spawner"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-nats",
- "bollard",
- "bytes",
- "chrono",
- "dashmap",
- "serde",
- "serde_json",
- "serde_with 2.0.0",
- "tokio",
- "tokio-stream",
- "tracing",
- "tracing-stackdriver",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
-name = "dis-spawner-controller"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "dashmap",
- "dis-spawner",
- "rand",
- "tokio",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
-name = "dis-spawner-drone"
-version = "0.2.0"
-dependencies = [
- "acme2-eab",
- "anyhow",
- "base64",
- "bollard",
- "chrono",
- "clap",
- "config",
- "dashmap",
- "dis-spawner",
- "futures",
- "http",
- "hyper",
- "notify",
- "openssl",
- "reqwest",
- "rustls",
- "rustls-pemfile 1.0.1",
- "serde",
- "serde_json",
- "signal-hook",
- "sqlx",
- "tokio",
- "tokio-rustls",
- "tokio-stream",
- "tracing",
 ]
 
 [[package]]
@@ -704,6 +688,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9852635589dc9f9ea1b6fe9f05b50ef208c85c834a562f0c6abb1c475736ec2b"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "endian-type"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
+
+[[package]]
+name = "enum-as-inner"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9720bba047d567ffc8a3cba48bf19126600e249ab7f128e9233e6376976a116"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1300,6 +1302,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nibble_vec"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a5d83df9f36fe23f0c3648c6bbb8b0298bb5f1939c8f2704431371f4b84d43"
+dependencies = [
+ "smallvec",
+]
+
+[[package]]
 name = "nkeys"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1588,6 +1599,126 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
 
 [[package]]
+name = "plane-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-nats 0.21.0",
+ "clap 4.0.4",
+ "colored",
+ "plane-core",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "plane-controller"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap 4.0.4",
+ "dashmap",
+ "futures",
+ "plane-core",
+ "rand",
+ "serde",
+ "signal-hook",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "trust-dns-server",
+]
+
+[[package]]
+name = "plane-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-nats 0.21.0",
+ "bollard",
+ "bytes",
+ "chrono",
+ "clap 3.2.20",
+ "config",
+ "dashmap",
+ "serde",
+ "serde_json",
+ "serde_with 2.0.0",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-stackdriver",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "plane-dev"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-nats 0.19.0",
+ "bollard",
+ "chrono",
+ "futures",
+ "http",
+ "hyper",
+ "integration-test",
+ "openssl",
+ "plane-controller",
+ "plane-core",
+ "plane-drone",
+ "rand",
+ "rcgen",
+ "reqwest",
+ "rustls-pemfile 1.0.1",
+ "serde_json",
+ "tokio",
+ "tokio-rustls",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "plane-drone"
+version = "0.2.0"
+dependencies = [
+ "acme2-eab",
+ "anyhow",
+ "base64",
+ "bollard",
+ "chrono",
+ "clap 4.0.4",
+ "config",
+ "dashmap",
+ "futures",
+ "http",
+ "hyper",
+ "notify",
+ "openssl",
+ "plane-core",
+ "reqwest",
+ "rustls",
+ "rustls-pemfile 1.0.1",
+ "serde",
+ "serde_json",
+ "signal-hook",
+ "sqlx",
+ "tokio",
+ "tokio-rustls",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1633,6 +1764,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbe448f377a7d6961e30f5955f9b8d106c3f5e449d493ee1b125c1d43c2b5179"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "radix_trie"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c069c179fcdc6a2fe24d8d18305cf085fdbd4f922c041943e203685d6a1c58fd"
+dependencies = [
+ "endian-type",
+ "nibble_vec",
 ]
 
 [[package]]
@@ -2405,9 +2546,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.21.0"
+version = "1.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89797afd69d206ccd11fb0ea560a44bbb87731d020670e79416d442919257d42"
+checksum = "a9e03c497dc955702ba729190dc4aac6f2a0ce97f913e5b1b5912fc5039d9099"
 dependencies = [
  "autocfg",
  "bytes",
@@ -2415,7 +2556,6 @@ dependencies = [
  "memchr",
  "mio",
  "num_cpus",
- "once_cell",
  "parking_lot 0.12.1",
  "pin-project-lite",
  "signal-hook-registry",
@@ -2620,6 +2760,73 @@ dependencies = [
 ]
 
 [[package]]
+name = "trust-dns-client"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c408c32e6a9dbb38037cece35740f2cf23c875d8ca134d33631cec83f74d3fe"
+dependencies = [
+ "cfg-if",
+ "data-encoding",
+ "futures-channel",
+ "futures-util",
+ "lazy_static",
+ "radix_trie",
+ "rand",
+ "thiserror",
+ "time 0.3.14",
+ "tokio",
+ "tracing",
+ "trust-dns-proto",
+]
+
+[[package]]
+name = "trust-dns-proto"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f7f83d1e4a0e4358ac54c5c3681e5d7da5efc5a7a632c90bb6d6669ddd9bc26"
+dependencies = [
+ "async-trait",
+ "cfg-if",
+ "data-encoding",
+ "enum-as-inner",
+ "futures-channel",
+ "futures-io",
+ "futures-util",
+ "idna",
+ "ipnet",
+ "lazy_static",
+ "rand",
+ "smallvec",
+ "thiserror",
+ "tinyvec",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "trust-dns-server"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1583cf9f8a359c9f16fdf760b79cb2be3f261b98db8027f81959c7a4f6645e2c"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "cfg-if",
+ "enum-as-inner",
+ "futures-executor",
+ "futures-util",
+ "serde",
+ "thiserror",
+ "time 0.3.14",
+ "tokio",
+ "toml",
+ "tracing",
+ "trust-dns-client",
+ "trust-dns-proto",
+]
+
+[[package]]
 name = "try-lock"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2712,6 +2919,15 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
+
+[[package]]
+name = "uuid"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "feb41e78f93363bb2df8b0e86a2ca30eed7806ea16ea0c790d757cf93f79be83"
+dependencies = [
+ "getrandom",
+]
 
 [[package]]
 name = "valuable"

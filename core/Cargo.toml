@@ -1,14 +1,16 @@
 [package]
-name = "dis-spawner"
+name = "plane-core"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0.61"
-async-nats = "0.19.0"
+async-nats = "0.21.0"
 bollard = "0.13.0"
 bytes = "1.2.1"
 chrono = { version = "0.4.22", features = ["serde"] }
+clap = { version = "3.2.20", features = ["derive"] }
+config = { version = "0.13.2", default_features = false, features = ["toml"] }
 dashmap = "5.4.0"
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = "1.0.83"
@@ -19,3 +21,4 @@ tracing = "0.1.36"
 tracing-stackdriver = "0.5.0"
 tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
 url = "2.2.2"
+uuid = { version = "1.1.2", features = ["v4"] }

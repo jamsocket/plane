@@ -1,25 +1,33 @@
 use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, fmt::Display, str::FromStr};
+use uuid::Uuid;
 
-const RESOURCE_PREFIX: &str = "spawner-";
+const RESOURCE_PREFIX: &str = "plane-";
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct DroneId(u32);
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct DroneId(String);
+
+impl Display for DroneId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 impl DroneId {
     #[must_use]
-    pub fn new(id: u32) -> Self {
+    pub fn new(id: String) -> Self {
         DroneId(id)
     }
 
     #[must_use]
-    pub fn id(&self) -> u32 {
-        self.0
+    pub fn id(&self) -> &str {
+        &self.0
     }
 
     #[must_use]
-    pub fn id_i32(&self) -> i32 {
-        self.0 as i32
+    pub fn new_random() -> Self {
+        let id = Uuid::new_v4();
+        DroneId(id.to_string())
     }
 }
 
@@ -54,9 +62,15 @@ impl BackendId {
             .strip_prefix(RESOURCE_PREFIX)
             .map(|d| BackendId(d.to_string()))
     }
+
+    #[must_use]
+    pub fn new_random() -> Self {
+        let id = Uuid::new_v4();
+        BackendId(id.to_string())
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClusterName(String);
 
 impl FromStr for ClusterName {

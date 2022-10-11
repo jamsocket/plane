@@ -1,5 +1,5 @@
 use anyhow::Result;
-use dis_spawner_drone::keys::KeyCertPathPair;
+use plane_drone::keys::KeyCertPathPair;
 use rcgen::generate_simple_self_signed;
 use std::{
     fs::{self, create_dir_all},
