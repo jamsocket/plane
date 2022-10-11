@@ -1,17 +1,16 @@
 use crate::util::random_loopback_ip;
 use anyhow::{anyhow, Result};
 use futures::Future;
-use futures::{future, SinkExt, StreamExt, TryStreamExt};
+use futures::{future, StreamExt, TryStreamExt};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{self, Body, Request, Response};
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
-use tokio_tungstenite::{client_async, tungstenite::protocol::Message};
 
 pub struct Server {
     server_handle: JoinHandle<()>,
@@ -77,46 +76,7 @@ impl Server {
             address,
         };
 
-        server.wait_ready_socket().await?;
         Ok(server)
-    }
-
-    async fn wait_ready_socket(&self) -> Result<()> {
-        let url_str = format!("ws://{}", self.address.to_string());
-        let tcp = TcpStream::connect(&self.address)
-            .await
-            .expect("failed to connect");
-        let url = url::Url::parse(&url_str).unwrap();
-
-        let (stream, _) = client_async(url, tcp)
-            .await
-            .expect("client failed to connect");
-        let (mut write, read) = stream.split();
-
-        let max_messages = 5;
-        for i in 1..max_messages + 1 {
-            write
-                .send(Message::Text(format!("{}", i)))
-                .await
-                .expect("Failed to send message");
-        }
-
-        let read = tokio_stream::StreamExt::timeout(read, Duration::from_secs(10));
-
-        let responses: Vec<Message> = read
-            .take(max_messages)
-            .map(|x| {
-                x.expect("response failed with timeout")
-                    .expect("failure while reading from stream")
-            })
-            .collect::<Vec<_>>()
-            .await;
-
-        assert_eq!(responses.len(), max_messages);
-
-        write.close().await.expect("Failed to close");
-
-        Ok(())
     }
 
     async fn wait_ready(&self) -> Result<()> {

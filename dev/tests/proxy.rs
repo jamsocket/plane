@@ -11,22 +11,17 @@ use dev::{
 };
 use dis_spawner_drone::database::DroneDatabase;
 use dis_spawner_drone::drone::proxy::ProxyOptions;
+use futures::{SinkExt, StreamExt};
 use http::StatusCode;
 use integration_test::integration_test;
 use reqwest::Response;
 use reqwest::{Certificate, ClientBuilder};
 use std::net::SocketAddrV4;
-use std::{net::SocketAddr, time::Duration};
-use tokio::time::Instant;
-
-// websocket related
-use futures::{
-    stream::{SplitSink, SplitStream},
-    SinkExt, StreamExt,
-};
 use std::sync::Arc;
+use std::{net::SocketAddr, time::Duration};
 use tokio::net::TcpStream;
-use tokio_rustls::{client::TlsStream, rustls::client as rustls_client, TlsConnector};
+use tokio::time::Instant;
+use tokio_rustls::{rustls::client as rustls_client, TlsConnector};
 use tokio_tungstenite::{
     tungstenite::handshake::client::generate_key, tungstenite::protocol::Message, WebSocketStream,
 };
@@ -232,10 +227,7 @@ async fn simple_ws_backend_proxy() -> Result<()> {
         http::status::StatusCode::SWITCHING_PROTOCOLS
     );
 
-    let (mut write, read): (
-        SplitSink<WebSocketStream<TlsStream<TcpStream>>, Message>,
-        SplitStream<WebSocketStream<TlsStream<TcpStream>>>,
-    ) = StreamExt::split(ws_stream);
+    let (mut write, read) = StreamExt::split(ws_stream);
 
     let max_messages = 6;
     for i in 1..max_messages + 1 {
@@ -257,7 +249,6 @@ async fn simple_ws_backend_proxy() -> Result<()> {
         .collect()
         .await;
 
-    assert_eq!(responses.len(), max_messages);
     assert_eq!(responses, ["1", "2", "3", "4", "5", "6"]);
 
     write.close().await.expect("Failed to close");
