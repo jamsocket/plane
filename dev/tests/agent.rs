@@ -382,8 +382,14 @@ async fn handle_error_during_start() -> Result<()> {
     let mut request = base_spawn_request();
     request.drone_id = drone_id;
     // Exit with error code 1 after 100ms.
-    request.env.insert("EXIT_CODE".into(), "1".into());
-    request.env.insert("EXIT_TIMEOUT".into(), "100".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_CODE".into(), "1".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_TIMEOUT".into(), "100".into());
 
     let mut state_subscription =
         BackendStateSubscription::new(&connection, &request.backend_id).await?;
