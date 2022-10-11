@@ -6,11 +6,7 @@ on:
     paths:
     - 'dev/test-server/**'
     - '.github/workflows/build-test-image.yml'
-  pull_request:
-    branches: [ "main" ]
-    paths:
-    - 'dev/test-server/**'
-    - '.github/workflows/build-test-image.yml'
+    paths-ignore: [ "/docs" ]
 
 env:
   REGISTRY: ghcr.io

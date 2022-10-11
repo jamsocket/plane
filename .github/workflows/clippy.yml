@@ -1,8 +1,7 @@
 on:
   pull_request:
     branches: [ "*" ]
-    paths:
-    - 'dev/test-server/*'
+    paths-ignore: [ "/docs" ]
 
 name: Clippy check
 jobs:
