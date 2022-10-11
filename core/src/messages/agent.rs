@@ -225,6 +225,7 @@ impl DroneConnectRequest {
 }
 
 /// A message telling a drone to spawn a backend.
+/*
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SpawnRequest {
@@ -253,6 +254,44 @@ pub struct SpawnRequest {
     /// Resource limits
     #[serde(default = "ResourceLimits::default")]
     pub resource_limits: ResourceLimits,
+}
+*/
+
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct DockerExecutableConfig {
+    /// The container image to run.
+    pub image: String,
+
+    /// Environment variables to pass in to the container.
+    pub env: HashMap<String, String>,
+
+    /// Credentials used to fetch the image.
+    pub credentials: Option<DockerCredentials>,
+
+    /// Resource limits
+    #[serde(default = "ResourceLimits::default")]
+    pub resource_limits: ResourceLimits,
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct SpawnRequest {
+    pub drone_id: DroneId,
+
+    /// The timeout after which the drone is shut down if no connections are made.
+    #[serde_as(as = "DurationSeconds")]
+    pub max_idle_secs: Duration,
+
+    /// The name of the backend. This forms part of the hostname used to
+    /// connect to the drone.
+    pub backend_id: BackendId,
+
+    /// Metadata for the spawn. Typically added to log messages for debugging and observability.
+    pub metadata: HashMap<String, String>,
+
+    ///configuration of executor (ie. image to run, executor being used etc)
+    pub executable: DockerExecutableConfig,
 }
 
 // eventually, this will be generic over executors

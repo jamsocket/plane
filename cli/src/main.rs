@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
     messages::{
-        agent::{BackendStateMessage, DroneStatusMessage},
+        agent::{BackendStateMessage, DockerExecutableConfig, DroneStatusMessage, ResourceLimits},
         dns::SetDnsRecord,
         scheduler::{ScheduleRequest, ScheduleResponse},
     },
@@ -95,11 +95,14 @@ async fn main() -> Result<()> {
                 .request(&ScheduleRequest {
                     backend_id: None,
                     cluster: ClusterName::new(&cluster),
-                    image,
                     max_idle_secs: Duration::from_secs(timeout),
-                    env: HashMap::new(),
                     metadata: HashMap::new(),
-                    credentials: None,
+                    executable: DockerExecutableConfig {
+                        image,
+                        env: HashMap::new(),
+                        credentials: None,
+                        resource_limits: ResourceLimits::default(),
+                    },
                 })
                 .await?;
 
