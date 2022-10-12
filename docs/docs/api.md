@@ -2,6 +2,8 @@
 sidebar_position: 3
 ---
 
+# API
+
 Communication with the controller occurs through a JSON-over-[NATS](https://nats.io) API.
 
 This API should not yet be considered stable -- it may change between Plane versions and in order to move quickly, we do not yet enforce cross-compatibility between versions. We're [in the process of stabilizing it](https://github.com/drifting-in-space/plane/issues/138), after which it will abide by [semver](https://semver.org/).
