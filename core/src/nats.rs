@@ -405,7 +405,7 @@ impl TypedNats {
             .await
             .to_anyhow()?;
 
-        let stream: Messages = consumer.messages().await.to_anyhow()?.into();
+        let stream: Messages = consumer.messages().await.to_anyhow()?;
 
         Ok(JetstreamSubscription {
             stream,
