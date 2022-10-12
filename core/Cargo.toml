@@ -1,7 +1,13 @@
 [package]
 name = "plane-core"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
+authors = ["Paul Butler <paul@driftingin.space>"]
+homepage = "https://plane.dev"
+description = "Session backend orchestrator for ambitious browser-based apps."
+repository = "https://github.com/drifting-in-space/plane"
+license = "MIT"
+readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.61"

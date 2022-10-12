@@ -1,7 +1,13 @@
 [package]
 name = "plane-drone"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
+authors = ["Paul Butler <paul@driftingin.space>"]
+homepage = "https://plane.dev"
+description = "Session backend orchestrator for ambitious browser-based apps."
+repository = "https://github.com/drifting-in-space/plane"
+license = "MIT"
+readme = "README.md"
 
 [dependencies]
 acme2-eab = "0.5.1"
@@ -12,7 +18,7 @@ chrono = { version = "0.4.21", features = ["serde"] }
 clap = { version = "4.0.4", features = ["derive"] }
 config = { version = "0.13.2", default_features = false, features = ["toml"] }
 dashmap = "5.3.4"
-plane-core = {path = "../core"}
+plane-core = {path = "../core", version="0.3.0"}
 futures = "0.3.24"
 http = "0.2.7"
 hyper = { version = "0.14.19", features = ["server", "client", "http1", "http2", "tcp"] }
