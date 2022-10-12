@@ -1,12 +1,14 @@
 use crate::util::random_loopback_ip;
 use anyhow::{anyhow, Result};
 use futures::Future;
+use futures::{future, StreamExt, TryStreamExt};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{self, Body, Request, Response};
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
@@ -47,6 +49,33 @@ impl Server {
             address,
         };
         server.wait_ready().await?;
+        Ok(server)
+    }
+
+    pub async fn serve_web_sockets() -> Result<Self> {
+        let ip = random_loopback_ip();
+        let address = SocketAddr::new(ip.into(), 8080);
+
+        let tcp_listener = TcpListener::bind(address).await.expect("failed to bind");
+
+        let server_handle = tokio::spawn(async move {
+            while let Ok((stream, _)) = tcp_listener.accept().await {
+                let ws_stream = tokio_tungstenite::accept_async(stream)
+                    .await
+                    .expect("Error during the websocket handshake occurred");
+                let (write, read) = ws_stream.split();
+                read.try_filter(|msg| future::ready(msg.is_text() || msg.is_binary()))
+                    .forward(write)
+                    .await
+                    .expect("Failed to forward messages");
+            }
+        });
+
+        let server = Server {
+            server_handle,
+            address,
+        };
+
         Ok(server)
     }
 

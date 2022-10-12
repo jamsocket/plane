@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use chrono::Utc;
+use futures::{SinkExt, StreamExt};
 use http::StatusCode;
 use integration_test::integration_test;
 use plane_core::NeverResult;
@@ -17,8 +18,14 @@ use plane_drone::proxy::ProxyOptions;
 use reqwest::Response;
 use reqwest::{Certificate, ClientBuilder};
 use std::net::SocketAddrV4;
+use std::sync::Arc;
 use std::{net::SocketAddr, time::Duration};
+use tokio::net::TcpStream;
 use tokio::time::Instant;
+use tokio_rustls::{rustls::client as rustls_client, TlsConnector};
+use tokio_tungstenite::{
+    tungstenite::handshake::client::generate_key, tungstenite::protocol::Message, WebSocketStream,
+};
 
 const CLUSTER: &str = "plane.test";
 
@@ -107,6 +114,60 @@ impl Proxy {
         let url = format!("https://{}:{}/{}", hostname, self.bind_address.port(), path);
         client.get(url).send().await
     }
+
+    pub async fn https_websocket(
+        &self,
+        subdomain: &str,
+        path: &str,
+    ) -> std::result::Result<
+        (
+            WebSocketStream<tokio_rustls::client::TlsStream<tokio::net::TcpStream>>,
+            http::Response<()>,
+        ),
+        tokio_tungstenite::tungstenite::Error,
+    > {
+        let hostname = format!("{}.{}", subdomain, CLUSTER);
+        let path = if let Some(path) = path.strip_prefix("/") {
+            path
+        } else {
+            path
+        };
+
+        let tcp_stream = TcpStream::connect(self.bind_address)
+            .await
+            .expect("failed to connect tcp");
+
+        let mut root_certs = tokio_rustls::rustls::RootCertStore::empty();
+        root_certs.add_parsable_certificates(
+            &rustls_pemfile::certs(&mut self.certs.cert_pem.as_bytes()).unwrap(),
+        );
+        let client_config = Arc::new(
+            tokio_rustls::rustls::ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(root_certs)
+                .with_no_client_auth(),
+        );
+
+        let connector = TlsConnector::from(client_config);
+        let domain =
+            rustls_client::ServerName::try_from(hostname.as_str()).expect("invalid dns for tls");
+        let tls_stream = connector
+            .connect(domain, tcp_stream)
+            .await
+            .expect("could not finish tls handshake");
+
+        let ws_adr = format!("ws://{}/{}", hostname, path);
+        let req = hyper::Request::get(ws_adr)
+            .header("Sec-WebSocket-Key", generate_key())
+            .header("Connection", "Upgrade")
+            .header("Upgrade", "websocket")
+            .header("Sec-WebSocket-Version", "13")
+            .header("Host", hostname)
+            .body(())
+            .unwrap();
+
+        tokio_tungstenite::client_async(req, tls_stream).await
+    }
 }
 
 #[integration_test]
@@ -134,6 +195,58 @@ async fn simple_backend_proxy() -> Result<()> {
 
     let result = proxy.http_get("foobar", "/").await?;
     assert_eq!("Hello World", result.text().await?);
+
+    Ok(())
+}
+
+#[integration_test]
+async fn simple_ws_backend_proxy() -> Result<()> {
+    let proxy = Proxy::new().await?;
+    let server = Server::serve_web_sockets().await?;
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await?;
+
+    proxy
+        .db
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .await?;
+
+    let (ws_stream, ws_handshake_resp) = proxy
+        .https_websocket("foobar", "/")
+        .await
+        .expect("could not request ws from proxy");
+
+    assert_eq!(
+        ws_handshake_resp.status(),
+        http::status::StatusCode::SWITCHING_PROTOCOLS
+    );
+
+    let (mut write, read) = StreamExt::split(ws_stream);
+
+    let max_messages = 6;
+    for i in 1..max_messages + 1 {
+        write
+            .send(Message::Text(format!("{}", i)))
+            .await
+            .expect("Failed to send message via proxy ws");
+    }
+
+    let read = tokio_stream::StreamExt::timeout(read, Duration::from_secs(10));
+
+    let responses: Vec<String> = read
+        .take(max_messages)
+        .map(|x| {
+            x.expect("response failed with timeout")
+                .expect("failure while reading from stream")
+                .to_string()
+        })
+        .collect()
+        .await;
+
+    assert_eq!(responses, ["1", "2", "3", "4", "5", "6"]);
+
+    write.close().await.expect("Failed to close");
 
     Ok(())
 }
