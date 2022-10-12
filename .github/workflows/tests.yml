@@ -3,8 +3,10 @@ name: Tests
 on:
   push:
     branches: [ main ]
+    paths-ignore: [ "/docs" ]
   pull_request:
     branches: [ main ]
+    paths-ignore: [ "/docs" ]
 
 env:
   CARGO_TERM_COLOR: always

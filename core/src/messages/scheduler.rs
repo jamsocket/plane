@@ -1,9 +1,8 @@
-use super::agent::SpawnRequest;
+use super::agent::{DockerExecutableConfig, SpawnRequest};
 use crate::{
     nats::{SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
-use bollard::auth::DockerCredentials;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
@@ -14,9 +13,6 @@ use std::{collections::HashMap, time::Duration};
 pub struct ScheduleRequest {
     pub cluster: ClusterName,
 
-    /// The container image to run.
-    pub image: String,
-
     /// The name of the backend. This forms part of the hostname used to
     /// connect to the drone.
     pub backend_id: Option<BackendId>,
@@ -25,14 +21,11 @@ pub struct ScheduleRequest {
     #[serde_as(as = "DurationSeconds")]
     pub max_idle_secs: Duration,
 
-    /// Environment variables to pass in to the container.
-    pub env: HashMap<String, String>,
-
     /// Metadata for the spawn. Typically added to log messages for debugging and observability.
     pub metadata: HashMap<String, String>,
 
-    /// Credentials used to fetch the image.
-    pub credentials: Option<DockerCredentials>,
+    /// Configuration for docker run (image, creds, env vars etc.)
+    pub executable: DockerExecutableConfig,
 }
 
 impl ScheduleRequest {
@@ -44,13 +37,10 @@ impl ScheduleRequest {
 
         SpawnRequest {
             drone_id: drone_id.clone(),
-            image: self.image.clone(),
             backend_id,
-            max_idle_secs: self.max_idle_secs,
-            env: self.env.clone(),
+            max_idle_secs: self.max_idle_secs.clone(),
             metadata: self.metadata.clone(),
-            credentials: self.credentials.clone(),
-            resource_limits: Default::default(),
+            executable: self.executable.clone(),
         }
     }
 }

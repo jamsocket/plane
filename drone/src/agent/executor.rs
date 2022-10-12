@@ -235,16 +235,19 @@ impl Executor {
         match state {
             BackendState::Loading => {
                 self.docker
-                    .pull_image(&spawn_request.image, &spawn_request.credentials)
+                    .pull_image(
+                        &spawn_request.executable.image,
+                        &spawn_request.executable.credentials,
+                    )
                     .await?;
 
                 let backend_id = spawn_request.backend_id.to_resource_name();
                 self.docker
                     .run_container(
                         &backend_id,
-                        &spawn_request.image,
-                        &spawn_request.env,
-                        &spawn_request.resource_limits,
+                        &spawn_request.executable.image,
+                        &spawn_request.executable.env,
+                        &spawn_request.executable.resource_limits,
                     )
                     .await?;
                 tracing::info!(%backend_id, "Container is running.");
