@@ -370,9 +370,9 @@ impl TypedNats {
                 deliver_policy: DeliverPolicy::All,
                 filter_subject: subject,
                 deliver_subject,
-                max_ack_pending: 1, // NOTE: IF YOU REMOVE THIS OR CHANGE THE VALUE,
-                // THE RESULTANT STREAM IS NO LONGER GUARANTEED TO BE IN ORDER, AND CALL SITES
-                // THAT RELY ON ORDERED MESSAGES WILL BREAK, NONDETERMINISTICALLY
+                max_ack_pending: 1, // NOTE: If you remove this or change the value,
+                // the resultant stream is no longer guaranteed to be in order, and call sites
+                // that rely on ordered messages will break, nondeterministically
                 ..Default::default()
             })
             .await
