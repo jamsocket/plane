@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 ---
 
 # Deploying
@@ -22,3 +22,6 @@ enable Jetstream.
 
 For more information on deploying NATS, see their [deployment guide](https://docs.nats.io/running-a-nats-service/introduction).
 
+## Sandboxing
+
+Plane uses a Docker daemon as its backend. By default, Docker uses the `runc` container runtime, which uses Linux primitives to isolate the process but is not hardened against kernel vulnerabilites. If you are running untrusted code, you should consider using [gVisor](https://gvisor.dev/) to intercept syscalls and configure iptables to limit network access as appropriate.
