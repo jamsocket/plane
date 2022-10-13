@@ -353,6 +353,7 @@ impl TypedNats {
         Ok(result)
     }
 
+    /// Returns an ORDERED stream of messages published to a nats topic
     pub async fn subscribe_jetstream<T: JetStreamable>(
         &self,
         subject: SubscribeSubject<T>,
@@ -369,12 +370,15 @@ impl TypedNats {
                 deliver_policy: DeliverPolicy::All,
                 filter_subject: subject,
                 deliver_subject,
-                ..async_nats::jetstream::consumer::push::Config::default()
+                max_ack_pending: 1, // NOTE: If you remove this or change the value,
+                // the resultant stream is no longer guaranteed to be in order, and call sites
+                // that rely on ordered messages will break, nondeterministically
+                ..Default::default()
             })
             .await
             .to_anyhow()?;
 
-        let stream = consumer.messages().await.to_anyhow()?;
+        let stream: Messages = consumer.messages().await.to_anyhow()?;
 
         Ok(JetstreamSubscription {
             stream,
