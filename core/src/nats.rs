@@ -353,6 +353,7 @@ impl TypedNats {
         Ok(result)
     }
 
+    /// Returns an ORDERED stream of messages published to a nats topic
     pub async fn subscribe_jetstream<T: JetStreamable>(
         &self,
         subject: SubscribeSubject<T>,
@@ -369,37 +370,9 @@ impl TypedNats {
                 deliver_policy: DeliverPolicy::All,
                 filter_subject: subject,
                 deliver_subject,
-                ..async_nats::jetstream::consumer::push::Config::default()
-            })
-            .await
-            .to_anyhow()?;
-
-        let stream: Messages = consumer.messages().await.to_anyhow()?;
-
-        Ok(JetstreamSubscription {
-            stream,
-            _ph: PhantomData::default(),
-        })
-    }
-
-    pub async fn subscribe_jetstream_ordered<T: JetStreamable>(
-        &self,
-        subject: SubscribeSubject<T>,
-    ) -> Result<JetstreamSubscription<T>> {
-        //TODO: use ordered consumers for this
-        let subject = subject.subject.to_string();
-        let _ = self.ensure_jetstream_exists::<T>().await;
-        let stream_name = T::stream_name();
-
-        let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
-        let deliver_subject = self.nc.new_inbox();
-
-        let consumer = stream
-            .create_consumer(async_nats::jetstream::consumer::push::Config {
-                deliver_policy: DeliverPolicy::All,
-                filter_subject: subject,
-                max_ack_pending: 1,
-                deliver_subject,
+                max_ack_pending: 1, // NOTE: IF YOU REMOVE THIS OR CHANGE THE VALUE,
+                // THE RESULTANT STREAM IS NO LONGER GUARANTEED TO BE IN ORDER, AND CALL SITES
+                // THAT RELY ON ORDERED MESSAGES WILL BREAK, NONDETERMINISTICALLY
                 ..Default::default()
             })
             .await
