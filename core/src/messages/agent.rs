@@ -103,9 +103,10 @@ impl JetStreamable for DroneLogMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BackendStatsMessage {
-    //just fractions of max for now, go from there
     backend_id: BackendId,
+    /// Fraction of maximum CPU.
     pub cpu_use_percent: f64,
+    /// Fraction of maximum memory.
     pub mem_use_percent: f64,
 }
 
@@ -130,9 +131,7 @@ impl BackendStatsMessage {
         prev_stats_message: &Stats,
         cur_stats_message: &Stats,
     ) -> Result<BackendStatsMessage, Error> {
-        // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
-
-        //memory
+        // Based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
         let mem_naive_usage = cur_stats_message
             .memory_stats
             .usage
@@ -152,11 +151,11 @@ impl BackendStatsMessage {
         let used_memory = mem_naive_usage - cache_mem;
         let mem_use_percent = ((used_memory as f64) / (mem_available as f64)) * 100.0;
 
-        //REF: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
-        //cpu
+        // REF: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
+        // cpu
         let cpu_stats = &cur_stats_message.cpu_stats;
         let prev_cpu_stats = &prev_stats_message.cpu_stats;
-        //NOTE: total_usage gives clock cycles, this is monotonically increasing
+        // NOTE: total_usage gives clock cycles, this is monotonically increasing
         let cpu_delta = cpu_stats.cpu_usage.total_usage - prev_cpu_stats.cpu_usage.total_usage;
         let sys_cpu_delta = (cpu_stats
             .system_cpu_usage
@@ -165,14 +164,14 @@ impl BackendStatsMessage {
             - (prev_cpu_stats
                 .system_cpu_usage
                 .ok_or_else(|| anyhow!("no cpu_stats.system_cpu_usage"))? as f64);
-        //NOTE: we deviate from docker's formula here by not multiplying by num_cpus
-        //      This is because what we actually want to know from this stat
-        //      is what proportion of total cpu resource is consumed, and not knowing
-        //      the top bound makes that impossible
+        // NOTE: we deviate from docker's formula here by not multiplying by num_cpus
+        //       This is because what we actually want to know from this stat
+        //       is what proportion of total cpu resource is consumed, and not knowing
+        //       the top bound makes that impossible
         let cpu_use_percent = (cpu_delta as f64 / sys_cpu_delta) * 100.0;
 
-        //TODO: implement disk stats from
-        //      stream at https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
+        // TODO: implement disk stats from stream at
+        //       https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
         Ok(BackendStatsMessage {
             backend_id: backend_id.clone(),
@@ -279,7 +278,7 @@ pub struct SpawnRequest {
     /// Metadata for the spawn. Typically added to log messages for debugging and observability.
     pub metadata: HashMap<String, String>,
 
-    ///configuration of executor (ie. image to run, executor being used etc)
+    /// Configuration of executor (ie. image to run, executor being used etc)
     pub executable: DockerExecutableConfig,
 }
 
@@ -288,14 +287,14 @@ pub struct SpawnRequest {
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct ResourceLimits {
-    /// period of cpu time, serializes as microseconds
+    /// Period of cpu time, serializes as microseconds
     #[serde_as(as = "Option<DurationSeconds>")]
     pub cpu_period: Option<Duration>,
 
-    /// proportion of period used by container
+    /// Proportion of period used by container
     pub cpu_period_percent: Option<u8>,
 
-    /// total cpu time allocated to container    
+    /// Total cpu time allocated to container    
     #[serde_as(as = "Option<DurationSeconds>")]
     pub cpu_time_limit: Option<Duration>,
 }

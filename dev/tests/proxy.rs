@@ -32,7 +32,6 @@ const CLUSTER: &str = "plane.test";
 struct Proxy {
     #[allow(unused)]
     guard: LivenessGuard<NeverResult>,
-    //ip: Ipv4Addr,
     bind_address: SocketAddr,
     certs: SelfSignedCert,
     db: DroneDatabase,
