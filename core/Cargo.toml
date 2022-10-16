@@ -15,7 +15,7 @@ async-nats = "0.21.0"
 bollard = "0.13.0"
 bytes = "1.2.1"
 chrono = { version = "0.4.22", features = ["serde"] }
-clap = { version = "3.2.20", features = ["derive"] }
+clap = { version = "4.0.15", features = ["derive"] }
 config = { version = "0.13.2", default_features = false, features = ["toml"] }
 dashmap = "5.4.0"
 serde = { version = "1.0.143", features = ["derive"] }
