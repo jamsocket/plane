@@ -336,6 +336,7 @@ impl DockerInterface {
         let container_id = {
             let options: Option<CreateContainerOptions<String>> = Some(CreateContainerOptions {
                 name: name.to_string(),
+                platform: None,
             });
 
             let config: Config<String> = Config {
