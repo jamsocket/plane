@@ -21,7 +21,7 @@ impl ControllerPlan {
 
         let scheduler_plan = config.scheduler.map(|_| SchedulerPlan);
         let dns_plan = config.dns.map(|options| DnsPlan {
-            options: options,
+            options,
             nc: nats.clone(),
         });
 

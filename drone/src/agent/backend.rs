@@ -121,7 +121,7 @@ impl BackendMonitor {
             let mut prev_stats = stream
                 .next()
                 .await
-                .ok_or(anyhow!("failed to get first stats"))??;
+                .ok_or_else(|| anyhow!("failed to get first stats"))??;
             while let Some(cur_stats) = stream.next().await {
                 match cur_stats {
                     Ok(cur_stats) => {

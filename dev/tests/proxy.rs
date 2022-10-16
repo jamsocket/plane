@@ -45,7 +45,7 @@ impl Proxy {
             .unwrap();
 
         loop {
-            let cert = Certificate::from_pem(&self.certs.cert_pem.as_bytes()).unwrap();
+            let cert = Certificate::from_pem(self.certs.cert_pem.as_bytes()).unwrap();
             let client = ClientBuilder::new()
                 .add_root_certificate(cert)
                 .resolve(CLUSTER, self.bind_address)
@@ -98,14 +98,14 @@ impl Proxy {
         subdomain: &str,
         path: &str,
     ) -> std::result::Result<Response, reqwest::Error> {
-        let cert = Certificate::from_pem(&self.certs.cert_pem.as_bytes()).unwrap();
+        let cert = Certificate::from_pem(self.certs.cert_pem.as_bytes()).unwrap();
         let hostname = format!("{}.{}", subdomain, CLUSTER);
         let client = ClientBuilder::new()
             .add_root_certificate(cert)
             .resolve(&hostname, self.bind_address)
             .build()?;
 
-        let path = if let Some(path) = path.strip_prefix("/") {
+        let path = if let Some(path) = path.strip_prefix('/') {
             path
         } else {
             path
@@ -127,7 +127,7 @@ impl Proxy {
         tokio_tungstenite::tungstenite::Error,
     > {
         let hostname = format!("{}.{}", subdomain, CLUSTER);
-        let path = if let Some(path) = path.strip_prefix("/") {
+        let path = if let Some(path) = path.strip_prefix('/') {
             path
         } else {
             path
