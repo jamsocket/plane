@@ -237,7 +237,7 @@ impl Executor {
                 self.docker
                     .pull_image(
                         &spawn_request.executable.image,
-                        &spawn_request.executable.credentials,
+                        &spawn_request.executable.credentials.as_ref().map(|d| d.into()),
                     )
                     .await?;
 

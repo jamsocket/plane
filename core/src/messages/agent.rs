@@ -2,13 +2,32 @@ use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
-use anyhow::anyhow;
-use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
+use anyhow::{anyhow, Error};
+#[cfg(feature = "bollard")]
+use bollard::{container::LogOutput, container::Stats};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
+
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub enum DockerCredentials {
+    UsernamePassword { username: String, password: String },
+}
+
+#[cfg(feature = "bollard")]
+impl From<&DockerCredentials> for bollard::auth::DockerCredentials {
+    fn from(creds: &DockerCredentials) -> Self {
+        match creds {
+            DockerCredentials::UsernamePassword { username, password } => bollard::auth::DockerCredentials {
+                username: Some(username.clone()),
+                password: Some(password.clone()),
+                ..bollard::auth::DockerCredentials::default()
+            },
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DroneLogMessageKind {
@@ -32,6 +51,7 @@ impl TypedMessage for DroneLogMessage {
 }
 
 impl DroneLogMessage {
+    #[cfg(feature = "bollard")]
     pub fn from_log_message(
         backend_id: &BackendId,
         log_message: &LogOutput,
@@ -104,11 +124,12 @@ impl BackendStatsMessage {
 }
 
 impl BackendStatsMessage {
+    #[cfg(feature = "bollard")]
     pub fn from_stats_messages(
         backend_id: &BackendId,
         prev_stats_message: &Stats,
         cur_stats_message: &Stats,
-    ) -> Result<BackendStatsMessage, anyhow::Error> {
+    ) -> Result<BackendStatsMessage, Error> {
         // based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
 
         //memory
@@ -224,39 +245,6 @@ impl DroneConnectRequest {
         SubscribeSubject::new("drone.register".to_string())
     }
 }
-
-/// A message telling a drone to spawn a backend.
-/*
-#[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct SpawnRequest {
-    pub drone_id: DroneId,
-
-    /// The container image to run.
-    pub image: String,
-
-    /// The name of the backend. This forms part of the hostname used to
-    /// connect to the drone.
-    pub backend_id: BackendId,
-
-    /// The timeout after which the drone is shut down if no connections are made.
-    #[serde_as(as = "DurationSeconds")]
-    pub max_idle_secs: Duration,
-
-    /// Environment variables to pass in to the container.
-    pub env: HashMap<String, String>,
-
-    /// Metadata for the spawn. Typically added to log messages for debugging and observability.
-    pub metadata: HashMap<String, String>,
-
-    /// Credentials used to fetch the image.
-    pub credentials: Option<DockerCredentials>,
-
-    /// Resource limits
-    #[serde(default = "ResourceLimits::default")]
-    pub resource_limits: ResourceLimits,
-}
-*/
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -379,7 +367,7 @@ pub enum BackendState {
 }
 
 impl FromStr for BackendState {
-    type Err = anyhow::Error;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -392,7 +380,7 @@ impl FromStr for BackendState {
             "Failed" => Ok(BackendState::Failed),
             "Exited" => Ok(BackendState::Exited),
             "Swept" => Ok(BackendState::Swept),
-            _ => Err(anyhow::anyhow!(
+            _ => Err(anyhow!(
                 "The string {:?} does not describe a valid state.",
                 s
             )),
