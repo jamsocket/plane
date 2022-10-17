@@ -226,7 +226,7 @@ impl DockerInterface {
                 .stats(container_name, Some(options))
                 .next()
                 .await
-                .ok_or(anyhow!("docker.stats failed"))?
+                .ok_or_else(|| anyhow!("docker.stats failed"))?
                 .map_err(|e| e.into())
         })
     }
@@ -336,6 +336,7 @@ impl DockerInterface {
         let container_id = {
             let options: Option<CreateContainerOptions<String>> = Some(CreateContainerOptions {
                 name: name.to_string(),
+                platform: None,
             });
 
             let config: Config<String> = Config {

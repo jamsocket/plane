@@ -1,4 +1,3 @@
-//use anyhow::Result;
 use core::future::Future;
 use core::task::Context;
 use futures::ready;

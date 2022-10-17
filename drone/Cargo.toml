@@ -13,12 +13,12 @@ readme = "README.md"
 acme2-eab = "0.5.1"
 anyhow = "1.0.57"
 base64 = "0.13.0"
-bollard = "0.13.0"
+bollard = {version = "0.13.0", git="https://github.com/drifting-in-space/bollard.git", branch = "paulgb/update-serde-with-version"}
 chrono = { version = "0.4.21", features = ["serde"] }
 clap = { version = "4.0.4", features = ["derive"] }
 config = { version = "0.13.2", default_features = false, features = ["toml"] }
 dashmap = "5.3.4"
-plane-core = {path = "../core", version="0.3.0"}
+plane-core = {path = "../core", version="0.3.0", features=["bollard"]}
 futures = "0.3.24"
 http = "0.2.7"
 hyper = { version = "0.14.19", features = ["server", "client", "http1", "http2", "tcp"] }

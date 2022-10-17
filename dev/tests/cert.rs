@@ -67,7 +67,7 @@ async fn cert_refresh() -> Result<()> {
 
     dns_handler.finish().await?;
 
-    let alt_names = collect_alt_names(&certs.first().unwrap());
+    let alt_names = collect_alt_names(certs.first().unwrap());
     assert_eq!(vec!["[*.plane.test]".to_string()], alt_names);
 
     Ok(())
@@ -85,7 +85,7 @@ async fn cert_refresh_full() -> Result<()> {
         cert_path: output_dir.join("output.pem"),
     };
 
-    let () = timeout(
+    timeout(
         60_000,
         "Getting certificate",
         plane_drone::cert::refresh_certificate(
@@ -135,7 +135,7 @@ async fn cert_refresh_eab() -> Result<()> {
 
     dns_handler.finish().await?;
 
-    let alt_names = collect_alt_names(&certs.first().unwrap());
+    let alt_names = collect_alt_names(certs.first().unwrap());
     assert_eq!(vec!["[*.plane.test]".to_string()], alt_names);
 
     Ok(())

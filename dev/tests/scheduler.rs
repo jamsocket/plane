@@ -31,7 +31,7 @@ impl MockAgent {
         // scheduler sends them.
         let mut sub = self
             .nats
-            .subscribe(SpawnRequest::subscribe_subject(&drone_id))
+            .subscribe(SpawnRequest::subscribe_subject(drone_id))
             .await?;
         sleep(Duration::from_millis(100)).await;
 

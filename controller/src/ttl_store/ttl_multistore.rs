@@ -25,11 +25,7 @@ impl<K: Hash + Eq + Clone, V> TtlMultistore<K, V> {
     }
 
     pub fn iter(&mut self, key: &K, time: SystemTime) -> Option<impl Iterator<Item = &V>> {
-        if let Some(v) = self.inner.get_mut(key, time) {
-            Some(v.iter(time))
-        } else {
-            None
-        }
+        self.inner.get_mut(key, time).map(|v| v.iter(time))
     }
 }
 

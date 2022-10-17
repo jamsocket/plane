@@ -548,7 +548,7 @@ async fn handle_termination_request() -> Result<()> {
     let agent = Agent::new(&nats, &drone_id).await?;
 
     let mut request = base_spawn_request();
-    //ensure spawnee lives long enough to be terminated
+    // Ensure spawnee lives long enough to be terminated.
     request.drone_id = drone_id.clone();
     request.max_idle_secs = Duration::from_secs(10000);
 
