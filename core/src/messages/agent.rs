@@ -185,7 +185,7 @@ impl BackendStatsMessage {
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
     pub cluster: ClusterName,
-    pub capacity: u32,
+    pub drone_version: String,
 }
 
 impl TypedMessage for DroneStatusMessage {

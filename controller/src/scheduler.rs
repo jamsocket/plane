@@ -77,6 +77,7 @@ impl Scheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
     fn date(date: &str) -> DateTime<Utc> {
         DateTime::parse_from_rfc3339(date).unwrap().into()
@@ -102,7 +103,7 @@ mod tests {
             &DroneStatusMessage {
                 drone_id: drone_id.clone(),
                 cluster: ClusterName::new("mycluster.test"),
-                capacity: 100,
+                drone_version: PLANE_VERSION.to_string(),
             },
         );
 
@@ -124,7 +125,7 @@ mod tests {
             &DroneStatusMessage {
                 drone_id: DroneId::new_random(),
                 cluster: ClusterName::new("mycluster1.test"),
-                capacity: 100,
+                drone_version: PLANE_VERSION.to_string(),
             },
         );
 
@@ -146,7 +147,7 @@ mod tests {
             &DroneStatusMessage {
                 drone_id: DroneId::new_random(),
                 cluster: ClusterName::new("mycluster.test"),
-                capacity: 100,
+                drone_version: PLANE_VERSION.to_string(),
             },
         );
 

@@ -17,6 +17,8 @@ use plane_dev::{
 use std::time::Duration;
 use tokio::time::sleep;
 
+const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 struct MockAgent {
     nats: TypedNats,
 }
@@ -99,9 +101,9 @@ async fn one_drone_available() -> Result<()> {
 
     nats_conn
         .publish(&DroneStatusMessage {
-            capacity: 100,
             cluster: ClusterName::new("plane.test"),
             drone_id: drone_id.clone(),
+            drone_version: PLANE_VERSION.to_string(),
         })
         .await?;
 
