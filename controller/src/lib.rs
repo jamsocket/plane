@@ -9,9 +9,9 @@ use plane_core::{
 use scheduler::Scheduler;
 use tokio::select;
 
-mod config;
-mod dns;
-mod plan;
+pub mod config;
+pub mod dns;
+pub mod plan;
 pub mod run;
 mod scheduler;
 pub mod ttl_store;
