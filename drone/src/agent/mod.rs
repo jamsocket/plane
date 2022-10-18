@@ -13,6 +13,8 @@ use plane_core::{
 };
 use std::{net::IpAddr, time::Duration};
 
+const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 mod backend;
 mod docker;
 mod executor;
@@ -103,8 +105,8 @@ async fn ready_loop(nc: TypedNats, drone_id: &DroneId, cluster: ClusterName) -> 
     loop {
         nc.publish_jetstream(&DroneStatusMessage {
             drone_id: drone_id.clone(),
-            capacity: 100,
             cluster: cluster.clone(),
+            drone_version: PLANE_VERSION.to_string(),
         })
         .await
         .log_error("Error in ready loop.");
