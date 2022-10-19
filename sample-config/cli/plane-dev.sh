@@ -13,7 +13,7 @@ then
 fi
 
 COMPOSE_FILE_DIR="$PWD/compose"
-DOCKER_COMPOSE="docker-compose"
+DOCKER_COMPOSE="docker compose"
 
 
 linux='' macos='' x11='' guac='' OS='' BROWSER_OPT=''

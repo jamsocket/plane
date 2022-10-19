@@ -3,6 +3,9 @@ services:
   drone:
     container_name: plane-drone
     image: ghcr.io/drifting-in-space/plane-drone:latest
+    build: 
+      dockerfile: ./drone/Dockerfile
+      context: ../..
     volumes:
       - ../auth:/etc/plane/auth:ro
       - ../plane-config/drone.toml:/etc/plane/drone.toml:ro
