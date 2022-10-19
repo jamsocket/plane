@@ -21,7 +21,8 @@ services:
     command:
       /etc/plane/controller.toml
     networks:
-      - plane
+      plane:
+        ipv4_address: 172.16.238.11
 
   nats:
     container_name: plane-nats

@@ -1,11 +1,10 @@
 version: "3.9"
 services:
   firefox:
-    container_name: plane-firefox-guac
-    build:
-      context: ..
-      dockerfile: ./guac-firefox/Dockerfile
+    image: lscr.io/linuxserver/firefox:latest
     ports:
       - "127.0.0.1:3000:3000"
     networks:
       - plane
+    dns:
+      - 172.16.238.10

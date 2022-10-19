@@ -30,14 +30,13 @@ done
 
 if [ $linux ] && [ $x11 ]
 then
-	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" -f "$COMPOSE_FILE_DIR/firefox-x11.yml" up -d
+	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" -f "$COMPOSE_FILE_DIR/firefox-x11.yml" up --remove-orphans --force-recreate --build
 	exit 0
 fi
 
 if { [ $linux ] || [ $macos ]; } && [ $guac ]
 then
-	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" -f "$COMPOSE_FILE_DIR/firefox-guac.yml" up -d
-	xdg-open "http://localhost:3000"
+	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" -f "$COMPOSE_FILE_DIR/firefox-guac.yml" up --remove-orphans --force-recreate --build & xdg-open "http://localhost:3000"
 	exit 0
 fi
 
