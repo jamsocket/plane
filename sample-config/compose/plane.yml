@@ -61,6 +61,15 @@ services:
     ports:
       - "127.0.0.1:5000:5000"
 
+  firefox:
+    image: lscr.io/linuxserver/firefox:latest
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - plane
+    dns:
+      - 172.16.238.10
+
 networks:
   plane:
     name: plane
