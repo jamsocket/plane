@@ -4,7 +4,8 @@ services:
     container_name: plane-drone
     image: ghcr.io/drifting-in-space/plane-drone:latest
     volumes:
-      - ..:/etc/plane:ro
+      - ../auth:/etc/plane/auth:ro
+      - ../plane-config/drone.toml:/etc/plane/drone.toml:ro
       - /var/run/docker.sock:/var/run/docker.sock
     command:
       /etc/plane/drone.toml
@@ -15,7 +16,8 @@ services:
     container_name: plane-controller
     image: ghcr.io/drifting-in-space/plane-controller:latest
     volumes:
-      - ..:/etc/plane:ro
+      - ../auth:/etc/plane/auth:ro
+      - ../plane-config/controller.toml:/etc/plane/controller.toml:ro
     command:
       /etc/plane/controller.toml
     networks:
