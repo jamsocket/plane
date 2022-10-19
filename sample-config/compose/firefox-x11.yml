@@ -4,7 +4,6 @@ services:
     container_name: plane-firefox-x11
     command:
       "https://plane.dev"
-    image: firefox
     build: ../x11-firefox
     networks:
       - plane
