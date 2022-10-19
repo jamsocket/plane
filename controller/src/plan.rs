@@ -1,11 +1,15 @@
-use crate::config::{ControllerConfig, DnsOptions};
-use anyhow::Result;
+use crate::{config::ControllerConfig, dns::rname_format::format_rname};
+use anyhow::{Context, Result};
 use plane_core::nats::TypedNats;
+use std::net::IpAddr;
+use trust_dns_server::client::rr::Name;
 
 pub struct SchedulerPlan;
 
 pub struct DnsPlan {
-    pub options: DnsOptions,
+    pub port: u16,
+    pub bind_ip: IpAddr,
+    pub soa_email: Option<Name>,
     pub nc: TypedNats,
 }
 
@@ -20,10 +24,28 @@ impl ControllerPlan {
         let nats = config.nats.connect_with_retry().await?;
 
         let scheduler_plan = config.scheduler.map(|_| SchedulerPlan);
-        let dns_plan = config.dns.map(|options| DnsPlan {
-            options,
-            nc: nats.clone(),
-        });
+        let dns_plan = if let Some(options) = config.dns {
+            let soa_email = if let Some(soa_email) = options.soa_email {
+                let soa_email = format_rname(&soa_email).context(
+                    "soa_email provided in configuration was not a valid email address.",
+                )?;
+                Some(
+                    Name::from_ascii(&soa_email)
+                        .context("soa_email contained non-ascii characters.")?,
+                )
+            } else {
+                None
+            };
+
+            Some(DnsPlan {
+                port: options.port,
+                bind_ip: options.bind_ip,
+                soa_email,
+                nc: nats.clone(),
+            })
+        } else {
+            None
+        };
 
         Ok(ControllerPlan {
             nats,

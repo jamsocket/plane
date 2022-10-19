@@ -1687,6 +1687,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "trust-dns-resolver",
+ "trust-dns-server",
  "url",
 ]
 
