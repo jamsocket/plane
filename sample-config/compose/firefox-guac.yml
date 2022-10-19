@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+  firefox:
+    container_name: plane-firefox-guac
+    build:
+      context: ..
+      dockerfile: ./guac-firefox/Dockerfile
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - plane

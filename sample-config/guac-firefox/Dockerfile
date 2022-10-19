@@ -7,10 +7,10 @@ RUN apk add dnsmasq
 RUN echo "firefox https://plane.dev" > defaults/autostart
 
 # Override default preferences.
-COPY firefox/firstrun.js /usr/lib/firefox/browser/defaults/preferences/firstrun.js
+COPY guac-firefox/firstrun.js /usr/lib/firefox/browser/defaults/preferences/firstrun.js
 
 # Copy init file, which starts the DNS server.
-COPY firefox/custom-cont-init.d /custom-cont-init.d
+COPY guac-firefox/custom-cont-init.d /custom-cont-init.d
 
 # This adds the certificate to Alpine's certificate store, where
 # curl will find it.
@@ -19,4 +19,4 @@ RUN update-ca-certificates
 
 # Install certificate for Firefox.
 COPY auth/ca-cert.pem /usr/lib/mozilla/certificates/plane.crt
-COPY firefox/policies.json /usr/lib/firefox/distribution/policies.json
+COPY guac-firefox/policies.json /usr/lib/firefox/distribution/policies.json

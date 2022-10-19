@@ -2,26 +2,20 @@ version: "3.9"
 services:
   drone:
     container_name: plane-drone
-    # build:
-    #   context: .
-    #   dockerfile: drone/Dockerfile
     image: ghcr.io/drifting-in-space/plane-drone:latest
     volumes:
-      - ./sample-config:/etc/plane:ro
+      - ..:/etc/plane:ro
       - /var/run/docker.sock:/var/run/docker.sock
     command:
       /etc/plane/drone.toml
     networks:
       - plane
-
+  
   controller:
     container_name: plane-controller
-    # build:
-    #   context: .
-    #   dockerfile: controller/Dockerfile
     image: ghcr.io/drifting-in-space/plane-controller:latest
     volumes:
-      - ./sample-config:/etc/plane:ro
+      - ..:/etc/plane:ro
     command:
       /etc/plane/controller.toml
     networks:
@@ -31,7 +25,7 @@ services:
     container_name: plane-nats
     image: nats:latest
     command:
-      "--jetstream"
+      "-DV --jetstream"
     ports:
       - "127.0.0.1:4222:4222"
     networks:
@@ -43,16 +37,26 @@ services:
     networks:
       - plane
 
-  firefox:
-    container_name: plane-firefox
-    build:
-      context: sample-config
-      dockerfile: firefox/Dockerfile
-    ports:
-      - "127.0.0.1:3000:3000"
+  dnsmasq:
+    container_name: plane-dnsmasq
+    image: dnsmasq
     networks:
-      - plane
+      plane:
+        ipv4_address: 172.16.238.10
+    build: ../dnsmasq
+    volumes:
+      - ../dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf
+
 
 networks:
   plane:
     name: plane
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.238.0/24
+          gateway: 172.16.238.1
+
+
+    
