@@ -1,4 +1,5 @@
 mod error;
+pub mod rname_format;
 
 use self::error::OrDnsError;
 use crate::plan::DnsPlan;
@@ -10,7 +11,7 @@ use error::Result;
 use plane_core::messages::dns::SetDnsRecord;
 use plane_core::types::ClusterName;
 use plane_core::Never;
-use plane_core::{messages::dns::DnsRecordType, nats::TypedNats};
+use plane_core::{messages::dns::DnsRecordType};
 use std::net::Ipv4Addr;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -19,7 +20,7 @@ use tokio::{
     self,
     net::{TcpListener, UdpSocket},
 };
-use trust_dns_server::client::rr::rdata::TXT;
+use trust_dns_server::client::rr::rdata::{SOA, TXT};
 use trust_dns_server::client::rr::Name;
 use trust_dns_server::{
     authority::MessageResponseBuilder,
@@ -47,12 +48,13 @@ struct RecordKey {
 struct ClusterDnsServer {
     a_record_map: Arc<Mutex<TtlMap<RecordKey, RData>>>,
     txt_record_map: Arc<Mutex<TtlMultistore<RecordKey, RData>>>,
+    soa_email: Option<Name>,
     _handle: JoinHandle<anyhow::Result<()>>,
 }
 
 impl ClusterDnsServer {
-    pub async fn new(nc: &TypedNats) -> Self {
-        let nc = nc.clone();
+    pub async fn new(plan: &DnsPlan) -> Self {
+        let nc = plan.nc.clone();
         let a_record_map: Arc<Mutex<TtlMap<RecordKey, RData>>> =
             Arc::new(Mutex::new(TtlMap::new(SetDnsRecord::ttl())));
         let txt_record_map: Arc<Mutex<TtlMultistore<RecordKey, RData>>> =
@@ -118,6 +120,7 @@ impl ClusterDnsServer {
         ClusterDnsServer {
             a_record_map,
             txt_record_map,
+            soa_email: plan.soa_email.clone(),
             _handle: handle,
         }
     }
@@ -184,28 +187,24 @@ impl ClusterDnsServer {
 
                 Ok(responses)
             }
-            // RecordType::SOA => {
-            //     let name = request.query().name();
-            //     let rdata = RData::SOA(SOA::new(
-            //         Name::from_ascii(&self.plane.nameserver)
-            //             .or_dns_error(ResponseCode::ServFail, || {
-            //                 format!("Failed to encode nameserver {}.", self.plane.nameserver)
-            //             })?,
-            //         Name::from_ascii("paul.driftingin.space")
-            //             .or_dns_error(ResponseCode::ServFail, || {
-            //                 format!("Failed to encode nameserver contact.")
-            //             })?,
-            //         1,
-            //         7200,
-            //         7200,
-            //         7200,
-            //         7200,
-            //     ));
-            //     let ttl = 60;
-            //     let record = Record::from_rdata(name.clone().into(), ttl, rdata);
+            RecordType::SOA => {
+                let name = request.query().name();
+                let soa_record = self.soa_email.as_ref().or_dns_error(ResponseCode::ServFail, || "SOA record email not set in config.".to_string())?;
 
-            //     Ok(vec![record])
-            // }
+                let rdata = RData::SOA(SOA::new(
+                    name.into(),
+                    soa_record.clone(),
+                    1,
+                    7200,
+                    7200,
+                    7200,
+                    7200,
+                ));
+                let ttl = 60;
+                let record = Record::from_rdata(name.clone().into(), ttl, rdata);
+
+                Ok(vec![record])
+            }
             RecordType::CAA | RecordType::AAAA => Ok(vec![]), // Not supported but don't report.
             request => {
                 tracing::info!(?request, "Unhandled lookup type {}.", request);
@@ -248,9 +247,9 @@ impl RequestHandler for ClusterDnsServer {
 }
 
 pub async fn serve_dns(plan: DnsPlan) -> anyhow::Result<Never> {
-    let mut fut = ServerFuture::new(ClusterDnsServer::new(&plan.nc).await);
+    let mut fut = ServerFuture::new(ClusterDnsServer::new(&plan).await);
 
-    let ip_port_pair = (plan.options.bind_ip, plan.options.port);
+    let ip_port_pair = (plan.bind_ip, plan.port);
 
     let sock = UdpSocket::bind(ip_port_pair)
         .await
@@ -265,7 +264,7 @@ pub async fn serve_dns(plan: DnsPlan) -> anyhow::Result<Never> {
         std::time::Duration::from_secs(TCP_TIMEOUT_SECONDS),
     );
 
-    tracing::info!(ip=%plan.options.bind_ip, port=%plan.options.port, "Listening for DNS queries.");
+    tracing::info!(ip=%plan.bind_ip, port=%plan.port, "Listening for DNS queries.");
 
     fut.block_until_done()
         .await

@@ -20,11 +20,13 @@ pub enum DockerCredentials {
 impl From<&DockerCredentials> for bollard::auth::DockerCredentials {
     fn from(creds: &DockerCredentials) -> Self {
         match creds {
-            DockerCredentials::UsernamePassword { username, password } => bollard::auth::DockerCredentials {
-                username: Some(username.clone()),
-                password: Some(password.clone()),
-                ..bollard::auth::DockerCredentials::default()
-            },
+            DockerCredentials::UsernamePassword { username, password } => {
+                bollard::auth::DockerCredentials {
+                    username: Some(username.clone()),
+                    password: Some(password.clone()),
+                    ..bollard::auth::DockerCredentials::default()
+                }
+            }
         }
     }
 }
