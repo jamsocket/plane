@@ -1,9 +1,9 @@
 {
     "policies": {
-        "ImportEnterpriseRoots": true,
         "Certificates": {
+            "ImportEnterpriseRoots": true,
             "Install": [
-                "plane.crt"
+                "plane.crt",
                 "usr/local/share/ca-certificates/plane.crt"
             ]
         }
