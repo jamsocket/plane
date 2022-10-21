@@ -10,10 +10,16 @@ long_opts() {
 	case $1 in
 	linux) [ ! "$OS" ] && linux=1 OS=1 || exit 1;;
 	macos) [ ! "$OS" ] && macos=1 OS=1 || exit 1;;
-	x11) [ ! "$BROWSER_OPT" ] && x11=1 || exit 1;;
-	guac) [ ! "$BROWSER_OPT" ] && guac=1 || exit 1;;	
-	?) usage ""
-	esac
+	x11) [ ! "$BROWSER_OPT" ] && x11=1 BROWSER_OPT=1 || exit 1;;
+	guac) [ ! "$BROWSER_OPT" ] && guac=1 BROWSER_OPT=1 || exit 1;;	
+	clean) [ ! "$CLEAN_OPT" ] && CLEAN_OPT=1 || exit 1;;
+	?) usage "" && exit 1;;
+ 	esac
+}
+
+clean() {
+	echo "not implemented!"
+	exit 1
 }
 
 if [ ! -d "$PWD/compose" ]
@@ -26,18 +32,25 @@ COMPOSE_FILE_DIR="$PWD/compose"
 DOCKER_COMPOSE="docker compose"
 
 
-linux='' macos='' x11='' guac='' OS='' BROWSER_OPT=''
-while getopts "lmxg-:" arg
+linux='' macos='' x11='' guac='' OS='' BROWSER_OPT='' CLEAN_OPT=''
+while getopts "lmxrcg-:" arg
 do
 	case $arg in 
 	l) [ ! "$OS" ] && linux=1 OS=1 || exit 1;;
 	m) [ ! "$OS" ] && macos=1 OS=1 || exit 1;;
-	x) [ ! "$BROWSER_OPT" ] && x11=1 || exit 1;;
-	g) [ ! "$BROWSER_OPT" ] && guac=1 || exit 1;;
-	-) long_opts "$OPTARG" || exit 1;;
-	?) usage ""
+	x) [ ! "$BROWSER_OPT" ] && x11=1 BROWSER_OPT=1 || exit 1;;
+	g) [ ! "$BROWSER_OPT" ] && guac=1 BROWSER_OPT=1 || exit 1;;
+	c) [ ! "$CLEAN_OPT" ] && CLEAN_OPT=1 || exit 1;;
+	-) long_opts "$OPTARG"; exit $?;;
+	?) usage "" && exit 1;;
 	esac
 done
+
+if [ $CLEAN_OPT ]
+then
+	clean ""
+	exit $?
+fi
 
 if [ $linux ] && [ $x11 ]
 then
