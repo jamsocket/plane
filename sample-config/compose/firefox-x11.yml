@@ -2,9 +2,12 @@ version: "3.9"
 services:
   firefox: 
     container_name: plane-firefox-x11
+    image: x11-firefox
     command:
       "https://plane.dev"
-    build: ../x11-firefox
+    build: 
+      context: ..
+      dockerfile: x11-firefox/Dockerfile
     networks:
       - plane
     environment:

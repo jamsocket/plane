@@ -3,7 +3,7 @@ services:
   drone:
     container_name: plane-drone
     image: ghcr.io/drifting-in-space/plane-drone:latest
-    build: 
+    build:
       dockerfile: ./drone/Dockerfile
       context: ../..
     volumes:
@@ -14,7 +14,7 @@ services:
       /etc/plane/drone.toml
     networks:
       - plane
-  
+
   controller:
     container_name: plane-controller
     image: ghcr.io/drifting-in-space/plane-controller:latest
@@ -52,7 +52,7 @@ services:
     build: ../dnsmasq
     volumes:
       - ../dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf
-    
+
   registry:
     container_name: plane-registry
     image: registry:2
@@ -63,7 +63,9 @@ services:
 
   firefox:
     container_name: plane-firefox
-    image: lscr.io/linuxserver/firefox:latest
+    build:
+      context: ..
+      dockerfile: guac-firefox/Dockerfile
     ports:
       - "127.0.0.1:3000:3000"
     networks:
@@ -80,6 +82,3 @@ networks:
       config:
         - subnet: 172.16.238.0/24
           gateway: 172.16.238.1
-
-
-    
