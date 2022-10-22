@@ -45,7 +45,7 @@ impl MockAgent {
 
         // Expect a spawn request from the scheduler.
         let result = timeout(1_000, "Agent should receive spawn request.", sub.next())
-            .await?
+            .await
             .unwrap();
 
         // Ensure that the SpawnRequest is as expected.

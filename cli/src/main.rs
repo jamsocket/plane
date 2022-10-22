@@ -59,7 +59,7 @@ async fn main() -> Result<()> {
                     .await?
             };
 
-            while let Some(message) = sub.next().await? {
+            while let Some(message) = sub.next().await {
                 println!(
                     "{}\t{}\t{}",
                     message.backend.to_string().bright_cyan(),

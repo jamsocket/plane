@@ -30,7 +30,7 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
         select! {
             status_msg = status_sub.next() => {
                 tracing::debug!(?status_msg, "Got drone status");
-                if let Some(status_msg) = status_msg? {
+                if let Some(status_msg) = status_msg {
                     scheduler.update_status(Utc::now(), &status_msg.value);
                 } else {
                     return Err(anyhow!("status_sub.next() returned None."));
@@ -39,7 +39,7 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
 
             spawn_request = spawn_request_sub.next() => {
                 match spawn_request {
-                    Ok(Some(schedule_request)) => {
+                    Some(schedule_request) => {
                         tracing::info!(spawn_request=?schedule_request.value, "Got spawn request");
                         let result = match scheduler.schedule(&schedule_request.value.cluster, Utc::now()) {
                             Ok(drone_id) => {
@@ -64,8 +64,7 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
 
                         schedule_request.respond(&result).await?;
                     },
-                    Ok(None) => return Err(anyhow!("spawn_request_sub.next() returned None.")),
-                    Err(err) => tracing::warn!("spawn_request_sub.next() returned error: {:?}", err)
+                    None => return Err(anyhow!("spawn_request_sub.next() returned None.")),
                 }
             }
         }

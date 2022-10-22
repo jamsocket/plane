@@ -28,7 +28,7 @@ impl DummyDnsHandler {
             .subscribe(SetAcmeDnsRecord::subscribe_subject())
             .await?;
         let handle = spawn_timeout(10_000, "Should get ACME DNS request.", async move {
-            let message = dns_sub.next().await.unwrap().unwrap();
+            let message = dns_sub.next().await.unwrap();
             assert_eq!(expect_domain, message.value.cluster);
             message.respond(&true).await?;
             Ok(())
