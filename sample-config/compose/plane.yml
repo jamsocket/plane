@@ -31,7 +31,7 @@ services:
     container_name: plane-nats
     image: nats:latest
     command:
-      "-DV --jetstream"
+      "--jetstream"
     ports:
       - "127.0.0.1:4222:4222"
     networks:
