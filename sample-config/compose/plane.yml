@@ -18,6 +18,9 @@ services:
   controller:
     container_name: plane-controller
     image: ghcr.io/drifting-in-space/plane-controller:latest
+    build:
+      dockerfile: ./controller/Dockerfile
+      context: ../..
     volumes:
       - ../auth:/etc/plane/auth:ro
       - ../plane-config/controller.toml:/etc/plane/controller.toml:ro
