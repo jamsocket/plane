@@ -84,8 +84,9 @@ fi
 
 if [ $macos ] && [ $x11 ]
 then
-	echo "unimplemented!"
-	exit 1
+	xhost +localhost || { echo "please install xquartz and enable network access to it!" 1>&2 ; exit 1 ;}
+	DISPLAY="host.docker.internal:0" $DOCKER_COMPOSE -f "$PLANE_COMPOSE" -f "$FIREFOX_X11_COMPOSE" up "$FLAGS"
+	exit $?
 fi
 
 usage ""
