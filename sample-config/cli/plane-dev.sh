@@ -32,12 +32,12 @@ COMPOSE_FILE_DIR="$PWD/compose"
 DOCKER_COMPOSE="docker compose"
 
 
-linux='' macos='' x11='' guac='' OS='' BROWSER_OPT='' CLEAN_OPT=''
+linux='' macos='' x11='' guac='' OS='' BROWSER_OPT='' CLEAN_OPT='' BROWSER_CMD=""
 while getopts "lmxrcg-:" arg
 do
 	case $arg in 
-	l) [ ! "$OS" ] && linux=1 OS=1 || exit 1;;
-	m) [ ! "$OS" ] && macos=1 OS=1 || exit 1;;
+	l) [ ! "$OS" ] && linux=1 OS=1 BROWSER_CMD="xdg-open" || exit 1;;
+	m) [ ! "$OS" ] && macos=1 OS=1 BROWSER_CMD="open" || exit 1;;
 	x) [ ! "$BROWSER_OPT" ] && x11=1 BROWSER_OPT=1 || exit 1;;
 	g) [ ! "$BROWSER_OPT" ] && guac=1 BROWSER_OPT=1 || exit 1;;
 	c) [ ! "$CLEAN_OPT" ] && CLEAN_OPT=1 || exit 1;;
@@ -60,7 +60,7 @@ fi
 
 if { [ $linux ] || [ $macos ]; } && [ $guac ]
 then
-	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" up --remove-orphans --force-recreate --build & xdg-open "http://localhost:3000"
+	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" up --remove-orphans --force-recreate --build & $BROWSER_CMD "http://localhost:3000"
 	exit 0
 fi
 
