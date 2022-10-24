@@ -30,6 +30,8 @@ then
 fi
 
 COMPOSE_FILE_DIR="$PWD/compose"
+PLANE_COMPOSE="$COMPOSE_FILE_DIR/plane.yml"
+FIREFOX_X11_COMPOSE="$COMPOSE_FILE_DIR/firefox-x11.yml"
 DOCKER_COMPOSE="docker compose"
 
 
@@ -62,13 +64,15 @@ fi
 
 if [ $linux ] && [ $x11 ]
 then
-	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" -f "$COMPOSE_FILE_DIR/firefox-x11.yml" up "$FLAGS"
+	$DOCKER_COMPOSE -f "$PLANE_COMPOSE" -f "$FIREFOX_X11_COMPOSE" up "$FLAGS"
 	exit $?
 fi
 
 if { [ $linux ] || [ $macos ]; } && [ $guac ]
 then
-	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" up "$FLAGS" & $BROWSER_CMD "http://localhost:3000"
+	$DOCKER_COMPOSE -f "$PLANE_COMPOSE" up -d "$FLAGS" &&\
+	$BROWSER_CMD "http://localhost:3000" &&\
+	$DOCKER_COMPOSE -f "$PLANE_COMPOSE" up -d
 	exit $?
 fi
 
