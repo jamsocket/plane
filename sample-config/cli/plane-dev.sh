@@ -87,7 +87,7 @@ if [ $macos ] && [ $x11 ]
 then
 	xhost +localhost || { echo "please install xquartz and enable network access to it!" 1>&2 ; exit 1 ;}
 	# shellcheck disable=2086 # I actually want splitting here
-	XAUTHORITY="/tmp/MEANINGLESS" DISPLAY="host.docker.internal:0" $DOCKER_COMPOSE -f "$PLANE_COMPOSE" -f "$FIREFOX_X11_COMPOSE" up $FLAGS
+	XAUTHORITY="$HOME/.Xauthority" DISPLAY="host.docker.internal:0" $DOCKER_COMPOSE -f "$PLANE_COMPOSE" -f "$FIREFOX_X11_COMPOSE" up $FLAGS
 	exit $?
 fi
 
