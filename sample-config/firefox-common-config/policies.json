@@ -4,7 +4,6 @@
             "ImportEnterpriseRoots": true,
             "Install": [
                 "plane.crt",
-                "usr/local/share/ca-certificates/plane.crt"
             ]
         }
     }
