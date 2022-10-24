@@ -85,9 +85,12 @@ fi
 
 if [ $macos ] && [ $x11 ]
 then
-	xhost +localhost || { echo "please install xquartz and enable network access to it!" 1>&2 ; exit 1 ;}
+	/opt/X11/bin/Xquartz :1 -listen tcp &
+	DISPLAY=:1 /opt/X11/bin/quartz-wm &
+	DISPLAY=:1 xhost +localhost || { echo "please install xquartz and enable network access to it!" 1>&2 ; exit 1 ;}
+	ip=$(ifconfig en0 | grep inet | awk '$1=="inet" {print $2}')
 	# shellcheck disable=2086 # I actually want splitting here
-	XAUTHORITY="$HOME/.Xauthority" DISPLAY="host.docker.internal:0" $DOCKER_COMPOSE -f "$PLANE_COMPOSE" -f "$FIREFOX_X11_COMPOSE" up $FLAGS
+	XAUTHORITY="$HOME/.Xauthority" DISPLAY="$ip:1" $DOCKER_COMPOSE -f "$PLANE_COMPOSE" -f "$FIREFOX_X11_COMPOSE" up $FLAGS
 	exit $?
 fi
 
