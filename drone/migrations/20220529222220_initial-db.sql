@@ -25,7 +25,7 @@ create table "route" (
     "subdomain" text unique not null,
 
     -- IP:port combo of the destination to proxy to.
-    "address" text not null,
+    "address" text unique not null,
 
     -- The timestamp this route last had an active connection.
     -- The proxy may debounce this by a reasonable amount (e.g. 5 seconds)

@@ -127,7 +127,7 @@ impl DroneDatabase {
         let backend_id = backend.id().to_string();
         sqlx::query!(
             r"
-            insert into route
+            insert or replace into route
             (backend, subdomain, address, last_active)
             values
             (?, ?, ?, unixepoch())

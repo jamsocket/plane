@@ -20,6 +20,16 @@
     },
     "query": "\n            insert into backend\n            (name, spec, state)\n            values\n            (?, ?, 'Loading')\n            "
   },
+  "960a424e5c893f7e0014c8b4d54fb41c996724552c0810f87f3644497c445fba": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 3
+      }
+    },
+    "query": "\n            insert or replace into route\n            (backend, subdomain, address, last_active)\n            values\n            (?, ?, ?, unixepoch())\n            "
+  },
   "9bde1570de3c5e831902027cc3d86457d3fef08176acb3d5aedc8eaec1f607b7": {
     "describe": {
       "columns": [
@@ -67,16 +77,6 @@
       }
     },
     "query": "\n            select name, spec, state\n            from backend\n            "
-  },
-  "d12abb6ea7bb7588dfec936a945b9aa20769a851a7b390485d535cd5936a6f29": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Right": 3
-      }
-    },
-    "query": "\n            insert into route\n            (backend, subdomain, address, last_active)\n            values\n            (?, ?, ?, unixepoch())\n            "
   },
   "e2b351bb878b0e2ffc84d405acf44eb7328f910564c66447aa336c4f49727740": {
     "describe": {
