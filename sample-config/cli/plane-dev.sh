@@ -2,7 +2,7 @@
 set -euf
 
 usage() {
-	echo usage: "$(basename "$0")" '[-[lmxg]]' 1>&2
+	echo usage: "$(basename "$0")" '[-[lmxrcgb] --linux --macos --x11 --guac --clean --build]' 1>&2
 	exit 1
 }
 
@@ -13,6 +13,7 @@ long_opts() {
 	x11) [ ! "$BROWSER_OPT" ] && x11=1 BROWSER_OPT=1 || exit 1;;
 	guac) [ ! "$BROWSER_OPT" ] && guac=1 BROWSER_OPT=1 || exit 1;;	
 	clean) [ ! "$CLEAN_OPT" ] && CLEAN_OPT=1 || exit 1;;
+	build) [ ! "$BUILD_OPT" ] && BUILD_OPT=1 || exit 1;;
 	?) usage "" && exit 1;;
  	esac
 }
@@ -32,8 +33,8 @@ COMPOSE_FILE_DIR="$PWD/compose"
 DOCKER_COMPOSE="docker compose"
 
 
-linux='' macos='' x11='' guac='' OS='' BROWSER_OPT='' CLEAN_OPT='' BROWSER_CMD=""
-while getopts "lmxrcg-:" arg
+linux='' macos='' x11='' guac='' OS='' BUILD_OPT='' BROWSER_OPT='' CLEAN_OPT='' BROWSER_CMD=""
+while getopts "lmxrcgb-:" arg
 do
 	case $arg in 
 	l) [ ! "$OS" ] && linux=1 OS=1 BROWSER_CMD="xdg-open" || exit 1;;
@@ -41,27 +42,34 @@ do
 	x) [ ! "$BROWSER_OPT" ] && x11=1 BROWSER_OPT=1 || exit 1;;
 	g) [ ! "$BROWSER_OPT" ] && guac=1 BROWSER_OPT=1 || exit 1;;
 	c) [ ! "$CLEAN_OPT" ] && CLEAN_OPT=1 || exit 1;;
+	b) [ ! "$BUILD_OPT" ] && BUILD_OPT=1 || exit 1;;
 	-) long_opts "$OPTARG"; exit $?;;
 	?) usage "" && exit 1;;
 	esac
 done
 
-if [ $CLEAN_OPT ]
-then
+FLAGS="--remove-orphans --pull always --no-build"
+if [ $BUILD_OPT ]; then
+	FLAGS="--remove-orphans --force-recreate --build"
+fi
+
+if [ $CLEAN_OPT ]; then
 	clean ""
 	exit $?
 fi
 
+
+
 if [ $linux ] && [ $x11 ]
 then
-	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" -f "$COMPOSE_FILE_DIR/firefox-x11.yml" up --remove-orphans --force-recreate --build
-	exit 0
+	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" -f "$COMPOSE_FILE_DIR/firefox-x11.yml" up "$FLAGS"
+	exit $?
 fi
 
 if { [ $linux ] || [ $macos ]; } && [ $guac ]
 then
-	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" up --remove-orphans --force-recreate --build & $BROWSER_CMD "http://localhost:3000"
-	exit 0
+	$DOCKER_COMPOSE -f "$COMPOSE_FILE_DIR/plane.yml" up "$FLAGS" & $BROWSER_CMD "http://localhost:3000"
+	exit $?
 fi
 
 if [ $macos ] && [ $x11 ]
