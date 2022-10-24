@@ -69,7 +69,7 @@ impl ClusterDnsServer {
                     .subscribe_jetstream(SetDnsRecord::subscribe_subject())
                     .await?;
 
-                while let Some(v) = stream.next().await? {
+                while let Some(v) = stream.next().await {
                     match v.kind {
                         DnsRecordType::A => {
                             let ip: Ipv4Addr = match v.value.parse() {

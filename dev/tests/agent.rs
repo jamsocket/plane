@@ -87,7 +87,7 @@ impl MockController {
             "Should receive DNS message.",
             self.dns_subscription.next(),
         )
-        .await?
+        .await
         .map(|d| d.value)
         .ok_or_else(|| anyhow!("Expected a DNS record."))
     }
@@ -104,7 +104,7 @@ impl MockController {
             "Should receive drone connect message.",
             self.drone_connect_response_subscription.next(),
         )
-        .await?
+        .await
         .unwrap();
 
         assert_eq!(ClusterName::new(CLUSTER_DOMAIN), message.value.cluster);
@@ -130,7 +130,7 @@ impl MockController {
             "Should receive status message from drone.",
             status_sub.next(),
         )
-        .await?
+        .await
         .unwrap();
 
         assert_eq!(drone_id, &message.value.drone_id);
@@ -186,7 +186,6 @@ impl BackendStateSubscription {
             )
             .await
             .unwrap()
-            .unwrap()
             .value
             .state
         );
@@ -208,7 +207,7 @@ impl BackendStateSubscription {
             let next = tokio::time::timeout_at(deadline, self.sub.next()).await;
 
             match next {
-                Ok(Ok(Some(v))) => {
+                Ok(Some(v)) => {
                     if v.value.state == desired_state {
                         tracing::info!(?desired_state, "State became desired state.");
                         return Ok(())
@@ -341,7 +340,7 @@ async fn stats_are_acquired() -> Result<()> {
         "Waiting for stats message.",
         stats_subscription.next(),
     )
-    .await?
+    .await
     .unwrap();
     assert!(stat.value.cpu_use_percent >= 0.);
     assert!(stat.value.mem_use_percent >= 0.);

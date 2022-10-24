@@ -18,6 +18,8 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 
+use crate::logging::LogError;
+
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
 #[derive(Serialize, Deserialize)]
@@ -139,14 +141,20 @@ where
         }
     }
 
-    pub async fn next(&mut self) -> Result<Option<MessageWithResponseHandle<T>>> {
-        if let Some(message) = self.subscription.next().await {
-            Ok(Some(MessageWithResponseHandle::new(
-                message,
-                self.nc.clone(),
-            )?))
-        } else {
-            Ok(None)
+    pub async fn next(&mut self) -> Option<MessageWithResponseHandle<T>> {
+        loop {
+            if let Some(message) = self.subscription.next().await {
+                let result = MessageWithResponseHandle::new(
+                    message,
+                    self.nc.clone(),
+                );
+                match result {
+                    Ok(v) => return Some(v),
+                    Err(error) => tracing::error!(?error, "Error parsing message; message ignored."),
+                }
+            } else {
+                return None
+            }
         }
     }
 }
@@ -216,17 +224,25 @@ pub struct JetstreamSubscription<T: TypedMessage> {
 }
 
 impl<T: TypedMessage> JetstreamSubscription<T> {
-    pub async fn next(&mut self) -> Result<Option<T>> {
-        if let Some(message) = self.stream.next().await {
-            let message = message.to_anyhow()?;
-            message.ack().await.to_anyhow()?;
-            let value: Result<T, _> = serde_json::from_slice(&message.payload);
-            match value {
-                Ok(value) => Ok(Some(value)),
-                Err(error) => Err(anyhow!("Parse error {:?}", error)),
+    pub async fn next(&mut self) -> Option<T> {
+        loop {
+            if let Some(message) = self.stream.next().await {
+                let message = match message {
+                    Ok(message) => message,
+                    Err(error) => {
+                        tracing::error!(?error, "Error accessing jetstream message.");
+                        continue;
+                    }
+                };
+                message.ack().await.log_error("Error acking jetstream message.");
+                let value: Result<T, _> = serde_json::from_slice(&message.payload);
+                match value {
+                    Ok(value) => return Some(value),
+                    Err(error) => tracing::error!(?error, "Error parsing jetstream message; message ignored."),
+                }
+            } else {
+                return None
             }
-        } else {
-            Ok(None)
         }
     }
 }

@@ -57,7 +57,7 @@ async fn listen_for_spawn_requests(
         let req = sub.next().await;
 
         match req {
-            Ok(Some(req)) => {
+            Some(req) => {
                 let executor = executor.clone();
 
                 req.respond(&true).await?;
@@ -65,10 +65,7 @@ async fn listen_for_spawn_requests(
                     executor.start_backend(&req.value).await;
                 });
             }
-            Ok(None) => return Err(anyhow!("Spawn request subscription closed.")),
-            Err(error) => {
-                tracing::error!(?error, "Non-fatal error when listening for spawn requests.")
-            }
+            None => return Err(anyhow!("Spawn request subscription closed.")),
         }
     }
 }
@@ -81,19 +78,13 @@ async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) ->
     loop {
         let req = sub.next().await;
         match req {
-            Ok(Some(req)) => {
+            Some(req) => {
                 let executor = executor.clone();
 
                 req.respond(&true).await?;
                 tokio::spawn(async move { executor.kill_backend(&req.value).await });
             }
-            Ok(None) => return Err(anyhow!("Termination request subscription closed.")),
-            Err(error) => {
-                tracing::error!(
-                    ?error,
-                    "Non-fatal error when listening for termination requests."
-                )
-            }
+            None => return Err(anyhow!("Termination request subscription closed.")),
         }
     }
 }
