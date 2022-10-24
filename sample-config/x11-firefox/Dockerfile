@@ -1,5 +1,5 @@
 FROM debian:11-slim
-RUN apt-get -y update && apt-get -y install firefox-esr ca-certificates
+RUN apt-get -y update && apt-get -y install firefox-esr
 
 # Override default preferences.
 COPY firefox-common-config/firstrun.js /usr/lib/firefox/browser/defaults/preferences/firstrun.js

@@ -3,7 +3,7 @@
         "Certificates": {
             "ImportEnterpriseRoots": true,
             "Install": [
-                "plane.crt",
+                "plane.crt"
             ]
         }
     }

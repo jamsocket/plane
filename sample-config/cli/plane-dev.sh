@@ -6,6 +6,12 @@ usage() {
 	exit 1
 }
 
+wait_until_guac() {
+	until [ "$( curl -s http://localhost:3000/ )" ]; do
+	    sleep 0.1;
+	done;
+}
+
 long_opts() {
 	case $1 in
 	linux) [ ! "$OS" ] && linux=1 OS=1 || exit 1;;
@@ -70,9 +76,9 @@ fi
 
 if { [ $linux ] || [ $macos ]; } && [ $guac ]
 then
-	$DOCKER_COMPOSE -f "$PLANE_COMPOSE" up -d "$FLAGS" &&\
-	$BROWSER_CMD "http://localhost:3000" &&\
-	$DOCKER_COMPOSE -f "$PLANE_COMPOSE" up -d
+	# shellcheck disable=2086 # I actually want splitting here
+	$DOCKER_COMPOSE -f "$PLANE_COMPOSE" up $FLAGS &\
+	{ wait_until_guac "" && $BROWSER_CMD "http://localhost:3000" ;}
 	exit $?
 fi
 
