@@ -37,7 +37,7 @@ Use docker-compose to start a local instance of Plane:
 
 ```bash
 cd plane/sample-config/compose
-docker compose up
+docker compose pull && docker compose up
 ```
 
 A full production Plane installation requires configuring DNS records and hosting on a public IP. We didn't want you to have to do all that just to
