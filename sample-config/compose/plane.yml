@@ -48,7 +48,6 @@ services:
 
   dnsmasq:
     container_name: plane-dnsmasq
-    image: dnsmasq
     networks:
       plane:
         ipv4_address: 172.16.238.10
