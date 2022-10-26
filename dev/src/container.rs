@@ -141,6 +141,11 @@ impl ContainerResource {
             log_handle,
         })
     }
+    
+    pub async fn restart(&mut self) -> Result<()> {
+        self.docker.restart_container(&self.container_id, None).await?;
+        Ok(())
+    }
 }
 
 impl Drop for ContainerResource {

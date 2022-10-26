@@ -76,4 +76,9 @@ impl Nats {
             log_handle,
         })
     }
+    
+    pub async fn restart(&mut self) -> Result<()> {
+        self.container.restart().await?;
+        Ok(())
+    }
 }
