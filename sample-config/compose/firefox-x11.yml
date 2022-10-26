@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  firefox: 
+    container_name: plane-firefox-x11
+    image: x11-firefox
+    command:
+      "https://plane.dev"
+    build: 
+      context: ..
+      dockerfile: x11-firefox/Dockerfile
+    networks:
+      - plane
+    environment:
+      DISPLAY: ${DISPLAY}
+    ipc: host
+    volumes:
+      - ${XAUTHORITY}:/root/.Xauthority
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    dns:
+      - 172.16.238.10
+

@@ -36,7 +36,8 @@ you'll also want to [install **Rust**](https://www.rust-lang.org/tools/install).
 Use docker-compose to start a local instance of Plane:
 
 ```bash
-cd plane
+cd plane/sample-config/compose
+docker compose pull
 docker compose up
 ```
 
