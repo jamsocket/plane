@@ -14,7 +14,7 @@ use tokio_stream::StreamExt;
 
 const NATS_TOKEN: &str = "mytoken";
 pub struct Nats {
-    container: ContainerResource,
+    pub container: ContainerResource,
     #[allow(unused)]
     log_handle: JoinHandle<()>,
 }
@@ -77,8 +77,10 @@ impl Nats {
         })
     }
     
+    /*
     pub async fn restart(&mut self) -> Result<()> {
         self.container.restart().await?;
         Ok(())
     }
+    */
 }

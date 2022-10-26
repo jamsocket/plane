@@ -142,10 +142,23 @@ impl ContainerResource {
         })
     }
     
-    pub async fn restart(&mut self) -> Result<()> {
-        self.docker.restart_container(&self.container_id, None).await?;
+    pub async fn pause(&mut self) -> Result<()> {
+        self.docker.pause_container(&self.container_id).await?;
         Ok(())
     }
+    
+    pub async fn unpause(&mut self) -> Result<()> {
+        let inspection = self.docker.inspect_container(&self.container_id, None).await?;
+        let is_paused = inspection.state.ok_or_else(|| anyhow::anyhow!("no docker state!"))?.paused.ok_or_else(|| anyhow::anyhow!("no paused field"))?;
+        if is_paused {
+            self.docker.unpause_container(&self.container_id).await?;
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("container is not paused!"))
+        }
+
+    }
+    
 }
 
 impl Drop for ContainerResource {

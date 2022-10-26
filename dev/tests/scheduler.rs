@@ -115,18 +115,20 @@ async fn one_drone_available() -> Result<()> {
 
 #[integration_test]
 async fn restarting_nats() -> Result<()> {
-    let nats = Nats::new().await?;
+    let mut nats = Nats::new().await?;
     let nats_conn = nats.connection().await?;
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone());
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
-    sleep(Duration::from_millis(100)).await;
     
-    nats_conn.publish(&DroneStatusMessage {
+    nats.container.pause().await?;
+    nats_conn.publish_jetstream(&DroneStatusMessage {
         cluster: ClusterName::new("plane.test"),
         drone_id: drone_id.clone(),
         drone_version: PLANE_VERSION.to_string(),
     }).await?;
+    nats.container.unpause().await?;
+    
     
     let result = mock_agent.schedule_drone(&drone_id).await?;
     assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));
