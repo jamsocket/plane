@@ -109,7 +109,10 @@ impl DroneDatabase {
             r"
             select address
             from route
+            left join backend
+            on route.backend = backend.name
             where subdomain = ?
+            and state = 'Ready'
             ",
             subdomain
         )

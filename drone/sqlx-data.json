@@ -78,7 +78,17 @@
     },
     "query": "\n            select name, spec, state\n            from backend\n            "
   },
-  "e2b351bb878b0e2ffc84d405acf44eb7328f910564c66447aa336c4f49727740": {
+  "e8f539cb76298c46fb8e833061efab5b0e742302281aff930c81f85cb245dd7c": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n            update backend\n            set state = ?\n            "
+  },
+  "f03435ecffdc1bde6190bb77ea3d053709097982e979115f962933aad826eff4": {
     "describe": {
       "columns": [
         {
@@ -94,16 +104,6 @@
         "Right": 1
       }
     },
-    "query": "\n            select address\n            from route\n            where subdomain = ?\n            "
-  },
-  "e8f539cb76298c46fb8e833061efab5b0e742302281aff930c81f85cb245dd7c": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Right": 1
-      }
-    },
-    "query": "\n            update backend\n            set state = ?\n            "
+    "query": "\n            select address\n            from route\n            left join backend\n            on route.backend = backend.name\n            where subdomain = ?\n            and state = 'Ready'\n            "
   }
 }
