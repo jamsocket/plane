@@ -10,7 +10,7 @@ use plane_core::{
 use plane_dev::{
     resources::nats::Nats,
     timeout::{expect_to_stay_alive, LivenessGuard},
-    util::random_loopback_ip,
+    util::{get_open_udp_port, random_loopback_ip},
 };
 use std::{
     net::{Ipv4Addr, SocketAddr},
@@ -24,8 +24,6 @@ use trust_dns_resolver::{
     TokioAsyncResolver,
 };
 use trust_dns_server::client::rr::Name;
-
-const DNS_PORT: u16 = 5353;
 
 struct DnsServer {
     _guard: LivenessGuard<Result<Never, anyhow::Error>>,
@@ -54,10 +52,11 @@ impl DnsServer {
         let ip = random_loopback_ip();
         let nats = Nats::new().await?;
         let nc = nats.connection().await?;
+        let dns_port = get_open_udp_port();
 
         let plan = DnsPlan {
             bind_ip: ip.into(),
-            port: DNS_PORT,
+            port: dns_port,
             soa_email: Some(Name::from_ascii("admin.plane.test.")?),
             nc: nc.clone(),
         };
@@ -65,7 +64,7 @@ impl DnsServer {
 
         let mut config = ResolverConfig::new();
         config.add_name_server(NameServerConfig::new(
-            SocketAddr::new(ip.into(), DNS_PORT),
+            SocketAddr::new(ip.into(), dns_port),
             Protocol::Tcp,
         ));
         let resolver = TokioAsyncResolver::tokio(config, ResolverOpts::default())?;

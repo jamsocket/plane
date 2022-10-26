@@ -7,7 +7,7 @@ use plane_core::types::DroneId;
 use rand::distributions::Alphanumeric;
 use rand::thread_rng;
 use rand::Rng;
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, UdpSocket};
 use std::time::SystemTime;
 use std::{
     net::{SocketAddr, SocketAddrV4},
@@ -37,6 +37,16 @@ pub fn random_loopback_ip() -> Ipv4Addr {
     let v3 = rng.gen_range(1..254);
 
     Ipv4Addr::new(127, v1, v2, v3)
+}
+
+pub fn get_open_udp_port() -> u16 {
+    for port in 1000..u16::MAX {
+        match UdpSocket::bind(("127.0.0.1", port)) {
+            Ok(_) => return port,
+            Err(_) => continue
+        }
+    }
+    panic!("all ports occupied!");
 }
 
 pub async fn wait_for_port(addr: SocketAddrV4, timeout_ms: u128) -> Result<()> {
