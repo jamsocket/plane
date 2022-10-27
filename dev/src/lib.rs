@@ -77,7 +77,7 @@ impl TestContext {
     }
 }
 
-const LOG_TO_STDOUT: bool = true;
+const LOG_TO_STDOUT: bool = false;
 
 pub fn run_test<F>(name: &str, future: F) -> Result<()>
 where
