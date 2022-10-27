@@ -68,7 +68,7 @@ impl Nats {
                 let message = std::str::from_utf8(&v.payload).unwrap();
                 if LOG_TO_STDOUT {
                     std::io::stdout().write_all(&v.payload).unwrap();
-                    std::io::stdout().write_all(b"\n").unwrap();
+                    std::io::stdout().write_all('\n');
                 }
                 output
                     .write_fmt(format_args!(
