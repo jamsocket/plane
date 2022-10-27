@@ -90,7 +90,7 @@ async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) ->
 }
 
 /// Repeatedly publish a status message advertising this drone as available.
-async fn ready_loop(nc: TypedNats, drone_id: &DroneId, cluster: ClusterName) -> NeverResult {
+pub async fn ready_loop(nc: TypedNats, drone_id: DroneId, cluster: ClusterName) -> NeverResult {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
@@ -126,7 +126,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     let executor = Executor::new(docker, db, nats.clone(), ip, cluster.clone());
     tokio::select!(
-        result = ready_loop(nats.clone(), &agent_opts.drone_id, cluster.clone()) => result,
+        result = ready_loop(nats.clone(), agent_opts.drone_id.clone(), cluster.clone()) => result,
         result = listen_for_spawn_requests(&agent_opts.drone_id, executor.clone(), nats.clone()) => result,
         result = listen_for_termination_requests(executor.clone(), nats.clone()) => result
     )

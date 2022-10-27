@@ -1,7 +1,7 @@
-use crate::{scratch_dir, TEST_CONTEXT};
+use crate::{scratch_dir, LOG_TO_STDOUT, TEST_CONTEXT};
 use anyhow::Result;
 use bollard::{
-    container::{Config, LogsOptions, StartContainerOptions},
+    container::{Config, KillContainerOptions, LogsOptions, StartContainerOptions},
     image::CreateImageOptions,
     models::HostConfig,
     Docker,
@@ -83,8 +83,10 @@ pub struct ContainerResource {
     pub ip: Ipv4Addr,
     #[allow(unused)]
     log_handle: JoinHandle<()>,
+    spec: ContainerSpec,
 }
 
+//const LOG_TO_STDOUT : bool = true;
 impl ContainerResource {
     pub async fn new(spec: &ContainerSpec) -> Result<ContainerResource> {
         let docker = Docker::connect_with_unix_defaults()?;
@@ -130,6 +132,11 @@ impl ContainerResource {
 
         let log_handle = tokio::spawn(async move {
             while let Some(Ok(v)) = log_stream.next().await {
+                if LOG_TO_STDOUT {
+                    std::io::stdout()
+                        .write_all(v.clone().into_bytes().as_ref())
+                        .unwrap();
+                }
                 log_file.write_all(&v.into_bytes()).unwrap();
             }
         });
@@ -139,26 +146,42 @@ impl ContainerResource {
             container_id,
             ip,
             log_handle,
+            spec: spec.clone(),
         })
     }
-    
+
     pub async fn pause(&mut self) -> Result<()> {
         self.docker.pause_container(&self.container_id).await?;
         Ok(())
     }
-    
+
     pub async fn unpause(&mut self) -> Result<()> {
-        let inspection = self.docker.inspect_container(&self.container_id, None).await?;
-        let is_paused = inspection.state.ok_or_else(|| anyhow::anyhow!("no docker state!"))?.paused.ok_or_else(|| anyhow::anyhow!("no paused field"))?;
+        let inspection = self
+            .docker
+            .inspect_container(&self.container_id, None)
+            .await?;
+        let is_paused = inspection
+            .state
+            .ok_or_else(|| anyhow::anyhow!("no docker state!"))?
+            .paused
+            .ok_or_else(|| anyhow::anyhow!("no paused field"))?;
         if is_paused {
             self.docker.unpause_container(&self.container_id).await?;
             Ok(())
         } else {
             Err(anyhow::anyhow!("container is not paused!"))
         }
-
     }
-    
+
+    pub async fn restart(&mut self) -> Result<ContainerResource> {
+        self.docker
+            .kill_container(
+                &self.container_id,
+                Some(KillContainerOptions { signal: "SIGKILL" }),
+            )
+            .await?;
+        Self::new(&self.spec).await
+    }
 }
 
 impl Drop for ContainerResource {

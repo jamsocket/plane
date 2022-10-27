@@ -14,6 +14,7 @@ use plane_dev::{
     timeout::{expect_to_stay_alive, timeout},
     util::base_scheduler_request,
 };
+use plane_drone::agent::ready_loop;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -119,24 +120,58 @@ async fn restarting_nats() -> Result<()> {
     let nats_conn = nats.connection().await?;
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone());
+    //let joined_futs = futures::future::join(run_scheduler(nats_conn.clone()), ready_loop());
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
-    
-    nats.container.pause().await?;
-    tokio::spawn( (|nats_conn: TypedNats, did: DroneId | async move { 
-        for _ in 1..10 {
-            nats_conn.publish_jetstream(&DroneStatusMessage {
-                cluster: ClusterName::new("plane.test"),
-                drone_id: did.clone(),
-                drone_version: PLANE_VERSION.to_string(),
-            }).await.unwrap();
-            sleep(Duration::from_secs(1)).await;
-            }
+    let cloned_did = drone_id.clone();
+    let _readyloop_guard = expect_to_stay_alive(ready_loop(
+        nats_conn.clone(),
+        cloned_did.clone(),
+        ClusterName::new("plane.test"),
+    ));
+
+    /*
+    nats_conn
+        .publish_jetstream(&DroneStatusMessage {
+            cluster: ClusterName::new("plane.test"),
+            drone_id: drone_id.clone(),
+            drone_version: PLANE_VERSION.into(),
+        })
+        .await?;
+
+    nats_conn
+        .publish_jetstream(&DroneStatusMessage {
+            cluster: ClusterName::new("plane.test"),
+            drone_id: drone_id.clone(),
+            drone_version: PLANE_VERSION.into(),
+        })
+        .await?;
+    */
+    /*
+    tokio::spawn((|nats_conn: TypedNats, did: DroneId| async move {
+        loop {
+            nats_conn
+                .publish_jetstream(&DroneStatusMessage {
+                    cluster: ClusterName::new("plane.test"),
+                    drone_id: did.clone(),
+                    drone_version: PLANE_VERSION.to_string(),
+                })
+                .await
+                .unwrap_or_else(|_| println!("timed out!"));
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
     })(nats_conn.clone(), drone_id.clone()));
-    nats.container.unpause().await?;
-    
-    
+    */
+
+    //nats.container.pause().await?;
+    //tokio::time::sleep(Duration::from_secs(30)).await;
+    //nats.container.unpause().await?;
+
+    tokio::time::sleep(Duration::from_secs(20)).await;
+    nats.container.restart().await?;
+    tokio::time::sleep(Duration::from_secs(100)).await;
+
     let result = mock_agent.schedule_drone(&drone_id.clone()).await?;
     assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));
-    
+
     Ok(())
 }

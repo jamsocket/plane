@@ -77,6 +77,8 @@ impl TestContext {
     }
 }
 
+const LOG_TO_STDOUT: bool = true;
+
 pub fn run_test<F>(name: &str, future: F) -> Result<()>
 where
     F: Future<Output = Result<()>>,
@@ -92,12 +94,17 @@ where
     );
 
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    let (non_blocking_stdout, _guard_stdout) = tracing_appender::non_blocking(std::io::stdout());
 
-    let subscriber = tracing_subscriber::fmt()
+    let mut subscriber_builder = tracing_subscriber::fmt()
         .compact()
         .with_ansi(false)
-        .with_writer(non_blocking)
-        .finish();
+        .with_writer(non_blocking);
+    if LOG_TO_STDOUT {
+        subscriber_builder = subscriber_builder.with_writer(non_blocking_stdout);
+    }
+    let subscriber = subscriber_builder.finish();
+    //subscriber = subscriber.finish();
 
     let dispatcher = tracing::dispatcher::Dispatch::new(subscriber);
     let _guard = tracing::dispatcher::set_default(&dispatcher);
