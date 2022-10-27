@@ -122,15 +122,20 @@ async fn restarting_nats() -> Result<()> {
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
     
     nats.container.pause().await?;
-    nats_conn.publish_jetstream(&DroneStatusMessage {
-        cluster: ClusterName::new("plane.test"),
-        drone_id: drone_id.clone(),
-        drone_version: PLANE_VERSION.to_string(),
-    }).await?;
+    tokio::spawn( (|nats_conn: TypedNats, did: DroneId | async move { 
+        for _ in 1..10 {
+            nats_conn.publish_jetstream(&DroneStatusMessage {
+                cluster: ClusterName::new("plane.test"),
+                drone_id: did.clone(),
+                drone_version: PLANE_VERSION.to_string(),
+            }).await.unwrap();
+            sleep(Duration::from_secs(1)).await;
+            }
+    })(nats_conn.clone(), drone_id.clone()));
     nats.container.unpause().await?;
     
     
-    let result = mock_agent.schedule_drone(&drone_id).await?;
+    let result = mock_agent.schedule_drone(&drone_id.clone()).await?;
     assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));
     
     Ok(())

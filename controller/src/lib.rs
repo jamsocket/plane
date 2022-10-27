@@ -22,7 +22,7 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
     tracing::info!("Subscribed to spawn requests.");
 
     let mut status_sub = nats
-        .subscribe(DroneStatusMessage::subscribe_subject())
+        .subscribe_jetstream(DroneStatusMessage::subscribe_subject())
         .await?;
     tracing::info!("Subscribed to drone status messages.");
 
@@ -31,7 +31,7 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
             status_msg = status_sub.next() => {
                 tracing::debug!(?status_msg, "Got drone status");
                 if let Some(status_msg) = status_msg {
-                    scheduler.update_status(Utc::now(), &status_msg.value);
+                    scheduler.update_status(Utc::now(), &status_msg);
                 } else {
                     return Err(anyhow!("status_sub.next() returned None."));
                 }

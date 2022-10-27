@@ -204,7 +204,7 @@ impl JetStreamable for DroneStatusMessage {
             name: Self::stream_name().into(),
             subjects: vec!["drone.*.status".into()],
             max_messages_per_subject: 1,
-            max_age: Duration::from_secs(5),
+            max_age: Duration::from_secs(50),
             ..async_nats::jetstream::stream::Config::default()
         }
     }
