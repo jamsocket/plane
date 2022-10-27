@@ -50,7 +50,7 @@ impl<T> DnsResultExt for Result<T, ResolveError> {
 impl DnsServer {
     async fn new() -> Result<Self> {
         let ip = random_loopback_ip();
-        let nats = Nats::new().await?;
+        let nats = Nats::new(false).await?;
         let nc = nats.connection().await?;
         let dns_port = get_open_udp_port();
 

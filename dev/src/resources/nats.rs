@@ -5,6 +5,7 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use plane_core::nats::TypedNats;
 use plane_core::nats_connection::{NatsAuthorization, NatsConnectionSpec};
+use rand::Rng;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -33,13 +34,19 @@ impl Nats {
         self.connection_spec().connect().await
     }
 
-    pub async fn new() -> Result<Nats> {
+    pub async fn new(persist: bool) -> Result<Nats> {
         let spec = ContainerSpec {
             name: "nats".into(),
             image: "docker.io/nats:2.8".into(),
             environment: HashMap::new(),
             command: vec!["--jetstream".into(), "--auth".into(), NATS_TOKEN.into()],
-            volumes: vec![("/tmp/nats/jetstream".into(), "/tmp/nats/jetstream".into())],
+            volumes: match persist {
+                false => Vec::new(),
+                true => vec![(
+                    format!("/tmp/nats/jetstream-{}", rand::thread_rng().gen::<u16>()),
+                    "/tmp/nats/jetstream".into(),
+                )],
+            },
         };
 
         let container = ContainerResource::new(&spec).await?;

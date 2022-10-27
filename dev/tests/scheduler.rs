@@ -72,7 +72,7 @@ impl MockAgent {
 
 #[integration_test]
 async fn no_drone_available() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let nats_conn = nats.connection().await?;
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
     sleep(Duration::from_millis(100)).await;
@@ -93,7 +93,7 @@ async fn no_drone_available() -> Result<()> {
 
 #[integration_test]
 async fn one_drone_available() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let nats_conn = nats.connection().await?;
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone());
@@ -116,7 +116,7 @@ async fn one_drone_available() -> Result<()> {
 
 #[integration_test]
 async fn restarting_nats() -> Result<()> {
-    let mut nats = Nats::new().await?;
+    let mut nats = Nats::new(true).await?;
     let nats_conn = nats.connection().await?;
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone());
@@ -166,9 +166,8 @@ async fn restarting_nats() -> Result<()> {
     //tokio::time::sleep(Duration::from_secs(30)).await;
     //nats.container.unpause().await?;
 
-    tokio::time::sleep(Duration::from_secs(20)).await;
     nats.container.restart().await?;
-    tokio::time::sleep(Duration::from_secs(100)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     let result = mock_agent.schedule_drone(&drone_id.clone()).await?;
     assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));

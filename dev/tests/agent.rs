@@ -224,7 +224,7 @@ impl BackendStateSubscription {
 
 #[integration_test]
 async fn drone_sends_status_messages() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let mut controller_mock = MockController::new(nats.connection().await?).await?;
     let drone_id = DroneId::new_random();
     let agent = Agent::new(&nats, &drone_id).await?;
@@ -248,7 +248,7 @@ async fn drone_sends_status_messages() -> Result<()> {
 
 #[integration_test]
 async fn spawn_with_agent() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let connection = nats.connection().await?;
     let mut controller_mock = MockController::new(connection.clone()).await?;
     let drone_id = DroneId::new_random();
@@ -306,7 +306,7 @@ async fn spawn_with_agent() -> Result<()> {
 
 #[integration_test]
 async fn stats_are_acquired() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let connection = nats.connection().await?;
     let mut controller_mock = MockController::new(connection.clone()).await?;
     let drone_id = DroneId::new_random();
@@ -365,7 +365,7 @@ async fn use_ip_lookup_api() -> Result<()> {
 
 #[integration_test]
 async fn handle_error_during_start() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let connection = nats.connection().await?;
     let mut controller_mock = MockController::new(connection.clone()).await?;
     let drone_id = DroneId::new_random();
@@ -409,7 +409,7 @@ async fn handle_error_during_start() -> Result<()> {
 
 #[integration_test]
 async fn handle_failure_after_ready() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let connection = nats.connection().await?;
     let mut controller_mock = MockController::new(connection.clone()).await?;
     let drone_id = DroneId::new_random();
@@ -452,7 +452,7 @@ async fn handle_failure_after_ready() -> Result<()> {
 
 #[integration_test]
 async fn handle_successful_termination() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let connection = nats.connection().await?;
     let mut controller_mock = MockController::new(connection.clone()).await?;
     let drone_id = DroneId::new_random();
@@ -495,7 +495,7 @@ async fn handle_successful_termination() -> Result<()> {
 
 #[integration_test]
 async fn handle_agent_restart() -> Result<()> {
-    let nats_con = Nats::new().await?;
+    let nats_con = Nats::new(false).await?;
     let nats = nats_con.connection().await?;
     let mut controller_mock = MockController::new(nats.clone()).await?;
 
@@ -540,7 +540,7 @@ async fn handle_agent_restart() -> Result<()> {
 
 #[integration_test]
 async fn handle_termination_request() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let connection = nats.connection().await?;
     let mut controller_mock = MockController::new(connection.clone()).await?;
     let drone_id = DroneId::new_random();

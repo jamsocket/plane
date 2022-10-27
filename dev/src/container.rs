@@ -86,7 +86,6 @@ pub struct ContainerResource {
     spec: ContainerSpec,
 }
 
-//const LOG_TO_STDOUT : bool = true;
 impl ContainerResource {
     pub async fn new(spec: &ContainerSpec) -> Result<ContainerResource> {
         let docker = Docker::connect_with_unix_defaults()?;

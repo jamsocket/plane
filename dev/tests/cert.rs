@@ -44,7 +44,7 @@ impl DummyDnsHandler {
 
 #[integration_test]
 async fn cert_refresh() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let pebble = Pebble::new().await?;
     let conn = nats.connection().await?;
     let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await?;
@@ -75,7 +75,7 @@ async fn cert_refresh() -> Result<()> {
 
 #[integration_test]
 async fn cert_refresh_full() -> Result<()> {
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let pebble = Pebble::new().await?;
     let conn = nats.connection().await?;
     let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await?;
@@ -114,7 +114,7 @@ async fn cert_refresh_eab() -> Result<()> {
         "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
     )?;
 
-    let nats = Nats::new().await?;
+    let nats = Nats::new(false).await?;
     let pebble = Pebble::new_eab(&eab_keypair).await?;
     let conn = nats.connection().await?;
     let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await?;
