@@ -223,14 +223,15 @@ impl Executor {
                     tracing::error!(?error, ?state, "Encountered error.");
                     match state {
                         BackendState::Loading => {
-                            self.database.update_backend_state(&spawn_request.backend_id, BackendState::ErrorLoading).await.log_error();
+                            state = BackendState::ErrorLoading;
+                            self.database.update_backend_state(&spawn_request.backend_id, state).await.log_error();
                             self.nc.publish_jetstream(&BackendStateMessage::new(
-                                BackendState::ErrorLoading,
+                                state,
                                 spawn_request.backend_id.clone()
                             )).await.log_error();
                             },
-                            _ => tracing::error!(?error, ?state, "Error unhandled (no Error State nats message published)"),
-                        }
+                            _ => tracing::error!(?error, ?state, "Error unhandled (no change in backend state)"),
+                    }
                     break;
                 }
             }
