@@ -56,7 +56,7 @@ do
 	esac
 done
 
-FLAGS="--remove-orphans --pull always --no-build"
+FLAGS="--remove-orphans --pull always"
 if [ $BUILD_OPT ]; then
 	FLAGS="--remove-orphans --force-recreate --build"
 fi
