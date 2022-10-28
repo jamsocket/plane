@@ -221,6 +221,17 @@ impl Executor {
                 }
                 Err(error) => {
                     tracing::error!(?error, ?state, "Encountered error.");
+                    match state {
+                        BackendState::Loading => {
+                            state = BackendState::ErrorLoading;
+                            self.database.update_backend_state(&spawn_request.backend_id, state).await.log_error();
+                            self.nc.publish_jetstream(&BackendStateMessage::new(
+                                state,
+                                spawn_request.backend_id.clone()
+                            )).await.log_error();
+                            },
+                            _ => tracing::error!(?error, ?state, "Error unhandled (no change in backend state)"),
+                    }
                     break;
                 }
             }
