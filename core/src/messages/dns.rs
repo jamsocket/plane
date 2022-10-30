@@ -36,7 +36,7 @@ impl TypedMessage for SetDnsRecord {
         format!(
             "cluster.{}.dns.{}",
             self.cluster.subject_name(),
-            serde_json::to_string(&self.kind).unwrap()
+            self.kind.to_string(),
         )
     }
 }
@@ -71,5 +71,31 @@ impl SetDnsRecord {
 
     pub fn send_period() -> u64 {
         Self::ttl_seconds() - TTL_BUFFER_SECONDS
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_set_dns_record_subject() {
+        let record = SetDnsRecord {
+            cluster: ClusterName::new("foo.bar"),
+            kind: DnsRecordType::A,
+            name: "blah".to_string(),
+            value: "12.12.12.12".to_string(),
+        };
+
+        assert_eq!("cluster.foo_bar.dns.A", &record.subject());
+
+        let record = SetDnsRecord {
+            cluster: ClusterName::new("gad.wom.tld"),
+            kind: DnsRecordType::TXT,
+            name: "goo".to_string(),
+            value: "14.14.14.14".to_string(),
+        };
+
+        assert_eq!("cluster.gad_wom_tld.dns.TXT", &record.subject());
     }
 }
