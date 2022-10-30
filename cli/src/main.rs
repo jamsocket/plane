@@ -103,17 +103,25 @@ async fn main() -> Result<()> {
                         credentials: None,
                         resource_limits: ResourceLimits::default(),
                     },
+                    require_bearer_token: false,
                 })
                 .await?;
 
             match result {
-                ScheduleResponse::Scheduled { drone, backend_id } => {
+                ScheduleResponse::Scheduled {
+                    drone,
+                    backend_id,
+                    bearer_token,
+                } => {
                     let url = format!("https://{}.{}", backend_id, cluster);
 
                     println!("Backend scheduled.");
                     println!("URL: {}", url.bright_green());
                     println!("Drone: {}", drone.to_string().bright_blue());
                     println!("Backend ID: {}", backend_id.to_string().bright_blue());
+                    if let Some(bearer_token) = bearer_token {
+                        println!("Bearer token: {}", bearer_token.bright_blue());
+                    }
                 }
                 ScheduleResponse::NoDroneAvailable => tracing::error!(
                     %cluster,

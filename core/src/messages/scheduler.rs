@@ -26,6 +26,9 @@ pub struct ScheduleRequest {
 
     /// Configuration for docker run (image, creds, env vars etc.)
     pub executable: DockerExecutableConfig,
+
+    #[serde(default)]
+    pub require_bearer_token: bool,
 }
 
 impl ScheduleRequest {
@@ -35,12 +38,17 @@ impl ScheduleRequest {
             .clone()
             .unwrap_or_else(BackendId::new_random);
 
+        if self.require_bearer_token {
+            tracing::warn!("Scheduler received request with auth_token, which is not yet implemented. Ignoring.");
+        }
+
         SpawnRequest {
             drone_id: drone_id.clone(),
             backend_id,
             max_idle_secs: self.max_idle_secs,
             metadata: self.metadata.clone(),
             executable: self.executable.clone(),
+            bearer_token: None,
         }
     }
 }
@@ -50,6 +58,8 @@ pub enum ScheduleResponse {
     Scheduled {
         drone: DroneId,
         backend_id: BackendId,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bearer_token: Option<String>,
     },
     NoDroneAvailable,
 }

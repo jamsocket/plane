@@ -53,7 +53,11 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                                         tracing::warn!(?error, "Scheduler returned error.");
                                         ScheduleResponse::NoDroneAvailable
                                     },
-                                    Ok(true) => ScheduleResponse::Scheduled { drone: drone_id, backend_id: spawn_request.backend_id }
+                                    Ok(true) => ScheduleResponse::Scheduled {
+                                        drone: drone_id,
+                                        backend_id: spawn_request.backend_id,
+                                        bearer_token: None,
+                                    }
                                 }
                             },
                             Err(error) => {

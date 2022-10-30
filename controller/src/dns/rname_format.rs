@@ -1,9 +1,11 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 pub fn format_rname(email: &str) -> Result<String> {
-    let (pre, post) = email.split_once('@').ok_or_else(|| anyhow!("Email address must include '@'."))?;
+    let (pre, post) = email
+        .split_once('@')
+        .ok_or_else(|| anyhow!("Email address must include '@'."))?;
     let pre = pre.replace('.', r"\.");
-    
+
     Ok(format!("{}.{}", pre, post))
 }
 
@@ -14,7 +16,10 @@ mod test {
     #[test]
     fn test_rname() {
         assert_eq!("foo.bar.com", &format_rname("foo@bar.com").unwrap());
-        assert_eq!(r"foo\.bar.baz.com", &format_rname("foo.bar@baz.com").unwrap());
+        assert_eq!(
+            r"foo\.bar.baz.com",
+            &format_rname("foo.bar@baz.com").unwrap()
+        );
 
         assert!(format_rname("foo.bar.com").is_err());
     }
