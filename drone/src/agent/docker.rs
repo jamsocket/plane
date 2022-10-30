@@ -11,7 +11,7 @@ use bollard::{
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
-use plane_core::messages::agent::ResourceLimits;
+use plane_core::{messages::agent::ResourceLimits, timing::Timer};
 use std::{collections::HashMap, net::IpAddr, time::Duration};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
@@ -231,12 +231,12 @@ impl DockerInterface {
         })
     }
 
-    #[allow(unused)]
     pub async fn pull_image(
         &self,
         image: &str,
         credentials: &Option<DockerCredentials>,
     ) -> Result<()> {
+        let timer = Timer::new();
         let options = Some(CreateImageOptions {
             from_image: image,
             ..Default::default()
@@ -246,6 +246,8 @@ impl DockerInterface {
         while let Some(next) = result.next().await {
             next?;
         }
+
+        tracing::info!(duration=?timer.duration(), ?image, "Pulled image.");
 
         Ok(())
     }
@@ -332,8 +334,10 @@ impl DockerInterface {
     ) -> Result<()> {
         let env: Vec<String> = env.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
 
+
         // Build the container.
         let container_id = {
+            let timer = Timer::new();
             let options: Option<CreateContainerOptions<String>> = Some(CreateContainerOptions {
                 name: name.to_string(),
                 platform: None,
@@ -392,14 +396,17 @@ impl DockerInterface {
             };
 
             let result = self.docker.create_container(options, config).await?;
+            tracing::info!(duration=?timer.duration(), %image, "Created container.");
             result.id
         };
 
         // Start the container.
         {
+            let timer = Timer::new();
             let options: Option<StartContainerOptions<&str>> = None;
 
             self.docker.start_container(&container_id, options).await?;
+            tracing::info!(duation=?timer.duration(), %container_id, "Started container.");
         };
 
         Ok(())
