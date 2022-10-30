@@ -104,6 +104,7 @@ async fn one_drone_available() -> Result<()> {
             cluster: ClusterName::new("plane.test"),
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
+            ready: true,
         })
         .await?;
 

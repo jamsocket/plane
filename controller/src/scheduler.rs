@@ -104,6 +104,7 @@ mod tests {
                 drone_id: drone_id.clone(),
                 cluster: ClusterName::new("mycluster.test"),
                 drone_version: PLANE_VERSION.to_string(),
+                ready: true,
             },
         );
 
@@ -126,6 +127,7 @@ mod tests {
                 drone_id: DroneId::new_random(),
                 cluster: ClusterName::new("mycluster1.test"),
                 drone_version: PLANE_VERSION.to_string(),
+                ready: true,
             },
         );
 
@@ -148,6 +150,7 @@ mod tests {
                 drone_id: DroneId::new_random(),
                 cluster: ClusterName::new("mycluster.test"),
                 drone_version: PLANE_VERSION.to_string(),
+                ready: true,
             },
         );
 
