@@ -5,6 +5,7 @@ use futures::{SinkExt, StreamExt};
 use http::StatusCode;
 use integration_test::integration_test;
 use plane_core::NeverResult;
+use plane_core::messages::agent::BackendState;
 use plane_dev::{
     resources::certs::SelfSignedCert,
     resources::server::Server,
@@ -186,6 +187,7 @@ async fn simple_backend_proxy() -> Result<()> {
 
     let sr = base_spawn_request();
     proxy.db.insert_backend(&sr).await?;
+    proxy.db.update_backend_state(&sr.backend_id, BackendState::Ready).await?;
 
     proxy
         .db
@@ -205,6 +207,7 @@ async fn simple_ws_backend_proxy() -> Result<()> {
 
     let sr = base_spawn_request();
     proxy.db.insert_backend(&sr).await?;
+    proxy.db.update_backend_state(&sr.backend_id, BackendState::Ready).await?;
 
     proxy
         .db
@@ -257,6 +260,7 @@ async fn connection_status_is_recorded() -> Result<()> {
 
     let sr = base_spawn_request();
     proxy.db.insert_backend(&sr).await?;
+    proxy.db.update_backend_state(&sr.backend_id, BackendState::Ready).await?;
     proxy
         .db
         .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
@@ -315,6 +319,7 @@ async fn host_header_is_set() -> Result<()> {
 
     let sr = base_spawn_request();
     proxy.db.insert_backend(&sr).await?;
+    proxy.db.update_backend_state(&sr.backend_id, BackendState::Ready).await?;
 
     proxy
         .db
@@ -334,6 +339,7 @@ async fn update_certificates() -> Result<()> {
 
     let sr = base_spawn_request();
     proxy.db.insert_backend(&sr).await?;
+    proxy.db.update_backend_state(&sr.backend_id, BackendState::Ready).await?;
 
     let original_cert = proxy.certs.cert_pem.clone();
 
