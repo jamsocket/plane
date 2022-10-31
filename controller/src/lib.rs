@@ -5,6 +5,7 @@ use plane_core::{
     messages::scheduler::{ScheduleRequest, ScheduleResponse},
     nats::TypedNats,
     NeverResult,
+    timing::Timer,
 };
 use scheduler::Scheduler;
 use tokio::select;
@@ -43,8 +44,22 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                         tracing::info!(spawn_request=?schedule_request.value, "Got spawn request");
                         let result = match scheduler.schedule(&schedule_request.value.cluster, Utc::now()) {
                             Ok(drone_id) => {
+                                let timer = Timer::new();
                                 let spawn_request = schedule_request.value.schedule(&drone_id);
                                 match nats.request(&spawn_request).await {
+                                    Ok(true) => {
+                                        tracing::info!(
+                                            duration=?timer.duration(),
+                                            backend_id=%spawn_request.backend_id,
+                                            %drone_id,
+                                            "Drone accepted backend."
+                                        );
+                                        ScheduleResponse::Scheduled {
+                                            drone: drone_id,
+                                            backend_id: spawn_request.backend_id,
+                                            bearer_token: None,
+                                        }
+                                    }
                                     Ok(false) => {
                                         tracing::warn!("No drone available.");
                                         ScheduleResponse::NoDroneAvailable
@@ -53,11 +68,6 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                                         tracing::warn!(?error, "Scheduler returned error.");
                                         ScheduleResponse::NoDroneAvailable
                                     },
-                                    Ok(true) => ScheduleResponse::Scheduled {
-                                        drone: drone_id,
-                                        backend_id: spawn_request.backend_id,
-                                        bearer_token: None,
-                                    }
                                 }
                             },
                             Err(error) => {

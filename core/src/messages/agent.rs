@@ -188,6 +188,16 @@ pub struct DroneStatusMessage {
     pub drone_id: DroneId,
     pub cluster: ClusterName,
     pub drone_version: String,
+
+    /// Indicates that a drone is ready to have backends scheduled to it.
+    /// When a drone has been told to drain or is otherwise unable to have
+    /// backends scheduled to it, this is set to false.
+    #[serde(default="default_ready")]
+    pub ready: bool,
+}
+
+fn default_ready() -> bool {
+    true
 }
 
 impl TypedMessage for DroneStatusMessage {

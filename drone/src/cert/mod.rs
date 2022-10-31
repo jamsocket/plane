@@ -11,12 +11,11 @@ use openssl::{
     x509::X509,
 };
 use plane_core::{
-    messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName, NeverResult,
+    nats::TypedNats, types::ClusterName, NeverResult, messages::dns::{SetDnsRecord, DnsRecordType},
 };
 use reqwest::Client;
 use std::io::Write;
 use std::{fs::File, path::Path, time::Duration};
-
 use crate::keys::KeyCertPathPair;
 
 pub mod acme;
@@ -76,16 +75,14 @@ pub async fn get_certificate(
             .ok_or_else(|| anyhow!("No authorization value."))?;
 
         tracing::info!("Requesting TXT record from platform.");
-        let result = nats
-            .request(&SetAcmeDnsRecord {
+        nats
+            .publish_jetstream(&SetDnsRecord {
                 cluster: ClusterName::new(cluster_domain),
+                kind: DnsRecordType::TXT,
+                name: "_acme-challenge".to_string(),
                 value,
             })
             .await?;
-
-        if !result {
-            return Err(anyhow!("Platform rejected TXT record."));
-        }
 
         tracing::info!("Validating challenge.");
         let challenge = challenge.validate().await?;
