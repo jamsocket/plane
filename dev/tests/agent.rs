@@ -302,12 +302,14 @@ async fn spawn_with_agent() -> Result<()> {
         .await?;
 
     // Route is invalidated after sweeping.
-    assert!(agent
-        .db
-        .get_proxy_route(request.backend_id.id())
-        .await?
-        .is_none(),
-        "Expected proxy route to be swept after backend is stopped.");
+    assert!(
+        agent
+            .db
+            .get_proxy_route(request.backend_id.id())
+            .await?
+            .is_none(),
+        "Expected proxy route to be swept after backend is stopped."
+    );
 
     Ok(())
 }

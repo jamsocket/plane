@@ -158,6 +158,12 @@ impl Executor {
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
 
+        if spawn_request.bearer_token.is_some() {
+            tracing::warn!(
+                "Spawn request included bearer token, which is not currently supported."
+            );
+        }
+
         loop {
             tracing::info!(
                 ?state,
@@ -224,13 +230,23 @@ impl Executor {
                     match state {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
-                            self.database.update_backend_state(&spawn_request.backend_id, state).await.log_error();
-                            self.nc.publish_jetstream(&BackendStateMessage::new(
-                                state,
-                                spawn_request.backend_id.clone()
-                            )).await.log_error();
-                            },
-                            _ => tracing::error!(?error, ?state, "Error unhandled (no change in backend state)"),
+                            self.database
+                                .update_backend_state(&spawn_request.backend_id, state)
+                                .await
+                                .log_error();
+                            self.nc
+                                .publish_jetstream(&BackendStateMessage::new(
+                                    state,
+                                    spawn_request.backend_id.clone(),
+                                ))
+                                .await
+                                .log_error();
+                        }
+                        _ => tracing::error!(
+                            ?error,
+                            ?state,
+                            "Error unhandled (no change in backend state)"
+                        ),
                     }
                     break;
                 }

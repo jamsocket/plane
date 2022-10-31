@@ -54,7 +54,11 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                                             %drone_id,
                                             "Drone accepted backend."
                                         );
-                                        ScheduleResponse::Scheduled { drone: drone_id, backend_id: spawn_request.backend_id }
+                                        ScheduleResponse::Scheduled {
+                                            drone: drone_id,
+                                            backend_id: spawn_request.backend_id,
+                                            bearer_token: None,
+                                        }
                                     }
                                     Ok(false) => {
                                         tracing::warn!("No drone available.");

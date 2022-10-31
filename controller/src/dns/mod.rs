@@ -8,10 +8,10 @@ use crate::ttl_store::ttl_multistore::TtlMultistore;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use error::Result;
+use plane_core::messages::dns::DnsRecordType;
 use plane_core::messages::dns::SetDnsRecord;
 use plane_core::types::ClusterName;
 use plane_core::Never;
-use plane_core::{messages::dns::DnsRecordType};
 use std::net::Ipv4Addr;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -189,7 +189,12 @@ impl ClusterDnsServer {
             }
             RecordType::SOA => {
                 let name = request.query().name();
-                let soa_record = self.soa_email.as_ref().or_dns_error(ResponseCode::ServFail, || "SOA record email not set in config.".to_string())?;
+                let soa_record = self
+                    .soa_email
+                    .as_ref()
+                    .or_dns_error(ResponseCode::ServFail, || {
+                        "SOA record email not set in config.".to_string()
+                    })?;
 
                 let rdata = RData::SOA(SOA::new(
                     name.into(),

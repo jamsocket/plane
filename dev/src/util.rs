@@ -115,6 +115,7 @@ pub fn base_spawn_request() -> SpawnRequest {
             credentials: None,
             resource_limits: Default::default(),
         },
+        bearer_token: None,
     }
 }
 
@@ -130,5 +131,6 @@ pub fn base_scheduler_request() -> ScheduleRequest {
             credentials: None,
             resource_limits: Default::default(),
         },
+        require_bearer_token: false,
     }
 }

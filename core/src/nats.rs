@@ -144,16 +144,15 @@ where
     pub async fn next(&mut self) -> Option<MessageWithResponseHandle<T>> {
         loop {
             if let Some(message) = self.subscription.next().await {
-                let result = MessageWithResponseHandle::new(
-                    message,
-                    self.nc.clone(),
-                );
+                let result = MessageWithResponseHandle::new(message, self.nc.clone());
                 match result {
                     Ok(v) => return Some(v),
-                    Err(error) => tracing::error!(?error, "Error parsing message; message ignored."),
+                    Err(error) => {
+                        tracing::error!(?error, "Error parsing message; message ignored.")
+                    }
                 }
             } else {
-                return None
+                return None;
             }
         }
     }
@@ -234,14 +233,19 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
                         continue;
                     }
                 };
-                message.ack().await.log_error("Error acking jetstream message.");
+                message
+                    .ack()
+                    .await
+                    .log_error("Error acking jetstream message.");
                 let value: Result<T, _> = serde_json::from_slice(&message.payload);
                 match value {
                     Ok(value) => return Some(value),
-                    Err(error) => tracing::error!(?error, "Error parsing jetstream message; message ignored."),
+                    Err(error) => {
+                        tracing::error!(?error, "Error parsing jetstream message; message ignored.")
+                    }
                 }
             } else {
-                return None
+                return None;
             }
         }
     }

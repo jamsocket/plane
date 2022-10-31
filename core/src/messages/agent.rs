@@ -292,6 +292,14 @@ pub struct SpawnRequest {
 
     /// Configuration of executor (ie. image to run, executor being used etc)
     pub executable: DockerExecutableConfig,
+
+    /// If set, the proxy will check for the given bearer token in requests (as
+    /// a Bearer Authorization header, HTTP cookie, or query parameter) before
+    /// allowing requests through.
+    ///
+    /// NOT YET IMPLEMENTED.
+    #[serde(default)]
+    pub bearer_token: Option<String>,
 }
 
 // eventually, this will be generic over executors
