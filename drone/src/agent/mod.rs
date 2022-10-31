@@ -98,6 +98,7 @@ async fn ready_loop(nc: TypedNats, drone_id: &DroneId, cluster: ClusterName) -> 
             drone_id: drone_id.clone(),
             cluster: cluster.clone(),
             drone_version: PLANE_VERSION.to_string(),
+            ready: true,
         })
         .await
         .log_error("Error in ready loop.");
