@@ -1,7 +1,7 @@
 use anyhow::Result;
 use integration_test::integration_test;
 use openssl::x509::X509;
-use plane_core::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName};
+use plane_core::{nats::TypedNats, types::ClusterName, messages::dns::{SetDnsRecord, DnsRecordType}};
 use plane_dev::{
     resources::{nats::Nats, pebble::Pebble},
     scratch_dir,
@@ -25,12 +25,13 @@ impl DummyDnsHandler {
     pub async fn new(conn: &TypedNats, expect_domain: &str) -> Result<DummyDnsHandler> {
         let expect_domain = ClusterName::new(expect_domain);
         let mut dns_sub = conn
-            .subscribe(SetAcmeDnsRecord::subscribe_subject())
+            .subscribe(SetDnsRecord::subscribe_subject())
             .await?;
         let handle = spawn_timeout(10_000, "Should get ACME DNS request.", async move {
             let message = dns_sub.next().await.unwrap();
             assert_eq!(expect_domain, message.value.cluster);
-            message.respond(&true).await?;
+            assert_eq!("_acme-challenge", &message.value.name);
+            assert_eq!(DnsRecordType::TXT, message.value.kind);
             Ok(())
         });
 
