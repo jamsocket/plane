@@ -2,7 +2,7 @@ name: Build Drone Image
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "paulgb/dual-dns-servers" ]
     tags: [ 'v*.*.*' ]
     paths-ignore: [ "/docs" ]
 
@@ -49,7 +49,6 @@ jobs:
           tags: |
             type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
             type=semver,pattern={{version}}
-            type=raw,value=latest
 
       - name: Build and push Docker image
         id: build-and-push

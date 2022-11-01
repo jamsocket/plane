@@ -192,7 +192,7 @@ pub struct DroneStatusMessage {
     /// Indicates that a drone is ready to have backends scheduled to it.
     /// When a drone has been told to drain or is otherwise unable to have
     /// backends scheduled to it, this is set to false.
-    #[serde(default="default_ready")]
+    #[serde(default = "default_ready")]
     pub ready: bool,
 }
 
