@@ -234,9 +234,9 @@ impl ProxyService {
             }
 
             tracing::warn!(?host, "Unrecognized host.");
+        } else {
+            tracing::warn!("No host header present on request.");
         }
-
-        tracing::warn!("No host header present on request.");
 
         Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)

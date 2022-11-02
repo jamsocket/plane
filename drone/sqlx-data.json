@@ -78,15 +78,15 @@
     },
     "query": "\n            select name, spec, state\n            from backend\n            "
   },
-  "e8f539cb76298c46fb8e833061efab5b0e742302281aff930c81f85cb245dd7c": {
+  "ea0eda3537831ebb17582fbc5d42e5847b2ac178d74036bb25bb83d70c73a7b6": {
     "describe": {
       "columns": [],
       "nullable": [],
       "parameters": {
-        "Right": 1
+        "Right": 2
       }
     },
-    "query": "\n            update backend\n            set state = ?\n            "
+    "query": "\n            update backend\n            set state = ?\n            where name = ?\n            "
   },
   "f03435ecffdc1bde6190bb77ea3d053709097982e979115f962933aad826eff4": {
     "describe": {
