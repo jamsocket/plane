@@ -2,7 +2,7 @@ name: Build Controller Image
 
 on:
   pull_request:
-    branches: [ "paulgb/dual-dns-servers" ]
+    branches: [ "main" ]
 
 env:
   REGISTRY: ghcr.io
