@@ -89,13 +89,16 @@ impl DroneDatabase {
         state: BackendState,
     ) -> Result<()> {
         let state = state.to_string();
+        let backend_id = backend.id().to_string();
 
         sqlx::query!(
             r"
             update backend
             set state = ?
+            where name = ?
             ",
-            state
+            state,
+            backend_id,
         )
         .execute(&self.pool)
         .await?;
