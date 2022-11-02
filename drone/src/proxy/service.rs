@@ -240,6 +240,7 @@ impl ProxyService {
 
         Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
+            .header(hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
             .body(Body::empty())?)
     }
 
