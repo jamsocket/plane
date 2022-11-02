@@ -1,15 +1,8 @@
 name: Build Controller Image
 
 on:
-  push:
-    branches: [ "main", "paulgb/dual-dns-servers" ]
-    tags: [ 'v*.*.*' ]
-    paths-ignore: [ "/docs" ]
-
   pull_request:
-    branches: [ "main" ]
-    paths:
-    - '.github/workflows/build-controller-image.yml'
+    branches: [ "paulgb/dual-dns-servers" ]
 
 env:
   REGISTRY: ghcr.io

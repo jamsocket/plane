@@ -1,15 +1,8 @@
 name: Build Drone Image
 
 on:
-  push:
-    branches: [ "main", "paulgb/dual-dns-servers" ]
-    tags: [ 'v*.*.*' ]
-    paths-ignore: [ "/docs" ]
-
   pull_request:
-    branches: [ "main" ]
-    paths:
-    - '.github/workflows/build-drone-image.yml'
+    branches: [ "paulgb/dual-dns-servers" ]
 
 env:
   REGISTRY: ghcr.io
@@ -56,6 +49,7 @@ jobs:
         with:
           context: "."
           file: "drone/Dockerfile"
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
