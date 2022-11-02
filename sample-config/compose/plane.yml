@@ -6,6 +6,10 @@ services:
     build:
       dockerfile: ./drone/Dockerfile
       context: ../..
+      args:
+        PLANE_SCCACHE_BUCKET: ${SCCACHE_BUCKET}
+        PLANE_AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+        PLANE_AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
     volumes:
       - ../auth:/etc/plane/auth:ro
       - ../plane-config/drone.toml:/etc/plane/drone.toml:ro
@@ -21,6 +25,10 @@ services:
     build:
       dockerfile: ./controller/Dockerfile
       context: ../..
+      args:
+        PLANE_SCCACHE_BUCKET: ${SCCACHE_BUCKET}
+        PLANE_AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+        PLANE_AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
     volumes:
       - ../auth:/etc/plane/auth:ro
       - ../plane-config/controller.toml:/etc/plane/controller.toml:ro
