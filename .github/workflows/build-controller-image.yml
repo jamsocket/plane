@@ -1,8 +1,8 @@
 name: Build Controller Image
 
 on:
-  pull_request:
-    branches: [ "main" ]
+  push:
+    branches: [ "paulgb/dual-dns-servers" ]
 
 env:
   REGISTRY: ghcr.io
