@@ -70,6 +70,8 @@ impl ClusterDnsServer {
                     .await?;
 
                 while let Some(v) = stream.next().await {
+                    tracing::debug!(?v, "Got SetDnsRecord request.");
+
                     match v.kind {
                         DnsRecordType::A => {
                             let ip: Ipv4Addr = match v.value.parse() {
@@ -137,6 +139,8 @@ impl ClusterDnsServer {
         } else {
             ClusterName::new(cluster_name)
         };
+
+        tracing::debug!(?cluster_name, %hostname, "Received DNS record request.");
 
         match request.query().query_type() {
             RecordType::TXT => {
