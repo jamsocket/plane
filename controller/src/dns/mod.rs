@@ -115,10 +115,11 @@ impl ClusterDnsServer {
                                         value,
                                         SystemTime::now(),
                                     );
-                                    continue;
                             }
                         }
                     }
+
+                    tracing::warn!("SetDnsRecord Jetstream connection lost; reconnecting.");
                 }
             })
         };
@@ -143,6 +144,8 @@ impl ClusterDnsServer {
         } else {
             ClusterName::new(cluster_name)
         };
+
+        tracing::info!(?cluster_name, %hostname, "Received DNS record request.");
 
         match request.query().query_type() {
             RecordType::TXT => {
