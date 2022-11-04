@@ -65,55 +65,61 @@ impl ClusterDnsServer {
             let txt_record_map = txt_record_map.clone();
 
             tokio::spawn(async move {
-                let mut stream = nc
-                    .subscribe_jetstream(SetDnsRecord::subscribe_subject())
-                    .await?;
+                tracing::info!("In SetDnsRecord jetstream loop.");
 
-                while let Some(v) = stream.next().await {
-                    match v.kind {
-                        DnsRecordType::A => {
-                            let ip: Ipv4Addr = match v.value.parse() {
-                                Ok(v) => v,
-                                Err(error) => {
-                                    tracing::warn!(
-                                        ?error,
-                                        ip = v.value,
-                                        "Error parsing IP in SetDnsRecord request."
+                loop {
+                    let mut stream = nc
+                        .subscribe(SetDnsRecord::subscribe_subject())
+                        .await?;
+
+                    while let Some(v) = stream.next().await {
+                        tracing::info!(?v, "Got SetDnsRecord request.");
+                        let v = v.value;
+
+                        match v.kind {
+                            DnsRecordType::A => {
+                                let ip: Ipv4Addr = match v.value.parse() {
+                                    Ok(v) => v,
+                                    Err(error) => {
+                                        tracing::warn!(
+                                            ?error,
+                                            ip = v.value,
+                                            "Error parsing IP in SetDnsRecord request."
+                                        );
+                                        continue;
+                                    }
+                                };
+                                let value = RData::A(ip);
+                                a_record_map
+                                    .lock()
+                                    .expect("a_record_map was poisoned")
+                                    .insert(
+                                        RecordKey {
+                                            cluster: v.cluster.clone(),
+                                            name: v.name.clone(),
+                                        },
+                                        value,
+                                        SystemTime::now(),
+                                    )
+                            }
+                            DnsRecordType::TXT => {
+                                let value = RData::TXT(TXT::new(vec![v.value]));
+                                txt_record_map
+                                    .lock()
+                                    .expect("txt_record_map was poisoned")
+                                    .insert(
+                                        RecordKey {
+                                            cluster: v.cluster.clone(),
+                                            name: v.name.clone(),
+                                        },
+                                        value,
+                                        SystemTime::now(),
                                     );
                                     continue;
-                                }
-                            };
-                            let value = RData::A(ip);
-                            a_record_map
-                                .lock()
-                                .expect("a_record_map was poisoned")
-                                .insert(
-                                    RecordKey {
-                                        cluster: v.cluster.clone(),
-                                        name: v.name.clone(),
-                                    },
-                                    value,
-                                    SystemTime::now(),
-                                )
-                        }
-                        DnsRecordType::TXT => {
-                            let value = RData::TXT(TXT::new(vec![v.value]));
-                            txt_record_map
-                                .lock()
-                                .expect("txt_record_map was poisoned")
-                                .insert(
-                                    RecordKey {
-                                        cluster: v.cluster.clone(),
-                                        name: v.name.clone(),
-                                    },
-                                    value,
-                                    SystemTime::now(),
-                                );
+                            }
                         }
                     }
                 }
-
-                Ok(())
             })
         };
 
