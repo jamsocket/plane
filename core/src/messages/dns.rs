@@ -33,7 +33,11 @@ impl TypedMessage for SetDnsRecord {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        format!("cluster.{}.dns.{}", self.cluster.subject_name(), self.kind,)
+        format!(
+            "cluster.{}.dns.{}",
+            self.cluster.subject_name(),
+            self.kind.to_string()
+        )
     }
 }
 
