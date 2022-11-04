@@ -68,9 +68,7 @@ impl ClusterDnsServer {
                 tracing::info!("In SetDnsRecord subscription loop.");
 
                 loop {
-                    let mut stream = nc
-                        .subscribe(SetDnsRecord::subscribe_subject())
-                        .await?;
+                    let mut stream = nc.subscribe(SetDnsRecord::subscribe_subject()).await?;
 
                     while let Some(v) = stream.next().await {
                         tracing::info!(?v, "Got SetDnsRecord request.");

@@ -56,7 +56,10 @@ impl DummyDnsHandler {
             })
         };
 
-        Ok(DummyDnsHandler { new_handle, old_handle })
+        Ok(DummyDnsHandler {
+            new_handle,
+            old_handle,
+        })
     }
 
     pub async fn finish(self) -> Result<()> {

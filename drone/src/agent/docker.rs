@@ -334,7 +334,6 @@ impl DockerInterface {
     ) -> Result<()> {
         let env: Vec<String> = env.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
 
-
         // Build the container.
         let container_id = {
             let timer = Timer::new();
