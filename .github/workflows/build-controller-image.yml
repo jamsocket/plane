@@ -56,6 +56,10 @@ jobs:
         uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
         with:
           context: "."
+          build-args: |
+            SCCACHE_BUCKET=${{ secrets.PLANE_SCCACHE_BUCKET }}
+            AWS_ACCESS_KEY_ID=${{ secrets.PLANE_AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.PLANE_AWS_SECRET_ACCESS_KEY }}
           file: "controller/Dockerfile"
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
