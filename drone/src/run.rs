@@ -79,7 +79,7 @@ async fn drone_main() -> NeverResult {
 }
 
 pub fn run() -> Result<()> {
-    let mut signals = Signals::new(&[SIGINT, SIGTERM])?;
+    let mut signals = Signals::new([SIGINT, SIGTERM])?;
 
     thread::spawn(move || {
         for _ in signals.forever() {
