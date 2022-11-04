@@ -3,8 +3,8 @@ pub mod logging;
 pub mod messages;
 pub mod nats;
 pub mod nats_connection;
-pub mod timing;
 pub mod retry;
+pub mod timing;
 pub mod types;
 
 /// This is a stand-in for the “never” type until RFC 1216 is stabilized.

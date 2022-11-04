@@ -36,7 +36,7 @@ impl TypedMessage for SetDnsRecord {
         format!(
             "cluster.{}.dns.{}",
             self.cluster.subject_name(),
-            self.kind.to_string(),
+            self.kind.to_string()
         )
     }
 }

@@ -1602,7 +1602,7 @@ checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
 
 [[package]]
 name = "plane-cli"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "async-nats",
@@ -1616,7 +1616,7 @@ dependencies = [
 
 [[package]]
 name = "plane-controller"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1636,7 +1636,7 @@ dependencies = [
 
 [[package]]
 name = "plane-core"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "async-nats",
@@ -1693,7 +1693,7 @@ dependencies = [
 
 [[package]]
 name = "plane-drone"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "acme2-eab",
  "anyhow",

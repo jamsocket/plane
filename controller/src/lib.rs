@@ -4,8 +4,8 @@ use plane_core::{
     messages::agent::DroneStatusMessage,
     messages::scheduler::{ScheduleRequest, ScheduleResponse},
     nats::TypedNats,
-    NeverResult,
     timing::Timer,
+    NeverResult,
 };
 use scheduler::Scheduler;
 use tokio::select;
