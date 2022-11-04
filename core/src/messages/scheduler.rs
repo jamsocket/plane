@@ -53,7 +53,7 @@ impl ScheduleRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ScheduleResponse {
     Scheduled {
         drone: DroneId,

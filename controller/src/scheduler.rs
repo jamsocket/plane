@@ -12,7 +12,7 @@ pub struct Scheduler {
     last_status: DashMap<ClusterName, DashMap<DroneId, DateTime<Utc>>>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SchedulerError {
     NoDroneAvailable,
 }
