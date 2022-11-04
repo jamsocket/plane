@@ -8,7 +8,7 @@ use plane_core::{
         dns::{DnsRecordType, SetDnsRecord},
     },
     nats::TypedNats,
-    types::{BackendId, ClusterName},
+    types::{BackendId, ClusterName}, logging::LogError,
 };
 use tokio::{task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
@@ -65,7 +65,7 @@ impl BackendMonitor {
                     name: backend_id.to_string(),
                     value: ip.to_string(),
                 })
-                .await?;
+                .await.log_error("Error publishing DNS record.");
 
                 sleep(Duration::from_secs(SetDnsRecord::send_period())).await;
             }
