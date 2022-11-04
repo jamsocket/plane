@@ -12,7 +12,7 @@ pub struct AcmeEabConfiguration {
 
 impl AcmeEabConfiguration {
     pub fn new(key_id: &str, key_b64: &str) -> Result<Self> {
-        let key = base64::decode_config(&key_b64, base64::URL_SAFE)?;
+        let key = base64::decode_config(key_b64, base64::URL_SAFE)?;
         Ok(AcmeEabConfiguration {
             key_id: key_id.into(),
             key,
@@ -31,7 +31,7 @@ fn as_base64<S>(key: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    serializer.serialize_str(&base64::encode_config(&key, base64::URL_SAFE))
+    serializer.serialize_str(&base64::encode_config(key, base64::URL_SAFE))
 }
 
 fn from_base64<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>

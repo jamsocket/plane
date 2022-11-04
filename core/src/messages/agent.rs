@@ -11,7 +11,7 @@ use serde_with::serde_as;
 use serde_with::DurationSeconds;
 use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
 
-#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize, Debug)]
 pub enum DockerCredentials {
     UsernamePassword { username: String, password: String },
 }
@@ -258,7 +258,7 @@ impl DroneConnectRequest {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DockerExecutableConfig {
     /// The container image to run.
     pub image: String,
@@ -275,7 +275,7 @@ pub struct DockerExecutableConfig {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SpawnRequest {
     pub drone_id: DroneId,
 
@@ -305,7 +305,7 @@ pub struct SpawnRequest {
 // eventually, this will be generic over executors
 // currently only applies to docker
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct ResourceLimits {
     /// Period of cpu time, serializes as microseconds
     #[serde_as(as = "Option<DurationSeconds>")]

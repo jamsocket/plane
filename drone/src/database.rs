@@ -33,7 +33,7 @@ pub struct Backend {
 impl DroneDatabase {
     pub async fn new(db_path: &Path) -> Result<DroneDatabase> {
         let co = SqliteConnectOptions::new()
-            .filename(&db_path)
+            .filename(db_path)
             .create_if_missing(true);
         let pool = SqlitePoolOptions::new().connect_with(co).await?;
         migrate!("./migrations").run(&pool).await?;
