@@ -65,7 +65,7 @@ impl ClusterDnsServer {
             let txt_record_map = txt_record_map.clone();
 
             tokio::spawn(async move {
-                tracing::info!("In SetDnsRecord jetstream loop.");
+                tracing::info!("In SetDnsRecord subscription loop.");
 
                 loop {
                     let mut stream = nc
@@ -119,7 +119,7 @@ impl ClusterDnsServer {
                         }
                     }
 
-                    tracing::warn!("SetDnsRecord Jetstream connection lost; reconnecting.");
+                    tracing::warn!("SetDnsRecord connection lost; reconnecting.");
                 }
             })
         };
