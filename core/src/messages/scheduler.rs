@@ -88,12 +88,20 @@ impl TypedMessage for DrainDrone {
     type Response = ();
 
     fn subject(&self) -> String {
-        format!("cluster.{}.drone.{}.drain", self.cluster.subject_name(), self.drone.id())
+        format!(
+            "cluster.{}.drone.{}.drain",
+            self.cluster.subject_name(),
+            self.drone.id()
+        )
     }
 }
 
 impl DrainDrone {
     pub fn subscribe_subject(drone: DroneId, cluster: ClusterName) -> SubscribeSubject<Self> {
-        SubscribeSubject::new(format!("cluster.{}.drone.{}.drain", cluster.subject_name(), drone.id()))
+        SubscribeSubject::new(format!(
+            "cluster.{}.drone.{}.drain",
+            cluster.subject_name(),
+            drone.id()
+        ))
     }
 }

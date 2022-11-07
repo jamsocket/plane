@@ -29,11 +29,14 @@ impl Scheduler {
     pub fn update_status(&self, timestamp: DateTime<Utc>, status: &DroneStatusMessage) {
         if status.ready {
             self.last_status
-            .entry(status.cluster.clone())
-            .or_default()
-            .insert(status.drone_id.clone(), timestamp);
+                .entry(status.cluster.clone())
+                .or_default()
+                .insert(status.drone_id.clone(), timestamp);
         } else {
-            self.last_status.entry(status.cluster.clone()).or_default().remove(&status.drone_id);
+            self.last_status
+                .entry(status.cluster.clone())
+                .or_default()
+                .remove(&status.drone_id);
         }
     }
 

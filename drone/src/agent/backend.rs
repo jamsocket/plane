@@ -3,12 +3,13 @@ use std::{net::IpAddr, time::Duration};
 use super::docker::DockerInterface;
 use anyhow::{anyhow, Result};
 use plane_core::{
+    logging::LogError,
     messages::{
         agent::{BackendStatsMessage, DroneLogMessage},
         dns::{DnsRecordType, SetDnsRecord},
     },
     nats::TypedNats,
-    types::{BackendId, ClusterName}, logging::LogError,
+    types::{BackendId, ClusterName},
 };
 use tokio::{task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
@@ -65,7 +66,8 @@ impl BackendMonitor {
                     name: backend_id.to_string(),
                     value: ip.to_string(),
                 })
-                .await.log_error("Error publishing DNS record.");
+                .await
+                .log_error("Error publishing DNS record.");
 
                 sleep(Duration::from_secs(SetDnsRecord::send_period())).await;
             }
