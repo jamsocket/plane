@@ -22,7 +22,7 @@ jobs:
         cache-on-failure: true
 
     - name: Install cargo-nextest
-      run: cargo install cargo-nextest
+      run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
 
     - name: Run tests
       run: cargo nextest run -j 10
