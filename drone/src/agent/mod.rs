@@ -109,6 +109,7 @@ async fn ready_loop(
             cluster: cluster.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready,
+            running_backends: None,
         })
         .await
         .log_error("Error in ready loop.");

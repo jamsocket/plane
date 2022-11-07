@@ -194,6 +194,9 @@ pub struct DroneStatusMessage {
     /// backends scheduled to it, this is set to false.
     #[serde(default = "default_ready")]
     pub ready: bool,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub running_backends: Option<u32>,
 }
 
 fn default_ready() -> bool {
@@ -257,7 +260,6 @@ impl DroneConnectRequest {
     }
 }
 
-#[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DockerExecutableConfig {
     /// The container image to run.
