@@ -123,23 +123,21 @@ async fn listen_for_drain(
     drone_id: DroneId,
     cluster: ClusterName,
     send_ready: Sender<bool>,
-) -> Result<()> {
+) -> NeverResult {
     let mut sub = nc
         .subscribe(DrainDrone::subscribe_subject(drone_id, cluster))
         .await?;
 
-    if let Some(req) = sub.next().await {
+    while let Some(req) = sub.next().await {
         tracing::info!(req=?req.message(), "Received request to drain drone.");
         req.respond(&()).await?;
 
         send_ready
-            .send(false)
+            .send(!req.value.drain)
             .log_error("Error sending drain instruction.");
-    } else {
-        tracing::warn!("DrainDrone subscription ended.");
     }
 
-    Ok(())
+    Err(anyhow!("Reached the end of DrainDrone subscription."))
 }
 
 pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
@@ -164,19 +162,30 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     let (send_ready, recv_ready) = watch::channel(true);
 
-    // listen_for_drain is spawned separately from the tokio::select, because unlike the futures in that
-    // select, resolving does not indicate an error. listen_for_drain resolves when a node is told to drain,
-    // becaues it has no further purpose.
-    tokio::spawn(listen_for_drain(
-        nats.clone(),
-        agent_opts.drone_id.clone(),
-        cluster.clone(),
-        send_ready,
-    ));
-
     tokio::select!(
-        result = ready_loop(nats.clone(), &agent_opts.drone_id, cluster.clone(), recv_ready.clone()) => result,
-        result = listen_for_spawn_requests(&agent_opts.drone_id, executor.clone(), nats.clone()) => result,
-        result = listen_for_termination_requests(executor.clone(), nats.clone()) => result,
+        result = ready_loop(
+            nats.clone(),
+            &agent_opts.drone_id,
+            cluster.clone(),
+            recv_ready.clone()
+        ) => result,
+        
+        result = listen_for_spawn_requests(
+            &agent_opts.drone_id,
+            executor.clone(),
+            nats.clone()
+        ) => result,
+        
+        result = listen_for_termination_requests(
+            executor.clone(),
+            nats.clone()
+        ) => result,
+        
+        result = listen_for_drain(
+            nats.clone(),
+            agent_opts.drone_id.clone(),
+            cluster.clone(),
+            send_ready,
+        ) => result,
     )
 }

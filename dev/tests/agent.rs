@@ -271,6 +271,7 @@ async fn drone_sends_draining_status() -> Result<()> {
         nats_connection.request(&DrainDrone {
             cluster: ClusterName::new(CLUSTER_DOMAIN),
             drone: drone_id.clone(),
+            drain: true,
         }),
     )
     .await??;

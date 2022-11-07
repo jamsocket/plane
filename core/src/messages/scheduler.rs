@@ -83,6 +83,7 @@ impl ScheduleRequest {
 pub struct DrainDrone {
     pub drone: DroneId,
     pub cluster: ClusterName,
+    pub drain: bool,
 }
 
 impl TypedMessage for DrainDrone {
