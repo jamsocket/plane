@@ -27,10 +27,14 @@ impl Error for SchedulerError {}
 
 impl Scheduler {
     pub fn update_status(&self, timestamp: DateTime<Utc>, status: &DroneStatusMessage) {
-        self.last_status
+        if status.ready {
+            self.last_status
             .entry(status.cluster.clone())
             .or_default()
             .insert(status.drone_id.clone(), timestamp);
+        } else {
+            self.last_status.entry(status.cluster.clone()).or_default().remove(&status.drone_id);
+        }
     }
 
     pub fn schedule(

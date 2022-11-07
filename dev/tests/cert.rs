@@ -88,7 +88,7 @@ async fn cert_refresh() -> Result<()> {
             None,
         ),
     )
-    .await?;
+    .await??;
 
     assert_eq!(2, certs.len());
 
@@ -127,7 +127,7 @@ async fn cert_refresh_full() -> Result<()> {
             &pebble.client()?,
         ),
     )
-    .await?;
+    .await??;
 
     dns_handler.finish().await?;
 
@@ -158,7 +158,7 @@ async fn cert_refresh_eab() -> Result<()> {
             Some(&eab_keypair),
         ),
     )
-    .await?;
+    .await??;
 
     dns_handler.finish().await?;
 
