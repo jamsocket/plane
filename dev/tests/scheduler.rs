@@ -105,6 +105,7 @@ async fn one_drone_available() -> Result<()> {
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: true,
+            running_backends: None,
         })
         .await?;
 
@@ -128,6 +129,7 @@ async fn drone_not_ready() -> Result<()> {
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: false,
+            running_backends: None,
         })
         .await?;
 
@@ -159,6 +161,7 @@ async fn drone_becomes_not_ready() -> Result<()> {
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: true,
+            running_backends: None,
         })
         .await?;
 
@@ -168,8 +171,11 @@ async fn drone_becomes_not_ready() -> Result<()> {
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: false,
+            running_backends: None,
         })
         .await?;
+
+    sleep(Duration::from_secs(5)).await;
 
     let request = base_scheduler_request();
     tracing::info!("Making spawn request.");

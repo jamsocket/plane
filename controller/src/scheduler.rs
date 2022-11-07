@@ -113,6 +113,7 @@ mod tests {
                 cluster: ClusterName::new("mycluster.test"),
                 drone_version: PLANE_VERSION.to_string(),
                 ready: true,
+                running_backends: None,
             },
         );
 
@@ -136,6 +137,7 @@ mod tests {
                 cluster: ClusterName::new("mycluster1.test"),
                 drone_version: PLANE_VERSION.to_string(),
                 ready: true,
+                running_backends: None,
             },
         );
 
@@ -159,6 +161,7 @@ mod tests {
                 cluster: ClusterName::new("mycluster.test"),
                 drone_version: PLANE_VERSION.to_string(),
                 ready: true,
+                running_backends: None,
             },
         );
 
