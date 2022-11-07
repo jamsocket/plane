@@ -78,6 +78,7 @@ impl ScheduleRequest {
     }
 }
 
+/// Message sent to a drone to tell it to start draining.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DrainDrone {
     pub drone: DroneId,

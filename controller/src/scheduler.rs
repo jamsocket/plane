@@ -27,16 +27,17 @@ impl Error for SchedulerError {}
 
 impl Scheduler {
     pub fn update_status(&self, timestamp: DateTime<Utc>, status: &DroneStatusMessage) {
+        // Drone status is stored in a hashmap for each cluster. There's no external
+        // source-of-truth for cluster existence; we simply create a hashmap for a cluster
+        // the first time we see a status message for it.
+        let cluster_map = self.last_status.entry(status.cluster.clone()).or_default();
         if status.ready {
-            self.last_status
-                .entry(status.cluster.clone())
-                .or_default()
-                .insert(status.drone_id.clone(), timestamp);
+            // If drone is ready, it gets an entry in cluster hashmap.
+            cluster_map.insert(status.drone_id.clone(), timestamp);
         } else {
-            self.last_status
-                .entry(status.cluster.clone())
-                .or_default()
-                .remove(&status.drone_id);
+            // If the drone is not ready, it is removed from the cluster hashmap. If it
+            // is not already in this cluster hashmap, this is a no-op.
+            cluster_map.remove(&status.drone_id);
         }
     }
 

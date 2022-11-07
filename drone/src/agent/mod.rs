@@ -164,6 +164,9 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     let (send_ready, recv_ready) = watch::channel(true);
 
+    // listen_for_drain is spawned separately from the tokio::select, because unlike the futures in that
+    // select, resolving does not indicate an error. listen_for_drain resolves when a node is told to drain,
+    // becaues it has no further purpose.
     tokio::spawn(listen_for_drain(
         nats.clone(),
         agent_opts.drone_id.clone(),
