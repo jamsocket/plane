@@ -77,3 +77,33 @@ impl ScheduleRequest {
         SubscribeSubject::new("cluster.*.schedule".into())
     }
 }
+
+/// Message sent to a drone to tell it to start draining.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct DrainDrone {
+    pub drone: DroneId,
+    pub cluster: ClusterName,
+    pub drain: bool,
+}
+
+impl TypedMessage for DrainDrone {
+    type Response = ();
+
+    fn subject(&self) -> String {
+        format!(
+            "cluster.{}.drone.{}.drain",
+            self.cluster.subject_name(),
+            self.drone.id()
+        )
+    }
+}
+
+impl DrainDrone {
+    pub fn subscribe_subject(drone: DroneId, cluster: ClusterName) -> SubscribeSubject<Self> {
+        SubscribeSubject::new(format!(
+            "cluster.{}.drone.{}.drain",
+            cluster.subject_name(),
+            drone.id()
+        ))
+    }
+}

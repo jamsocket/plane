@@ -45,7 +45,7 @@ impl MockAgent {
 
         // Expect a spawn request from the scheduler.
         let result = timeout(1_000, "Agent should receive spawn request.", sub.next())
-            .await
+            .await?
             .unwrap();
 
         // Ensure that the SpawnRequest is as expected.
@@ -63,7 +63,7 @@ impl MockAgent {
             "Schedule request should be responded.",
             response_handle.response(),
         )
-        .await?;
+        .await??;
 
         Ok(result)
     }
@@ -83,7 +83,7 @@ async fn no_drone_available() -> Result<()> {
         "Schedule request should be responded.",
         nats_conn.request(&request),
     )
-    .await?;
+    .await??;
 
     assert_eq!(ScheduleResponse::NoDroneAvailable, result);
 
@@ -110,6 +110,76 @@ async fn one_drone_available() -> Result<()> {
 
     let result = mock_agent.schedule_drone(&drone_id).await?;
     assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));
+
+    Ok(())
+}
+
+#[integration_test]
+async fn drone_not_ready() -> Result<()> {
+    let nats = Nats::new().await?;
+    let nats_conn = nats.connection().await?;
+    let drone_id = DroneId::new_random();
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
+    sleep(Duration::from_millis(100)).await;
+
+    nats_conn
+        .publish(&DroneStatusMessage {
+            cluster: ClusterName::new("plane.test"),
+            drone_id: drone_id.clone(),
+            drone_version: PLANE_VERSION.to_string(),
+            ready: false,
+        })
+        .await?;
+
+    let request = base_scheduler_request();
+    tracing::info!("Making spawn request.");
+    let result = timeout(
+        1_000,
+        "Schedule request should be responded.",
+        nats_conn.request(&request),
+    )
+    .await??;
+
+    assert_eq!(ScheduleResponse::NoDroneAvailable, result);
+
+    Ok(())
+}
+
+#[integration_test]
+async fn drone_becomes_not_ready() -> Result<()> {
+    let nats = Nats::new().await?;
+    let nats_conn = nats.connection().await?;
+    let drone_id = DroneId::new_random();
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
+    sleep(Duration::from_millis(100)).await;
+
+    nats_conn
+        .publish(&DroneStatusMessage {
+            cluster: ClusterName::new("plane.test"),
+            drone_id: drone_id.clone(),
+            drone_version: PLANE_VERSION.to_string(),
+            ready: true,
+        })
+        .await?;
+
+    nats_conn
+        .publish(&DroneStatusMessage {
+            cluster: ClusterName::new("plane.test"),
+            drone_id: drone_id.clone(),
+            drone_version: PLANE_VERSION.to_string(),
+            ready: false,
+        })
+        .await?;
+
+    let request = base_scheduler_request();
+    tracing::info!("Making spawn request.");
+    let result = timeout(
+        1_000,
+        "Schedule request should be responded.",
+        nats_conn.request(&request),
+    )
+    .await??;
+    assert_eq!(ScheduleResponse::NoDroneAvailable, result);
 
     Ok(())
 }

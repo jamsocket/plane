@@ -5,13 +5,17 @@ use http::Uri;
 use hyper::Client;
 use plane_core::{
     logging::LogError,
-    messages::agent::{DroneConnectRequest, DroneStatusMessage, SpawnRequest, TerminationRequest},
+    messages::{
+        agent::{DroneConnectRequest, DroneStatusMessage, SpawnRequest, TerminationRequest},
+        scheduler::DrainDrone,
+    },
     nats::TypedNats,
     retry::do_with_retry,
     types::{ClusterName, DroneId},
     NeverResult,
 };
 use std::{net::IpAddr, time::Duration};
+use tokio::sync::watch::{self, Receiver, Sender};
 
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -90,21 +94,50 @@ async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) ->
 }
 
 /// Repeatedly publish a status message advertising this drone as available.
-async fn ready_loop(nc: TypedNats, drone_id: &DroneId, cluster: ClusterName) -> NeverResult {
+async fn ready_loop(
+    nc: TypedNats,
+    drone_id: &DroneId,
+    cluster: ClusterName,
+    recv_ready: Receiver<bool>,
+) -> NeverResult {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
+        let ready = *recv_ready.borrow();
         nc.publish_jetstream(&DroneStatusMessage {
             drone_id: drone_id.clone(),
             cluster: cluster.clone(),
             drone_version: PLANE_VERSION.to_string(),
-            ready: true,
+            ready,
         })
         .await
         .log_error("Error in ready loop.");
 
         interval.tick().await;
     }
+}
+
+/// Listen for drain instruction.
+async fn listen_for_drain(
+    nc: TypedNats,
+    drone_id: DroneId,
+    cluster: ClusterName,
+    send_ready: Sender<bool>,
+) -> NeverResult {
+    let mut sub = nc
+        .subscribe(DrainDrone::subscribe_subject(drone_id, cluster))
+        .await?;
+
+    while let Some(req) = sub.next().await {
+        tracing::info!(req=?req.message(), "Received request to drain drone.");
+        req.respond(&()).await?;
+
+        send_ready
+            .send(!req.value.drain)
+            .log_error("Error sending drain instruction.");
+    }
+
+    Err(anyhow!("Reached the end of DrainDrone subscription."))
 }
 
 pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
@@ -126,9 +159,33 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
     nats.publish(&request).await?;
 
     let executor = Executor::new(docker, db, nats.clone(), ip, cluster.clone());
+
+    let (send_ready, recv_ready) = watch::channel(true);
+
     tokio::select!(
-        result = ready_loop(nats.clone(), &agent_opts.drone_id, cluster.clone()) => result,
-        result = listen_for_spawn_requests(&agent_opts.drone_id, executor.clone(), nats.clone()) => result,
-        result = listen_for_termination_requests(executor.clone(), nats.clone()) => result
+        result = ready_loop(
+            nats.clone(),
+            &agent_opts.drone_id,
+            cluster.clone(),
+            recv_ready.clone()
+        ) => result,
+        
+        result = listen_for_spawn_requests(
+            &agent_opts.drone_id,
+            executor.clone(),
+            nats.clone()
+        ) => result,
+        
+        result = listen_for_termination_requests(
+            executor.clone(),
+            nats.clone()
+        ) => result,
+        
+        result = listen_for_drain(
+            nats.clone(),
+            agent_opts.drone_id.clone(),
+            cluster.clone(),
+            send_ready,
+        ) => result,
     )
 }

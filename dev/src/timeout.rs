@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use futures::FutureExt;
 use std::{
     fmt::{Debug, Display},
@@ -52,14 +52,14 @@ impl Display for HumanDuration {
 /// This returns a future which must be awaited. If you want to put a
 /// timeout on a future that runs “in the background” without being awaited,
 /// use [spawn_timeout].
-pub async fn timeout<F, T>(timeout_ms: u64, message: &str, future: F) -> T
+pub async fn timeout<F, T>(timeout_ms: u64, message: &str, future: F) -> Result<T>
 where
     F: Future<Output = T>,
 {
     let start_time = SystemTime::now();
     let result = match tokio::time::timeout(Duration::from_millis(timeout_ms), future).await {
         Ok(t) => t,
-        Err(_) => panic!("{} timed out after {}ms", message, timeout_ms),
+        Err(_) => return Err(anyhow!("{} timed out after {}ms", message, timeout_ms)),
     };
     let elapsed = SystemTime::now().duration_since(start_time).unwrap();
 
@@ -70,7 +70,7 @@ where
         "Successfully executed future before timeout."
     );
 
-    result
+    Ok(result)
 }
 
 #[must_use]
