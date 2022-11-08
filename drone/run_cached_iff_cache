@@ -1,0 +1,6 @@
+#!/bin/sh
+
+#if --var VARIABLE is not empty or undefined
+#then exec the COMMAND after --
+#else exec the normal command
+exec $@
