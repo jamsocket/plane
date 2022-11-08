@@ -1,5 +1,3 @@
-
-
 FROM rust:buster as build
 
 ARG SCCACHE_BUCKET=""
