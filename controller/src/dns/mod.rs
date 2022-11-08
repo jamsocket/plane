@@ -71,8 +71,8 @@ impl ClusterDnsServer {
                     let mut stream = nc.subscribe(SetDnsRecord::subscribe_subject()).await?;
 
                     while let Some(v) = stream.next().await {
-                        tracing::info!(?v, "Got SetDnsRecord request.");
                         let v = v.value;
+                        tracing::info!(?v, "Got SetDnsRecord request.");
 
                         match v.kind {
                             DnsRecordType::A => {

@@ -155,9 +155,8 @@ impl MockController {
     }
 
     pub async fn terminate_backend(&self, request: &TerminationRequest) -> Result<()> {
-        let result = timeout(10_000, "Termination!", self.nats.request(request)).await??;
+        timeout(10_000, "Termination!", self.nats.request(request)).await??;
 
-        assert!(result, "Termination should result in response of _true_.");
         Ok(())
     }
 }
@@ -616,6 +615,7 @@ async fn handle_termination_request() -> Result<()> {
 
     let termination_request = TerminationRequest {
         backend_id: request.backend_id.clone(),
+        cluster_id: ClusterName::new(&CLUSTER_DOMAIN),
     };
     controller_mock
         .terminate_backend(&termination_request)

@@ -117,9 +117,10 @@ impl Executor {
         &self,
         termination_request: &TerminationRequest,
     ) -> Result<(), anyhow::Error> {
+        let resource_name = termination_request.backend_id.to_resource_name();
         tracing::info!(backend_id=%termination_request.backend_id, "Trying to terminate backend");
         self.docker
-            .stop_container(&termination_request.backend_id.to_resource_name())
+            .stop_container(&resource_name)
             .await
     }
 

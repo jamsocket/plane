@@ -74,9 +74,9 @@ async fn listen_for_spawn_requests(
     }
 }
 
-async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) -> NeverResult {
+async fn listen_for_termination_requests(executor: Executor, nats: TypedNats, cluster: ClusterName) -> NeverResult {
     let mut sub = nats
-        .subscribe(TerminationRequest::subscribe_subject())
+        .subscribe(TerminationRequest::subscribe_subject(&cluster))
         .await?;
     tracing::info!("Listening for termination requests.");
     loop {
@@ -85,7 +85,7 @@ async fn listen_for_termination_requests(executor: Executor, nats: TypedNats) ->
             Some(req) => {
                 let executor = executor.clone();
 
-                req.respond(&true).await?;
+                req.respond(&()).await?;
                 tokio::spawn(async move { executor.kill_backend(&req.value).await });
             }
             None => return Err(anyhow!("Termination request subscription closed.")),
@@ -179,7 +179,8 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
         
         result = listen_for_termination_requests(
             executor.clone(),
-            nats.clone()
+            nats.clone(),
+            cluster.clone(),
         ) => result,
         
         result = listen_for_drain(
