@@ -1,8 +1,8 @@
+FROM rust:buster as build
+
 ARG SCCACHE_BUCKET=""
 ARG AWS_SECRET_ACCESS_KEY=""
 ARG AWS_ACCESS_KEY_ID=""
-
-FROM rust:buster as build
 
 WORKDIR /work
 
