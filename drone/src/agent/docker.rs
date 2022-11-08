@@ -40,8 +40,11 @@ impl<T> AllowNotFound for Result<T, bollard::errors::Error> {
         match self {
             Ok(_) => Ok(()),
             Err(bollard::errors::Error::DockerResponseServerError {
-                status_code: 404, ..
-            }) => Ok(()),
+                status_code: 404, message,
+            }) => {
+                tracing::warn!(?message, "Received 404 error from docker, possibly expected.");
+                Ok(())
+            },
             Err(e) => Err(e),
         }
     }
