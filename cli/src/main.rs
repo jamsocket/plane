@@ -4,12 +4,15 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
     messages::{
-        agent::{BackendStateMessage, DockerExecutableConfig, DroneStatusMessage, ResourceLimits},
+        agent::{
+            BackendStateMessage, DockerExecutableConfig, DroneStatusMessage, ResourceLimits,
+            TerminationRequest,
+        },
         dns::SetDnsRecord,
-        scheduler::{ScheduleRequest, ScheduleResponse},
+        scheduler::{ScheduleRequest, ScheduleResponse, DrainDrone},
     },
     nats_connection::NatsConnectionSpec,
-    types::{BackendId, ClusterName},
+    types::{BackendId, ClusterName, DroneId},
 };
 use std::{collections::HashMap, time::Duration};
 
@@ -35,6 +38,18 @@ enum Command {
     },
     Status {
         backend: Option<String>,
+    },
+    Drain {
+        drone: String,
+        cluster: String,
+
+        /// Cancel draining and allow a drone to accept backends again.
+        #[clap(long)]
+        cancel: bool,
+    },
+    Terminate {
+        cluster: String,
+        backend: String,
     },
 }
 
@@ -147,6 +162,31 @@ async fn main() -> Result<()> {
                     result.kind.to_string().bright_cyan(),
                     result.value.to_string().bold()
                 );
+            }
+        }
+        Command::Terminate {
+            cluster, backend, ..
+        } => {
+            nats.request(&TerminationRequest {
+                backend_id: BackendId::new(backend),
+                cluster_id: ClusterName::new(&cluster),
+            })
+            .await?;
+
+            println!("{}", "Terminated successfully".bright_green());
+        }
+        Command::Drain { drone, cluster, cancel } => {
+            let drain = !cancel;
+            nats.request(&DrainDrone {
+                cluster: ClusterName::new(&cluster),
+                drone: DroneId::new(drone),
+                drain,
+            }).await?;
+
+            if drain {
+                println!("{}", "Draining started on drone.".bright_green());
+            } else {
+                println!("{}", "Draining cancelled on drone.".bright_green());
             }
         }
     }

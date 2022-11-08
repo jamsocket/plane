@@ -338,21 +338,22 @@ impl SpawnRequest {
 /// A message telling a drone to terminate a backend.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TerminationRequest {
+    pub cluster_id: ClusterName,
     pub backend_id: BackendId,
 }
 
 impl TypedMessage for TerminationRequest {
-    type Response = bool;
+    type Response = ();
 
     fn subject(&self) -> String {
-        format!("backend.{}.terminate", self.backend_id.id())
+        format!("cluster.{}.backend.{}.terminate", self.cluster_id.subject_name(), self.backend_id.id())
     }
 }
 
 impl TerminationRequest {
     #[must_use]
-    pub fn subscribe_subject() -> SubscribeSubject<TerminationRequest> {
-        SubscribeSubject::new("backend.*.terminate".into())
+    pub fn subscribe_subject(cluster: &ClusterName) -> SubscribeSubject<TerminationRequest> {
+        SubscribeSubject::new(format!("cluster.{}.backend.*.terminate", cluster.subject_name()))
     }
 }
 
