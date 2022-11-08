@@ -99,17 +99,21 @@ async fn ready_loop(
     drone_id: &DroneId,
     cluster: ClusterName,
     recv_ready: Receiver<bool>,
+    db: DroneDatabase,
 ) -> NeverResult {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
         let ready = *recv_ready.borrow();
+
+        let running_backends = db.running_backends().await?;
+
         nc.publish_jetstream(&DroneStatusMessage {
             drone_id: drone_id.clone(),
             cluster: cluster.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready,
-            running_backends: None,
+            running_backends: Some(running_backends as u32),
         })
         .await
         .log_error("Error in ready loop.");
@@ -159,7 +163,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     nats.publish(&request).await?;
 
-    let executor = Executor::new(docker, db, nats.clone(), ip, cluster.clone());
+    let executor = Executor::new(docker, db.clone(), nats.clone(), ip, cluster.clone());
 
     let (send_ready, recv_ready) = watch::channel(true);
 
@@ -168,20 +172,21 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
             nats.clone(),
             &agent_opts.drone_id,
             cluster.clone(),
-            recv_ready.clone()
+            recv_ready.clone(),
+            db,
         ) => result,
-        
+
         result = listen_for_spawn_requests(
             &agent_opts.drone_id,
             executor.clone(),
             nats.clone()
         ) => result,
-        
+
         result = listen_for_termination_requests(
             executor.clone(),
             nats.clone()
         ) => result,
-        
+
         result = listen_for_drain(
             nats.clone(),
             agent_opts.drone_id.clone(),
