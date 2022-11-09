@@ -63,6 +63,18 @@ impl DroneDatabase {
         Ok(())
     }
 
+    pub async fn running_backends(&self) -> anyhow::Result<i32> {
+        let result = sqlx::query!(
+            r"
+            select count(1) as c from backend
+            where state in ('Loading', 'Starting', 'Ready')
+            "
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(result.c)
+    }
+
     pub async fn get_backends(&self) -> anyhow::Result<Vec<Backend>> {
         sqlx::query!(
             r"
