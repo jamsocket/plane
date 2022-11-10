@@ -11,7 +11,10 @@ COPY . .
 #note: this is safe because build container is transitory
 ENV SCCACHE_BUCKET=$SCCACHE_BUCKET AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
 
-RUN RUSTC_WRAPPER=/usr/local/bin/sccache cargo build --bin=plane-drone --release && sccache --show-stats
+RUN [ $SCCACHE_BUCKET ] \
+    && RUSTC_WRAPPER=/usr/local/bin/sccache cargo build --bin=plane-drone --release && sccache --show-stats \
+    || cargo build --bin=plane-drone --release 
+
 
 FROM gcr.io/distroless/cc-debian11
 
