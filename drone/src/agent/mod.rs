@@ -19,9 +19,10 @@ use tokio::sync::watch::{self, Receiver, Sender};
 
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+mod engine;
 mod backend;
-mod docker;
 mod executor;
+mod engines;
 
 pub struct AgentOptions {
     pub drone_id: DroneId,
@@ -44,53 +45,6 @@ pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
     do_with_retry(|| client.get(uri.clone()), 3000, Duration::from_millis(10)).await?;
 
     Ok(())
-}
-
-async fn listen_for_spawn_requests(
-    drone_id: &DroneId,
-    executor: Executor,
-    nats: TypedNats,
-) -> NeverResult {
-    let mut sub = nats
-        .subscribe(SpawnRequest::subscribe_subject(drone_id))
-        .await?;
-    executor.resume_backends().await?;
-    tracing::info!("Listening for spawn requests.");
-
-    loop {
-        let req = sub.next().await;
-
-        match req {
-            Some(req) => {
-                let executor = executor.clone();
-
-                req.respond(&true).await?;
-                tokio::spawn(async move {
-                    executor.start_backend(&req.value).await;
-                });
-            }
-            None => return Err(anyhow!("Spawn request subscription closed.")),
-        }
-    }
-}
-
-async fn listen_for_termination_requests(executor: Executor, nats: TypedNats, cluster: ClusterName) -> NeverResult {
-    let mut sub = nats
-        .subscribe(TerminationRequest::subscribe_subject(&cluster))
-        .await?;
-    tracing::info!("Listening for termination requests.");
-    loop {
-        let req = sub.next().await;
-        match req {
-            Some(req) => {
-                let executor = executor.clone();
-
-                req.respond(&()).await?;
-                tokio::spawn(async move { executor.kill_backend(&req.value).await });
-            }
-            None => return Err(anyhow!("Termination request subscription closed.")),
-        }
-    }
 }
 
 /// Repeatedly publish a status message advertising this drone as available.
@@ -174,18 +128,6 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
             cluster.clone(),
             recv_ready.clone(),
             db,
-        ) => result,
-
-        result = listen_for_spawn_requests(
-            &agent_opts.drone_id,
-            executor.clone(),
-            nats.clone()
-        ) => result,
-
-        result = listen_for_termination_requests(
-            executor.clone(),
-            nats.clone(),
-            cluster.clone(),
         ) => result,
 
         result = listen_for_drain(
