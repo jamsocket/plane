@@ -11,7 +11,7 @@ readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.61"
-async-nats = "0.21.0"
+async-nats = "0.22.0"
 bollard = {version = "0.13.0", optional=true, git="https://github.com/drifting-in-space/bollard.git", branch = "paulgb/update-serde-with-version"}
 bytes = "1.2.1"
 chrono = { version = "0.4.22", features = ["serde"] }
