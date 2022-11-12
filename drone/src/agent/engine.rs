@@ -1,7 +1,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::Stream;
-use plane_core::{messages::agent::SpawnRequest, types::BackendId};
+use plane_core::{
+    messages::agent::{DroneLogMessage, SpawnRequest},
+    types::BackendId,
+};
 use std::{net::SocketAddr, pin::Pin};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -41,5 +44,10 @@ pub trait Engine {
     /// Return true if the backend is running according to the execution engine.
     /// This is considered a necessary but not sufficient condition for the
     /// backend to be considered "ready" by the agent.
-    async fn backend_status(&self, container_name: &BackendId) -> Result<EngineBackendStatus>;
+    async fn backend_status(&self, backend: &BackendId) -> Result<EngineBackendStatus>;
+
+    fn log_stream(
+        &self,
+        backend: &BackendId,
+    ) -> Pin<Box<dyn Stream<Item = DroneLogMessage> + Send>>;
 }

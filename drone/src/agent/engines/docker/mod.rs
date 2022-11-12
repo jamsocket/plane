@@ -21,7 +21,10 @@ use bollard::{
     Docker, API_DEFAULT_VERSION,
 };
 use plane_core::{
-    messages::agent::ResourceLimits, messages::agent::SpawnRequest, timing::Timer, types::BackendId,
+    messages::agent::ResourceLimits,
+    messages::agent::{DroneLogMessage, SpawnRequest},
+    timing::Timer,
+    types::BackendId,
 };
 use std::{collections::HashMap, time::Duration};
 use std::{net::SocketAddr, pin::Pin};
@@ -63,7 +66,7 @@ impl DockerInterface {
         })
     }
 
-    pub fn get_logs(
+    fn get_logs(
         &self,
         container_name: &str,
     ) -> impl Stream<Item = Result<LogOutput, bollard::errors::Error>> {
@@ -326,5 +329,19 @@ impl Engine for DockerInterface {
                 Some(_) => Ok(EngineBackendStatus::Failed),
             }
         }
+    }
+
+    fn log_stream(
+        &self,
+        backend: &BackendId,
+    ) -> Pin<Box<dyn Stream<Item = DroneLogMessage> + Send>> {
+        let stream = self.get_logs(&backend.to_resource_name());
+        let backend = backend.clone();
+        let stream = stream.filter_map(move |v| {
+            v.ok()
+                .as_ref()
+                .and_then(|d| DroneLogMessage::from_log_message(&backend, d))
+        });
+        Box::pin(stream)
     }
 }

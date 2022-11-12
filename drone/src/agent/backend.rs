@@ -1,9 +1,9 @@
-use crate::agent::engines::docker::DockerInterface;
+use crate::agent::{engine::Engine, engines::docker::DockerInterface};
 use anyhow::{anyhow, Result};
 use plane_core::{
     logging::LogError,
     messages::{
-        agent::{BackendStatsMessage, DroneLogMessage},
+        agent::BackendStatsMessage,
         dns::{DnsRecordType, SetDnsRecord},
     },
     nats::TypedNats,
@@ -83,21 +83,11 @@ impl BackendMonitor {
         let backend_id = backend_id.clone();
 
         tokio::spawn(async move {
-            let container_name = backend_id.to_resource_name();
             tracing::info!(%backend_id, "Log recording loop started.");
-            let mut stream = docker.get_logs(&container_name);
+            let mut stream = docker.log_stream(&backend_id);
 
             while let Some(v) = stream.next().await {
-                match v {
-                    Ok(v) => {
-                        if let Some(message) = DroneLogMessage::from_log_message(&backend_id, &v) {
-                            nc.publish(&message).await?;
-                        }
-                    }
-                    Err(error) => {
-                        tracing::warn!(?error, "Error encountered forwarding log.");
-                    }
-                }
+                nc.publish(&v).await?;
             }
 
             tracing::info!(%backend_id, "Log loop terminated.");
