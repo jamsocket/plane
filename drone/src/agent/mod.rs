@@ -17,7 +17,7 @@ use plane_core::{
     types::{ClusterName, DroneId},
     NeverResult,
 };
-use std::{net::{SocketAddr}, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 use tokio::sync::watch::{self, Receiver, Sender};
 
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");

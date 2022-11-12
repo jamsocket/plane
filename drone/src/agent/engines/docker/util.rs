@@ -133,7 +133,8 @@ pub fn get_ip_of_container(inspect_response: &ContainerInspectResponse) -> Resul
     }
 
     let networks = network_settings
-        .networks.as_ref()
+        .networks
+        .as_ref()
         .ok_or_else(|| anyhow!("Inspect did not return an IP or networks."))?;
     if networks.len() != 1 {
         return Err(anyhow!(

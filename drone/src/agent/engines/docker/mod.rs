@@ -1,5 +1,5 @@
 mod util;
-use self::util::{AllowNotFound, ContainerEvent, ContainerEventType, get_ip_of_container};
+use self::util::{get_ip_of_container, AllowNotFound, ContainerEvent, ContainerEventType};
 use crate::{
     agent::{
         engine::{Engine, EngineBackendStatus},
@@ -328,4 +328,3 @@ impl Engine for DockerInterface {
         }
     }
 }
-

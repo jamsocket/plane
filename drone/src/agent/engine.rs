@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::Stream;
 use plane_core::{messages::agent::SpawnRequest, types::BackendId};
-use std::{pin::Pin, net::SocketAddr};
+use std::{net::SocketAddr, pin::Pin};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum EngineBackendStatus {
@@ -10,9 +10,7 @@ pub enum EngineBackendStatus {
     Unknown,
 
     /// The backend is running.
-    Running {
-        addr: SocketAddr
-    },
+    Running { addr: SocketAddr },
 
     /// The backend exited on its own without indicating failure.
     Finished,

@@ -256,9 +256,9 @@ impl Executor {
             }
             BackendState::Starting => {
                 let status = self
-                .docker
-                .backend_status(&spawn_request.backend_id)
-                .await?;
+                    .docker
+                    .backend_status(&spawn_request.backend_id)
+                    .await?;
 
                 let container_addr = match status {
                     EngineBackendStatus::Running { addr } => addr,
