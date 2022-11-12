@@ -1,5 +1,5 @@
-use self::{docker::DockerInterface, executor::Executor};
-use crate::{config::DockerConfig, database::DroneDatabase, ip::IpSource};
+use self::{executor::Executor};
+use crate::{config::DockerConfig, database::DroneDatabase, ip::IpSource, agent::engines::docker::DockerInterface};
 use anyhow::{anyhow, Result};
 use http::Uri;
 use hyper::Client;
@@ -20,8 +20,8 @@ use tokio::sync::watch::{self, Receiver, Sender};
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod backend;
-mod docker;
 mod engine;
+mod engines;
 mod executor;
 
 pub struct AgentOptions {

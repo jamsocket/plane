@@ -1,6 +1,4 @@
 use std::{net::IpAddr, time::Duration};
-
-use super::docker::DockerInterface;
 use anyhow::{anyhow, Result};
 use plane_core::{
     logging::LogError,
@@ -13,6 +11,7 @@ use plane_core::{
 };
 use tokio::{task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
+use crate::agent::engines::docker::DockerInterface;
 
 /// JoinHandle does not abort when it is dropped; this wrapper does.
 struct AbortOnDrop<T>(JoinHandle<T>);

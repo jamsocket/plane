@@ -1,7 +1,4 @@
-use super::{
-    backend::BackendMonitor,
-    docker::{ContainerEventType, DockerInterface},
-};
+use super::{backend::BackendMonitor, engine::Engine, engines::docker::DockerInterface};
 use crate::{
     agent::wait_port_ready,
     database::{Backend, DroneDatabase},
@@ -79,19 +76,10 @@ impl Executor {
         docker: DockerInterface,
         backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
     ) {
-        let mut event_stream = docker.container_events().await;
-        while let Some(event) = event_stream.next().await {
-            if event.event == ContainerEventType::Die {
-                let backend_id =
-                    if let Some(backend_id) = BackendId::from_resource_name(&event.name) {
-                        backend_id
-                    } else {
-                        continue;
-                    };
-
-                if let Some(v) = backend_to_listener.get(&backend_id) {
-                    v.try_send(()).log_error();
-                }
+        let mut event_stream = docker.interrupt_stream();
+        while let Some(backend_id) = event_stream.next().await {
+            if let Some(v) = backend_to_listener.get(&backend_id) {
+                v.try_send(()).log_error();
             }
         }
     }
