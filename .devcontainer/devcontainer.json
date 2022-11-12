@@ -1,0 +1,21 @@
+{
+	"name": "Rust",
+	"build": { "dockerfile": "Dockerfile" },
+	"features": {
+		"ghcr.io/devcontainers/features/docker-from-docker:1": {}
+	},
+
+	// Features to add to the dev container. More info: https://containers.dev/implementors/features.
+	// "features": {},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "rustc --version",
+
+	// Configure tool-specific properties.
+	// "customizations": {},
+
+	"remoteUser": "vscode"
+}
