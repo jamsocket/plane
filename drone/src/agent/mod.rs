@@ -52,7 +52,7 @@ pub async fn wait_port_ready(addr: &SocketAddr) -> Result<()> {
 
 async fn listen_for_spawn_requests(
     drone_id: &DroneId,
-    executor: Executor,
+    executor: Executor<DockerInterface>,
     nats: TypedNats,
 ) -> NeverResult {
     let mut sub = nats
@@ -79,7 +79,7 @@ async fn listen_for_spawn_requests(
 }
 
 async fn listen_for_termination_requests(
-    executor: Executor,
+    executor: Executor<DockerInterface>,
     nats: TypedNats,
     cluster: ClusterName,
 ) -> NeverResult {

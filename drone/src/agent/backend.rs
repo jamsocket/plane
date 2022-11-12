@@ -1,4 +1,4 @@
-use crate::agent::{engine::Engine, engines::docker::DockerInterface};
+use crate::agent::engine::Engine;
 use anyhow::Result;
 use plane_core::{
     logging::LogError,
@@ -26,15 +26,15 @@ pub struct BackendMonitor {
 }
 
 impl BackendMonitor {
-    pub fn new(
+    pub fn new<E: Engine>(
         backend_id: &BackendId,
         cluster: &ClusterName,
         ip: IpAddr,
-        docker: &DockerInterface,
+        engine: &E,
         nc: &TypedNats,
     ) -> Self {
-        let log_loop = Self::log_loop(backend_id, docker, nc);
-        let stats_loop = Self::stats_loop(backend_id, docker, nc);
+        let log_loop = Self::log_loop(backend_id, engine, nc);
+        let stats_loop = Self::stats_loop(backend_id, engine, nc);
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
         BackendMonitor {
@@ -70,18 +70,17 @@ impl BackendMonitor {
         })
     }
 
-    fn log_loop(
+    fn log_loop<E: Engine>(
         backend_id: &BackendId,
-        docker: &DockerInterface,
+        engine: &E,
         nc: &TypedNats,
     ) -> JoinHandle<Result<(), anyhow::Error>> {
-        let docker = docker.clone();
+        let mut stream = engine.log_stream(backend_id);
         let nc = nc.clone();
         let backend_id = backend_id.clone();
 
         tokio::spawn(async move {
             tracing::info!(%backend_id, "Log recording loop started.");
-            let mut stream = docker.log_stream(&backend_id);
 
             while let Some(v) = stream.next().await {
                 nc.publish(&v).await?;
@@ -93,18 +92,17 @@ impl BackendMonitor {
         })
     }
 
-    fn stats_loop(
+    fn stats_loop<E: Engine>(
         backend_id: &BackendId,
-        docker: &DockerInterface,
+        engine: &E,
         nc: &TypedNats,
     ) -> JoinHandle<Result<(), anyhow::Error>> {
-        let docker = docker.clone();
+        let mut stream = Box::pin(engine.stats_stream(backend_id));
         let nc = nc.clone();
         let backend_id = backend_id.clone();
 
         tokio::spawn(async move {
             tracing::info!(%backend_id, "Stats recording loop started.");
-            let mut stream = Box::pin(docker.stats_stream(&backend_id));
 
             while let Some(stats) = stream.next().await {
                 nc.publish(&stats).await?;

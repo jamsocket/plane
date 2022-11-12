@@ -1,6 +1,9 @@
 use anyhow::{anyhow, Result};
+use bollard::container::Stats;
 use bollard::service::{ContainerInspectResponse, EventMessage};
-use std::{collections::HashMap, net::IpAddr};
+use futures::Stream;
+use plane_core::{messages::agent::BackendStatsMessage, types::BackendId};
+use std::{collections::HashMap, net::IpAddr, pin::Pin, task::Poll};
 
 pub trait MinuteExt {
     fn as_minutes(&self) -> u128;
@@ -155,4 +158,48 @@ pub fn get_ip_of_container(inspect_response: &ContainerInspectResponse) -> Resul
         .ok_or_else(|| anyhow!("One network found, but did not have IP address."))?;
 
     Ok(ip.parse()?)
+}
+
+pub struct StatsStream<T: Stream<Item = Stats> + Unpin> {
+    stream: T,
+    last: Option<Stats>,
+    backend_id: BackendId,
+}
+
+impl<T: Stream<Item = Stats> + Unpin> StatsStream<T> {
+    pub fn new(backend_id: BackendId, stream: T) -> StatsStream<T> {
+        StatsStream {
+            stream,
+            last: None,
+            backend_id,
+        }
+    }
+}
+
+impl<T: Stream<Item = Stats> + Unpin> Stream for StatsStream<T> {
+    type Item = BackendStatsMessage;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let next = futures::StreamExt::poll_next_unpin(&mut self.stream, cx);
+
+        match next {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(Some(stat)) => {
+                if let Some(last) = &self.last {
+                    let v = BackendStatsMessage::from_stats_messages(&self.backend_id, last, &stat)
+                        .unwrap();
+
+                    self.last = Some(stat);
+                    Poll::Ready(Some(v))
+                } else {
+                    self.last = Some(stat);
+                    Poll::Pending
+                }
+            }
+        }
+    }
 }

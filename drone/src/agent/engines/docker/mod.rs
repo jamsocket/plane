@@ -1,5 +1,7 @@
 mod util;
-use self::util::{get_ip_of_container, AllowNotFound, ContainerEvent, ContainerEventType};
+use self::util::{
+    get_ip_of_container, AllowNotFound, ContainerEvent, ContainerEventType, StatsStream,
+};
 use crate::{
     agent::{
         engine::{Engine, EngineBackendStatus},
@@ -26,7 +28,7 @@ use plane_core::{
     timing::Timer,
     types::BackendId,
 };
-use std::{collections::HashMap, task::Poll, time::Duration};
+use std::{collections::HashMap, time::Duration};
 use std::{net::SocketAddr, pin::Pin};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
@@ -345,48 +347,8 @@ impl Engine for DockerInterface {
 
         Box::pin(StatsStream::new(backend, stream))
     }
-}
 
-struct StatsStream<T: Stream<Item = Stats> + Unpin> {
-    stream: T,
-    last: Option<Stats>,
-    backend_id: BackendId,
-}
-
-impl<T: Stream<Item = Stats> + Unpin> StatsStream<T> {
-    pub fn new(backend_id: BackendId, stream: T) -> StatsStream<T> {
-        StatsStream {
-            stream,
-            last: None,
-            backend_id,
-        }
-    }
-}
-
-impl<T: Stream<Item = Stats> + Unpin> Stream for StatsStream<T> {
-    type Item = BackendStatsMessage;
-
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        let next = futures::StreamExt::poll_next_unpin(&mut self.stream, cx);
-
-        match next {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Ready(Some(stat)) => {
-                if let Some(last) = &self.last {
-                    let v = BackendStatsMessage::from_stats_messages(&self.backend_id, last, &stat)
-                        .unwrap();
-
-                    self.last = Some(stat);
-                    Poll::Ready(Some(v))
-                } else {
-                    self.last = Some(stat);
-                    Poll::Pending
-                }
-            }
-        }
+    async fn stop(&self, backend: &BackendId) -> Result<()> {
+        self.stop_container(&backend.to_resource_name()).await
     }
 }

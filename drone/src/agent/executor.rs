@@ -1,7 +1,6 @@
 use super::{
     backend::BackendMonitor,
     engine::{Engine, EngineBackendStatus},
-    engines::docker::DockerInterface,
 };
 use crate::{
     agent::wait_port_ready,
@@ -38,9 +37,8 @@ impl<T, E: Debug> LogError for Result<T, E> {
     }
 }
 
-#[derive(Clone)]
-pub struct Executor {
-    docker: DockerInterface,
+pub struct Executor<E: Engine> {
+    engine: Arc<E>,
     database: DroneDatabase,
     nc: TypedNats,
     _container_events_handle: Arc<JoinHandle<()>>,
@@ -50,22 +48,39 @@ pub struct Executor {
     cluster: ClusterName,
 }
 
-impl Executor {
+impl<E: Engine> Clone for Executor<E> {
+    fn clone(&self) -> Self {
+        Self {
+            engine: self.engine.clone(),
+            database: self.database.clone(),
+            nc: self.nc.clone(),
+            _container_events_handle: self._container_events_handle.clone(),
+            backend_to_monitor: self.backend_to_monitor.clone(),
+            backend_to_listener: self.backend_to_listener.clone(),
+            ip: self.ip,
+            cluster: self.cluster.clone(),
+        }
+    }
+}
+
+impl<E: Engine> Executor<E> {
     pub fn new(
-        docker: DockerInterface,
+        engine: E,
         database: DroneDatabase,
         nc: TypedNats,
         ip: IpAddr,
         cluster: ClusterName,
     ) -> Self {
         let backend_to_listener: Arc<DashMap<BackendId, Sender<()>>> = Arc::default();
+        let engine = Arc::new(engine);
+
         let container_events_handle = tokio::spawn(Self::listen_for_container_events(
-            docker.clone(),
+            engine.clone(),
             backend_to_listener.clone(),
         ));
 
         Executor {
-            docker,
+            engine,
             database,
             nc,
             _container_events_handle: Arc::new(container_events_handle),
@@ -77,10 +92,10 @@ impl Executor {
     }
 
     async fn listen_for_container_events(
-        docker: DockerInterface,
+        engine: Arc<E>,
         backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
     ) {
-        let mut event_stream = docker.interrupt_stream();
+        let mut event_stream = engine.interrupt_stream();
         while let Some(backend_id) = event_stream.next().await {
             if let Some(v) = backend_to_listener.get(&backend_id) {
                 v.try_send(()).log_error();
@@ -109,9 +124,8 @@ impl Executor {
         &self,
         termination_request: &TerminationRequest,
     ) -> Result<(), anyhow::Error> {
-        let resource_name = termination_request.backend_id.to_resource_name();
         tracing::info!(backend_id=%termination_request.backend_id, "Trying to terminate backend");
-        self.docker.stop_container(&resource_name).await
+        self.engine.stop(&termination_request.backend_id).await
     }
 
     pub async fn resume_backends(&self) -> Result<()> {
@@ -133,7 +147,7 @@ impl Executor {
                         &backend_id,
                         &self.cluster,
                         self.ip,
-                        &self.docker,
+                        self.engine.as_ref(),
                         &self.nc,
                     ),
                 );
@@ -191,7 +205,7 @@ impl Executor {
                                 &spawn_request.backend_id,
                                 &self.cluster,
                                 self.ip,
-                                &self.docker,
+                                self.engine.as_ref(),
                                 &self.nc,
                             ),
                         );
@@ -250,13 +264,13 @@ impl Executor {
     ) -> Result<Option<BackendState>> {
         match state {
             BackendState::Loading => {
-                self.docker.load(spawn_request).await?;
+                self.engine.load(spawn_request).await?;
 
                 Ok(Some(BackendState::Starting))
             }
             BackendState::Starting => {
                 let status = self
-                    .docker
+                    .engine
                     .backend_status(&spawn_request.backend_id)
                     .await?;
 
@@ -280,7 +294,7 @@ impl Executor {
             }
             BackendState::Ready => {
                 match self
-                    .docker
+                    .engine
                     .backend_status(&spawn_request.backend_id)
                     .await?
                 {
@@ -318,10 +332,8 @@ impl Executor {
             | BackendState::Failed
             | BackendState::Exited
             | BackendState::Swept => {
-                let container_name = spawn_request.backend_id.to_resource_name();
-
-                self.docker
-                    .stop_container(&container_name)
+                self.engine
+                    .stop(&spawn_request.backend_id)
                     .await
                     .map_err(|e| anyhow!("Error stopping container: {:?}", e))?;
 

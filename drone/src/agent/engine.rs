@@ -26,7 +26,7 @@ pub enum EngineBackendStatus {
 }
 
 #[async_trait]
-pub trait Engine {
+pub trait Engine: Send + Sync + 'static {
     /// Returns an async stream which yields a backend ID when the status of that
     /// backend has changed. This causes the Plane-side control loop to request
     /// state information from the engine.
@@ -39,6 +39,9 @@ pub trait Engine {
     /// This is considered a necessary but not sufficient condition for the
     /// backend to be considered "ready" by the agent.
     async fn backend_status(&self, backend: &BackendId) -> Result<EngineBackendStatus>;
+
+    /// Terminate a backend.
+    async fn stop(&self, backend: &BackendId) -> Result<()>;
 
     fn log_stream(
         &self,
