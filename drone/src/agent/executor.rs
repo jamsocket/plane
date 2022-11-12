@@ -1,4 +1,8 @@
-use super::{backend::BackendMonitor, engine::Engine, engines::docker::DockerInterface};
+use super::{
+    backend::BackendMonitor,
+    engine::{Engine, EngineBackendStatus},
+    engines::docker::DockerInterface,
+};
 use crate::{
     agent::wait_port_ready,
     database::{Backend, DroneDatabase},
@@ -246,36 +250,16 @@ impl Executor {
     ) -> Result<Option<BackendState>> {
         match state {
             BackendState::Loading => {
-                self.docker
-                    .pull_image(
-                        &spawn_request.executable.image,
-                        &spawn_request
-                            .executable
-                            .credentials
-                            .as_ref()
-                            .map(|d| d.into()),
-                    )
-                    .await?;
-
-                let backend_id = spawn_request.backend_id.to_resource_name();
-                self.docker
-                    .run_container(
-                        &backend_id,
-                        &spawn_request.executable.image,
-                        &spawn_request.executable.env,
-                        &spawn_request.executable.resource_limits,
-                    )
-                    .await?;
-                tracing::info!(%backend_id, "Container is running.");
+                self.docker.load(spawn_request).await?;
 
                 Ok(Some(BackendState::Starting))
             }
             BackendState::Starting => {
-                if !self
+                if self
                     .docker
-                    .is_running(&spawn_request.backend_id.to_resource_name())
+                    .backend_status(&spawn_request.backend_id)
                     .await?
-                    .0
+                    != EngineBackendStatus::Running
                 {
                     return Ok(Some(BackendState::ErrorStarting));
                 }
@@ -300,16 +284,15 @@ impl Executor {
                 Ok(Some(BackendState::Ready))
             }
             BackendState::Ready => {
-                if let (false, exit_code) = self
+                match self
                     .docker
-                    .is_running(&spawn_request.backend_id.to_resource_name())
+                    .backend_status(&spawn_request.backend_id)
                     .await?
                 {
-                    if exit_code == Some(0) {
-                        return Ok(Some(BackendState::Exited));
-                    } else {
-                        return Ok(Some(BackendState::Failed));
-                    }
+                    EngineBackendStatus::Failed => return Ok(Some(BackendState::Failed)),
+                    EngineBackendStatus::Finished => return Ok(Some(BackendState::Exited)),
+                    EngineBackendStatus::Terminated => return Ok(Some(BackendState::Swept)),
+                    _ => (),
                 }
 
                 // wait for idle

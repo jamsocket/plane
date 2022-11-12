@@ -1,10 +1,14 @@
 mod util;
 use self::util::{AllowNotFound, ContainerEvent, ContainerEventType};
 use crate::{
-    agent::{engines::docker::util::{make_exposed_ports, MinuteExt}, engine::Engine},
+    agent::{
+        engine::{Engine, EngineBackendStatus},
+        engines::docker::util::{make_exposed_ports, MinuteExt},
+    },
     config::{DockerConfig, DockerConnection},
 };
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use bollard::{
     auth::DockerCredentials,
     container::{
@@ -16,10 +20,12 @@ use bollard::{
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
-use plane_core::{messages::agent::ResourceLimits, timing::Timer, types::BackendId};
+use plane_core::{
+    messages::agent::ResourceLimits, messages::agent::SpawnRequest, timing::Timer, types::BackendId,
+};
+use std::pin::Pin;
 use std::{collections::HashMap, net::IpAddr, time::Duration};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
-use std::pin::Pin;
 
 /// The port in the container which is exposed.
 const CONTAINER_PORT: u16 = 8080;
@@ -79,7 +85,7 @@ impl DockerInterface {
     /// from self.docker.stats, hence the effective minimal interval is a second
     pub fn get_stats<'a>(
         &'a self,
-        container_name: &'a str,
+        backend_id: &BackendId,
     ) -> impl Stream<Item = Result<Stats, anyhow::Error>> + 'a {
         let options = StatsOptions {
             stream: false,
@@ -94,26 +100,30 @@ impl DockerInterface {
             ticker
         });
 
-        futures::StreamExt::take_while(ticker, move |_| async move {
-            self.is_running(container_name)
-                .await
-                .map_or(false, |res| res.0)
+        let backend_id = backend_id.clone();
+        let resource_name = backend_id.to_resource_name();
+        futures::StreamExt::take_while(ticker, move |_| {
+            let backend_id = backend_id.clone();
+            async move {
+                self.backend_status(&backend_id)
+                    .await
+                    .map_or(false, |res| res == EngineBackendStatus::Running)
+            }
         })
-        .then(move |_tick| async move {
-            self.docker
-                .stats(container_name, Some(options))
-                .next()
-                .await
-                .ok_or_else(|| anyhow!("docker.stats failed"))?
-                .map_err(|e| e.into())
+        .then(move |_tick| {
+            let resource_name = resource_name.clone();
+            async move {
+                self.docker
+                    .stats(&resource_name, Some(options))
+                    .next()
+                    .await
+                    .ok_or_else(|| anyhow!("docker.stats failed"))?
+                    .map_err(|e| e.into())
+            }
         })
     }
 
-    pub async fn pull_image(
-        &self,
-        image: &str,
-        credentials: &Option<DockerCredentials>,
-    ) -> Result<()> {
+    async fn pull_image(&self, image: &str, credentials: &Option<DockerCredentials>) -> Result<()> {
         let timer = Timer::new();
         let options = Some(CreateImageOptions {
             from_image: image,
@@ -143,27 +153,6 @@ impl DockerInterface {
             .allow_not_found()?;
 
         Ok(())
-    }
-
-    pub async fn is_running(&self, container_name: &str) -> Result<(bool, Option<i64>)> {
-        let container = match self.docker.inspect_container(container_name, None).await {
-            Ok(container) => container,
-            Err(bollard::errors::Error::DockerResponseServerError {
-                status_code: 404, ..
-            }) => return Ok((false, None)),
-            Err(err) => return Err(err.into()),
-        };
-        let state = container
-            .state
-            .ok_or_else(|| anyhow!("No state found for container."))?;
-
-        let running = state
-            .running
-            .ok_or_else(|| anyhow!("State found but no running field for container."))?;
-
-        let exit_code = if running { None } else { state.exit_code };
-
-        Ok((running, exit_code))
     }
 
     pub async fn get_ip(&self, container_name: &str) -> Result<IpAddr> {
@@ -203,7 +192,7 @@ impl DockerInterface {
     }
 
     /// Run the specified image and return the name of the created container.
-    pub async fn run_container(
+    async fn run_container(
         &self,
         name: &str,
         image: &str,
@@ -290,14 +279,16 @@ impl DockerInterface {
     }
 }
 
+#[async_trait]
 impl Engine for DockerInterface {
-     fn interrupt_stream(&self) -> Pin<Box<dyn Stream<Item=plane_core::types::BackendId> + Send>> {
+    fn interrupt_stream(&self) -> Pin<Box<dyn Stream<Item = plane_core::types::BackendId> + Send>> {
         let options: EventsOptions<&str> = EventsOptions {
             since: None,
             until: None,
             filters: vec![("type", vec!["container"])].into_iter().collect(),
         };
-        let stream = self.docker
+        let stream = self
+            .docker
             .events(Some(options))
             .filter_map(|event| match event {
                 Ok(event) => {
@@ -307,7 +298,7 @@ impl Engine for DockerInterface {
                     } else {
                         None
                     }
-                },
+                }
                 Err(error) => {
                     tracing::error!(?error, "Error tracking container terminations.");
                     None
@@ -315,5 +306,57 @@ impl Engine for DockerInterface {
             });
 
         Box::pin(stream)
+    }
+
+    async fn load(&self, spawn_request: &SpawnRequest) -> Result<()> {
+        self.pull_image(
+            &spawn_request.executable.image,
+            &spawn_request
+                .executable
+                .credentials
+                .as_ref()
+                .map(|d| d.into()),
+        )
+        .await?;
+
+        let backend_id = spawn_request.backend_id.to_resource_name();
+        self.run_container(
+            &backend_id,
+            &spawn_request.executable.image,
+            &spawn_request.executable.env,
+            &spawn_request.executable.resource_limits,
+        )
+        .await?;
+        tracing::info!(%backend_id, "Container is running.");
+
+        Ok(())
+    }
+
+    async fn backend_status(&self, backend: &BackendId) -> Result<EngineBackendStatus> {
+        let container_name = backend.to_resource_name();
+        let container = match self.docker.inspect_container(&container_name, None).await {
+            Ok(container) => container,
+            Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 404, ..
+            }) => return Ok(EngineBackendStatus::Unknown),
+            Err(err) => return Err(err.into()),
+        };
+        let state = container
+            .state
+            .ok_or_else(|| anyhow!("No state found for container."))?;
+
+        let running = state
+            .running
+            .ok_or_else(|| anyhow!("State found but no running field for container."))?;
+
+        if running {
+            Ok(EngineBackendStatus::Running)
+        } else {
+            match state.exit_code {
+                None => Ok(EngineBackendStatus::Terminated),
+                Some(0) => Ok(EngineBackendStatus::Finished),
+                Some(_) => Ok(EngineBackendStatus::Failed),
+            }
+        }
     }
 }

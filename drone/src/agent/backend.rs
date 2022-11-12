@@ -1,4 +1,4 @@
-use std::{net::IpAddr, time::Duration};
+use crate::agent::engines::docker::DockerInterface;
 use anyhow::{anyhow, Result};
 use plane_core::{
     logging::LogError,
@@ -9,9 +9,9 @@ use plane_core::{
     nats::TypedNats,
     types::{BackendId, ClusterName},
 };
+use std::{net::IpAddr, time::Duration};
 use tokio::{task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
-use crate::agent::engines::docker::DockerInterface;
 
 /// JoinHandle does not abort when it is dropped; this wrapper does.
 struct AbortOnDrop<T>(JoinHandle<T>);
@@ -118,7 +118,7 @@ impl BackendMonitor {
         tokio::spawn(async move {
             let container_name = backend_id.to_resource_name();
             tracing::info!(%backend_id, "Stats recording loop started.");
-            let mut stream = Box::pin(docker.get_stats(&container_name));
+            let mut stream = Box::pin(docker.get_stats(&backend_id));
             let mut prev_stats = stream
                 .next()
                 .await

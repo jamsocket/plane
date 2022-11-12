@@ -346,14 +346,21 @@ impl TypedMessage for TerminationRequest {
     type Response = ();
 
     fn subject(&self) -> String {
-        format!("cluster.{}.backend.{}.terminate", self.cluster_id.subject_name(), self.backend_id.id())
+        format!(
+            "cluster.{}.backend.{}.terminate",
+            self.cluster_id.subject_name(),
+            self.backend_id.id()
+        )
     }
 }
 
 impl TerminationRequest {
     #[must_use]
     pub fn subscribe_subject(cluster: &ClusterName) -> SubscribeSubject<TerminationRequest> {
-        SubscribeSubject::new(format!("cluster.{}.backend.*.terminate", cluster.subject_name()))
+        SubscribeSubject::new(format!(
+            "cluster.{}.backend.*.terminate",
+            cluster.subject_name()
+        ))
     }
 }
 

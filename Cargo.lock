@@ -1688,6 +1688,7 @@ version = "0.3.3"
 dependencies = [
  "acme2-eab",
  "anyhow",
+ "async-trait",
  "base64",
  "bollard",
  "chrono",

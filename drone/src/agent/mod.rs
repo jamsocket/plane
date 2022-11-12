@@ -1,5 +1,8 @@
-use self::{executor::Executor};
-use crate::{config::DockerConfig, database::DroneDatabase, ip::IpSource, agent::engines::docker::DockerInterface};
+use self::executor::Executor;
+use crate::{
+    agent::engines::docker::DockerInterface, config::DockerConfig, database::DroneDatabase,
+    ip::IpSource,
+};
 use anyhow::{anyhow, Result};
 use http::Uri;
 use hyper::Client;
@@ -75,7 +78,11 @@ async fn listen_for_spawn_requests(
     }
 }
 
-async fn listen_for_termination_requests(executor: Executor, nats: TypedNats, cluster: ClusterName) -> NeverResult {
+async fn listen_for_termination_requests(
+    executor: Executor,
+    nats: TypedNats,
+    cluster: ClusterName,
+) -> NeverResult {
     let mut sub = nats
         .subscribe(TerminationRequest::subscribe_subject(&cluster))
         .await?;
