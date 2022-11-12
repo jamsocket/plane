@@ -21,6 +21,7 @@ const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod backend;
 mod docker;
+mod engine;
 mod executor;
 
 pub struct AgentOptions {
