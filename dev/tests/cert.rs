@@ -70,11 +70,11 @@ impl DummyDnsHandler {
 }
 
 #[integration_test]
-async fn cert_refresh() -> Result<()> {
-    let nats = Nats::new().await?;
-    let pebble = Pebble::new().await?;
-    let conn = nats.connection().await?;
-    let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await?;
+async fn cert_refresh() {
+    let nats = Nats::new().await.unwrap();
+    let pebble = Pebble::new().await.unwrap();
+    let conn = nats.connection().await.unwrap();
+    let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await.unwrap();
 
     let (_, certs) = timeout(
         60_000,
@@ -84,28 +84,28 @@ async fn cert_refresh() -> Result<()> {
             &conn,
             &pebble.directory_url(),
             "admin@plane.test",
-            &pebble.client()?,
+            &pebble.client().unwrap(),
             None,
         ),
     )
-    .await??;
+    .await
+    .unwrap()
+    .unwrap();
 
     assert_eq!(2, certs.len());
 
-    dns_handler.finish().await?;
+    dns_handler.finish().await.unwrap();
 
     let alt_names = collect_alt_names(certs.first().unwrap());
     assert_eq!(vec!["[*.plane.test]".to_string()], alt_names);
-
-    Ok(())
 }
 
 #[integration_test]
-async fn cert_refresh_full() -> Result<()> {
-    let nats = Nats::new().await?;
-    let pebble = Pebble::new().await?;
-    let conn = nats.connection().await?;
-    let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await?;
+async fn cert_refresh_full() {
+    let nats = Nats::new().await.unwrap();
+    let pebble = Pebble::new().await.unwrap();
+    let conn = nats.connection().await.unwrap();
+    let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await.unwrap();
     let output_dir = scratch_dir("output");
     let key_paths = KeyCertPathPair {
         key_path: output_dir.join("output.key"),
@@ -118,33 +118,34 @@ async fn cert_refresh_full() -> Result<()> {
         plane_drone::cert::refresh_certificate(
             &CertOptions {
                 cluster_domain: "plane.test".into(),
-                nats: nats.connection().await?,
+                nats: nats.connection().await.unwrap(),
                 key_paths,
                 email: "admin@plane.test".into(),
                 acme_server_url: pebble.directory_url(),
                 acme_eab_keypair: None,
             },
-            &pebble.client()?,
+            &pebble.client().unwrap(),
         ),
     )
-    .await??;
+    .await
+    .unwrap()
+    .unwrap();
 
-    dns_handler.finish().await?;
-
-    Ok(())
+    dns_handler.finish().await.unwrap();
 }
 
 #[integration_test]
-async fn cert_refresh_eab() -> Result<()> {
+async fn cert_refresh_eab() {
     let eab_keypair = AcmeEabConfiguration::new(
         "kid-1",
         "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
-    )?;
+    )
+    .unwrap();
 
-    let nats = Nats::new().await?;
-    let pebble = Pebble::new_eab(&eab_keypair).await?;
-    let conn = nats.connection().await?;
-    let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await?;
+    let nats = Nats::new().await.unwrap();
+    let pebble = Pebble::new_eab(&eab_keypair).await.unwrap();
+    let conn = nats.connection().await.unwrap();
+    let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await.unwrap();
 
     let (_, certs) = timeout(
         60_000,
@@ -154,16 +155,16 @@ async fn cert_refresh_eab() -> Result<()> {
             &conn,
             &pebble.directory_url(),
             "admin@plane.test",
-            &pebble.client()?,
+            &pebble.client().unwrap(),
             Some(&eab_keypair),
         ),
     )
-    .await??;
+    .await
+    .unwrap()
+    .unwrap();
 
-    dns_handler.finish().await?;
+    dns_handler.finish().await.unwrap();
 
     let alt_names = collect_alt_names(certs.first().unwrap());
     assert_eq!(vec!["[*.plane.test]".to_string()], alt_names);
-
-    Ok(())
 }

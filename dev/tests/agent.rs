@@ -227,44 +227,50 @@ impl BackendStateSubscription {
 }
 
 #[integration_test]
-async fn drone_sends_status_messages() -> Result<()> {
-    let nats = Nats::new().await?;
-    let mut controller_mock = MockController::new(nats.connection().await?).await?;
+async fn drone_sends_status_messages() {
+    let nats = Nats::new().await.unwrap();
+    let mut controller_mock = MockController::new(nats.connection().await.unwrap())
+        .await
+        .unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await?;
+    let agent = Agent::new(&nats, &drone_id).await.unwrap();
 
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
-        .await?;
+        .await
+        .unwrap();
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
+        .await
+        .unwrap();
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
+        .await
+        .unwrap();
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
-
-    Ok(())
+        .await
+        .unwrap();
 }
 
 #[integration_test]
-async fn drone_sends_draining_status() -> Result<()> {
-    let nats = Nats::new().await?;
-    let nats_connection = nats.connection().await?;
-    let mut controller_mock = MockController::new(nats_connection.clone()).await?;
+async fn drone_sends_draining_status() {
+    let nats = Nats::new().await.unwrap();
+    let nats_connection = nats.connection().await.unwrap();
+    let mut controller_mock = MockController::new(nats_connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await?;
+    let agent = Agent::new(&nats, &drone_id).await.unwrap();
 
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
-        .await?;
+        .await
+        .unwrap();
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
+        .await
+        .unwrap();
 
     timeout(
         1_000,
@@ -275,48 +281,55 @@ async fn drone_sends_draining_status() -> Result<()> {
             drain: true,
         }),
     )
-    .await??;
+    .await
+    .unwrap()
+    .unwrap();
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), false, 0)
-        .await?;
-
-    Ok(())
+        .await
+        .unwrap();
 }
 
 #[integration_test]
-async fn spawn_with_agent() -> Result<()> {
-    let nats = Nats::new().await?;
-    let connection = nats.connection().await?;
-    let mut controller_mock = MockController::new(connection.clone()).await?;
+async fn spawn_with_agent() {
+    let nats = Nats::new().await.unwrap();
+    let connection = nats.connection().await.unwrap();
+    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await?;
+    let agent = Agent::new(&nats, &drone_id).await.unwrap();
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
-        .await?;
+        .await
+        .unwrap();
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
+        .await
+        .unwrap();
 
     let mut request = base_spawn_request();
     request.drone_id = drone_id.clone();
 
-    let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
-    controller_mock.spawn_backend(&request).await?;
+    let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+        .await
+        .unwrap();
+    controller_mock.spawn_backend(&request).await.unwrap();
 
     state_subscription
         .expect_backend_status_message(BackendState::Loading, 5_000)
-        .await?;
+        .await
+        .unwrap();
     state_subscription
         .expect_backend_status_message(BackendState::Starting, 30_000)
-        .await?;
+        .await
+        .unwrap();
     state_subscription
         .expect_backend_status_message(BackendState::Ready, 5_000)
-        .await?;
+        .await
+        .unwrap();
 
-    let dns_record = controller_mock.next_dns_record().await?;
+    let dns_record = controller_mock.next_dns_record().await.unwrap();
     assert_eq!(
         SetDnsRecord {
             cluster: ClusterName::new("plane.test"),
@@ -329,110 +342,123 @@ async fn spawn_with_agent() -> Result<()> {
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 1)
-        .await?;
+        .await
+        .unwrap();
 
     let proxy_route = agent
         .db
         .get_proxy_route(request.backend_id.id())
-        .await?
+        .await
+        .unwrap()
         .expect("Expected proxy route.");
-    let result = reqwest::get(format!("http://{}/", proxy_route)).await?;
-    assert_eq!("Hello World!", result.text().await?);
+    let result = reqwest::get(format!("http://{}/", proxy_route))
+        .await
+        .unwrap();
+    assert_eq!("Hello World!", result.text().await.unwrap());
 
     state_subscription
         .expect_backend_status_message(BackendState::Swept, 15_000)
-        .await?;
+        .await
+        .unwrap();
 
     // Route is invalidated after sweeping.
     assert!(
         agent
             .db
             .get_proxy_route(request.backend_id.id())
-            .await?
+            .await
+            .unwrap()
             .is_none(),
         "Expected proxy route to be swept after backend is stopped."
     );
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
-
-    Ok(())
+        .await
+        .unwrap();
 }
 
 #[integration_test]
-async fn stats_are_acquired() -> Result<()> {
-    let nats = Nats::new().await?;
-    let connection = nats.connection().await?;
-    let mut controller_mock = MockController::new(connection.clone()).await?;
+async fn stats_are_acquired() {
+    let nats = Nats::new().await.unwrap();
+    let connection = nats.connection().await.unwrap();
+    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await?;
+    let agent = Agent::new(&nats, &drone_id).await.unwrap();
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
-        .await?;
+        .await
+        .unwrap();
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
+        .await
+        .unwrap();
 
     let mut request = base_spawn_request();
     request.drone_id = drone_id;
     // Ensure long enough life to report stats.
     request.max_idle_secs = Duration::from_secs(30);
 
-    let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
-    controller_mock.spawn_backend(&request).await?;
+    let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+        .await
+        .unwrap();
+    controller_mock.spawn_backend(&request).await.unwrap();
 
     state_subscription
         .wait_for_state(BackendState::Ready, 60_000)
-        .await?;
+        .await
+        .unwrap();
 
     let mut stats_subscription = connection
         .subscribe(BackendStatsMessage::subscribe_subject(&request.backend_id))
-        .await?;
+        .await
+        .unwrap();
 
     let stat = timeout(
         30_000,
         "Waiting for stats message.",
         stats_subscription.next(),
     )
-    .await?
+    .await
+    .unwrap()
     .unwrap();
     assert!(stat.value.cpu_use_percent >= 0.);
     assert!(stat.value.mem_use_percent >= 0.);
 
     state_subscription
         .wait_for_state(BackendState::Swept, 60_000)
-        .await?;
-    Ok(())
+        .await
+        .unwrap();
 }
 
 #[integration_test]
-async fn use_ip_lookup_api() -> Result<()> {
-    let server = Server::new(|_| async { "123.11.22.33".to_string() }).await?;
+async fn use_ip_lookup_api() {
+    let server = Server::new(|_| async { "123.11.22.33".to_string() })
+        .await
+        .unwrap();
 
     let provider = IpSource::Api { api: server.url() };
 
-    let result = provider.get_ip().await?;
-    assert_eq!("123.11.22.33".parse::<IpAddr>()?, result);
-
-    Ok(())
+    let result = provider.get_ip().await.unwrap();
+    assert_eq!("123.11.22.33".parse::<IpAddr>().unwrap(), result);
 }
 
 #[integration_test]
-async fn handle_error_during_start() -> Result<()> {
-    let nats = Nats::new().await?;
-    let connection = nats.connection().await?;
-    let mut controller_mock = MockController::new(connection.clone()).await?;
+async fn handle_error_during_start() {
+    let nats = Nats::new().await.unwrap();
+    let connection = nats.connection().await.unwrap();
+    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await?;
+    let agent = Agent::new(&nats, &drone_id).await.unwrap();
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
-        .await?;
+        .await
+        .unwrap();
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
+        .await
+        .unwrap();
 
     let mut request = base_spawn_request();
     request.drone_id = drone_id;
@@ -446,53 +472,60 @@ async fn handle_error_during_start() -> Result<()> {
         .env
         .insert("EXIT_TIMEOUT".into(), "100".into());
 
-    let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
-    controller_mock.spawn_backend(&request).await?;
+    let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+        .await
+        .unwrap();
+    controller_mock.spawn_backend(&request).await.unwrap();
 
     state_subscription
         .expect_backend_status_message(BackendState::Loading, 5_000)
-        .await?;
+        .await
+        .unwrap();
     state_subscription
         .expect_backend_status_message(BackendState::Starting, 30_000)
-        .await?;
+        .await
+        .unwrap();
     state_subscription
         .expect_backend_status_message(BackendState::ErrorStarting, 5_000)
-        .await?;
-
-    Ok(())
+        .await
+        .unwrap();
 }
 
 #[integration_test]
-async fn handle_failure_after_ready() -> Result<()> {
-    let nats = Nats::new().await?;
-    let connection = nats.connection().await?;
-    let mut controller_mock = MockController::new(connection.clone()).await?;
+async fn handle_failure_after_ready() {
+    let nats = Nats::new().await.unwrap();
+    let connection = nats.connection().await.unwrap();
+    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await?;
+    let agent = Agent::new(&nats, &drone_id).await.unwrap();
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
-        .await?;
+        .await
+        .unwrap();
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
+        .await
+        .unwrap();
 
     let mut request = base_spawn_request();
     request.drone_id = drone_id;
 
-    let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
-    controller_mock.spawn_backend(&request).await?;
+    let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+        .await
+        .unwrap();
+    controller_mock.spawn_backend(&request).await.unwrap();
 
     state_subscription
         .wait_for_state(BackendState::Ready, 60_000)
-        .await?;
+        .await
+        .unwrap();
 
     let proxy_route = agent
         .db
         .get_proxy_route(request.backend_id.id())
-        .await?
+        .await
+        .unwrap()
         .expect("Expected proxy route.");
     // A get request to this URL will cause the container to exit with status 1.
     // We don't check the status, because the request itself is expected to fail
@@ -501,41 +534,45 @@ async fn handle_failure_after_ready() -> Result<()> {
 
     state_subscription
         .expect_backend_status_message(BackendState::Failed, 5_000)
-        .await?;
-
-    Ok(())
+        .await
+        .unwrap();
 }
 
 #[integration_test]
-async fn handle_successful_termination() -> Result<()> {
-    let nats = Nats::new().await?;
-    let connection = nats.connection().await?;
-    let mut controller_mock = MockController::new(connection.clone()).await?;
+async fn handle_successful_termination() {
+    let nats = Nats::new().await.unwrap();
+    let connection = nats.connection().await.unwrap();
+    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await?;
+    let agent = Agent::new(&nats, &drone_id).await.unwrap();
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
-        .await?;
+        .await
+        .unwrap();
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
+        .await
+        .unwrap();
 
     let mut request = base_spawn_request();
     request.drone_id = drone_id;
 
-    let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
-    controller_mock.spawn_backend(&request).await?;
+    let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+        .await
+        .unwrap();
+    controller_mock.spawn_backend(&request).await.unwrap();
 
     state_subscription
         .wait_for_state(BackendState::Ready, 60_000)
-        .await?;
+        .await
+        .unwrap();
 
     let proxy_route = agent
         .db
         .get_proxy_route(request.backend_id.id())
-        .await?
+        .await
+        .unwrap()
         .expect("Expected proxy route.");
     // A get request to this URL will cause the container to exit with status 1.
     // We don't check the status, because the request itself is expected to fail
@@ -544,63 +581,66 @@ async fn handle_successful_termination() -> Result<()> {
 
     state_subscription
         .expect_backend_status_message(BackendState::Exited, 5_000)
-        .await?;
-
-    Ok(())
+        .await
+        .unwrap();
 }
 
 #[integration_test]
-async fn handle_agent_restart() -> Result<()> {
-    let nats_con = Nats::new().await?;
-    let nats = nats_con.connection().await?;
-    let mut controller_mock = MockController::new(nats.clone()).await?;
+async fn handle_agent_restart() {
+    let nats_con = Nats::new().await.unwrap();
+    let nats = nats_con.connection().await.unwrap();
+    let mut controller_mock = MockController::new(nats.clone()).await.unwrap();
 
     let mut state_subscription = {
         let drone_id = DroneId::new_random();
-        let agent = Agent::new(&nats_con, &drone_id).await?;
+        let agent = Agent::new(&nats_con, &drone_id).await.unwrap();
         controller_mock
             .expect_handshake(&drone_id, agent.ip)
-            .await?;
+            .await
+            .unwrap();
 
         controller_mock
             .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
-            .await?;
+            .await
+            .unwrap();
 
         let mut request = base_spawn_request();
         request.drone_id = drone_id;
 
-        let mut state_subscription =
-            BackendStateSubscription::new(&nats, &request.backend_id).await?;
-        controller_mock.spawn_backend(&request).await?;
+        let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id)
+            .await
+            .unwrap();
+        controller_mock.spawn_backend(&request).await.unwrap();
         state_subscription
             .wait_for_state(BackendState::Ready, 60_000)
-            .await?;
+            .await
+            .unwrap();
         state_subscription
     };
 
     // Original agent goes away when it goes out of scope.
     {
         let drone_id = DroneId::new_random();
-        let agent = Agent::new(&nats_con, &drone_id).await?;
+        let agent = Agent::new(&nats_con, &drone_id).await.unwrap();
         controller_mock
             .expect_handshake(&drone_id, agent.ip)
-            .await?;
+            .await
+            .unwrap();
 
         state_subscription
             .wait_for_state(BackendState::Swept, 20_000)
-            .await?;
+            .await
+            .unwrap();
     }
-
-    Ok(())
 }
 
 #[integration_test]
-async fn handle_termination_request() -> Result<()> {
-    let nats = Nats::new().await?;
-    let connection = nats.connection().await?;
-    let mut controller_mock = MockController::new(connection.clone()).await?;
+async fn handle_termination_request() {
+    let nats = Nats::new().await.unwrap();
+    let connection = nats.connection().await.unwrap();
+    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await?;
+    let agent = Agent::new(&nats, &drone_id).await.unwrap();
 
     let mut request = base_spawn_request();
     // Ensure spawnee lives long enough to be terminated.
@@ -609,19 +649,23 @@ async fn handle_termination_request() -> Result<()> {
 
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
-        .await?;
+        .await
+        .unwrap();
     controller_mock
         .expect_status_message(&request.drone_id, &ClusterName::new("plane.test"), true, 0)
-        .await?;
+        .await
+        .unwrap();
 
     request.max_idle_secs = Duration::from_secs(1000);
-    let mut state_subscription =
-        BackendStateSubscription::new(&connection, &request.backend_id).await?;
+    let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+        .await
+        .unwrap();
 
-    controller_mock.spawn_backend(&request).await?;
+    controller_mock.spawn_backend(&request).await.unwrap();
     state_subscription
         .wait_for_state(BackendState::Ready, 60_000)
-        .await?;
+        .await
+        .unwrap();
 
     let termination_request = TerminationRequest {
         backend_id: request.backend_id.clone(),
@@ -629,10 +673,11 @@ async fn handle_termination_request() -> Result<()> {
     };
     controller_mock
         .terminate_backend(&termination_request)
-        .await?;
+        .await
+        .unwrap();
 
     state_subscription
         .wait_for_state(BackendState::Failed, 60_000)
-        .await?;
-    Ok(())
+        .await
+        .unwrap();
 }

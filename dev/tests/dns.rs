@@ -104,17 +104,15 @@ impl DnsServer {
 }
 
 #[integration_test]
-async fn dns_bad_request() -> Result<()> {
-    let dns = DnsServer::new().await?;
+async fn dns_bad_request() {
+    let dns = DnsServer::new().await.unwrap();
 
     assert!(dns.a_record("foo.bar").await.is_nxdomain());
-
-    Ok(())
 }
 
 #[integration_test]
-async fn dns_txt_record() -> Result<()> {
-    let dns = DnsServer::new().await?;
+async fn dns_txt_record() {
+    let dns = DnsServer::new().await.unwrap();
 
     dns.nc
         .publish_jetstream(&SetDnsRecord {
@@ -123,19 +121,18 @@ async fn dns_txt_record() -> Result<()> {
             name: "_acme-challenge".into(),
             value: "foobar".into(),
         })
-        .await?;
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let result = dns.txt_record("_acme-challenge.plane.test").await?;
+    let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
     assert_eq!(vec!["foobar".to_string()], result);
-
-    Ok(())
 }
 
 #[integration_test]
-async fn dns_multi_txt_record() -> Result<()> {
-    let dns = DnsServer::new().await?;
+async fn dns_multi_txt_record() {
+    let dns = DnsServer::new().await.unwrap();
 
     dns.nc
         .publish_jetstream(&SetDnsRecord {
@@ -144,7 +141,8 @@ async fn dns_multi_txt_record() -> Result<()> {
             name: "_acme-challenge".into(),
             value: "foobar".into(),
         })
-        .await?;
+        .await
+        .unwrap();
 
     dns.nc
         .publish_jetstream(&SetDnsRecord {
@@ -153,19 +151,18 @@ async fn dns_multi_txt_record() -> Result<()> {
             name: "_acme-challenge".into(),
             value: "foobaz".into(),
         })
-        .await?;
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let result = dns.txt_record("_acme-challenge.plane.test").await?;
+    let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
     assert_eq!(vec!["foobar".to_string(), "foobaz".to_string()], result);
-
-    Ok(())
 }
 
 #[integration_test]
-async fn dns_a_record() -> Result<()> {
-    let dns = DnsServer::new().await?;
+async fn dns_a_record() {
+    let dns = DnsServer::new().await.unwrap();
 
     dns.nc
         .publish_jetstream(&SetDnsRecord {
@@ -174,19 +171,21 @@ async fn dns_a_record() -> Result<()> {
             name: "louie".into(),
             value: "12.12.12.12".into(),
         })
-        .await?;
+        .await
+        .expect("Error publishing to Jetstream");
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let result = dns.a_record("louie.plane.test").await?;
+    let result = dns
+        .a_record("louie.plane.test")
+        .await
+        .expect("Couldn't fetch DNS record.");
     assert_eq!(vec![Ipv4Addr::new(12, 12, 12, 12)], result);
-
-    Ok(())
 }
 
 #[integration_test]
-async fn dns_multi_a_record() -> Result<()> {
-    let dns = DnsServer::new().await?;
+async fn dns_multi_a_record() {
+    let dns = DnsServer::new().await.unwrap();
 
     dns.nc
         .publish_jetstream(&SetDnsRecord {
@@ -195,7 +194,8 @@ async fn dns_multi_a_record() -> Result<()> {
             name: "louie".into(),
             value: "12.12.12.12".into(),
         })
-        .await?;
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
@@ -206,27 +206,24 @@ async fn dns_multi_a_record() -> Result<()> {
             name: "louie".into(),
             value: "14.14.14.14".into(),
         })
-        .await?;
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let result = dns.a_record("louie.plane.test").await?;
+    let result = dns.a_record("louie.plane.test").await.unwrap();
     assert_eq!(vec![Ipv4Addr::new(14, 14, 14, 14)], result);
-
-    Ok(())
 }
 
 #[integration_test]
-async fn dns_soa_record() -> Result<()> {
-    let dns = DnsServer::new().await?;
+async fn dns_soa_record() {
+    let dns = DnsServer::new().await.unwrap();
 
-    let result = dns.soa_record("plane.test").await?;
+    let result = dns.soa_record("plane.test").await.unwrap();
 
     assert_eq!(1, result.len());
 
     let result = result.first().unwrap();
     assert_eq!("admin.plane.test.", &result.rname().to_ascii());
     assert_eq!("plane.test.", &result.mname().to_ascii());
-
-    Ok(())
 }
