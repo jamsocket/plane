@@ -119,9 +119,7 @@ impl Executor {
     ) -> Result<(), anyhow::Error> {
         let resource_name = termination_request.backend_id.to_resource_name();
         tracing::info!(backend_id=%termination_request.backend_id, "Trying to terminate backend");
-        self.docker
-            .stop_container(&resource_name)
-            .await
+        self.docker.stop_container(&resource_name).await
     }
 
     pub async fn resume_backends(&self) -> Result<()> {
@@ -207,17 +205,7 @@ impl Executor {
                         );
                     }
 
-                    self.database
-                        .update_backend_state(&spawn_request.backend_id, state)
-                        .await
-                        .log_error();
-                    self.nc
-                        .publish_jetstream(&BackendStateMessage::new(
-                            state,
-                            spawn_request.backend_id.clone(),
-                        ))
-                        .await
-                        .log_error();
+                    self.update_backend_state(spawn_request, state).await;
                 }
                 Ok(None) => {
                     // Successful termination.
@@ -231,17 +219,7 @@ impl Executor {
                     match state {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
-                            self.database
-                                .update_backend_state(&spawn_request.backend_id, state)
-                                .await
-                                .log_error();
-                            self.nc
-                                .publish_jetstream(&BackendStateMessage::new(
-                                    state,
-                                    spawn_request.backend_id.clone(),
-                                ))
-                                .await
-                                .log_error();
+                            self.update_backend_state(spawn_request, state).await;
                         }
                         _ => tracing::error!(
                             ?error,
@@ -253,6 +231,24 @@ impl Executor {
                 }
             }
         }
+    }
+
+    /// Update the rest of the system on the state of a backend, by writing it to the local
+    /// sqlite database (where the proxy can see it), and by broadcasting it to interested
+    /// remote listeners over NATS.
+    async fn update_backend_state(&self, spawn_request: &SpawnRequest, state: BackendState) {
+        self.database
+            .update_backend_state(&spawn_request.backend_id, state)
+            .await
+            .log_error();
+
+        self.nc
+            .publish_jetstream(&BackendStateMessage::new(
+                state,
+                spawn_request.backend_id.clone(),
+            ))
+            .await
+            .log_error();
     }
 
     pub async fn step(
