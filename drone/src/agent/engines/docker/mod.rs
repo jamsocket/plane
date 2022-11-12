@@ -22,11 +22,11 @@ use bollard::{
 };
 use plane_core::{
     messages::agent::ResourceLimits,
-    messages::agent::{DroneLogMessage, SpawnRequest},
+    messages::agent::{BackendStatsMessage, DroneLogMessage, SpawnRequest},
     timing::Timer,
     types::BackendId,
 };
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, task::Poll, time::Duration};
 use std::{net::SocketAddr, pin::Pin};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
@@ -86,10 +86,7 @@ impl DockerInterface {
 
     /// The docker api (as of docker version 20.10.18) blocks for ~1s before returning
     /// from self.docker.stats, hence the effective minimal interval is a second
-    pub fn get_stats<'a>(
-        &'a self,
-        backend_id: &BackendId,
-    ) -> impl Stream<Item = Result<Stats, anyhow::Error>> + 'a {
+    fn get_stats(&self, backend_id: &BackendId) -> impl Stream<Item = Stats> {
         let options = StatsOptions {
             stream: false,
             one_shot: true,
@@ -105,23 +102,17 @@ impl DockerInterface {
 
         let backend_id = backend_id.clone();
         let resource_name = backend_id.to_resource_name();
-        futures::StreamExt::take_while(ticker, move |_| {
-            let backend_id = backend_id.clone();
-            async move {
-                self.backend_status(&backend_id)
-                    .await
-                    .map_or(false, |d| d.is_running())
-            }
-        })
-        .then(move |_tick| {
+        let docker = self.docker.clone();
+
+        futures::stream::StreamExt::filter_map(ticker, move |_tick| {
             let resource_name = resource_name.clone();
+            let docker = docker.clone();
             async move {
-                self.docker
+                docker
                     .stats(&resource_name, Some(options))
                     .next()
                     .await
-                    .ok_or_else(|| anyhow!("docker.stats failed"))?
-                    .map_err(|e| e.into())
+                    .and_then(|d| d.ok())
             }
         })
     }
@@ -343,5 +334,59 @@ impl Engine for DockerInterface {
                 .and_then(|d| DroneLogMessage::from_log_message(&backend, d))
         });
         Box::pin(stream)
+    }
+
+    fn stats_stream(
+        &self,
+        backend: &BackendId,
+    ) -> Pin<Box<dyn Stream<Item = BackendStatsMessage> + Send>> {
+        let stream = Box::pin(self.get_stats(backend));
+        let backend = backend.clone();
+
+        Box::pin(StatsStream::new(backend, stream))
+    }
+}
+
+struct StatsStream<T: Stream<Item = Stats> + Unpin> {
+    stream: T,
+    last: Option<Stats>,
+    backend_id: BackendId,
+}
+
+impl<T: Stream<Item = Stats> + Unpin> StatsStream<T> {
+    pub fn new(backend_id: BackendId, stream: T) -> StatsStream<T> {
+        StatsStream {
+            stream,
+            last: None,
+            backend_id,
+        }
+    }
+}
+
+impl<T: Stream<Item = Stats> + Unpin> Stream for StatsStream<T> {
+    type Item = BackendStatsMessage;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let next = futures::StreamExt::poll_next_unpin(&mut self.stream, cx);
+
+        match next {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(Some(stat)) => {
+                if let Some(last) = &self.last {
+                    let v = BackendStatsMessage::from_stats_messages(&self.backend_id, last, &stat)
+                        .unwrap();
+
+                    self.last = Some(stat);
+                    Poll::Ready(Some(v))
+                } else {
+                    self.last = Some(stat);
+                    Poll::Pending
+                }
+            }
+        }
     }
 }

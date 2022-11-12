@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::Stream;
 use plane_core::{
-    messages::agent::{DroneLogMessage, SpawnRequest},
+    messages::agent::{BackendStatsMessage, DroneLogMessage, SpawnRequest},
     types::BackendId,
 };
 use std::{net::SocketAddr, pin::Pin};
@@ -25,12 +25,6 @@ pub enum EngineBackendStatus {
     Terminated,
 }
 
-impl EngineBackendStatus {
-    pub fn is_running(&self) -> bool {
-        matches!(self, EngineBackendStatus::Running { .. })
-    }
-}
-
 #[async_trait]
 pub trait Engine {
     /// Returns an async stream which yields a backend ID when the status of that
@@ -50,4 +44,9 @@ pub trait Engine {
         &self,
         backend: &BackendId,
     ) -> Pin<Box<dyn Stream<Item = DroneLogMessage> + Send>>;
+
+    fn stats_stream(
+        &self,
+        backend: &BackendId,
+    ) -> Pin<Box<dyn Stream<Item = BackendStatsMessage> + Send>>;
 }

@@ -1,11 +1,8 @@
 use crate::agent::{engine::Engine, engines::docker::DockerInterface};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use plane_core::{
     logging::LogError,
-    messages::{
-        agent::BackendStatsMessage,
-        dns::{DnsRecordType, SetDnsRecord},
-    },
+    messages::dns::{DnsRecordType, SetDnsRecord},
     nats::TypedNats,
     types::{BackendId, ClusterName},
 };
@@ -107,26 +104,10 @@ impl BackendMonitor {
 
         tokio::spawn(async move {
             tracing::info!(%backend_id, "Stats recording loop started.");
-            let mut stream = Box::pin(docker.get_stats(&backend_id));
-            let mut prev_stats = stream
-                .next()
-                .await
-                .ok_or_else(|| anyhow!("failed to get first stats"))??;
-            while let Some(cur_stats) = stream.next().await {
-                match cur_stats {
-                    Ok(cur_stats) => {
-                        nc.publish(&BackendStatsMessage::from_stats_messages(
-                            &backend_id,
-                            &prev_stats,
-                            &cur_stats,
-                        )?)
-                        .await?;
-                        prev_stats = cur_stats;
-                    }
-                    Err(error) => {
-                        tracing::warn!(?error, "Error encountered sending stats.")
-                    }
-                }
+            let mut stream = Box::pin(docker.stats_stream(&backend_id));
+
+            while let Some(stats) = stream.next().await {
+                nc.publish(&stats).await?;
             }
 
             Ok(())
