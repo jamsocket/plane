@@ -40,10 +40,7 @@ trait DnsResultExt {
 impl<T> DnsResultExt for Result<T, ResolveError> {
     fn is_nxdomain(&self) -> bool {
         match self {
-            Err(e) => match e.kind() {
-                ResolveErrorKind::NoRecordsFound { .. } => true,
-                _ => false,
-            },
+            Err(e) => matches!(e.kind(), ResolveErrorKind::NoRecordsFound { .. }),
             Ok(_) => false,
         }
     }
@@ -84,7 +81,7 @@ impl DnsServer {
             .into_iter()
             .map(|d| {
                 d.txt_data()
-                    .into_iter()
+                    .iter()
                     .map(|k| std::str::from_utf8(k))
                     .collect()
             })

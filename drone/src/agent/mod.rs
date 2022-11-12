@@ -17,7 +17,7 @@ use plane_core::{
     types::{ClusterName, DroneId},
     NeverResult,
 };
-use std::{net::IpAddr, time::Duration};
+use std::{net::{SocketAddr}, time::Duration};
 use tokio::sync::watch::{self, Receiver, Sender};
 
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -39,11 +39,11 @@ pub struct AgentOptions {
     pub docker_options: DockerConfig,
 }
 
-pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
-    tracing::info!(port, %host_ip, "Waiting for ready port.");
+pub async fn wait_port_ready(addr: &SocketAddr) -> Result<()> {
+    tracing::info!(%addr, "Waiting for ready port.");
 
     let client = Client::new();
-    let uri = Uri::from_maybe_shared(format!("http://{}:{}/", host_ip, port))?;
+    let uri = Uri::from_maybe_shared(format!("http://{}:{}/", addr.ip(), addr.port()))?;
 
     do_with_retry(|| client.get(uri.clone()), 3000, Duration::from_millis(10)).await?;
 

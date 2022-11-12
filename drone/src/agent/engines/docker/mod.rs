@@ -1,5 +1,5 @@
 mod util;
-use self::util::{AllowNotFound, ContainerEvent, ContainerEventType};
+use self::util::{AllowNotFound, ContainerEvent, ContainerEventType, get_ip_of_container};
 use crate::{
     agent::{
         engine::{Engine, EngineBackendStatus},
@@ -23,8 +23,8 @@ use bollard::{
 use plane_core::{
     messages::agent::ResourceLimits, messages::agent::SpawnRequest, timing::Timer, types::BackendId,
 };
-use std::pin::Pin;
-use std::{collections::HashMap, net::IpAddr, time::Duration};
+use std::{collections::HashMap, time::Duration};
+use std::{net::SocketAddr, pin::Pin};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
 /// The port in the container which is exposed.
@@ -107,7 +107,7 @@ impl DockerInterface {
             async move {
                 self.backend_status(&backend_id)
                     .await
-                    .map_or(false, |res| res == EngineBackendStatus::Running)
+                    .map_or(false, |d| d.is_running())
             }
         })
         .then(move |_tick| {
@@ -153,42 +153,6 @@ impl DockerInterface {
             .allow_not_found()?;
 
         Ok(())
-    }
-
-    pub async fn get_ip(&self, container_name: &str) -> Result<IpAddr> {
-        let inspect = self.docker.inspect_container(container_name, None).await?;
-
-        let network_settings = inspect
-            .network_settings
-            .ok_or_else(|| anyhow!("Inspect did not return network settings."))?;
-
-        if let Some(ip_addr) = network_settings.ip_address {
-            if !ip_addr.is_empty() {
-                return Ok(ip_addr.parse()?);
-            }
-        }
-
-        let networks = network_settings
-            .networks
-            .ok_or_else(|| anyhow!("Inspect did not return an IP or networks."))?;
-        if networks.len() != 1 {
-            return Err(anyhow!(
-                "Expected exactly one network, got {}",
-                networks.len()
-            ));
-        }
-
-        let network = networks
-            .values()
-            .into_iter()
-            .next()
-            .expect("next() should never fail after length check.");
-        let ip = network
-            .ip_address
-            .as_ref()
-            .ok_or_else(|| anyhow!("One network found, but did not have IP address."))?;
-
-        Ok(ip.parse()?)
     }
 
     /// Run the specified image and return the name of the created container.
@@ -343,6 +307,7 @@ impl Engine for DockerInterface {
         };
         let state = container
             .state
+            .as_ref()
             .ok_or_else(|| anyhow!("No state found for container."))?;
 
         let running = state
@@ -350,7 +315,10 @@ impl Engine for DockerInterface {
             .ok_or_else(|| anyhow!("State found but no running field for container."))?;
 
         if running {
-            Ok(EngineBackendStatus::Running)
+            let ip = get_ip_of_container(&container)?;
+            let addr = SocketAddr::new(ip, CONTAINER_PORT);
+
+            Ok(EngineBackendStatus::Running { addr })
         } else {
             match state.exit_code {
                 None => Ok(EngineBackendStatus::Terminated),
@@ -360,3 +328,4 @@ impl Engine for DockerInterface {
         }
     }
 }
+

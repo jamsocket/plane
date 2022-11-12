@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-
-use bollard::service::EventMessage;
+use anyhow::{anyhow, Result};
+use bollard::service::{ContainerInspectResponse, EventMessage};
+use std::{collections::HashMap, net::IpAddr};
 
 pub trait MinuteExt {
     fn as_minutes(&self) -> u128;
@@ -118,4 +118,40 @@ impl ContainerEvent {
 
         Some(ContainerEvent { event, name })
     }
+}
+
+pub fn get_ip_of_container(inspect_response: &ContainerInspectResponse) -> Result<IpAddr> {
+    let network_settings = inspect_response
+        .network_settings
+        .as_ref()
+        .ok_or_else(|| anyhow!("Inspect did not return network settings."))?;
+
+    if let Some(ip_addr) = network_settings.ip_address.as_ref() {
+        if !ip_addr.is_empty() {
+            return Ok(ip_addr.parse()?);
+        }
+    }
+
+    let networks = network_settings
+        .networks.as_ref()
+        .ok_or_else(|| anyhow!("Inspect did not return an IP or networks."))?;
+    if networks.len() != 1 {
+        return Err(anyhow!(
+            "Expected exactly one network, got {}",
+            networks.len()
+        ));
+    }
+
+    let network = networks
+        .values()
+        .into_iter()
+        .next()
+        .expect("next() should never fail after length check.");
+
+    let ip = network
+        .ip_address
+        .as_ref()
+        .ok_or_else(|| anyhow!("One network found, but did not have IP address."))?;
+
+    Ok(ip.parse()?)
 }

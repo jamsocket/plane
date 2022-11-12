@@ -116,7 +116,6 @@ impl BackendMonitor {
         let backend_id = backend_id.clone();
 
         tokio::spawn(async move {
-            let container_name = backend_id.to_resource_name();
             tracing::info!(%backend_id, "Stats recording loop started.");
             let mut stream = Box::pin(docker.get_stats(&backend_id));
             let mut prev_stats = stream

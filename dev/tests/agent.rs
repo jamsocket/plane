@@ -625,7 +625,7 @@ async fn handle_termination_request() -> Result<()> {
 
     let termination_request = TerminationRequest {
         backend_id: request.backend_id.clone(),
-        cluster_id: ClusterName::new(&CLUSTER_DOMAIN),
+        cluster_id: ClusterName::new(CLUSTER_DOMAIN),
     };
     controller_mock
         .terminate_backend(&termination_request)

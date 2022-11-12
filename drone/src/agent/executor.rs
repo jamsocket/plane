@@ -255,29 +255,24 @@ impl Executor {
                 Ok(Some(BackendState::Starting))
             }
             BackendState::Starting => {
-                if self
-                    .docker
-                    .backend_status(&spawn_request.backend_id)
-                    .await?
-                    != EngineBackendStatus::Running
-                {
-                    return Ok(Some(BackendState::ErrorStarting));
-                }
+                let status = self
+                .docker
+                .backend_status(&spawn_request.backend_id)
+                .await?;
 
-                let container_ip = self
-                    .docker
-                    .get_ip(&spawn_request.backend_id.to_resource_name())
-                    .await
-                    .unwrap();
+                let container_addr = match status {
+                    EngineBackendStatus::Running { addr } => addr,
+                    _ => return Ok(Some(BackendState::ErrorStarting)),
+                };
 
-                tracing::info!(%container_ip, "Got IP from container.");
-                wait_port_ready(8080, container_ip).await?;
+                tracing::info!(%container_addr, "Got address from container.");
+                wait_port_ready(&container_addr).await?;
 
                 self.database
                     .insert_proxy_route(
                         &spawn_request.backend_id,
                         spawn_request.backend_id.id(),
-                        &format!("{}:{}", container_ip, 8080),
+                        &container_addr.to_string(),
                     )
                     .await?;
 
