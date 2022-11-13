@@ -645,7 +645,7 @@ async fn handle_termination_request() {
     let mut request = base_spawn_request();
     // Ensure spawnee lives long enough to be terminated.
     request.drone_id = drone_id.clone();
-    request.max_idle_secs = Duration::from_secs(10000);
+    request.max_idle_secs = Duration::from_secs(10_000);
 
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
@@ -663,7 +663,7 @@ async fn handle_termination_request() {
 
     controller_mock.spawn_backend(&request).await.unwrap();
     state_subscription
-        .wait_for_state(BackendState::Ready, 60_000)
+        .wait_for_state(BackendState::Ready, 20_000)
         .await
         .unwrap();
 
@@ -677,7 +677,7 @@ async fn handle_termination_request() {
         .unwrap();
 
     state_subscription
-        .wait_for_state(BackendState::Failed, 60_000)
+        .wait_for_state(BackendState::Terminated, 20_000)
         .await
         .unwrap();
 }

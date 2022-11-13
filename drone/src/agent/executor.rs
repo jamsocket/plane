@@ -37,14 +37,37 @@ impl<T, E: Debug> LogError for Result<T, E> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum Signal {
+    /// Tells the executor to interrupt current step to recapture an external status
+    /// change. This signal is sent after an engine detects an external status change,
+    /// e.g. a backend has terminated itself with an error.
+    Interrupt,
+
+    /// Tells the executor to terminate the current step.
+    Terminate,
+}
+
 pub struct Executor<E: Engine> {
     engine: Arc<E>,
     database: DroneDatabase,
     nc: TypedNats,
     _container_events_handle: Arc<JoinHandle<()>>,
+
+    /// Associates a backend with a monitor, which owns a number of
+    /// event loops related to a backend.
     backend_to_monitor: Arc<DashMap<BackendId, BackendMonitor>>,
-    backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
+
+    /// Associates a backend with a channel, through which signals can
+    /// be sent to interrupt the state machine. This is used for
+    /// telling the state machine to receive external events, and also
+    /// for terminating backends.
+    backend_to_listener: Arc<DashMap<BackendId, Sender<Signal>>>,
+
+    /// The IP address associated with this executor.
     ip: IpAddr,
+
+    /// The cluster name associated with this executor.
     cluster: ClusterName,
 }
 
@@ -71,7 +94,7 @@ impl<E: Engine> Executor<E> {
         ip: IpAddr,
         cluster: ClusterName,
     ) -> Self {
-        let backend_to_listener: Arc<DashMap<BackendId, Sender<()>>> = Arc::default();
+        let backend_to_listener: Arc<DashMap<BackendId, Sender<Signal>>> = Arc::default();
         let engine = Arc::new(engine);
 
         let container_events_handle = tokio::spawn(Self::listen_for_container_events(
@@ -93,12 +116,12 @@ impl<E: Engine> Executor<E> {
 
     async fn listen_for_container_events(
         engine: Arc<E>,
-        backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
+        backend_to_listener: Arc<DashMap<BackendId, Sender<Signal>>>,
     ) {
         let mut event_stream = engine.interrupt_stream();
         while let Some(backend_id) = event_stream.next().await {
             if let Some(v) = backend_to_listener.get(&backend_id) {
-                v.try_send(()).log_error();
+                v.try_send(Signal::Interrupt).log_error();
             }
         }
     }
@@ -124,8 +147,17 @@ impl<E: Engine> Executor<E> {
         &self,
         termination_request: &TerminationRequest,
     ) -> Result<(), anyhow::Error> {
-        tracing::info!(backend_id=%termination_request.backend_id, "Trying to terminate backend");
-        self.engine.stop(&termination_request.backend_id).await
+        if let Some(sender) = self
+            .backend_to_listener
+            .get(&termination_request.backend_id)
+        {
+            Ok(sender.send(Signal::Terminate).await?)
+        } else {
+            Err(anyhow!(
+                "Unknown backend {}",
+                &termination_request.backend_id
+            ))
+        }
     }
 
     pub async fn resume_backends(&self) -> Result<()> {
@@ -186,9 +218,18 @@ impl<E: Engine> Executor<E> {
                     // if the container dies).
                     tokio::select! {
                         next_state = self.step(spawn_request, state) => break next_state,
-                        _ = recv.recv() => {
-                            tracing::info!("State may have updated externally.");
-                            continue;
+                        sig = recv.recv() => match sig {
+                            Some(Signal::Interrupt) => {
+                                tracing::info!("State may have updated externally.");
+                                continue;
+                            },
+                            Some(Signal::Terminate) => {
+                                break Ok(Some(BackendState::Terminated))
+                            },
+                            None => {
+                                tracing::error!("Signal sender lost!");
+                                return
+                            }
                         },
                     }
                 };
@@ -332,7 +373,8 @@ impl<E: Engine> Executor<E> {
             | BackendState::TimedOutBeforeReady
             | BackendState::Failed
             | BackendState::Exited
-            | BackendState::Swept => {
+            | BackendState::Swept
+            | BackendState::Terminated => {
                 self.engine
                     .stop(&spawn_request.backend_id)
                     .await

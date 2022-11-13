@@ -393,6 +393,9 @@ pub enum BackendState {
 
     /// The container was terminated because all connections were closed.
     Swept,
+
+    /// The container was terminated through the API.
+    Terminated,
 }
 
 impl FromStr for BackendState {
@@ -429,6 +432,7 @@ impl ToString for BackendState {
             BackendState::Failed => "Failed".to_string(),
             BackendState::Exited => "Exited".to_string(),
             BackendState::Swept => "Swept".to_string(),
+            BackendState::Terminated => "Terminated".to_string(),
         }
     }
 }
@@ -445,6 +449,7 @@ impl BackendState {
                 | BackendState::Failed
                 | BackendState::Exited
                 | BackendState::Swept
+                | BackendState::Terminated
         )
     }
 
