@@ -1,5 +1,7 @@
 FROM mcr.microsoft.com/devcontainers/rust:1-bullseye
 
+USER vscode
+
 RUN rustup update stable
 
 RUN cargo install cargo-workspaces
