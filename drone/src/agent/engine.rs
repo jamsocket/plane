@@ -16,13 +16,13 @@ pub enum EngineBackendStatus {
     Running { addr: SocketAddr },
 
     /// The backend exited on its own without indicating failure.
-    Finished,
+    Exited,
 
     /// The backend exited on its own with a failure state.
     Failed,
 
     /// The backend was terminated by external forces.
-    Terminated,
+    Swept,
 }
 
 #[async_trait]

@@ -216,8 +216,6 @@ impl<E: Engine> Executor<E> {
                 Ok(None) => {
                     // Successful termination.
                     tracing::info!("Terminated successfully.");
-                    self.backend_to_monitor.remove(&spawn_request.backend_id);
-                    self.backend_to_listener.remove(&spawn_request.backend_id);
                     break;
                 }
                 Err(error) => {
@@ -237,6 +235,9 @@ impl<E: Engine> Executor<E> {
                 }
             }
         }
+
+        self.backend_to_monitor.remove(&spawn_request.backend_id);
+        self.backend_to_listener.remove(&spawn_request.backend_id);
     }
 
     /// Update the rest of the system on the state of a backend, by writing it to the local
@@ -274,19 +275,19 @@ impl<E: Engine> Executor<E> {
                     .backend_status(&spawn_request.backend_id)
                     .await?;
 
-                let container_addr = match status {
+                let backend_addr = match status {
                     EngineBackendStatus::Running { addr } => addr,
                     _ => return Ok(Some(BackendState::ErrorStarting)),
                 };
 
-                tracing::info!(%container_addr, "Got address from container.");
-                wait_port_ready(&container_addr).await?;
+                tracing::info!(%backend_addr, "Got address from container.");
+                wait_port_ready(&backend_addr).await?;
 
                 self.database
                     .insert_proxy_route(
                         &spawn_request.backend_id,
                         spawn_request.backend_id.id(),
-                        &container_addr.to_string(),
+                        &backend_addr.to_string(),
                     )
                     .await?;
 
@@ -299,8 +300,8 @@ impl<E: Engine> Executor<E> {
                     .await?
                 {
                     EngineBackendStatus::Failed => return Ok(Some(BackendState::Failed)),
-                    EngineBackendStatus::Finished => return Ok(Some(BackendState::Exited)),
-                    EngineBackendStatus::Terminated => return Ok(Some(BackendState::Swept)),
+                    EngineBackendStatus::Exited => return Ok(Some(BackendState::Exited)),
+                    EngineBackendStatus::Swept => return Ok(Some(BackendState::Swept)),
                     _ => (),
                 }
 
