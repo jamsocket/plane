@@ -39,11 +39,14 @@ fi
 COMPOSE_FILE_DIR="$PWD/compose"
 PLANE_COMPOSE="$COMPOSE_FILE_DIR/plane.yml"
 FIREFOX_X11_COMPOSE="$COMPOSE_FILE_DIR/firefox-x11.yml"
+NATS_CLUSTER_COMPOSE="$COMPOSE_FILE_DIR/nats-cluster.yml"
+NATS_SINGLE_COMPOSE="$COMPOSE_FILE_DIR/nats.yml"
+NATS_COMPOSE="$NATS_SINGLE_COMPOSE"
 DOCKER_COMPOSE="docker compose"
 
 
-linux='' macos='' x11='' guac='' debug='' OS='' BUILD_OPT='' BROWSER_OPT='' CLEAN_OPT='' BROWSER_CMD=""
-while getopts "lmxrcdgb-:" arg
+linux='' macos='' x11='' guac='' debug='' OS='' BUILD_OPT='' BROWSER_OPT='' CLEAN_OPT='' BROWSER_CMD="" nats_cluster=''
+while getopts "lmxrcdgnb-:" arg
 do
 	case $arg in 
 	l) [ ! "$OS" ] && linux=1 OS=1 BROWSER_CMD="xdg-open" || exit 1;;
@@ -52,6 +55,7 @@ do
 	g) [ ! "$BROWSER_OPT" ] && guac=1 BROWSER_OPT=1 || exit 1;;
 	c) [ ! "$CLEAN_OPT" ] && CLEAN_OPT=1 || exit 1;;
 	b) [ ! "$BUILD_OPT" ] && BUILD_OPT=1 || exit 1;;
+	n) nats_cluster=1 ;;
 	d) debug=1;;
 	-) long_opts "$OPTARG"; exit $?;;
 	?) usage "" && exit 1;;
@@ -73,18 +77,21 @@ if [ $debug ]; then
 	NATS_FLAGS="-DV"
 fi
 
+if [ $nats_cluster ]; then
+	NATS_COMPOSE=$NATS_CLUSTER_COMPOSE
+fi
 
 if [ $linux ] && [ $x11 ]
 then
 	# shellcheck disable=2086 # I actually want splitting here
-	NATS_FLAGS=$NATS_FLAGS $DOCKER_COMPOSE -f "$PLANE_COMPOSE" -f "$FIREFOX_X11_COMPOSE" up $FLAGS
+	NATS_FLAGS=$NATS_FLAGS $DOCKER_COMPOSE -f "$PLANE_COMPOSE" -f "$FIREFOX_X11_COMPOSE" -f "$NATS_COMPOSE" up $FLAGS
 	exit $?
 fi
 
 if { [ $linux ] || [ $macos ]; } && [ $guac ]
 then
 	# shellcheck disable=2086 # I actually want splitting here
-	NATS_FLAGS=$NATS_FLAGS $DOCKER_COMPOSE -f "$PLANE_COMPOSE" up $FLAGS &\
+	NATS_FLAGS=$NATS_FLAGS $DOCKER_COMPOSE -f "$PLANE_COMPOSE" -f "$NATS_COMPOSE" up $FLAGS &\
 	{ wait_until_guac "" && $BROWSER_CMD "http://localhost:3000" ;}
 	exit $?
 fi

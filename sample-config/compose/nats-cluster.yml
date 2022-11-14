@@ -4,7 +4,7 @@ services:
       container_name: plane-nats-A
       image: nats:latest
       command:
-        "--jetstream ${NATS_FLAGS} -cluster nats://localhost:4248 --cluster-name plane-nats-cluster"
+        "--jetstream ${NATS_FLAGS} -cluster nats://natsA:4248 -routes nats://natsB:4248 -routes nats://natsC:4248 --cluster_name plane-nats-cluster --server_name natsA"
       ports:
         - "127.0.0.1:4222:4222"
       networks:
@@ -13,17 +13,13 @@ services:
       container_name: plane-nats-B
       image: nats:latest
       command:
-        "--jetstream ${NATS_FLAGS} -cluster nats://localhost:4248 -routes nats://natsA:4248 --cluster-name plane-nats-cluster"
-      ports:
-        - "127.0.0.1:4222:4222"
+        "--jetstream ${NATS_FLAGS} -cluster nats://natsB:4248 -routes nats://natsA:4248 --cluster_name plane-nats-cluster --server_name natsB"
       networks:
         - plane
     natsC:
       container_name: plane-nats-C
       image: nats:latest
       command:
-        "--jetstream ${NATS_FLAGS} -cluster nats://localhost:4248 -routes nats://natsA:4248 --cluster-name plane-nats-cluster"
-      ports:
-        - "127.0.0.1:4222:4222"
+        "--jetstream ${NATS_FLAGS} -cluster nats://natsC:4248 -routes nats://natsA:4248 --cluster_name plane-nats-cluster --server_name natsC"
       networks:
         - plane

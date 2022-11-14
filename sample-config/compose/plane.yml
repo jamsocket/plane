@@ -38,16 +38,6 @@ services:
       plane:
         ipv4_address: 172.16.238.11
 
-  nats:
-    container_name: plane-nats
-    image: nats:latest
-    command:
-      "--jetstream ${NATS_FLAGS}"
-    ports:
-      - "127.0.0.1:4222:4222"
-    networks:
-      - plane
-
   ip-api:
     container_name: plane-ip-api
     image: ghcr.io/drifting-in-space/ip-api:latest
