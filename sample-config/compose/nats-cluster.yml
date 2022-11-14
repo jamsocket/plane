@@ -1,0 +1,29 @@
+version: "3.9"
+services:
+    natsA:
+      container_name: plane-nats-A
+      image: nats:latest
+      command:
+        "--jetstream ${NATS_FLAGS} -cluster nats://localhost:4248 --cluster-name plane-nats-cluster"
+      ports:
+        - "127.0.0.1:4222:4222"
+      networks:
+        - plane
+    natsB:
+      container_name: plane-nats-B
+      image: nats:latest
+      command:
+        "--jetstream ${NATS_FLAGS} -cluster nats://localhost:4248 -routes nats://natsA:4248 --cluster-name plane-nats-cluster"
+      ports:
+        - "127.0.0.1:4222:4222"
+      networks:
+        - plane
+    natsC:
+      container_name: plane-nats-C
+      image: nats:latest
+      command:
+        "--jetstream ${NATS_FLAGS} -cluster nats://localhost:4248 -routes nats://natsA:4248 --cluster-name plane-nats-cluster"
+      ports:
+        - "127.0.0.1:4222:4222"
+      networks:
+        - plane
