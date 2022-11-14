@@ -22,7 +22,7 @@ pub enum EngineBackendStatus {
     Failed,
 
     /// The backend was terminated by external forces.
-    Swept,
+    Terminated,
 }
 
 #[async_trait]

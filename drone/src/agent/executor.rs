@@ -342,7 +342,7 @@ impl<E: Engine> Executor<E> {
                 {
                     EngineBackendStatus::Failed => return Ok(Some(BackendState::Failed)),
                     EngineBackendStatus::Exited => return Ok(Some(BackendState::Exited)),
-                    EngineBackendStatus::Swept => return Ok(Some(BackendState::Swept)),
+                    EngineBackendStatus::Terminated => return Ok(Some(BackendState::Swept)),
                     _ => (),
                 }
 

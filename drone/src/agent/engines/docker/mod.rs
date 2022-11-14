@@ -317,7 +317,7 @@ impl Engine for DockerInterface {
             Ok(EngineBackendStatus::Running { addr })
         } else {
             match state.exit_code {
-                None => Ok(EngineBackendStatus::Swept),
+                None => Ok(EngineBackendStatus::Terminated),
                 Some(0) => Ok(EngineBackendStatus::Exited),
                 Some(_) => Ok(EngineBackendStatus::Failed),
             }
