@@ -1,6 +1,6 @@
 [package]
 name = "plane-controller"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 authors = ["Paul Butler <paul@driftingin.space>"]
 homepage = "https://plane.dev"
@@ -12,7 +12,7 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.64"
 async-trait = "0.1.57"
-chrono = "0.4.22"
+chrono = { version="0.4.22", default_features = false }
 clap = { version = "4.0.4", features = ["derive"] }
 dashmap = "5.3.4"
 plane-core = {path = "../core", version="0.3.0"}

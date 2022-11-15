@@ -1,6 +1,6 @@
 use super::{
     backend::BackendMonitor,
-    docker::{ContainerEventType, DockerInterface},
+    engine::{Engine, EngineBackendStatus},
 };
 use crate::{
     agent::wait_port_ready,
@@ -37,34 +37,73 @@ impl<T, E: Debug> LogError for Result<T, E> {
     }
 }
 
-#[derive(Clone)]
-pub struct Executor {
-    docker: DockerInterface,
+#[derive(Debug, PartialEq, Eq)]
+enum Signal {
+    /// Tells the executor to interrupt current step to recapture an external status
+    /// change. This signal is sent after an engine detects an external status change,
+    /// e.g. a backend has terminated itself with an error.
+    Interrupt,
+
+    /// Tells the executor to terminate the current step.
+    Terminate,
+}
+
+pub struct Executor<E: Engine> {
+    engine: Arc<E>,
     database: DroneDatabase,
     nc: TypedNats,
     _container_events_handle: Arc<JoinHandle<()>>,
+
+    /// Associates a backend with a monitor, which owns a number of
+    /// event loops related to a backend.
     backend_to_monitor: Arc<DashMap<BackendId, BackendMonitor>>,
-    backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
+
+    /// Associates a backend with a channel, through which signals can
+    /// be sent to interrupt the state machine. This is used for
+    /// telling the state machine to receive external events, and also
+    /// for terminating backends.
+    backend_to_listener: Arc<DashMap<BackendId, Sender<Signal>>>,
+
+    /// The IP address associated with this executor.
     ip: IpAddr,
+
+    /// The cluster name associated with this executor.
     cluster: ClusterName,
 }
 
-impl Executor {
+impl<E: Engine> Clone for Executor<E> {
+    fn clone(&self) -> Self {
+        Self {
+            engine: self.engine.clone(),
+            database: self.database.clone(),
+            nc: self.nc.clone(),
+            _container_events_handle: self._container_events_handle.clone(),
+            backend_to_monitor: self.backend_to_monitor.clone(),
+            backend_to_listener: self.backend_to_listener.clone(),
+            ip: self.ip,
+            cluster: self.cluster.clone(),
+        }
+    }
+}
+
+impl<E: Engine> Executor<E> {
     pub fn new(
-        docker: DockerInterface,
+        engine: E,
         database: DroneDatabase,
         nc: TypedNats,
         ip: IpAddr,
         cluster: ClusterName,
     ) -> Self {
-        let backend_to_listener: Arc<DashMap<BackendId, Sender<()>>> = Arc::default();
+        let backend_to_listener: Arc<DashMap<BackendId, Sender<Signal>>> = Arc::default();
+        let engine = Arc::new(engine);
+
         let container_events_handle = tokio::spawn(Self::listen_for_container_events(
-            docker.clone(),
+            engine.clone(),
             backend_to_listener.clone(),
         ));
 
         Executor {
-            docker,
+            engine,
             database,
             nc,
             _container_events_handle: Arc::new(container_events_handle),
@@ -76,22 +115,13 @@ impl Executor {
     }
 
     async fn listen_for_container_events(
-        docker: DockerInterface,
-        backend_to_listener: Arc<DashMap<BackendId, Sender<()>>>,
+        engine: Arc<E>,
+        backend_to_listener: Arc<DashMap<BackendId, Sender<Signal>>>,
     ) {
-        let mut event_stream = docker.container_events().await;
-        while let Some(event) = event_stream.next().await {
-            if event.event == ContainerEventType::Die {
-                let backend_id =
-                    if let Some(backend_id) = BackendId::from_resource_name(&event.name) {
-                        backend_id
-                    } else {
-                        continue;
-                    };
-
-                if let Some(v) = backend_to_listener.get(&backend_id) {
-                    v.try_send(()).log_error();
-                }
+        let mut event_stream = engine.interrupt_stream();
+        while let Some(backend_id) = event_stream.next().await {
+            if let Some(v) = backend_to_listener.get(&backend_id) {
+                v.try_send(Signal::Interrupt).log_error();
             }
         }
     }
@@ -117,11 +147,17 @@ impl Executor {
         &self,
         termination_request: &TerminationRequest,
     ) -> Result<(), anyhow::Error> {
-        let resource_name = termination_request.backend_id.to_resource_name();
-        tracing::info!(backend_id=%termination_request.backend_id, "Trying to terminate backend");
-        self.docker
-            .stop_container(&resource_name)
-            .await
+        if let Some(sender) = self
+            .backend_to_listener
+            .get(&termination_request.backend_id)
+        {
+            Ok(sender.send(Signal::Terminate).await?)
+        } else {
+            Err(anyhow!(
+                "Unknown backend {}",
+                &termination_request.backend_id
+            ))
+        }
     }
 
     pub async fn resume_backends(&self) -> Result<()> {
@@ -143,7 +179,7 @@ impl Executor {
                         &backend_id,
                         &self.cluster,
                         self.ip,
-                        &self.docker,
+                        self.engine.as_ref(),
                         &self.nc,
                     ),
                 );
@@ -182,9 +218,18 @@ impl Executor {
                     // if the container dies).
                     tokio::select! {
                         next_state = self.step(spawn_request, state) => break next_state,
-                        _ = recv.recv() => {
-                            tracing::info!("State may have updated externally.");
-                            continue;
+                        sig = recv.recv() => match sig {
+                            Some(Signal::Interrupt) => {
+                                tracing::info!("State may have updated externally.");
+                                continue;
+                            },
+                            Some(Signal::Terminate) => {
+                                break Ok(Some(BackendState::Terminated))
+                            },
+                            None => {
+                                tracing::error!("Signal sender lost!");
+                                return
+                            }
                         },
                     }
                 };
@@ -201,29 +246,17 @@ impl Executor {
                                 &spawn_request.backend_id,
                                 &self.cluster,
                                 self.ip,
-                                &self.docker,
+                                self.engine.as_ref(),
                                 &self.nc,
                             ),
                         );
                     }
 
-                    self.database
-                        .update_backend_state(&spawn_request.backend_id, state)
-                        .await
-                        .log_error();
-                    self.nc
-                        .publish_jetstream(&BackendStateMessage::new(
-                            state,
-                            spawn_request.backend_id.clone(),
-                        ))
-                        .await
-                        .log_error();
+                    self.update_backend_state(spawn_request, state).await;
                 }
                 Ok(None) => {
                     // Successful termination.
                     tracing::info!("Terminated successfully.");
-                    self.backend_to_monitor.remove(&spawn_request.backend_id);
-                    self.backend_to_listener.remove(&spawn_request.backend_id);
                     break;
                 }
                 Err(error) => {
@@ -231,17 +264,7 @@ impl Executor {
                     match state {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
-                            self.database
-                                .update_backend_state(&spawn_request.backend_id, state)
-                                .await
-                                .log_error();
-                            self.nc
-                                .publish_jetstream(&BackendStateMessage::new(
-                                    state,
-                                    spawn_request.backend_id.clone(),
-                                ))
-                                .await
-                                .log_error();
+                            self.update_backend_state(spawn_request, state).await;
                         }
                         _ => tracing::error!(
                             ?error,
@@ -253,6 +276,27 @@ impl Executor {
                 }
             }
         }
+
+        self.backend_to_monitor.remove(&spawn_request.backend_id);
+        self.backend_to_listener.remove(&spawn_request.backend_id);
+    }
+
+    /// Update the rest of the system on the state of a backend, by writing it to the local
+    /// sqlite database (where the proxy can see it), and by broadcasting it to interested
+    /// remote listeners over NATS.
+    async fn update_backend_state(&self, spawn_request: &SpawnRequest, state: BackendState) {
+        self.database
+            .update_backend_state(&spawn_request.backend_id, state)
+            .await
+            .log_error();
+
+        self.nc
+            .publish_jetstream(&BackendStateMessage::new(
+                state,
+                spawn_request.backend_id.clone(),
+            ))
+            .await
+            .log_error();
     }
 
     pub async fn step(
@@ -262,70 +306,44 @@ impl Executor {
     ) -> Result<Option<BackendState>> {
         match state {
             BackendState::Loading => {
-                self.docker
-                    .pull_image(
-                        &spawn_request.executable.image,
-                        &spawn_request
-                            .executable
-                            .credentials
-                            .as_ref()
-                            .map(|d| d.into()),
-                    )
-                    .await?;
-
-                let backend_id = spawn_request.backend_id.to_resource_name();
-                self.docker
-                    .run_container(
-                        &backend_id,
-                        &spawn_request.executable.image,
-                        &spawn_request.executable.env,
-                        &spawn_request.executable.resource_limits,
-                    )
-                    .await?;
-                tracing::info!(%backend_id, "Container is running.");
+                self.engine.load(spawn_request).await?;
 
                 Ok(Some(BackendState::Starting))
             }
             BackendState::Starting => {
-                if !self
-                    .docker
-                    .is_running(&spawn_request.backend_id.to_resource_name())
-                    .await?
-                    .0
-                {
-                    return Ok(Some(BackendState::ErrorStarting));
-                }
+                let status = self
+                    .engine
+                    .backend_status(&spawn_request.backend_id)
+                    .await?;
 
-                let container_ip = self
-                    .docker
-                    .get_ip(&spawn_request.backend_id.to_resource_name())
-                    .await
-                    .unwrap();
+                let backend_addr = match status {
+                    EngineBackendStatus::Running { addr } => addr,
+                    _ => return Ok(Some(BackendState::ErrorStarting)),
+                };
 
-                tracing::info!(%container_ip, "Got IP from container.");
-                wait_port_ready(8080, container_ip).await?;
+                tracing::info!(%backend_addr, "Got address from container.");
+                wait_port_ready(&backend_addr).await?;
 
                 self.database
                     .insert_proxy_route(
                         &spawn_request.backend_id,
                         spawn_request.backend_id.id(),
-                        &format!("{}:{}", container_ip, 8080),
+                        &backend_addr.to_string(),
                     )
                     .await?;
 
                 Ok(Some(BackendState::Ready))
             }
             BackendState::Ready => {
-                if let (false, exit_code) = self
-                    .docker
-                    .is_running(&spawn_request.backend_id.to_resource_name())
+                match self
+                    .engine
+                    .backend_status(&spawn_request.backend_id)
                     .await?
                 {
-                    if exit_code == Some(0) {
-                        return Ok(Some(BackendState::Exited));
-                    } else {
-                        return Ok(Some(BackendState::Failed));
-                    }
+                    EngineBackendStatus::Failed => return Ok(Some(BackendState::Failed)),
+                    EngineBackendStatus::Exited => return Ok(Some(BackendState::Exited)),
+                    EngineBackendStatus::Terminated => return Ok(Some(BackendState::Swept)),
+                    _ => (),
                 }
 
                 // wait for idle
@@ -355,11 +373,10 @@ impl Executor {
             | BackendState::TimedOutBeforeReady
             | BackendState::Failed
             | BackendState::Exited
-            | BackendState::Swept => {
-                let container_name = spawn_request.backend_id.to_resource_name();
-
-                self.docker
-                    .stop_container(&container_name)
+            | BackendState::Swept
+            | BackendState::Terminated => {
+                self.engine
+                    .stop(&spawn_request.backend_id)
                     .await
                     .map_err(|e| anyhow!("Error stopping container: {:?}", e))?;
 

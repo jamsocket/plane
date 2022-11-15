@@ -70,9 +70,9 @@ impl MockAgent {
 }
 
 #[integration_test]
-async fn no_drone_available() -> Result<()> {
-    let nats = Nats::new().await?;
-    let nats_conn = nats.connection().await?;
+async fn no_drone_available() {
+    let nats = Nats::new().await.unwrap();
+    let nats_conn = nats.connection().await.unwrap();
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
     sleep(Duration::from_millis(100)).await;
 
@@ -83,17 +83,17 @@ async fn no_drone_available() -> Result<()> {
         "Schedule request should be responded.",
         nats_conn.request(&request),
     )
-    .await??;
+    .await
+    .unwrap()
+    .unwrap();
 
     assert_eq!(ScheduleResponse::NoDroneAvailable, result);
-
-    Ok(())
 }
 
 #[integration_test]
-async fn one_drone_available() -> Result<()> {
-    let nats = Nats::new().await?;
-    let nats_conn = nats.connection().await?;
+async fn one_drone_available() {
+    let nats = Nats::new().await.unwrap();
+    let nats_conn = nats.connection().await.unwrap();
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone());
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
@@ -107,18 +107,17 @@ async fn one_drone_available() -> Result<()> {
             ready: true,
             running_backends: None,
         })
-        .await?;
+        .await
+        .unwrap();
 
-    let result = mock_agent.schedule_drone(&drone_id).await?;
+    let result = mock_agent.schedule_drone(&drone_id).await.unwrap();
     assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));
-
-    Ok(())
 }
 
 #[integration_test]
-async fn drone_not_ready() -> Result<()> {
-    let nats = Nats::new().await?;
-    let nats_conn = nats.connection().await?;
+async fn drone_not_ready() {
+    let nats = Nats::new().await.unwrap();
+    let nats_conn = nats.connection().await.unwrap();
     let drone_id = DroneId::new_random();
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
     sleep(Duration::from_millis(100)).await;
@@ -131,7 +130,8 @@ async fn drone_not_ready() -> Result<()> {
             ready: false,
             running_backends: None,
         })
-        .await?;
+        .await
+        .unwrap();
 
     let request = base_scheduler_request();
     tracing::info!("Making spawn request.");
@@ -140,17 +140,17 @@ async fn drone_not_ready() -> Result<()> {
         "Schedule request should be responded.",
         nats_conn.request(&request),
     )
-    .await??;
+    .await
+    .unwrap()
+    .unwrap();
 
     assert_eq!(ScheduleResponse::NoDroneAvailable, result);
-
-    Ok(())
 }
 
 #[integration_test]
-async fn drone_becomes_not_ready() -> Result<()> {
-    let nats = Nats::new().await?;
-    let nats_conn = nats.connection().await?;
+async fn drone_becomes_not_ready() {
+    let nats = Nats::new().await.unwrap();
+    let nats_conn = nats.connection().await.unwrap();
     let drone_id = DroneId::new_random();
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
     sleep(Duration::from_millis(100)).await;
@@ -163,7 +163,8 @@ async fn drone_becomes_not_ready() -> Result<()> {
             ready: true,
             running_backends: None,
         })
-        .await?;
+        .await
+        .unwrap();
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -173,7 +174,8 @@ async fn drone_becomes_not_ready() -> Result<()> {
             ready: false,
             running_backends: None,
         })
-        .await?;
+        .await
+        .unwrap();
 
     sleep(Duration::from_secs(5)).await;
 
@@ -184,8 +186,8 @@ async fn drone_becomes_not_ready() -> Result<()> {
         "Schedule request should be responded.",
         nats_conn.request(&request),
     )
-    .await??;
+    .await
+    .unwrap()
+    .unwrap();
     assert_eq!(ScheduleResponse::NoDroneAvailable, result);
-
-    Ok(())
 }

@@ -1,5 +1,8 @@
-use self::{docker::DockerInterface, executor::Executor};
-use crate::{config::DockerConfig, database::DroneDatabase, ip::IpSource};
+use self::executor::Executor;
+use crate::{
+    agent::engines::docker::DockerInterface, config::DockerConfig, database::DroneDatabase,
+    ip::IpSource,
+};
 use anyhow::{anyhow, Result};
 use http::Uri;
 use hyper::Client;
@@ -14,13 +17,14 @@ use plane_core::{
     types::{ClusterName, DroneId},
     NeverResult,
 };
-use std::{net::IpAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 use tokio::sync::watch::{self, Receiver, Sender};
 
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod backend;
-mod docker;
+mod engine;
+mod engines;
 mod executor;
 
 pub struct AgentOptions {
@@ -35,11 +39,11 @@ pub struct AgentOptions {
     pub docker_options: DockerConfig,
 }
 
-pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
-    tracing::info!(port, %host_ip, "Waiting for ready port.");
+pub async fn wait_port_ready(addr: &SocketAddr) -> Result<()> {
+    tracing::info!(%addr, "Waiting for ready port.");
 
     let client = Client::new();
-    let uri = Uri::from_maybe_shared(format!("http://{}:{}/", host_ip, port))?;
+    let uri = Uri::from_maybe_shared(format!("http://{}:{}/", addr.ip(), addr.port()))?;
 
     do_with_retry(|| client.get(uri.clone()), 3000, Duration::from_millis(10)).await?;
 
@@ -48,7 +52,7 @@ pub async fn wait_port_ready(port: u16, host_ip: IpAddr) -> Result<()> {
 
 async fn listen_for_spawn_requests(
     drone_id: &DroneId,
-    executor: Executor,
+    executor: Executor<DockerInterface>,
     nats: TypedNats,
 ) -> NeverResult {
     let mut sub = nats
@@ -74,7 +78,11 @@ async fn listen_for_spawn_requests(
     }
 }
 
-async fn listen_for_termination_requests(executor: Executor, nats: TypedNats, cluster: ClusterName) -> NeverResult {
+async fn listen_for_termination_requests(
+    executor: Executor<DockerInterface>,
+    nats: TypedNats,
+    cluster: ClusterName,
+) -> NeverResult {
     let mut sub = nats
         .subscribe(TerminationRequest::subscribe_subject(&cluster))
         .await?;

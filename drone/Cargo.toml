@@ -1,6 +1,6 @@
 [package]
 name = "plane-drone"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 authors = ["Paul Butler <paul@driftingin.space>"]
 homepage = "https://plane.dev"
@@ -14,7 +14,7 @@ acme2-eab = "0.5.1"
 anyhow = "1.0.57"
 base64 = "0.13.0"
 bollard = {version = "0.13.0", git="https://github.com/drifting-in-space/bollard.git", branch = "paulgb/update-serde-with-version"}
-chrono = { version = "0.4.21", features = ["serde"] }
+chrono = { version = "0.4.21", features = ["serde"], default_features=false }
 clap = { version = "4.0.4", features = ["derive"] }
 config = { version = "0.13.2", default_features = false, features = ["toml"] }
 dashmap = "5.3.4"
@@ -41,6 +41,7 @@ tokio = { version = "1.18.2", features = ["rt"] }
 tokio-rustls = "0.23.4"
 tokio-stream = "0.1.8"
 tracing = "0.1.36"
+async-trait = "0.1.58"
 
 [[bin]]
 name = "plane-drone"

@@ -346,14 +346,21 @@ impl TypedMessage for TerminationRequest {
     type Response = ();
 
     fn subject(&self) -> String {
-        format!("cluster.{}.backend.{}.terminate", self.cluster_id.subject_name(), self.backend_id.id())
+        format!(
+            "cluster.{}.backend.{}.terminate",
+            self.cluster_id.subject_name(),
+            self.backend_id.id()
+        )
     }
 }
 
 impl TerminationRequest {
     #[must_use]
     pub fn subscribe_subject(cluster: &ClusterName) -> SubscribeSubject<TerminationRequest> {
-        SubscribeSubject::new(format!("cluster.{}.backend.*.terminate", cluster.subject_name()))
+        SubscribeSubject::new(format!(
+            "cluster.{}.backend.*.terminate",
+            cluster.subject_name()
+        ))
     }
 }
 
@@ -386,6 +393,9 @@ pub enum BackendState {
 
     /// The container was terminated because all connections were closed.
     Swept,
+
+    /// The container was terminated through the API.
+    Terminated,
 }
 
 impl FromStr for BackendState {
@@ -422,6 +432,7 @@ impl ToString for BackendState {
             BackendState::Failed => "Failed".to_string(),
             BackendState::Exited => "Exited".to_string(),
             BackendState::Swept => "Swept".to_string(),
+            BackendState::Terminated => "Terminated".to_string(),
         }
     }
 }
@@ -438,6 +449,7 @@ impl BackendState {
                 | BackendState::Failed
                 | BackendState::Exited
                 | BackendState::Swept
+                | BackendState::Terminated
         )
     }
 

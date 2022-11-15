@@ -1,5 +1,5 @@
 use crate::{scratch_dir, TEST_CONTEXT};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bollard::{
     container::{Config, LogsOptions, StartContainerOptions},
     image::CreateImageOptions,
@@ -87,24 +87,34 @@ pub struct ContainerResource {
 
 impl ContainerResource {
     pub async fn new(spec: &ContainerSpec) -> Result<ContainerResource> {
-        let docker = Docker::connect_with_unix_defaults()?;
+        let docker =
+            Docker::connect_with_unix_defaults().context("Couldn't connect to Docker socket.")?;
 
         tracing::info!(image_name=%spec.image, "Pulling container.");
-        pull_image(&docker, &spec.image).await?;
+        pull_image(&docker, &spec.image)
+            .await
+            .with_context(|| format!("Couldn't pull image. {}", spec.image))?;
 
         tracing::info!(image_name=%spec.image, "Creating container.");
         let result = docker
             .create_container::<String, String>(None, spec.as_config())
-            .await?;
+            .await
+            .context("Couldn't create container.")?;
         let container_id = ContainerId::new(result.id, spec.name.clone());
 
         tracing::info!(%container_id, "Starting container.");
         {
             let options: Option<StartContainerOptions<&str>> = None;
-            docker.start_container(&container_id, options).await?;
+            docker
+                .start_container(&container_id, options)
+                .await
+                .context("Couldn't start container.")?;
         };
 
-        let result = docker.inspect_container(&container_id, None).await?;
+        let result = docker
+            .inspect_container(&container_id, None)
+            .await
+            .context("Couldn't inspect container.")?;
         let ip: Ipv4Addr = result
             .network_settings
             .unwrap()
@@ -126,7 +136,8 @@ impl ContainerResource {
             }),
         );
 
-        let mut log_file = File::create(scratch_dir("logs").join(format!("{}.txt", spec.name)))?;
+        let mut log_file = File::create(scratch_dir("logs").join(format!("{}.txt", spec.name)))
+            .context("Couldn't open log file for writing.")?;
 
         let log_handle = tokio::spawn(async move {
             while let Some(Ok(v)) = log_stream.next().await {

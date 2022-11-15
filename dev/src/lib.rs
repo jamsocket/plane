@@ -77,9 +77,9 @@ impl TestContext {
     }
 }
 
-pub fn run_test<F>(name: &str, future: F) -> Result<()>
+pub fn run_test<F>(name: &str, future: F)
 where
-    F: Future<Output = Result<()>>,
+    F: Future<Output = ()>,
 {
     let context = TestContext::new(name);
     TEST_CONTEXT.with(|cell| cell.replace(Some(context)));
@@ -102,19 +102,16 @@ where
     let dispatcher = tracing::dispatcher::Dispatch::new(subscriber);
     let _guard = tracing::dispatcher::set_default(&dispatcher);
 
-    let result = tokio::runtime::Builder::new_current_thread()
+    tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .build()?
+        .build()
+        .unwrap()
         .block_on(future);
 
-    if result.is_ok() {
-        TEST_CONTEXT.with(|cell| {
-            tokio::runtime::Runtime::new().unwrap().block_on(async {
-                let context = cell.borrow_mut().take().unwrap();
-                context.teardown().await;
-            })
-        });
-    }
-
-    result
+    TEST_CONTEXT.with(|cell| {
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let context = cell.borrow_mut().take().unwrap();
+            context.teardown().await;
+        })
+    });
 }

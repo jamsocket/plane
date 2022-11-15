@@ -1,16 +1,12 @@
-use std::{net::IpAddr, time::Duration};
-
-use super::docker::DockerInterface;
-use anyhow::{anyhow, Result};
+use crate::agent::engine::Engine;
+use anyhow::Result;
 use plane_core::{
     logging::LogError,
-    messages::{
-        agent::{BackendStatsMessage, DroneLogMessage},
-        dns::{DnsRecordType, SetDnsRecord},
-    },
+    messages::dns::{DnsRecordType, SetDnsRecord},
     nats::TypedNats,
     types::{BackendId, ClusterName},
 };
+use std::{net::IpAddr, time::Duration};
 use tokio::{task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
 
@@ -24,21 +20,21 @@ impl<T> Drop for AbortOnDrop<T> {
 }
 
 pub struct BackendMonitor {
-    _log_loop: AbortOnDrop<Result<(), anyhow::Error>>,
-    _stats_loop: AbortOnDrop<Result<(), anyhow::Error>>,
+    _log_loop: AbortOnDrop<()>,
+    _stats_loop: AbortOnDrop<()>,
     _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
 }
 
 impl BackendMonitor {
-    pub fn new(
+    pub fn new<E: Engine>(
         backend_id: &BackendId,
         cluster: &ClusterName,
         ip: IpAddr,
-        docker: &DockerInterface,
+        engine: &E,
         nc: &TypedNats,
     ) -> Self {
-        let log_loop = Self::log_loop(backend_id, docker, nc);
-        let stats_loop = Self::stats_loop(backend_id, docker, nc);
+        let log_loop = Self::log_loop(backend_id, engine, nc);
+        let stats_loop = Self::stats_loop(backend_id, engine, nc);
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
         BackendMonitor {
@@ -74,74 +70,43 @@ impl BackendMonitor {
         })
     }
 
-    fn log_loop(
+    fn log_loop<E: Engine>(
         backend_id: &BackendId,
-        docker: &DockerInterface,
+        engine: &E,
         nc: &TypedNats,
-    ) -> JoinHandle<Result<(), anyhow::Error>> {
-        let docker = docker.clone();
+    ) -> JoinHandle<()> {
+        let mut stream = engine.log_stream(backend_id);
         let nc = nc.clone();
         let backend_id = backend_id.clone();
 
         tokio::spawn(async move {
-            let container_name = backend_id.to_resource_name();
             tracing::info!(%backend_id, "Log recording loop started.");
-            let mut stream = docker.get_logs(&container_name);
 
             while let Some(v) = stream.next().await {
-                match v {
-                    Ok(v) => {
-                        if let Some(message) = DroneLogMessage::from_log_message(&backend_id, &v) {
-                            nc.publish(&message).await?;
-                        }
-                    }
-                    Err(error) => {
-                        tracing::warn!(?error, "Error encountered forwarding log.");
-                    }
-                }
+                nc.publish(&v).await.log_error("Error publishing log message.");
             }
 
             tracing::info!(%backend_id, "Log loop terminated.");
-
-            Ok::<(), anyhow::Error>(())
         })
     }
 
-    fn stats_loop(
+    fn stats_loop<E: Engine>(
         backend_id: &BackendId,
-        docker: &DockerInterface,
+        engine: &E,
         nc: &TypedNats,
-    ) -> JoinHandle<Result<(), anyhow::Error>> {
-        let docker = docker.clone();
+    ) -> JoinHandle<()> {
+        let mut stream = Box::pin(engine.stats_stream(backend_id));
         let nc = nc.clone();
         let backend_id = backend_id.clone();
 
         tokio::spawn(async move {
-            let container_name = backend_id.to_resource_name();
             tracing::info!(%backend_id, "Stats recording loop started.");
-            let mut stream = Box::pin(docker.get_stats(&container_name));
-            let mut prev_stats = stream
-                .next()
-                .await
-                .ok_or_else(|| anyhow!("failed to get first stats"))??;
-            while let Some(cur_stats) = stream.next().await {
-                match cur_stats {
-                    Ok(cur_stats) => {
-                        nc.publish(&BackendStatsMessage::from_stats_messages(
-                            &backend_id,
-                            &prev_stats,
-                            &cur_stats,
-                        )?)
-                        .await?;
-                        prev_stats = cur_stats;
-                    }
-                    Err(error) => {
-                        tracing::warn!(?error, "Error encountered sending stats.")
-                    }
-                }
+
+            while let Some(stats) = stream.next().await {
+                nc.publish(&stats).await.log_error("Error publishing stats message.");
             }
 
-            Ok(())
+            tracing::info!(%backend_id, "Stats loop terminated.");
         })
     }
 }

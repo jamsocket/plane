@@ -171,54 +171,56 @@ impl Proxy {
 }
 
 #[integration_test]
-async fn backend_not_exist_404s() -> Result<()> {
-    let proxy = Proxy::new().await?;
+async fn backend_not_exist_404s() {
+    let proxy = Proxy::new().await.unwrap();
 
-    let result = proxy.http_get("foobar", "/").await?;
+    let result = proxy.http_get("foobar", "/").await.unwrap();
     assert_eq!(StatusCode::NOT_FOUND, result.status());
-
-    Ok(())
 }
 
 #[integration_test]
-async fn simple_backend_proxy() -> Result<()> {
-    let proxy = Proxy::new().await?;
-    let server = Server::new(|_| async { "Hello World".into() }).await?;
+async fn simple_backend_proxy() {
+    let proxy = Proxy::new().await.unwrap();
+    let server = Server::new(|_| async { "Hello World".into() })
+        .await
+        .unwrap();
 
     let sr = base_spawn_request();
-    proxy.db.insert_backend(&sr).await?;
+    proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
         .update_backend_state(&sr.backend_id, BackendState::Ready)
-        .await?;
+        .await
+        .unwrap();
 
     proxy
         .db
         .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
-        .await?;
+        .await
+        .unwrap();
 
-    let result = proxy.http_get("foobar", "/").await?;
-    assert_eq!("Hello World", result.text().await?);
-
-    Ok(())
+    let result = proxy.http_get("foobar", "/").await.unwrap();
+    assert_eq!("Hello World", result.text().await.unwrap());
 }
 
 #[integration_test]
-async fn simple_ws_backend_proxy() -> Result<()> {
-    let proxy = Proxy::new().await?;
-    let server = Server::serve_web_sockets().await?;
+async fn simple_ws_backend_proxy() {
+    let proxy = Proxy::new().await.unwrap();
+    let server = Server::serve_web_sockets().await.unwrap();
 
     let sr = base_spawn_request();
-    proxy.db.insert_backend(&sr).await?;
+    proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
         .update_backend_state(&sr.backend_id, BackendState::Ready)
-        .await?;
+        .await
+        .unwrap();
 
     proxy
         .db
         .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
-        .await?;
+        .await
+        .unwrap();
 
     let (ws_stream, ws_handshake_resp) = proxy
         .https_websocket("foobar", "/")
@@ -255,28 +257,34 @@ async fn simple_ws_backend_proxy() -> Result<()> {
     assert_eq!(responses, ["1", "2", "3", "4", "5", "6"]);
 
     write.close().await.expect("Failed to close");
-
-    Ok(())
 }
 
 #[integration_test]
-async fn connection_status_is_recorded() -> Result<()> {
-    let proxy = Proxy::new().await?;
-    let server = Server::new(|_| async { "Hello World".into() }).await?;
+async fn connection_status_is_recorded() {
+    let proxy = Proxy::new().await.unwrap();
+    let server = Server::new(|_| async { "Hello World".into() })
+        .await
+        .unwrap();
 
     let sr = base_spawn_request();
-    proxy.db.insert_backend(&sr).await?;
+    proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
         .update_backend_state(&sr.backend_id, BackendState::Ready)
-        .await?;
+        .await
+        .unwrap();
     proxy
         .db
         .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
-        .await?;
+        .await
+        .unwrap();
 
     // Last active time is initially set to the time of creation.
-    let t1_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
+    let t1_last_active = proxy
+        .db
+        .get_backend_last_active(&sr.backend_id)
+        .await
+        .unwrap();
     assert!(
         Utc::now().signed_duration_since(t1_last_active) < chrono::Duration::seconds(5),
         "Last active should be close to present."
@@ -284,10 +292,14 @@ async fn connection_status_is_recorded() -> Result<()> {
 
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    proxy.http_get("foobar", "/").await?;
+    proxy.http_get("foobar", "/").await.unwrap();
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let t2_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
+    let t2_last_active = proxy
+        .db
+        .get_backend_last_active(&sr.backend_id)
+        .await
+        .unwrap();
     assert!(
         t1_last_active < t2_last_active,
         "Last active should increase after activity."
@@ -295,27 +307,33 @@ async fn connection_status_is_recorded() -> Result<()> {
 
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    let t3_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
+    let t3_last_active = proxy
+        .db
+        .get_backend_last_active(&sr.backend_id)
+        .await
+        .unwrap();
     assert_eq!(
         t3_last_active, t2_last_active,
         "Last active timestamp shouldn't change without new activity."
     );
 
-    proxy.http_get("foobar", "/").await?;
+    proxy.http_get("foobar", "/").await.unwrap();
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let t4_last_active = proxy.db.get_backend_last_active(&sr.backend_id).await?;
+    let t4_last_active = proxy
+        .db
+        .get_backend_last_active(&sr.backend_id)
+        .await
+        .unwrap();
     assert!(
         t3_last_active < t4_last_active,
         "Last active should increase after activity."
     );
-
-    Ok(())
 }
 
 #[integration_test]
-async fn host_header_is_set() -> Result<()> {
-    let proxy = Proxy::new().await?;
+async fn host_header_is_set() {
+    let proxy = Proxy::new().await.unwrap();
     let server = Server::new(|req| async move {
         req.headers()
             .get("host")
@@ -324,56 +342,59 @@ async fn host_header_is_set() -> Result<()> {
             .unwrap()
             .to_owned()
     })
-    .await?;
+    .await
+    .unwrap();
 
     let sr = base_spawn_request();
-    proxy.db.insert_backend(&sr).await?;
+    proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
         .update_backend_state(&sr.backend_id, BackendState::Ready)
-        .await?;
+        .await
+        .unwrap();
 
     proxy
         .db
         .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
-        .await?;
+        .await
+        .unwrap();
 
-    let result = proxy.http_get("foobar", "/").await?;
-    assert_eq!("foobar.plane.test:4040", result.text().await?);
-
-    Ok(())
+    let result = proxy.http_get("foobar", "/").await.unwrap();
+    assert_eq!("foobar.plane.test:4040", result.text().await.unwrap());
 }
 
 #[integration_test]
-async fn update_certificates() -> Result<()> {
-    let mut proxy = Proxy::new().await?;
-    let server = Server::new(|_| async { "Hello World".into() }).await?;
+async fn update_certificates() {
+    let mut proxy = Proxy::new().await.unwrap();
+    let server = Server::new(|_| async { "Hello World".into() })
+        .await
+        .unwrap();
 
     let sr = base_spawn_request();
-    proxy.db.insert_backend(&sr).await?;
+    proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
         .update_backend_state(&sr.backend_id, BackendState::Ready)
-        .await?;
+        .await
+        .unwrap();
 
     let original_cert = proxy.certs.cert_pem.clone();
 
     proxy
         .db
         .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
-        .await?;
+        .await
+        .unwrap();
 
-    let result = proxy.http_get("foobar", "/").await?;
-    assert_eq!("Hello World", result.text().await?);
+    let result = proxy.http_get("foobar", "/").await.unwrap();
+    assert_eq!("Hello World", result.text().await.unwrap());
 
-    proxy.update_cert()?;
+    proxy.update_cert().unwrap();
     let new_cert = proxy.certs.cert_pem.clone();
 
-    let result = proxy.http_get("foobar", "/").await?;
-    assert_eq!("Hello World", result.text().await?);
+    let result = proxy.http_get("foobar", "/").await.unwrap();
+    assert_eq!("Hello World", result.text().await.unwrap());
 
     // Ensure the certs are actually different.
     assert_ne!(original_cert, new_cert);
-
-    Ok(())
 }
