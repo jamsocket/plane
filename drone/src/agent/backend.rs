@@ -20,8 +20,8 @@ impl<T> Drop for AbortOnDrop<T> {
 }
 
 pub struct BackendMonitor {
-    _log_loop: AbortOnDrop<Result<(), anyhow::Error>>,
-    _stats_loop: AbortOnDrop<Result<(), anyhow::Error>>,
+    _log_loop: AbortOnDrop<()>,
+    _stats_loop: AbortOnDrop<()>,
     _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
 }
 
@@ -74,7 +74,7 @@ impl BackendMonitor {
         backend_id: &BackendId,
         engine: &E,
         nc: &TypedNats,
-    ) -> JoinHandle<Result<(), anyhow::Error>> {
+    ) -> JoinHandle<()> {
         let mut stream = engine.log_stream(backend_id);
         let nc = nc.clone();
         let backend_id = backend_id.clone();
@@ -83,12 +83,10 @@ impl BackendMonitor {
             tracing::info!(%backend_id, "Log recording loop started.");
 
             while let Some(v) = stream.next().await {
-                nc.publish(&v).await?;
+                nc.publish(&v).await.log_error("Error publishing log message.");
             }
 
             tracing::info!(%backend_id, "Log loop terminated.");
-
-            Ok::<(), anyhow::Error>(())
         })
     }
 
@@ -96,7 +94,7 @@ impl BackendMonitor {
         backend_id: &BackendId,
         engine: &E,
         nc: &TypedNats,
-    ) -> JoinHandle<Result<(), anyhow::Error>> {
+    ) -> JoinHandle<()> {
         let mut stream = Box::pin(engine.stats_stream(backend_id));
         let nc = nc.clone();
         let backend_id = backend_id.clone();
@@ -105,10 +103,10 @@ impl BackendMonitor {
             tracing::info!(%backend_id, "Stats recording loop started.");
 
             while let Some(stats) = stream.next().await {
-                nc.publish(&stats).await?;
+                nc.publish(&stats).await.log_error("Error publishing stats message.");
             }
 
-            Ok(())
+            tracing::info!(%backend_id, "Stats loop terminated.");
         })
     }
 }
