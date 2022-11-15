@@ -412,6 +412,7 @@ impl FromStr for BackendState {
             "Failed" => Ok(BackendState::Failed),
             "Exited" => Ok(BackendState::Exited),
             "Swept" => Ok(BackendState::Swept),
+            "Terminated" => Ok(BackendState::Terminated),
             _ => Err(anyhow!(
                 "The string {:?} does not describe a valid state.",
                 s
