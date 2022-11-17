@@ -14,7 +14,7 @@ anyhow = "1.0.61"
 async-nats = "0.22.0"
 bollard = {version = "0.13.0", optional=true, git="https://github.com/drifting-in-space/bollard.git", branch = "paulgb/update-serde-with-version"}
 bytes = "1.2.1"
-chrono = { version = "0.4.22", features = ["serde"], default_features=false }
+chrono = { version = "0.4.22", features = ["serde", "clock"], default_features=false }
 clap = { version = "4.0.15", features = ["derive"] }
 config = { version = "0.13.2", default_features = false, features = ["toml"] }
 dashmap = "5.4.0"
