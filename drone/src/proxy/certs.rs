@@ -2,7 +2,7 @@ use crate::keys::{load_certs, load_private_key, KeyCertPathPair};
 use anyhow::{Context, Result};
 use notify::{
     event::{AccessKind, AccessMode},
-    recommended_watcher, Event, EventKind, INotifyWatcher, RecursiveMode, Watcher,
+    recommended_watcher, Event, EventKind, RecursiveMode, Watcher, RecommendedWatcher,
 };
 use rustls::{
     server::ResolvesServerCert,
@@ -14,7 +14,7 @@ use tokio::sync::watch::{channel, Receiver, Sender};
 
 pub struct CertRefresher {
     receiver: Receiver<Option<Arc<CertifiedKey>>>,
-    _watcher: INotifyWatcher,
+    _watcher: RecommendedWatcher,
 }
 
 impl CertRefresher {
