@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  registry:
+    container_name: plane-registry
+    image: registry:2
+    networks:
+      - plane
+    ports:
+      - "127.0.0.1:5000:5000"

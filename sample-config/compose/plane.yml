@@ -63,14 +63,6 @@ services:
     volumes:
       - ../dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf
 
-  registry:
-    container_name: plane-registry
-    image: registry:2
-    networks:
-      - plane
-    ports:
-      - "127.0.0.1:5000:5000"
-
   firefox:
     container_name: plane-firefox
     build:
