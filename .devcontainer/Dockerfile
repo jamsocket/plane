@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/devcontainers/rust:1-bullseye
 USER vscode
 
 # Allow pushing directly to new branches.
-RUN git config --add push.autoSetupRemote true
+RUN git config --global --add push.autoSetupRemote true
 
 # Update Rust version to latest.
 RUN rustup update stable
