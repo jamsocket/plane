@@ -52,8 +52,7 @@ Although Plane is primarily used via its NATS API, it also includes a small CLI 
 If you have Rust, you can build and install the CLI by running:
 
 ```bash
-cd cli
-cargo install --path=.
+cargo install --path=cli
 ```
 
 If you don't, or just want a temporary way to try out Plane, you can create a temporary alias that uses a pre-built Docker image of the cli:
