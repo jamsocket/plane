@@ -263,7 +263,7 @@ fn nats_error_hack(
         Some(Err(err)) => {
             // If we update async_nats to a version that includes https://github.com/nats-io/nats.rs/pull/652, correct the typo below.
             if err.to_string()
-                == r#"eror while processing messages from the stream: 404, Some("No Messages")"#
+                == r#"error while processing messages from the stream: 404, Some("No Messages")"#
             {
                 return Ok(None);
             }
