@@ -2,6 +2,8 @@ FROM mcr.microsoft.com/devcontainers/rust:1-bullseye
 
 USER vscode
 
+RUN git config --add push.autoSetupRemote true
+
 RUN rustup update stable
 
 RUN cargo install cargo-workspaces
