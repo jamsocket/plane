@@ -309,8 +309,7 @@ impl TypedNats {
                 inbox,
                 Bytes::from(serde_json::to_vec(&message)?),
             )
-            .await
-            .to_anyhow()?;
+            .await?;
 
         Ok(DelayedReply {
             subscription,
