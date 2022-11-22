@@ -260,6 +260,14 @@ impl DroneConnectRequest {
     }
 }
 
+//TODO: move this somewhere more appropriate?
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
+pub enum DockerPullPolicies {
+    IfNotPresent,
+    Always,
+    Never,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DockerExecutableConfig {
     /// The container image to run.
@@ -274,6 +282,8 @@ pub struct DockerExecutableConfig {
     /// Resource limits
     #[serde(default = "ResourceLimits::default")]
     pub resource_limits: ResourceLimits,
+
+    pub pull_policy: DockerPullPolicies,
 }
 
 #[serde_as]
@@ -346,14 +356,21 @@ impl TypedMessage for TerminationRequest {
     type Response = ();
 
     fn subject(&self) -> String {
-        format!("cluster.{}.backend.{}.terminate", self.cluster_id.subject_name(), self.backend_id.id())
+        format!(
+            "cluster.{}.backend.{}.terminate",
+            self.cluster_id.subject_name(),
+            self.backend_id.id()
+        )
     }
 }
 
 impl TerminationRequest {
     #[must_use]
     pub fn subscribe_subject(cluster: &ClusterName) -> SubscribeSubject<TerminationRequest> {
-        SubscribeSubject::new(format!("cluster.{}.backend.*.terminate", cluster.subject_name()))
+        SubscribeSubject::new(format!(
+            "cluster.{}.backend.*.terminate",
+            cluster.subject_name()
+        ))
     }
 }
 
