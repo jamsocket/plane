@@ -260,6 +260,19 @@ impl DroneConnectRequest {
     }
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
+pub enum DockerPullPolicies {
+    IfNotPresent,
+    Always,
+    Never,
+}
+
+impl Default for DockerPullPolicies {
+    fn default() -> Self {
+        DockerPullPolicies::IfNotPresent
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DockerExecutableConfig {
     /// The container image to run.
@@ -274,6 +287,10 @@ pub struct DockerExecutableConfig {
     /// Resource limits
     #[serde(default = "ResourceLimits::default")]
     pub resource_limits: ResourceLimits,
+
+    /// Pull policies, note: default is IfNotPresent
+    #[serde(default = "DockerPullPolicies::default")]
+    pub pull_policy: DockerPullPolicies,
 }
 
 #[serde_as]
