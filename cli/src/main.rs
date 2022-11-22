@@ -9,7 +9,7 @@ use plane_core::{
             TerminationRequest,
         },
         dns::SetDnsRecord,
-        scheduler::{ScheduleRequest, ScheduleResponse, DrainDrone},
+        scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
     },
     nats_connection::NatsConnectionSpec,
     types::{BackendId, ClusterName, DroneId},
@@ -117,6 +117,7 @@ async fn main() -> Result<()> {
                         env: HashMap::new(),
                         credentials: None,
                         resource_limits: ResourceLimits::default(),
+                        pull_policy: Default::default(),
                     },
                     require_bearer_token: false,
                 })
@@ -175,13 +176,18 @@ async fn main() -> Result<()> {
 
             println!("{}", "Terminated successfully".bright_green());
         }
-        Command::Drain { drone, cluster, cancel } => {
+        Command::Drain {
+            drone,
+            cluster,
+            cancel,
+        } => {
             let drain = !cancel;
             nats.request(&DrainDrone {
                 cluster: ClusterName::new(&cluster),
                 drone: DroneId::new(drone),
                 drain,
-            }).await?;
+            })
+            .await?;
 
             if drain {
                 println!("{}", "Draining started on drone.".bright_green());
