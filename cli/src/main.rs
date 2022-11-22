@@ -117,6 +117,7 @@ async fn main() -> Result<()> {
                         env: HashMap::new(),
                         credentials: None,
                         resource_limits: ResourceLimits::default(),
+                        pull_policy: Default::default(),
                     },
                     require_bearer_token: false,
                 })
