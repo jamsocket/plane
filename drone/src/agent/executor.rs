@@ -10,7 +10,9 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use plane_core::{
-    messages::agent::{BackendState, BackendStateMessage, SpawnRequest, TerminationRequest},
+    messages::agent::{
+        BackendState, BackendStateMessage, DockerPullPolicies, SpawnRequest, TerminationRequest,
+    },
     nats::TypedNats,
     types::{BackendId, ClusterName},
 };
@@ -119,9 +121,7 @@ impl Executor {
     ) -> Result<(), anyhow::Error> {
         let resource_name = termination_request.backend_id.to_resource_name();
         tracing::info!(backend_id=%termination_request.backend_id, "Trying to terminate backend");
-        self.docker
-            .stop_container(&resource_name)
-            .await
+        self.docker.stop_container(&resource_name).await
     }
 
     pub async fn resume_backends(&self) -> Result<()> {
@@ -262,16 +262,30 @@ impl Executor {
     ) -> Result<Option<BackendState>> {
         match state {
             BackendState::Loading => {
-                self.docker
-                    .pull_image(
-                        &spawn_request.executable.image,
-                        &spawn_request
-                            .executable
-                            .credentials
-                            .as_ref()
-                            .map(|d| d.into()),
-                    )
-                    .await?;
+                let should_pull_image;
+                match spawn_request.executable.pull_policy {
+                    DockerPullPolicies::Always => should_pull_image = true,
+                    DockerPullPolicies::IfNotPresent => {
+                        should_pull_image = !self
+                            .docker
+                            .image_exists(&spawn_request.executable.image)
+                            .await
+                    }
+                    DockerPullPolicies::Never => should_pull_image = false,
+                }
+
+                if should_pull_image {
+                    self.docker
+                        .pull_image(
+                            &spawn_request.executable.image,
+                            &spawn_request
+                                .executable
+                                .credentials
+                                .as_ref()
+                                .map(|d| d.into()),
+                        )
+                        .await?;
+                }
 
                 let backend_id = spawn_request.backend_id.to_resource_name();
                 self.docker

@@ -40,11 +40,15 @@ impl<T> AllowNotFound for Result<T, bollard::errors::Error> {
         match self {
             Ok(_) => Ok(()),
             Err(bollard::errors::Error::DockerResponseServerError {
-                status_code: 404, message,
+                status_code: 404,
+                message,
             }) => {
-                tracing::warn!(?message, "Received 404 error from docker, possibly expected.");
+                tracing::warn!(
+                    ?message,
+                    "Received 404 error from docker, possibly expected."
+                );
                 Ok(())
-            },
+            }
             Err(e) => Err(e),
         }
     }
@@ -325,6 +329,15 @@ impl DockerInterface {
             .ok_or_else(|| anyhow!("One network found, but did not have IP address."))?;
 
         Ok(ip.parse()?)
+    }
+
+    /// returns true if image exists, returns false in all other cases
+    pub async fn image_exists(&self, image: &str) -> bool {
+        //not sure if it's faster to do this or check if image in docker.list_images
+        match self.docker.inspect_image(image).await {
+            Ok(..) => true,
+            Err(..) => false,
+        }
     }
 
     /// Run the specified image and return the name of the created container.
