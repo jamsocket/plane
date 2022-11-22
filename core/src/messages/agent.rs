@@ -268,6 +268,12 @@ pub enum DockerPullPolicies {
     Never,
 }
 
+impl Default for DockerPullPolicies {
+    fn default() -> Self {
+        DockerPullPolicies::IfNotPresent
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DockerExecutableConfig {
     /// The container image to run.
@@ -283,6 +289,7 @@ pub struct DockerExecutableConfig {
     #[serde(default = "ResourceLimits::default")]
     pub resource_limits: ResourceLimits,
 
+    #[serde(default = "DockerPullPolicies::default")]
     pub pull_policy: DockerPullPolicies,
 }
 
