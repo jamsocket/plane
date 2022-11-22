@@ -289,6 +289,7 @@ pub struct DockerExecutableConfig {
     #[serde(default = "ResourceLimits::default")]
     pub resource_limits: ResourceLimits,
 
+    /// Pull policies, note: default is IfNotPresent
     #[serde(default = "DockerPullPolicies::default")]
     pub pull_policy: DockerPullPolicies,
 }
