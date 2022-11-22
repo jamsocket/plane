@@ -33,7 +33,12 @@ impl TypedMessage for SetDnsRecord {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        format!("cluster.{}.dns.{}", self.cluster.subject_name(), self.kind)
+        format!(
+            "cluster.{}.dns.{}.{}",
+            self.cluster.subject_name(),
+            self.name,
+            self.kind
+        )
     }
 }
 
@@ -41,7 +46,7 @@ impl JetStreamable for SetDnsRecord {
     fn config() -> async_nats::jetstream::stream::Config {
         async_nats::jetstream::stream::Config {
             name: Self::stream_name().into(),
-            subjects: vec!["cluster.*.dns.*".into()],
+            subjects: vec!["cluster.*.dns.*.*".into()],
             max_age: Duration::from_secs(Self::ttl_seconds()),
             ..async_nats::jetstream::stream::Config::default()
         }
@@ -54,7 +59,7 @@ impl JetStreamable for SetDnsRecord {
 
 impl SetDnsRecord {
     pub fn subscribe_subject() -> SubscribeSubject<Self> {
-        SubscribeSubject::new("cluster.*.dns.*".into())
+        SubscribeSubject::new("cluster.*.dns.*.*".into())
     }
 
     fn ttl_seconds() -> u64 {
@@ -83,7 +88,7 @@ mod test {
             value: "12.12.12.12".to_string(),
         };
 
-        assert_eq!("cluster.foo_bar.dns.A", &record.subject());
+        assert_eq!("cluster.foo_bar.dns.blah.A", &record.subject());
 
         let record = SetDnsRecord {
             cluster: ClusterName::new("gad.wom.tld"),
@@ -92,6 +97,6 @@ mod test {
             value: "14.14.14.14".to_string(),
         };
 
-        assert_eq!("cluster.gad_wom_tld.dns.TXT", &record.subject());
+        assert_eq!("cluster.gad_wom_tld.dns.goo.TXT", &record.subject());
     }
 }
