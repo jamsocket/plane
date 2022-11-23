@@ -24,7 +24,7 @@ use bollard::{
 };
 use plane_core::{
     messages::agent::ResourceLimits,
-    messages::agent::{BackendStatsMessage, DroneLogMessage, SpawnRequest},
+    messages::agent::{BackendStatsMessage, DockerPullPolicies, DroneLogMessage, SpawnRequest},
     timing::Timer,
     types::BackendId,
 };
@@ -151,6 +151,14 @@ impl DockerInterface {
         Ok(())
     }
 
+    /// returns true if image exists, returns false in all other cases
+    pub async fn image_exists(&self, image: &str) -> bool {
+        match self.docker.inspect_image(image).await {
+            Ok(..) => true,
+            Err(..) => false,
+        }
+    }
+
     /// Run the specified image and return the name of the created container.
     async fn run_container(
         &self,
@@ -269,15 +277,25 @@ impl Engine for DockerInterface {
     }
 
     async fn load(&self, spawn_request: &SpawnRequest) -> Result<()> {
-        self.pull_image(
-            &spawn_request.executable.image,
-            &spawn_request
-                .executable
-                .credentials
-                .as_ref()
-                .map(|d| d.into()),
-        )
-        .await?;
+        let should_pull_image = match spawn_request.executable.pull_policy {
+            DockerPullPolicies::Always => true,
+            DockerPullPolicies::IfNotPresent => {
+                !self.image_exists(&spawn_request.executable.image).await
+            }
+            DockerPullPolicies::Never => false,
+        };
+
+        if should_pull_image {
+            self.pull_image(
+                &spawn_request.executable.image,
+                &spawn_request
+                    .executable
+                    .credentials
+                    .as_ref()
+                    .map(|d| d.into()),
+            )
+            .await?;
+        }
 
         let backend_id = spawn_request.backend_id.to_resource_name();
         self.run_container(

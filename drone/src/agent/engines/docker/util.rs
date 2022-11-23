@@ -88,7 +88,10 @@ impl ContainerEvent {
         let actor = event.actor.as_ref()?;
         let name: String = actor.attributes.as_ref()?.get("name")?.to_string();
         // Some actions add extra metadata after a colon, we strip that out.
-        let action = action.split(':').next().expect("First next() on split should never fail.");
+        let action = action
+            .split(':')
+            .next()
+            .expect("First next() on split should never fail.");
 
         let event = match action {
             "attach" => ContainerEventType::Attach,

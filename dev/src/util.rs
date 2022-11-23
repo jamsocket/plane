@@ -114,6 +114,7 @@ pub fn base_spawn_request() -> SpawnRequest {
             env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
             credentials: None,
             resource_limits: Default::default(),
+            pull_policy: Default::default(),
         },
         bearer_token: None,
     }
@@ -130,6 +131,7 @@ pub fn base_scheduler_request() -> ScheduleRequest {
             image: TEST_IMAGE.into(),
             credentials: None,
             resource_limits: Default::default(),
+            pull_policy: Default::default(),
         },
         require_bearer_token: false,
     }
