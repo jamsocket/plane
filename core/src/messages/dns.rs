@@ -46,20 +46,24 @@ impl JetStreamable for SetDnsRecord {
     fn config() -> async_nats::jetstream::stream::Config {
         async_nats::jetstream::stream::Config {
             name: Self::stream_name().into(),
-            subjects: vec!["cluster.*.dns.*.*".into()],
+            // TODO: change to "cluster.*.dns.*.*" after stepped deploy.
+            subjects: vec!["cluster.*.dns.>".into()],
             max_age: Duration::from_secs(Self::ttl_seconds()),
             ..async_nats::jetstream::stream::Config::default()
         }
     }
 
     fn stream_name() -> &'static str {
-        "dns_record"
+        // Temporary rename to force recreation.
+        // TODO: change back to "dns_record" after stepped deploy.
+        "dns_record_tmp"
     }
 }
 
 impl SetDnsRecord {
     pub fn subscribe_subject() -> SubscribeSubject<Self> {
-        SubscribeSubject::new("cluster.*.dns.*.*".into())
+        // TODO: change to "cluster.*.dns.*.*" after stepped deploy.
+        SubscribeSubject::new("cluster.*.dns.>".into())
     }
 
     fn ttl_seconds() -> u64 {
