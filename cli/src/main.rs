@@ -148,12 +148,15 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListDns => {
-            let results = nats
+            let mut results = nats
                 .get_all(
                     &SetDnsRecord::subscribe_subject(),
                     DeliverPolicy::LastPerSubject,
                 )
                 .await?;
+
+            results.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
+            results.dedup_by(|lhs, rhs| lhs.name == rhs.name);
 
             println!("Found {} DNS records:", results.len());
 
