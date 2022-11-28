@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 const RESOURCE_PREFIX: &str = "plane-";
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DroneId(String);
 
 impl Display for DroneId {

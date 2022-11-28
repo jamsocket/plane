@@ -84,13 +84,15 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListDrones => {
-            let drones = nats
+            let mut drones = nats
                 .get_all(
                     &DroneStatusMessage::subscribe_subject(),
                     DeliverPolicy::LastPerSubject,
                 )
                 .await?;
 
+            drones.sort_by(|lhs, rhs| lhs.drone_id.cmp(&rhs.drone_id));
+            drones.dedup_by(|lhs, rhs| lhs.drone_id == rhs.drone_id);
             println!("Found {} drones:", drones.len());
 
             for drone in drones {
@@ -146,12 +148,15 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListDns => {
-            let results = nats
+            let mut results = nats
                 .get_all(
                     &SetDnsRecord::subscribe_subject(),
                     DeliverPolicy::LastPerSubject,
                 )
                 .await?;
+
+            results.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
+            results.dedup_by(|lhs, rhs| lhs.name == rhs.name);
 
             println!("Found {} DNS records:", results.len());
 
