@@ -261,15 +261,15 @@ impl DroneConnectRequest {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
-pub enum DockerPullPolicies {
+pub enum DockerPullPolicy {
     IfNotPresent,
     Always,
     Never,
 }
 
-impl Default for DockerPullPolicies {
+impl Default for DockerPullPolicy {
     fn default() -> Self {
-        DockerPullPolicies::IfNotPresent
+        DockerPullPolicy::IfNotPresent
     }
 }
 
@@ -289,8 +289,8 @@ pub struct DockerExecutableConfig {
     pub resource_limits: ResourceLimits,
 
     /// Pull policies, note: default is IfNotPresent
-    #[serde(default = "DockerPullPolicies::default")]
-    pub pull_policy: DockerPullPolicies,
+    #[serde(default = "DockerPullPolicy::default")]
+    pub pull_policy: DockerPullPolicy,
 }
 
 #[serde_as]
