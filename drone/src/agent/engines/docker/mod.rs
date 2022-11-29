@@ -287,6 +287,7 @@ impl Engine for DockerInterface {
             }
             DockerPullPolicy::Never => false,
         };
+        tracing::info!(?should_pull_image, pull_policy=?spawn_request.executable.pull_policy, "Image pull decision made.");
 
         if should_pull_image {
             self.pull_image(
