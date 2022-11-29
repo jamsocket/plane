@@ -290,15 +290,15 @@ impl DroneConnectRequest {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
-pub enum DockerPullPolicies {
+pub enum DockerPullPolicy {
     IfNotPresent,
     Always,
     Never,
 }
 
-impl Default for DockerPullPolicies {
+impl Default for DockerPullPolicy {
     fn default() -> Self {
-        DockerPullPolicies::IfNotPresent
+        DockerPullPolicy::IfNotPresent
     }
 }
 
@@ -318,13 +318,15 @@ pub struct DockerExecutableConfig {
     pub resource_limits: ResourceLimits,
 
     /// Pull policies, note: default is IfNotPresent
-    #[serde(default = "DockerPullPolicies::default")]
-    pub pull_policy: DockerPullPolicies,
+    #[serde(default = "DockerPullPolicy::default")]
+    pub pull_policy: DockerPullPolicy,
 }
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SpawnRequest {
+    pub cluster: Option<ClusterName>,
+
     pub drone_id: DroneId,
 
     /// The timeout after which the drone is shut down if no connections are made.
@@ -510,6 +512,9 @@ impl BackendState {
 /// An message representing a change in the state of a backend.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BackendStateMessage {
+    /// The cluster the backend belongs to.
+    pub cluster: Option<ClusterName>,
+
     /// The new state.
     pub state: BackendState,
 
@@ -555,8 +560,9 @@ impl BackendStateMessage {
 impl BackendStateMessage {
     /// Construct a status message using the current time as its timestamp.
     #[must_use]
-    pub fn new(state: BackendState, backend: BackendId) -> Self {
+    pub fn new(state: BackendState, cluster: Option<ClusterName>, backend: BackendId) -> Self {
         BackendStateMessage {
+            cluster,
             state,
             backend,
             time: Utc::now(),

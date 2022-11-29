@@ -135,6 +135,7 @@ impl<E: Engine> Executor<E> {
         self.nc
             .publish_jetstream(&BackendStateMessage::new(
                 BackendState::Loading,
+                spawn_request.cluster.clone(),
                 spawn_request.backend_id.clone(),
             ))
             .await
@@ -293,6 +294,7 @@ impl<E: Engine> Executor<E> {
         self.nc
             .publish_jetstream(&BackendStateMessage::new(
                 state,
+                spawn_request.cluster.clone(),
                 spawn_request.backend_id.clone(),
             ))
             .await

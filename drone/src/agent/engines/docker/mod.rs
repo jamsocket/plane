@@ -24,7 +24,7 @@ use bollard::{
 };
 use plane_core::{
     messages::agent::ResourceLimits,
-    messages::agent::{BackendStatsMessage, DockerPullPolicies, DroneLogMessage, SpawnRequest},
+    messages::agent::{BackendStatsMessage, DockerPullPolicy, DroneLogMessage, SpawnRequest},
     timing::Timer,
     types::BackendId,
 };
@@ -152,10 +152,13 @@ impl DockerInterface {
     }
 
     /// returns true if image exists, returns false in all other cases
-    pub async fn image_exists(&self, image: &str) -> bool {
+    pub async fn image_exists(&self, image: &str) -> Result<bool> {
         match self.docker.inspect_image(image).await {
-            Ok(..) => true,
-            Err(..) => false,
+            Ok(..) => Ok(true),
+            Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 404, ..
+            }) => Ok(false),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -278,12 +281,13 @@ impl Engine for DockerInterface {
 
     async fn load(&self, spawn_request: &SpawnRequest) -> Result<()> {
         let should_pull_image = match spawn_request.executable.pull_policy {
-            DockerPullPolicies::Always => true,
-            DockerPullPolicies::IfNotPresent => {
-                !self.image_exists(&spawn_request.executable.image).await
+            DockerPullPolicy::Always => true,
+            DockerPullPolicy::IfNotPresent => {
+                !self.image_exists(&spawn_request.executable.image).await?
             }
-            DockerPullPolicies::Never => false,
+            DockerPullPolicy::Never => false,
         };
+        tracing::info!(?should_pull_image, pull_policy=?spawn_request.executable.pull_policy, "Image pull decision made.");
 
         if should_pull_image {
             self.pull_image(
