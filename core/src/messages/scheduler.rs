@@ -43,6 +43,7 @@ impl ScheduleRequest {
         }
 
         SpawnRequest {
+            cluster: Some(self.cluster.clone()),
             drone_id: drone_id.clone(),
             backend_id,
             max_idle_secs: self.max_idle_secs,
