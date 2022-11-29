@@ -3,7 +3,7 @@ use integration_test::integration_test;
 use plane_controller::run_scheduler;
 use plane_core::{
     messages::{
-        agent::{DroneStatusMessage, SpawnRequest},
+        agent::{DroneStatusMessage, SpawnRequest, DroneState},
         scheduler::ScheduleResponse,
     },
     nats::TypedNats,
@@ -105,6 +105,7 @@ async fn one_drone_available() {
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: true,
+            state: DroneState::Ready,
             running_backends: None,
         })
         .await
@@ -128,6 +129,7 @@ async fn drone_not_ready() {
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: false,
+            state: DroneState::Draining,
             running_backends: None,
         })
         .await
@@ -161,6 +163,7 @@ async fn drone_becomes_not_ready() {
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: true,
+            state: DroneState::Ready,
             running_backends: None,
         })
         .await
@@ -172,6 +175,7 @@ async fn drone_becomes_not_ready() {
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: false,
+            state: DroneState::Draining,
             running_backends: None,
         })
         .await

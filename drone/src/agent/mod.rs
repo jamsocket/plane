@@ -9,7 +9,7 @@ use hyper::Client;
 use plane_core::{
     logging::LogError,
     messages::{
-        agent::{DroneConnectRequest, DroneStatusMessage, SpawnRequest, TerminationRequest},
+        agent::{DroneConnectRequest, DroneStatusMessage, SpawnRequest, TerminationRequest, DroneState},
         scheduler::DrainDrone,
     },
     nats::TypedNats,
@@ -106,13 +106,14 @@ async fn ready_loop(
     nc: TypedNats,
     drone_id: &DroneId,
     cluster: ClusterName,
-    recv_ready: Receiver<bool>,
+    recv_ready: Receiver<DroneState>,
     db: DroneDatabase,
 ) -> NeverResult {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
-        let ready = *recv_ready.borrow();
+        let state = *recv_ready.borrow();
+        let ready = state == DroneState::Ready;
 
         let running_backends = db.running_backends().await?;
 
@@ -121,6 +122,7 @@ async fn ready_loop(
             cluster: cluster.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready,
+            state,
             running_backends: Some(running_backends as u32),
         })
         .await
@@ -135,7 +137,7 @@ async fn listen_for_drain(
     nc: TypedNats,
     drone_id: DroneId,
     cluster: ClusterName,
-    send_ready: Sender<bool>,
+    send_state: Sender<DroneState>,
 ) -> NeverResult {
     let mut sub = nc
         .subscribe(DrainDrone::subscribe_subject(drone_id, cluster))
@@ -145,8 +147,14 @@ async fn listen_for_drain(
         tracing::info!(req=?req.message(), "Received request to drain drone.");
         req.respond(&()).await?;
 
-        send_ready
-            .send(!req.value.drain)
+        let state = if req.value.drain {
+            DroneState::Drained
+        } else {
+            DroneState::Ready
+        };
+
+        send_state
+            .send(state)
             .log_error("Error sending drain instruction.");
     }
 
@@ -173,7 +181,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     let executor = Executor::new(docker, db.clone(), nats.clone(), ip, cluster.clone());
 
-    let (send_ready, recv_ready) = watch::channel(true);
+    let (send_ready, recv_ready) = watch::channel(DroneState::Ready);
 
     tokio::select!(
         result = ready_loop(
