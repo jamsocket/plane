@@ -2,14 +2,8 @@
 set -euf
 
 usage() {
-	echo usage: "$(basename "$0")" '[-[lmxrcgb] --linux --macos --x11 --guac --clean --build]' 1>&2
+	echo usage: "$(basename "$0")" '[-[lmxrocgb] --linux --macos --x11 --cluster --guac --clean --build]' 1>&2
 	exit 1
-}
-
-wait_until_guac() {
-	until [ "$( curl -s http://localhost:3000/ )" ]; do
-	    sleep 0.1;
-	done;
 }
 
 long_opts() {
@@ -17,8 +11,9 @@ long_opts() {
 	linux) [ ! "$OS" ] && linux=1 OS=1 || exit 1;;
 	macos) [ ! "$OS" ] && macos=1 OS=1 || exit 1;;
 	x11) [ ! "$BROWSER_OPT" ] && x11=1 BROWSER_OPT=1 || exit 1;;
-	guac) [ ! "$BROWSER_OPT" ] && guac=1 BROWSER_OPT=1 || exit 1;;	
-	clean) [ ! "$CLEAN_OPT" ] && CLEAN_OPT=1 || exit 1;;
+	guac) [ ! "$BROWSER_OPT" ] && BROWSER_OPT=1 || exit 1;;	
+	clean) CLEAN_OPT=1;;
+	cluster) NATS_CLUSTER=1;;
 	build) [ ! "$BUILD_OPT" ] && BUILD_OPT=1 || exit 1;;
 	debug) debug=1;;
 	?) usage "" && exit 1;;
@@ -26,8 +21,28 @@ long_opts() {
 }
 
 clean() {
-	echo "not implemented!"
-	exit 1
+	# kill orphaned plane backends
+	# note: this is required, otherwise the plane network can't be dismantled
+	orphaned_containers=$(docker container ls -q -f name=^plane*) 
+	docker kill "$orphaned_containers" || echo "no orphaned backends!"
+	
+	# shellcheck disable=2086 # I actually want splitting here
+	$DOCKER_COMPOSE -f $PLANE_COMPOSE -f $FIREFOX_X11_COMPOSE -f $NATS_CLUSTER_COMPOSE down --remove-orphans --rmi all
+	exit 0
+}
+
+build_compose_up() {
+	#arg array consists of compose files
+	#nats flags set in NATS_FLAGS env var
+	#compose flags set in FLAGS env var
+	COMPOSE_FILES=''
+	for compose_file in "$@"
+	do
+		COMPOSE_FILES="$COMPOSE_FILES -f $compose_file"
+	done
+	
+	# shellcheck disable=2086 # I actually want splitting here
+	NATS_FLAGS=$NATS_FLAGS $DOCKER_COMPOSE $COMPOSE_FILES up $FLAGS
 }
 
 if [ ! -d "$PWD/compose" ]
@@ -40,20 +55,23 @@ COMPOSE_FILE_DIR="$PWD/compose"
 PLANE_COMPOSE="$COMPOSE_FILE_DIR/plane.yml"
 FIREFOX_X11_COMPOSE="$COMPOSE_FILE_DIR/firefox-x11.yml"
 DOCKER_COMPOSE="docker compose"
+NATS_CLUSTER_COMPOSE="$COMPOSE_FILE_DIR/nats-cluster.yml"
 
 
-linux='' macos='' x11='' guac='' debug='' OS='' BUILD_OPT='' BROWSER_OPT='' CLEAN_OPT='' BROWSER_CMD=""
-while getopts "lmxrcdgb-:" arg
+linux='' macos='' x11='' debug='' OS='' BUILD_OPT='' BROWSER_OPT='' CLEAN_OPT=''
+NATS_CLUSTER=''
+while getopts "lmxrocdgb-:" arg
 do
 	case $arg in 
-	l) [ ! "$OS" ] && linux=1 OS=1 BROWSER_CMD="xdg-open" || exit 1;;
-	m) [ ! "$OS" ] && macos=1 OS=1 BROWSER_CMD="open" || exit 1;;
+	l) [ ! "$OS" ] && linux=1 OS=1 || exit 1;;
+	m) [ ! "$OS" ] && macos=1 OS=1 || exit 1;;
 	x) [ ! "$BROWSER_OPT" ] && x11=1 BROWSER_OPT=1 || exit 1;;
-	g) [ ! "$BROWSER_OPT" ] && guac=1 BROWSER_OPT=1 || exit 1;;
-	c) [ ! "$CLEAN_OPT" ] && CLEAN_OPT=1 || exit 1;;
+	g) [ ! "$BROWSER_OPT" ] && BROWSER_OPT=1 || exit 1;;
+	c) CLEAN_OPT=1;;
 	b) [ ! "$BUILD_OPT" ] && BUILD_OPT=1 || exit 1;;
+	o) NATS_CLUSTER=1;;
 	d) debug=1;;
-	-) long_opts "$OPTARG"; exit $?;;
+	-) long_opts "$OPTARG" || exit 1;;
 	?) usage "" && exit 1;;
 	esac
 done
@@ -73,20 +91,17 @@ if [ $debug ]; then
 	NATS_FLAGS="-DV"
 fi
 
+set -- #unsets positional param array in order to build up compose files
+set "$PLANE_COMPOSE"
 
 if [ $linux ] && [ $x11 ]
 then
-	# shellcheck disable=2086 # I actually want splitting here
-	NATS_FLAGS=$NATS_FLAGS $DOCKER_COMPOSE -f "$PLANE_COMPOSE" -f "$FIREFOX_X11_COMPOSE" up $FLAGS
-	exit $?
+	set -- "$@" "$FIREFOX_X11_COMPOSE"
 fi
 
-if { [ $linux ] || [ $macos ]; } && [ $guac ]
+if [ $NATS_CLUSTER ]
 then
-	# shellcheck disable=2086 # I actually want splitting here
-	NATS_FLAGS=$NATS_FLAGS $DOCKER_COMPOSE -f "$PLANE_COMPOSE" up $FLAGS &\
-	{ wait_until_guac "" && $BROWSER_CMD "http://localhost:3000" ;}
-	exit $?
+	set -- "$@" "$NATS_CLUSTER_COMPOSE"
 fi
 
 if [ $macos ] && [ $x11 ]
@@ -102,4 +117,4 @@ then
 	exit 1
 fi
 
-usage ""
+build_compose_up "$@" || usage ""
