@@ -36,8 +36,8 @@ enum Command {
         backend: Option<String>,
     },
     Drain {
-        drone: String,
         cluster: String,
+        drone: String,
 
         /// Cancel draining and allow a drone to accept backends again.
         #[clap(long)]
