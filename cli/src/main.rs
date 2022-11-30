@@ -65,13 +65,12 @@ async fn main() -> Result<()> {
     match opts.command {
         Command::Status { backend } => {
             let mut sub = if let Some(backend) = backend {
-                nats.subscribe_jetstream(BackendStateMessage::subscribe_subject(&BackendId::new(
-                    backend,
-                )))
+                nats.subscribe_jetstream_subject(BackendStateMessage::subscribe_subject(
+                    &BackendId::new(backend),
+                ))
                 .await?
             } else {
-                nats.subscribe_jetstream(BackendStateMessage::wildcard_subject())
-                    .await?
+                nats.subscribe_jetstream().await?
             };
 
             while let Some(message) = sub.next().await {

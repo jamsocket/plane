@@ -372,12 +372,12 @@ impl TypedNats {
         Ok(result)
     }
 
-    /// Returns an ORDERED stream of messages published to a nats topic
-    pub async fn subscribe_jetstream<T: JetStreamable>(
+    async fn subscribe_jetstream_impl<T: JetStreamable>(
         &self,
-        subject: SubscribeSubject<T>,
+        subject: Option<SubscribeSubject<T>>,
     ) -> Result<JetstreamSubscription<T>> {
-        let subject = subject.subject.to_string();
+        // An empty string is equivalent to no subject filter.
+        let subject = subject.map(|d| d.subject).unwrap_or_default();
         let _ = self.ensure_jetstream_exists::<T>().await;
         let stream_name = T::stream_name();
 
@@ -403,6 +403,22 @@ impl TypedNats {
             stream,
             _ph: PhantomData::default(),
         })
+    }
+
+    /// Returns an ORDERED stream of messages published to a nats jetstream, filtered
+    /// to a specific subject.
+    pub async fn subscribe_jetstream_subject<T: JetStreamable>(
+        &self,
+        subject: SubscribeSubject<T>,
+    ) -> Result<JetstreamSubscription<T>> {
+        self.subscribe_jetstream_impl(Some(subject)).await
+    }
+
+    /// Returns an ORDERED stream of messages published to a nats jetstream.
+    pub async fn subscribe_jetstream<T: JetStreamable>(
+        &self,
+    ) -> Result<JetstreamSubscription<T>> {
+        self.subscribe_jetstream_impl(None).await
     }
 
     pub async fn publish<T>(&self, value: &T) -> Result<()>
