@@ -183,7 +183,7 @@ impl BackendStatsMessage {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum DroneState {
     /// The drone is starting and is not ready to spawn backends.
     Starting,

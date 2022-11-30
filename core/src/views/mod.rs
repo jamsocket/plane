@@ -1,33 +1,129 @@
 use crate::{
-    messages::agent::{BackendStateMessage, DroneState, DroneStatusMessage},
-    nats::TypedNats,
+    messages::agent::{BackendState, DroneState},
     types::{BackendId, ClusterName, DroneId},
-    Never,
 };
-use anyhow::{anyhow, Result};
-use dashmap::DashMap;
+use std::{collections::HashMap, net::IpAddr};
 use time::OffsetDateTime;
-use std::{collections::HashMap, net::Ipv4Addr, sync::Arc};
-use tokio::task::JoinHandle;
 
+#[derive(Debug)]
+pub enum StateUpdate {
+    /// A drone heartbeat, sent periodically as long as the drone is alive.
+    /// Also sent immediately when the state changes.
+    DroneStatus {
+        cluster: ClusterName,
+        drone: DroneId,
+
+        /// State for scheduling purposes.
+        state: DroneState,
+
+        /// Public IP of the drone.
+        ip: IpAddr,
+        drone_version: String,
+    },
+    /// A backend state change. Sent immediately when a backend state changes.
+    BackendStatus {
+        cluster: ClusterName,
+        drone: DroneId,
+        backend: BackendId,
+        state: BackendState,
+    },
+    /// A message sent by a consumer who thinks a drone may be dead. If the
+    /// message comes back and the last timestamp of the drone in question
+    /// is still the last heartbeat on record, the drone can be assumed dead.
+    MaybeDead {
+        cluster: ClusterName,
+        drone: DroneId,
+        last_timestamp: OffsetDateTime,
+    },
+}
+
+impl StateUpdate {
+    fn cluster(&self) -> &ClusterName {
+        match self {
+            StateUpdate::DroneStatus { cluster, .. } => cluster,
+            StateUpdate::BackendStatus { cluster, .. } => cluster,
+            StateUpdate::MaybeDead { cluster, .. } => cluster,
+        }
+    }
+}
+
+#[derive(Default)]
 pub struct DroneView {
-    state: DroneState,
+    /// The most recent heartbeat we've received for this drone.
+    pub last_heartbeat: Option<(DroneState, OffsetDateTime)>,
+    pub ip: Option<IpAddr>,
+    pub version: Option<String>,
+
+    pub backends: HashMap<BackendId, BackendState>,
+}
+
+impl DroneView {
+    pub fn state(&self) -> Option<DroneState> {
+        let (last_drone_state, _timestamp) = self.last_heartbeat?;
+        Some(last_drone_state)
+    }
+
+    pub fn num_backends(&self) -> usize {
+        self.backends.len()
+    }
 }
 
 #[derive(Default)]
 pub struct ClusterView {
-    backends: HashMap<BackendId, (DroneId, Ipv4Addr)>,
+    /// Maps active backends to the drone they run on.
+    backends: HashMap<BackendId, DroneId>,
+
+    /// Maps drones to their status.
     drones: HashMap<DroneId, DroneView>,
 }
 
 impl ClusterView {
-    pub fn receive_drone_status(&mut self, status: &DroneStatusMessage) {
-        if status.state == DroneState::Stopped {
-            self.drones.remove(&status.drone_id);
-        } else {
-            self.drones.insert(status.drone_id, )
+    pub fn update_state(&mut self, update: StateUpdate, timestamp: OffsetDateTime) {
+        match update {
+            StateUpdate::DroneStatus {
+                drone,
+                state,
+                ip,
+                drone_version,
+                ..
+            } => {
+                if state == DroneState::Stopped {
+                    self.drones.remove(&drone);
+                    return;
+                }
+                let mut drone = self.drones.entry(drone.clone()).or_default();
+
+                drone.last_heartbeat = Some((state, timestamp));
+                drone.ip = Some(ip);
+                drone.version = Some(drone_version);
+            }
+            StateUpdate::BackendStatus {
+                drone,
+                backend,
+                state,
+                ..
+            } => {
+                let drone_view = self.drones.entry(drone.clone()).or_default();
+                if state.terminal() {
+                    self.backends.remove(&backend);
+                    drone_view.backends.remove(&backend);
+                } else {
+                    self.backends.insert(backend.clone(), drone);
+                    drone_view.backends.insert(backend, state);
+                }
+            }
+            StateUpdate::MaybeDead { .. } => todo!(),
         }
-        
+    }
+
+    pub fn drone(&self, drone: &DroneId) -> Option<&DroneView> {
+        self.drones.get(drone)
+    }
+
+    pub fn route(&self, backend: &BackendId) -> Option<IpAddr> {
+        let drone_id = self.backends.get(backend)?;
+        let drone = self.drone(drone_id)?;
+        drone.ip
     }
 }
 
@@ -37,46 +133,188 @@ pub struct SystemView {
 }
 
 impl SystemView {
-    pub fn receive_drone_status_message(&mut self, message: &DroneStatusMessage, timestamp: OffsetDateTime) -> Result<()> {
-        let cluster = self.clusters.entry(message.cluster.clone()).or_default();
-
-        cluster.receive_drone_status(message);
-
-        Ok(())
+    pub fn update_state(&mut self, update: StateUpdate, timestamp: OffsetDateTime) {
+        let cluster = self.clusters.entry(update.cluster().clone()).or_default();
+        cluster.update_state(update, timestamp);
     }
 
-    pub fn receive_backend_state_message(&mut self, message: &BackendStateMessage, timestamp: OffsetDateTime) -> Result<()> {
-        Ok(())
+    pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterView> {
+        self.clusters.get(cluster)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::net::Ipv4Addr;
+
+    use super::*;
+    const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+    #[test]
+    fn test_drone_status() {
+        let mut system = SystemView::default();
+        let cluster = ClusterName::new("plane.test");
+        let drone = DroneId::new_random();
+
+        // Drone view is created when status is first seen.
+        system.update_state(
+            StateUpdate::DroneStatus {
+                cluster: cluster.clone(),
+                drone: drone.clone(),
+                state: DroneState::Starting,
+                ip: IpAddr::V4(Ipv4Addr::new(12, 12, 12, 12)),
+                drone_version: PLANE_VERSION.into(),
+            },
+            OffsetDateTime::UNIX_EPOCH,
+        );
+
+        assert_eq!(
+            DroneState::Starting,
+            system
+                .cluster(&cluster)
+                .expect("Expected to find cluster.")
+                .drone(&drone)
+                .expect("Expected to find drone.")
+                .state()
+                .expect("Expected state.")
+        );
+
+        // Drone view is removed when the drone is stopped.
+        system.update_state(
+            StateUpdate::DroneStatus {
+                cluster: cluster.clone(),
+                drone: drone.clone(),
+                state: DroneState::Stopped,
+                ip: IpAddr::V4(Ipv4Addr::new(12, 12, 12, 12)),
+                drone_version: PLANE_VERSION.into(),
+            },
+            OffsetDateTime::UNIX_EPOCH,
+        );
+
+        assert!(system
+            .cluster(&cluster)
+            .expect("Expected to find cluster.")
+            .drone(&drone)
+            .is_none());
     }
 
-    // pub fn new(nats: TypedNats) -> Self {
-    //     let clusters: Arc<DashMap<ClusterName, ClusterView>> = Default::default();
+    #[test]
+    fn test_route() {
+        let mut system = SystemView::default();
+        let cluster = ClusterName::new("plane.test");
+        let drone = DroneId::new_random();
+        let backend = BackendId::new_random();
+        let ip = IpAddr::V4(Ipv4Addr::new(12, 12, 12, 12));
 
-    //     let handle = {
-    //         let clusters = clusters.clone();
-    //         tokio::spawn(async move {
-    //             let mut drone_status_sub = nats
-    //                 .subscribe_jetstream(DroneStatusMessage::subscribe_subject())
-    //                 .await?;
-    //             let mut backend_status_sub = nats
-    //                 .subscribe_jetstream(BackendStateMessage::wildcard_subject())
-    //                 .await?;
+        // Drone view is created when status is first seen.
+        system.update_state(
+            StateUpdate::BackendStatus {
+                cluster: cluster.clone(),
+                drone: drone.clone(),
+                backend: backend.clone(),
+                state: BackendState::Ready,
+            },
+            OffsetDateTime::UNIX_EPOCH,
+        );
 
-    //             loop {
-    //                 tokio::select! {
-    //                     status = drone_status_sub.next() => {
-                            
-    //                     }
-    //                 }
-    //             }
+        // Route will not work, because we have not yet seen
+        // a drone status message from this drone.
+        assert!(system
+            .cluster(&cluster)
+            .expect("Expected cluster")
+            .route(&backend)
+            .is_none());
 
-    //             Err::<Never, anyhow::Error>(anyhow::anyhow!("not implemented."))
-    //         })
-    //     };
+        system.update_state(
+            StateUpdate::DroneStatus {
+                cluster: cluster.clone(),
+                drone,
+                state: DroneState::Ready,
+                ip,
+                drone_version: PLANE_VERSION.into(),
+            },
+            OffsetDateTime::UNIX_EPOCH,
+        );
 
-    //     SystemView {
-    //         clusters,
-    //         _handle: handle,
-    //     }
-    // }
+        // Now we have seen a drone status message, so the route
+        // works.
+        assert_eq!(
+            ip,
+            system
+                .cluster(&cluster)
+                .expect("Expected cluster")
+                .route(&backend)
+                .expect("Expected route")
+        );
+    }
+
+    #[test]
+    fn test_num_backends() {
+        let mut system = SystemView::default();
+        let cluster = ClusterName::new("plane.test");
+        let drone = DroneId::new_random();
+        let backend = BackendId::new_random();
+        let ip = IpAddr::V4(Ipv4Addr::new(12, 12, 12, 12));
+
+        system.update_state(
+            StateUpdate::DroneStatus {
+                cluster: cluster.clone(),
+                drone: drone.clone(),
+                state: DroneState::Ready,
+                ip,
+                drone_version: PLANE_VERSION.into(),
+            },
+            OffsetDateTime::UNIX_EPOCH,
+        );
+
+        assert_eq!(
+            0,
+            system
+                .cluster(&cluster)
+                .expect("Expected cluster.")
+                .drone(&drone)
+                .expect("Expected drone")
+                .num_backends()
+        );
+
+        system.update_state(
+            StateUpdate::BackendStatus {
+                cluster: cluster.clone(),
+                drone: drone.clone(),
+                backend: backend.clone(),
+                state: BackendState::Starting,
+            },
+            OffsetDateTime::UNIX_EPOCH,
+        );
+
+        assert_eq!(
+            1,
+            system
+                .cluster(&cluster)
+                .expect("Expected cluster.")
+                .drone(&drone)
+                .expect("Expected drone")
+                .num_backends()
+        );
+
+        system.update_state(
+            StateUpdate::BackendStatus {
+                cluster: cluster.clone(),
+                drone: drone.clone(),
+                backend,
+                state: BackendState::Swept,
+            },
+            OffsetDateTime::UNIX_EPOCH,
+        );
+
+        assert_eq!(
+            0,
+            system
+                .cluster(&cluster)
+                .expect("Expected cluster.")
+                .drone(&drone)
+                .expect("Expected drone")
+                .num_backends()
+        );
+    }
 }

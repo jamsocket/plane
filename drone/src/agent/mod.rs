@@ -148,7 +148,7 @@ async fn listen_for_drain(
         req.respond(&()).await?;
 
         let state = if req.value.drain {
-            DroneState::Drained
+            DroneState::Draining
         } else {
             DroneState::Ready
         };
