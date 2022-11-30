@@ -4,8 +4,8 @@ use crate::{
     types::{BackendId, ClusterName, DroneId},
 };
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 use std::net::IpAddr;
-use time::OffsetDateTime;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum StateUpdate {
@@ -29,14 +29,15 @@ pub enum StateUpdate {
         backend: BackendId,
         state: BackendState,
     },
-    /// A message sent by a consumer who thinks a drone may be dead. If the
-    /// message comes back and the last timestamp of the drone in question
-    /// is still the last heartbeat on record, the drone can be assumed dead.
-    MaybeDead {
-        cluster: ClusterName,
-        drone: DroneId,
-        last_timestamp: OffsetDateTime,
-    },
+    Landmark {
+        uuid: uuid::Uuid,
+    }
+}
+
+impl StateUpdate {
+    pub fn landmark() -> StateUpdate {
+        Self::Landmark { uuid: Uuid::new_v4() }
+    }
 }
 
 impl TypedMessage for StateUpdate {
@@ -60,11 +61,7 @@ impl TypedMessage for StateUpdate {
                 drone.id(),
                 backend.id()
             ),
-            StateUpdate::MaybeDead { cluster, drone, .. } => format!(
-                "cluster.{}.drone.{}.sm.dead",
-                cluster.subject_name(),
-                drone.id()
-            ),
+            StateUpdate::Landmark { .. } => "state_update.landmark".into(),
         }
     }
 }
@@ -78,18 +75,18 @@ impl JetStreamable for StateUpdate {
         async_nats::jetstream::stream::Config {
             name: Self::stream_name().into(),
             max_messages_per_subject: 1,
-            subjects: vec!["cluster.*.drone.*.sm.>".into()],
+            subjects: vec!["cluster.*.drone.*.sm.>".into(), "state_update.landmark".into()],
             ..async_nats::jetstream::stream::Config::default()
         }
     }
 }
 
 impl StateUpdate {
-    pub fn cluster(&self) -> &ClusterName {
+    pub fn cluster(&self) -> Option<&ClusterName> {
         match self {
-            StateUpdate::DroneStatus { cluster, .. } => cluster,
-            StateUpdate::BackendStatus { cluster, .. } => cluster,
-            StateUpdate::MaybeDead { cluster, .. } => cluster,
+            StateUpdate::DroneStatus { cluster, .. } => Some(cluster),
+            StateUpdate::BackendStatus { cluster, .. } => Some(cluster),
+            StateUpdate::Landmark { .. } => None,
         }
     }
 }

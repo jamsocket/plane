@@ -28,7 +28,7 @@ tracing = "0.1.36"
 tracing-stackdriver = "0.5.0"
 tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
 url = "2.2.2"
-uuid = { version = "1.1.2", features = ["v4"] }
+uuid = { version = "1.1.2", features = ["v4", "serde"] }
 
 [features]
 bollard = ["dep:bollard"]

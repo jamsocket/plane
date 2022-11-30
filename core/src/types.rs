@@ -31,7 +31,7 @@ impl DroneId {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BackendId(String);
 
 impl Display for BackendId {
@@ -70,7 +70,7 @@ impl BackendId {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ClusterName(String);
 
 impl FromStr for ClusterName {

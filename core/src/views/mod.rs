@@ -2,8 +2,10 @@ use crate::{
     messages::{agent::{BackendState, DroneState}, state::StateUpdate},
     types::{BackendId, ClusterName, DroneId},
 };
-use std::{collections::HashMap, net::IpAddr};
+use std::{collections::{HashMap, BTreeMap}, net::IpAddr};
 use time::OffsetDateTime;
+
+pub mod replica;
 
 #[derive(Default)]
 pub struct DroneView {
@@ -31,14 +33,14 @@ impl DroneView {
 #[derive(Default)]
 pub struct ClusterView {
     /// Maps active backends to the drone they run on.
-    backends: HashMap<BackendId, DroneId>,
+    pub routes: BTreeMap<BackendId, DroneId>,
 
     /// Maps drones to their status.
-    drones: HashMap<DroneId, DroneView>,
+    pub drones: BTreeMap<DroneId, DroneView>,
 }
 
 impl ClusterView {
-    pub fn update_state(&mut self, update: StateUpdate, timestamp: OffsetDateTime) {
+    fn update_state(&mut self, update: StateUpdate, timestamp: OffsetDateTime) {
         match update {
             StateUpdate::DroneStatus {
                 drone,
@@ -65,14 +67,16 @@ impl ClusterView {
             } => {
                 let drone_view = self.drones.entry(drone.clone()).or_default();
                 if state.terminal() {
-                    self.backends.remove(&backend);
+                    self.routes.remove(&backend);
                     drone_view.backends.remove(&backend);
                 } else {
-                    self.backends.insert(backend.clone(), drone);
+                    self.routes.insert(backend.clone(), drone);
                     drone_view.backends.insert(backend, state);
                 }
             }
-            StateUpdate::MaybeDead { .. } => todo!(),
+            StateUpdate::Landmark { .. } => {
+                unreachable!("update_state should never be called on ClusterView with a Landmark.");
+            },
         }
     }
 
@@ -81,7 +85,7 @@ impl ClusterView {
     }
 
     pub fn route(&self, backend: &BackendId) -> Option<IpAddr> {
-        let drone_id = self.backends.get(backend)?;
+        let drone_id = self.routes.get(backend)?;
         let drone = self.drone(drone_id)?;
         drone.ip
     }
@@ -89,13 +93,15 @@ impl ClusterView {
 
 #[derive(Default)]
 pub struct SystemView {
-    clusters: HashMap<ClusterName, ClusterView>,
+    pub clusters: BTreeMap<ClusterName, ClusterView>,
 }
 
 impl SystemView {
     pub fn update_state(&mut self, update: StateUpdate, timestamp: OffsetDateTime) {
-        let cluster = self.clusters.entry(update.cluster().clone()).or_default();
-        cluster.update_state(update, timestamp);
+        if let Some(cluster_name) = update.cluster() {
+            let cluster = self.clusters.entry(cluster_name.clone()).or_default();
+            cluster.update_state(update, timestamp);
+        }
     }
 
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterView> {

@@ -35,6 +35,7 @@ mod test {
     use crate::ttl_store::test::ts;
 
     #[test]
+    #[allow(clippy::needless_collect)]
     fn test_multistore() {
         let mut store: TtlMultistore<u32, u32> = TtlMultistore::new(Duration::from_secs(10));
 
