@@ -9,7 +9,7 @@ use hyper::Client;
 use plane_core::{
     logging::LogError,
     messages::{
-        agent::{DroneConnectRequest, DroneStatusMessage, SpawnRequest, TerminationRequest, DroneState},
+        agent::{DroneStatusMessage, SpawnRequest, TerminationRequest, DroneState},
         scheduler::DrainDrone,
     },
     nats::TypedNats,
@@ -170,14 +170,6 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
     let db = agent_opts.db;
     let cluster = agent_opts.cluster_domain.clone();
     let ip = do_with_retry(|| agent_opts.ip.get_ip(), 10, Duration::from_secs(10)).await?;
-
-    let request = DroneConnectRequest {
-        drone_id: agent_opts.drone_id.clone(),
-        cluster: cluster.clone(),
-        ip,
-    };
-
-    nats.publish(&request).await?;
 
     let executor = Executor::new(docker, db.clone(), nats.clone(), ip, cluster.clone());
 
