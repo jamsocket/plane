@@ -3,7 +3,7 @@ use integration_test::integration_test;
 use plane_controller::run_scheduler;
 use plane_core::{
     messages::{
-        agent::{DroneStatusMessage, SpawnRequest, DroneState},
+        agent::{DroneState, DroneStatusMessage, SpawnRequest},
         scheduler::ScheduleResponse,
     },
     nats::TypedNats,

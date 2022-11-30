@@ -238,7 +238,7 @@ impl<T: DeserializeOwned> DelayedReply<T> {
 
 pub struct JetstreamSubscription<T: TypedMessage> {
     stream: Messages,
-    
+
     /// True if this consumer has pending messages to be consumed.
     pub has_pending: bool,
     _ph: PhantomData<T>,
@@ -363,8 +363,6 @@ impl TypedNats {
             .to_anyhow()?;
 
         let stream: Messages = consumer.messages().await.to_anyhow()?;
-
-        
 
         Ok(JetstreamSubscription {
             stream,

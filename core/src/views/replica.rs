@@ -11,19 +11,21 @@ pub struct SystemViewReplica {
 }
 
 impl SystemViewReplica {
-    async fn snapshot_impl(nats: TypedNats) -> Result<(SystemView, JetstreamSubscription<StateUpdate>)> {
+    async fn snapshot_impl(
+        nats: TypedNats,
+    ) -> Result<(SystemView, JetstreamSubscription<StateUpdate>)> {
         let mut view = SystemView::default();
         let mut sub = nats.subscribe_jetstream::<StateUpdate>().await?;
 
         if sub.has_pending {
             while let Some((update, meta)) = sub.next().await {
                 view.update_state(update, meta.timestamp);
-    
+
                 if !sub.has_pending {
                     break;
                 }
             }
-        }            
+        }
 
         Ok((view, sub))
     }
