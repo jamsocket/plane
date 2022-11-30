@@ -15,20 +15,15 @@ impl SystemViewReplica {
         let mut view = SystemView::default();
         let mut sub = nats.subscribe_jetstream::<StateUpdate>().await?;
 
-        // Toss a landmark into the stream to get its sequence number.
-        // When we see a sequence number at least as high as this, we
-        // know we have consumed everything up to the point of the landmark.
-        let landmark = StateUpdate::landmark();
-        let seq = nats.publish_jetstream(&landmark).await?;
-
-        while let Some((update, meta)) = sub.next().await {
-            view.update_state(update, meta.timestamp);
-
-            if meta.sequence >= seq {
-                // We've consumed everything up to our initial landmark.
-                break;
+        if sub.has_pending {
+            while let Some((update, meta)) = sub.next().await {
+                view.update_state(update, meta.timestamp);
+    
+                if !sub.has_pending {
+                    break;
+                }
             }
-        }
+        }            
 
         Ok((view, sub))
     }

@@ -1,8 +1,14 @@
 use crate::{
-    messages::{agent::{BackendState, DroneState}, state::StateUpdate},
+    messages::{
+        agent::{BackendState, DroneState},
+        state::StateUpdate,
+    },
     types::{BackendId, ClusterName, DroneId},
 };
-use std::{collections::{HashMap, BTreeMap}, net::IpAddr};
+use std::{
+    collections::{BTreeMap, HashMap},
+    net::IpAddr,
+};
 use time::OffsetDateTime;
 
 pub mod replica;
@@ -74,9 +80,6 @@ impl ClusterView {
                     drone_view.backends.insert(backend, state);
                 }
             }
-            StateUpdate::Landmark { .. } => {
-                unreachable!("update_state should never be called on ClusterView with a Landmark.");
-            },
         }
     }
 
@@ -98,10 +101,9 @@ pub struct SystemView {
 
 impl SystemView {
     pub fn update_state(&mut self, update: StateUpdate, timestamp: OffsetDateTime) {
-        if let Some(cluster_name) = update.cluster() {
-            let cluster = self.clusters.entry(cluster_name.clone()).or_default();
-            cluster.update_state(update, timestamp);
-        }
+        let cluster_name = update.cluster();
+        let cluster = self.clusters.entry(cluster_name.clone()).or_default();
+        cluster.update_state(update, timestamp);
     }
 
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterView> {

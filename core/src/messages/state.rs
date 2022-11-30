@@ -4,7 +4,6 @@ use crate::{
     types::{BackendId, ClusterName, DroneId},
 };
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use std::net::IpAddr;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -29,15 +28,6 @@ pub enum StateUpdate {
         backend: BackendId,
         state: BackendState,
     },
-    Landmark {
-        uuid: uuid::Uuid,
-    }
-}
-
-impl StateUpdate {
-    pub fn landmark() -> StateUpdate {
-        Self::Landmark { uuid: Uuid::new_v4() }
-    }
 }
 
 impl TypedMessage for StateUpdate {
@@ -61,7 +51,6 @@ impl TypedMessage for StateUpdate {
                 drone.id(),
                 backend.id()
             ),
-            StateUpdate::Landmark { .. } => "state_update.landmark".into(),
         }
     }
 }
@@ -82,11 +71,10 @@ impl JetStreamable for StateUpdate {
 }
 
 impl StateUpdate {
-    pub fn cluster(&self) -> Option<&ClusterName> {
+    pub fn cluster(&self) -> &ClusterName {
         match self {
-            StateUpdate::DroneStatus { cluster, .. } => Some(cluster),
-            StateUpdate::BackendStatus { cluster, .. } => Some(cluster),
-            StateUpdate::Landmark { .. } => None,
+            StateUpdate::DroneStatus { cluster, .. } => cluster,
+            StateUpdate::BackendStatus { cluster, .. } => cluster,
         }
     }
 }

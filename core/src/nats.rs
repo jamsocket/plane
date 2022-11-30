@@ -238,6 +238,9 @@ impl<T: DeserializeOwned> DelayedReply<T> {
 
 pub struct JetstreamSubscription<T: TypedMessage> {
     stream: Messages,
+    
+    /// True if this consumer has pending messages to be consumed.
+    pub has_pending: bool,
     _ph: PhantomData<T>,
 }
 
@@ -264,6 +267,7 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
                         continue;
                     }
                 };
+                self.has_pending = meta.pending > 0;
                 match value {
                     Ok(value) => return Some((value, meta)),
                     Err(error) => {
@@ -342,6 +346,7 @@ impl TypedNats {
         let stream_name = T::stream_name();
 
         let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
+        let has_pending = stream.cached_info().state.messages > 0;
         let deliver_subject = self.nc.new_inbox();
 
         let consumer = stream
@@ -359,8 +364,11 @@ impl TypedNats {
 
         let stream: Messages = consumer.messages().await.to_anyhow()?;
 
+        
+
         Ok(JetstreamSubscription {
             stream,
+            has_pending,
             _ph: PhantomData::default(),
         })
     }
