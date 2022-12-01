@@ -21,6 +21,7 @@ impl Display for DnsRecordType {
     }
 }
 
+/// **DEPRECATED**. Will be removed in a future version of Plane.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct SetDnsRecord {
     pub cluster: ClusterName,

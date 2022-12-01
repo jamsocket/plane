@@ -208,13 +208,13 @@ fn drone_state_ready() -> DroneState {
     DroneState::Ready
 }
 
+/// **DEPRECATED**. Will be removed in a future version of Plane.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
     pub cluster: ClusterName,
     pub drone_version: String,
 
-    /// **DEPRECATED**. Will be removed in a future version of Plane.
     /// Indicates that a drone is ready to have backends scheduled to it.
     /// When a drone has been told to drain or is otherwise unable to have
     /// backends scheduled to it, this is set to false.
