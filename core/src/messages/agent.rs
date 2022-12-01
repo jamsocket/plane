@@ -510,6 +510,7 @@ impl BackendState {
 }
 
 /// An message representing a change in the state of a backend.
+/// **DEPRECATED**. Will be removed in a future version of Plane.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BackendStateMessage {
     /// The cluster the backend belongs to.

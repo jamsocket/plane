@@ -112,14 +112,14 @@ async fn ready_loop(
     nc: TypedNats,
     drone_id: &DroneId,
     cluster: ClusterName,
-    recv_ready: Receiver<DroneState>,
+    recv_state: Receiver<DroneState>,
     db: DroneDatabase,
     ip: IpAddr,
 ) -> NeverResult {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
-        let state = *recv_ready.borrow();
+        let state = *recv_state.borrow();
         let ready = state == DroneState::Ready;
 
         let running_backends = db.running_backends().await?;
@@ -198,14 +198,14 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     let executor = Executor::new(docker, db.clone(), nats.clone(), ip, cluster.clone());
 
-    let (send_ready, recv_ready) = watch::channel(DroneState::Ready);
+    let (send_state, recv_state) = watch::channel(DroneState::Ready);
 
     tokio::select!(
         result = ready_loop(
             nats.clone(),
             &agent_opts.drone_id,
             cluster.clone(),
-            recv_ready.clone(),
+            recv_state.clone(),
             db,
             ip,
         ) => result,
@@ -226,7 +226,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
             nats.clone(),
             agent_opts.drone_id.clone(),
             cluster.clone(),
-            send_ready,
+            send_state,
         ) => result,
     )
 }
