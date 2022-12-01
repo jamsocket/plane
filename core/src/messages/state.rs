@@ -64,10 +64,7 @@ impl JetStreamable for StateUpdate {
         async_nats::jetstream::stream::Config {
             name: Self::stream_name().into(),
             max_messages_per_subject: 1,
-            subjects: vec![
-                "cluster.*.drone.*.sm.>".into(),
-                "state_update.landmark".into(),
-            ],
+            subjects: vec!["cluster.*.drone.*.sm.>".into()],
             ..async_nats::jetstream::stream::Config::default()
         }
     }
