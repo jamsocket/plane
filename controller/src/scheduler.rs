@@ -84,6 +84,8 @@ impl Scheduler {
 
 #[cfg(test)]
 mod tests {
+    use plane_core::messages::agent::DroneState;
+
     use super::*;
     const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -113,6 +115,7 @@ mod tests {
                 cluster: ClusterName::new("mycluster.test"),
                 drone_version: PLANE_VERSION.to_string(),
                 ready: true,
+                state: DroneState::Ready,
                 running_backends: None,
             },
         );
@@ -137,6 +140,7 @@ mod tests {
                 cluster: ClusterName::new("mycluster1.test"),
                 drone_version: PLANE_VERSION.to_string(),
                 ready: true,
+                state: DroneState::Ready,
                 running_backends: None,
             },
         );
@@ -161,6 +165,7 @@ mod tests {
                 cluster: ClusterName::new("mycluster.test"),
                 drone_version: PLANE_VERSION.to_string(),
                 ready: true,
+                state: DroneState::Ready,
                 running_backends: None,
             },
         );

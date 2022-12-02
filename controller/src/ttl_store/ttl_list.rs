@@ -57,6 +57,7 @@ mod test {
     use crate::ttl_store::test::ts;
 
     #[test]
+    #[allow(clippy::needless_collect)]
     fn test_list() {
         let mut list: TtlList<u32> = TtlList::new(Duration::from_secs(10));
 

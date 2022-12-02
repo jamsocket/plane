@@ -70,11 +70,7 @@ impl BackendMonitor {
         })
     }
 
-    fn log_loop<E: Engine>(
-        backend_id: &BackendId,
-        engine: &E,
-        nc: &TypedNats,
-    ) -> JoinHandle<()> {
+    fn log_loop<E: Engine>(backend_id: &BackendId, engine: &E, nc: &TypedNats) -> JoinHandle<()> {
         let mut stream = engine.log_stream(backend_id);
         let nc = nc.clone();
         let backend_id = backend_id.clone();
@@ -83,18 +79,16 @@ impl BackendMonitor {
             tracing::info!(%backend_id, "Log recording loop started.");
 
             while let Some(v) = stream.next().await {
-                nc.publish(&v).await.log_error("Error publishing log message.");
+                nc.publish(&v)
+                    .await
+                    .log_error("Error publishing log message.");
             }
 
             tracing::info!(%backend_id, "Log loop terminated.");
         })
     }
 
-    fn stats_loop<E: Engine>(
-        backend_id: &BackendId,
-        engine: &E,
-        nc: &TypedNats,
-    ) -> JoinHandle<()> {
+    fn stats_loop<E: Engine>(backend_id: &BackendId, engine: &E, nc: &TypedNats) -> JoinHandle<()> {
         let mut stream = Box::pin(engine.stats_stream(backend_id));
         let nc = nc.clone();
         let backend_id = backend_id.clone();
@@ -103,7 +97,9 @@ impl BackendMonitor {
             tracing::info!(%backend_id, "Stats recording loop started.");
 
             while let Some(stats) = stream.next().await {
-                nc.publish(&stats).await.log_error("Error publishing stats message.");
+                nc.publish(&stats)
+                    .await
+                    .log_error("Error publishing stats message.");
             }
 
             tracing::info!(%backend_id, "Stats loop terminated.");

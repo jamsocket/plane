@@ -2,6 +2,7 @@
 //!
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
+use crate::logging::LogError;
 use anyhow::{anyhow, Result};
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::push::Messages;
@@ -12,18 +13,36 @@ use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
 use dashmap::DashSet;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::error::Error;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use time::OffsetDateTime;
 use tokio_stream::StreamExt;
-
-use crate::logging::LogError;
 
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
 #[derive(Serialize, Deserialize)]
 pub enum NoReply {}
+
+pub struct MessageMeta {
+    pub timestamp: OffsetDateTime,
+    pub pending: u64,
+    pub sequence: u64,
+}
+
+impl TryFrom<jetstream::Message> for MessageMeta {
+    type Error = anyhow::Error;
+
+    fn try_from(value: jetstream::Message) -> Result<Self, Self::Error> {
+        let info = value.info().to_anyhow()?;
+
+        Ok(MessageMeta {
+            timestamp: info.published,
+            pending: info.pending,
+            sequence: info.stream_sequence,
+        })
+    }
+}
 
 pub trait TypedMessage: Serialize + DeserializeOwned {
     type Response: Serialize + DeserializeOwned;
@@ -219,11 +238,14 @@ impl<T: DeserializeOwned> DelayedReply<T> {
 
 pub struct JetstreamSubscription<T: TypedMessage> {
     stream: Messages,
+
+    /// True if this consumer has pending messages to be consumed.
+    pub has_pending: bool,
     _ph: PhantomData<T>,
 }
 
 impl<T: TypedMessage> JetstreamSubscription<T> {
-    pub async fn next(&mut self) -> Option<T> {
+    pub async fn next(&mut self) -> Option<(T, MessageMeta)> {
         loop {
             if let Some(message) = self.stream.next().await {
                 let message = match message {
@@ -238,8 +260,16 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
                     .await
                     .log_error("Error acking jetstream message.");
                 let value: Result<T, _> = serde_json::from_slice(&message.payload);
+                let meta = match MessageMeta::try_from(message) {
+                    Ok(meta) => meta,
+                    Err(error) => {
+                        tracing::error!(?error, "Error parsing jetstream message metadata.");
+                        continue;
+                    }
+                };
+                self.has_pending = meta.pending > 0;
                 match value {
-                    Ok(value) => return Some(value),
+                    Ok(value) => return Some((value, meta)),
                     Err(error) => {
                         tracing::error!(?error, "Error parsing jetstream message; message ignored.")
                     }
@@ -248,28 +278,6 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
                 return None;
             }
         }
-    }
-}
-
-/// async_nats returns an Ok(Err(_)) when a stream is empty instead of None, this replaces that specific error
-/// with None.
-///
-/// This will not be necessary once async_nats has concrete error types, which is coming.
-fn nats_error_hack(
-    message_result: Option<Result<jetstream::Message, Box<dyn Error + Send + Sync>>>,
-) -> anyhow::Result<Option<jetstream::Message>> {
-    match message_result {
-        Some(Ok(v)) => Ok(Some(v)),
-        Some(Err(err)) => {
-            // If we update async_nats to a version that includes https://github.com/nats-io/nats.rs/pull/652, correct the typo below.
-            if err.to_string()
-                == r#"error while processing messages from the stream: 404, Some("No Messages")"#
-            {
-                return Ok(None);
-            }
-            Err(anyhow!("NATS Error: {:?}", err))
-        }
-        None => Ok(None),
     }
 }
 
@@ -328,60 +336,17 @@ impl TypedNats {
         Ok(())
     }
 
-    pub async fn get_all<T>(
+    async fn subscribe_jetstream_impl<T: JetStreamable>(
         &self,
-        subject: &SubscribeSubject<T>,
-        deliver_policy: DeliverPolicy,
-    ) -> Result<Vec<T>>
-    where
-        T: TypedMessage<Response = NoReply> + JetStreamable,
-    {
-        let _ = self.ensure_jetstream_exists::<T>().await;
-        let stream = self
-            .jetstream
-            .get_stream(T::stream_name())
-            .await
-            .to_anyhow()?;
-
-        let consumer = stream
-            .create_consumer(async_nats::jetstream::consumer::pull::Config {
-                deliver_policy,
-                filter_subject: subject.subject.clone(),
-                ..async_nats::jetstream::consumer::pull::Config::default()
-            })
-            .await
-            .to_anyhow()?;
-
-        let mut result: Vec<T> = Vec::new();
-
-        loop {
-            let mut messages = consumer.fetch().messages().await.to_anyhow()?;
-            let mut done = true;
-
-            while let Some(v) = nats_error_hack(messages.next().await)? {
-                done = false;
-
-                result.push(serde_json::from_slice(&v.payload)?);
-            }
-
-            if done {
-                break;
-            }
-        }
-
-        Ok(result)
-    }
-
-    /// Returns an ORDERED stream of messages published to a nats topic
-    pub async fn subscribe_jetstream<T: JetStreamable>(
-        &self,
-        subject: SubscribeSubject<T>,
+        subject: Option<SubscribeSubject<T>>,
     ) -> Result<JetstreamSubscription<T>> {
-        let subject = subject.subject.to_string();
+        // An empty string is equivalent to no subject filter.
+        let subject = subject.map(|d| d.subject).unwrap_or_default();
         let _ = self.ensure_jetstream_exists::<T>().await;
         let stream_name = T::stream_name();
 
         let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
+        let has_pending = stream.cached_info().state.messages > 0;
         let deliver_subject = self.nc.new_inbox();
 
         let consumer = stream
@@ -401,8 +366,23 @@ impl TypedNats {
 
         Ok(JetstreamSubscription {
             stream,
+            has_pending,
             _ph: PhantomData::default(),
         })
+    }
+
+    /// Returns an ORDERED stream of messages published to a nats jetstream, filtered
+    /// to a specific subject.
+    pub async fn subscribe_jetstream_subject<T: JetStreamable>(
+        &self,
+        subject: SubscribeSubject<T>,
+    ) -> Result<JetstreamSubscription<T>> {
+        self.subscribe_jetstream_impl(Some(subject)).await
+    }
+
+    /// Returns an ORDERED stream of messages published to a nats jetstream.
+    pub async fn subscribe_jetstream<T: JetStreamable>(&self) -> Result<JetstreamSubscription<T>> {
+        self.subscribe_jetstream_impl(None).await
     }
 
     pub async fn publish<T>(&self, value: &T) -> Result<()>
@@ -418,20 +398,25 @@ impl TypedNats {
         Ok(())
     }
 
-    pub async fn publish_jetstream<T>(&self, value: &T) -> Result<()>
+    pub async fn publish_jetstream<T>(&self, value: &T) -> Result<u64>
     where
         T: TypedMessage<Response = NoReply> + JetStreamable,
     {
         self.ensure_jetstream_exists::<T>().await?;
 
-        self.jetstream
+        let sequence = self
+            .jetstream
             .publish(
                 value.subject().clone(),
                 Bytes::from(serde_json::to_vec(value)?),
             )
             .await
-            .to_anyhow()?;
-        Ok(())
+            .to_anyhow()?
+            .await
+            .to_anyhow()?
+            .sequence;
+
+        Ok(sequence)
     }
 
     pub async fn request<T>(&self, value: &T) -> Result<T::Response>

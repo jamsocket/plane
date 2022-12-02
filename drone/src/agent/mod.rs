@@ -9,15 +9,21 @@ use hyper::Client;
 use plane_core::{
     logging::LogError,
     messages::{
-        agent::{DroneConnectRequest, DroneStatusMessage, SpawnRequest, TerminationRequest},
+        agent::{
+            DroneConnectRequest, DroneState, DroneStatusMessage, SpawnRequest, TerminationRequest,
+        },
         scheduler::DrainDrone,
+        state::StateUpdate,
     },
     nats::TypedNats,
     retry::do_with_retry,
     types::{ClusterName, DroneId},
     NeverResult,
 };
-use std::{net::SocketAddr, time::Duration};
+use std::{
+    net::{IpAddr, SocketAddr},
+    time::Duration,
+};
 use tokio::sync::watch::{self, Receiver, Sender};
 
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -106,13 +112,15 @@ async fn ready_loop(
     nc: TypedNats,
     drone_id: &DroneId,
     cluster: ClusterName,
-    recv_ready: Receiver<bool>,
+    recv_state: Receiver<DroneState>,
     db: DroneDatabase,
+    ip: IpAddr,
 ) -> NeverResult {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
-        let ready = *recv_ready.borrow();
+        let state = *recv_state.borrow();
+        let ready = state == DroneState::Ready;
 
         let running_backends = db.running_backends().await?;
 
@@ -121,10 +129,21 @@ async fn ready_loop(
             cluster: cluster.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready,
+            state,
             running_backends: Some(running_backends as u32),
         })
         .await
         .log_error("Error in ready loop.");
+
+        nc.publish_jetstream(&StateUpdate::DroneStatus {
+            cluster: cluster.clone(),
+            drone: drone_id.clone(),
+            state,
+            ip,
+            drone_version: PLANE_VERSION.to_string(),
+        })
+        .await
+        .log_error("Error publishing StateUpdate::DroneStatus.");
 
         interval.tick().await;
     }
@@ -135,7 +154,7 @@ async fn listen_for_drain(
     nc: TypedNats,
     drone_id: DroneId,
     cluster: ClusterName,
-    send_ready: Sender<bool>,
+    send_state: Sender<DroneState>,
 ) -> NeverResult {
     let mut sub = nc
         .subscribe(DrainDrone::subscribe_subject(drone_id, cluster))
@@ -145,8 +164,14 @@ async fn listen_for_drain(
         tracing::info!(req=?req.message(), "Received request to drain drone.");
         req.respond(&()).await?;
 
-        send_ready
-            .send(!req.value.drain)
+        let state = if req.value.drain {
+            DroneState::Draining
+        } else {
+            DroneState::Ready
+        };
+
+        send_state
+            .send(state)
             .log_error("Error sending drain instruction.");
     }
 
@@ -173,15 +198,16 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     let executor = Executor::new(docker, db.clone(), nats.clone(), ip, cluster.clone());
 
-    let (send_ready, recv_ready) = watch::channel(true);
+    let (send_state, recv_state) = watch::channel(DroneState::Ready);
 
     tokio::select!(
         result = ready_loop(
             nats.clone(),
             &agent_opts.drone_id,
             cluster.clone(),
-            recv_ready.clone(),
+            recv_state.clone(),
             db,
+            ip,
         ) => result,
 
         result = listen_for_spawn_requests(
@@ -200,7 +226,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
             nats.clone(),
             agent_opts.drone_id.clone(),
             cluster.clone(),
-            send_ready,
+            send_state,
         ) => result,
     )
 }

@@ -2,7 +2,7 @@ use crate::keys::{load_certs, load_private_key, KeyCertPathPair};
 use anyhow::{Context, Result};
 use notify::{
     event::{AccessKind, AccessMode},
-    recommended_watcher, Event, EventKind, RecursiveMode, Watcher, RecommendedWatcher,
+    recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
 use rustls::{
     server::ResolvesServerCert,

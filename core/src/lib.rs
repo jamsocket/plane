@@ -6,6 +6,7 @@ pub mod nats_connection;
 pub mod retry;
 pub mod timing;
 pub mod types;
+pub mod views;
 
 /// This is a stand-in for the “never” type until RFC 1216 is stabilized.
 /// Because it is not constructable, the compiler enforces that a function

@@ -1,18 +1,14 @@
 use anyhow::Result;
-use async_nats::jetstream::consumer::DeliverPolicy;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
     messages::{
-        agent::{
-            BackendStateMessage, DockerExecutableConfig, DroneStatusMessage, ResourceLimits,
-            TerminationRequest,
-        },
-        dns::SetDnsRecord,
+        agent::{BackendStateMessage, DockerExecutableConfig, ResourceLimits, TerminationRequest},
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
     },
     nats_connection::NatsConnectionSpec,
     types::{BackendId, ClusterName, DroneId},
+    views::replica::SystemViewReplica,
 };
 use std::{collections::HashMap, time::Duration};
 
@@ -40,8 +36,8 @@ enum Command {
         backend: Option<String>,
     },
     Drain {
-        drone: String,
         cluster: String,
+        drone: String,
 
         /// Cancel draining and allow a drone to accept backends again.
         #[clap(long)]
@@ -65,16 +61,15 @@ async fn main() -> Result<()> {
     match opts.command {
         Command::Status { backend } => {
             let mut sub = if let Some(backend) = backend {
-                nats.subscribe_jetstream(BackendStateMessage::subscribe_subject(&BackendId::new(
-                    backend,
-                )))
+                nats.subscribe_jetstream_subject(BackendStateMessage::subscribe_subject(
+                    &BackendId::new(backend),
+                ))
                 .await?
             } else {
-                nats.subscribe_jetstream(BackendStateMessage::wildcard_subject())
-                    .await?
+                nats.subscribe_jetstream().await?
             };
 
-            while let Some(message) = sub.next().await {
+            while let Some((message, _)) = sub.next().await {
                 println!(
                     "{}\t{}\t{}",
                     message.backend.to_string().bright_cyan(),
@@ -84,23 +79,28 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListDrones => {
-            let mut drones = nats
-                .get_all(
-                    &DroneStatusMessage::subscribe_subject(),
-                    DeliverPolicy::LastPerSubject,
-                )
-                .await?;
+            let sys = SystemViewReplica::snapshot(nats).await?;
 
-            drones.sort_by(|lhs, rhs| lhs.drone_id.cmp(&rhs.drone_id));
-            drones.dedup_by(|lhs, rhs| lhs.drone_id == rhs.drone_id);
-            println!("Found {} drones:", drones.len());
-
-            for drone in drones {
+            println!("Found {} clusters:", sys.clusters.len());
+            for (cluster_name, cluster) in sys.clusters {
                 println!(
-                    "{}\t{}",
-                    drone.drone_id.to_string().bright_green(),
-                    drone.cluster.to_string().bright_cyan()
+                    "Found {} drones in cluster {}:",
+                    cluster.drones.len(),
+                    cluster_name.hostname().bright_cyan()
                 );
+
+                for (drone_id, drone) in cluster.drones {
+                    println!(
+                        "{}\t{}\t{}",
+                        drone_id.to_string().bright_green(),
+                        cluster_name.to_string().bright_cyan(),
+                        drone
+                            .state()
+                            .map(|d| format!("{:?}", d))
+                            .unwrap_or_default()
+                            .bright_yellow(),
+                    );
+                }
             }
         }
         Command::Spawn {
@@ -148,26 +148,21 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListDns => {
-            let mut results = nats
-                .get_all(
-                    &SetDnsRecord::subscribe_subject(),
-                    DeliverPolicy::LastPerSubject,
-                )
-                .await?;
+            let sys = SystemViewReplica::snapshot(nats).await?;
 
-            results.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
-            results.dedup_by(|lhs, rhs| lhs.name == rhs.name);
-
-            println!("Found {} DNS records:", results.len());
-
-            for result in results {
+            println!("Found {} clusters:", sys.clusters.len());
+            for (cluster_name, cluster) in sys.clusters {
                 println!(
-                    "{}.{}\t{}\t{}",
-                    result.name.to_string().bright_magenta(),
-                    result.cluster.to_string().bright_blue(),
-                    result.kind.to_string().bright_cyan(),
-                    result.value.to_string().bold()
+                    "Found {} live routes in cluster {}:",
+                    cluster.routes.len(),
+                    cluster_name.hostname().bright_cyan()
                 );
+
+                for backend in cluster.routes.keys() {
+                    if let Some(route) = cluster.route(backend) {
+                        println!("{}.{}\t{}", backend.id(), cluster_name.hostname(), route);
+                    }
+                }
             }
         }
         Command::Terminate {

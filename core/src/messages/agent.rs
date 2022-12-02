@@ -183,6 +183,32 @@ impl BackendStatsMessage {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
+pub enum DroneState {
+    /// The drone is starting and is not ready to spawn backends.
+    Starting,
+
+    /// The drone is ready to spawn backends (subject to available capacity).
+    Ready,
+
+    /// The drone is running backends but is not accepting additional ones.
+    Draining,
+
+    /// The drone has finished draining and is ready to be shut down.
+    Drained,
+
+    /// The drone has shut down successfully.
+    Stopped,
+
+    /// The drone disappeared without a graceful shut-down and is assumed to be shut down.
+    Lost,
+}
+
+fn drone_state_ready() -> DroneState {
+    DroneState::Ready
+}
+
+/// **DEPRECATED**. Will be removed in a future version of Plane.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
@@ -194,6 +220,9 @@ pub struct DroneStatusMessage {
     /// backends scheduled to it, this is set to false.
     #[serde(default = "default_ready")]
     pub ready: bool,
+
+    #[serde(default = "drone_state_ready")]
+    pub state: DroneState,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub running_backends: Option<u32>,
@@ -481,6 +510,7 @@ impl BackendState {
 }
 
 /// An message representing a change in the state of a backend.
+/// **DEPRECATED**. Will be removed in a future version of Plane.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BackendStateMessage {
     /// The cluster the backend belongs to.
