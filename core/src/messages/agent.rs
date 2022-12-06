@@ -321,9 +321,7 @@ pub struct DockerExecutableConfig {
     #[serde(default = "DockerPullPolicy::default")]
     pub pull_policy: DockerPullPolicy,
 
-    /// Port to serve on. If this is not set, Plane picks a port
-    /// (currently 8080) and passes it as the PORT environment
-    /// variable.
+    /// Port to serve on. If this is not set, Plane uses port 8080.
     pub port: Option<u16>,
 }
 
