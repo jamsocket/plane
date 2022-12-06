@@ -187,7 +187,8 @@ pub fn cert_validity(certificate_path: &Path) -> Option<DateTime<Utc>> {
     let not_after_naive = NaiveDateTime::from_timestamp_opt(
         i64::from(not_after_unix.days) * 86400 + i64::from(not_after_unix.secs),
         0,
-    ).expect("from_timestamp_opt should not return a Some result on valid inputs.");
+    )
+    .expect("from_timestamp_opt should not return a Some result on valid inputs.");
     Some(DateTime::from_utc(not_after_naive, Utc))
 }
 
