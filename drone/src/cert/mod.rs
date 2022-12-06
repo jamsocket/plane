@@ -184,10 +184,10 @@ pub fn cert_validity(certificate_path: &Path) -> Option<DateTime<Utc>> {
     let cert = X509::from_pem(&cert_pem).ok()?;
     let not_after_asn1 = cert.not_after();
     let not_after_unix = Asn1Time::from_unix(0).ok()?.diff(not_after_asn1).ok()?;
-    let not_after_naive = NaiveDateTime::from_timestamp(
+    let not_after_naive = NaiveDateTime::from_timestamp_opt(
         i64::from(not_after_unix.days) * 86400 + i64::from(not_after_unix.secs),
         0,
-    );
+    ).expect("from_timestamp_opt should not return a Some result on valid inputs.");
     Some(DateTime::from_utc(not_after_naive, Utc))
 }
 

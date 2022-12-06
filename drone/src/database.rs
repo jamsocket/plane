@@ -192,6 +192,8 @@ impl DroneDatabase {
         .await?
         .last_active;
 
-        Ok(Utc.timestamp(time, 0))
+        Ok(Utc.timestamp_opt(time, 0).single().expect(
+            "timestamp_opt should always return a LocalResult::Single for in-range inputs.",
+        ))
     }
 }

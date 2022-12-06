@@ -122,7 +122,7 @@ impl Proxy {
     ) -> std::result::Result<
         (
             WebSocketStream<tokio_rustls::client::TlsStream<tokio::net::TcpStream>>,
-            http::Response<()>,
+            http::Response<std::option::Option<std::vec::Vec<u8>>>,
         ),
         tokio_tungstenite::tungstenite::Error,
     > {
