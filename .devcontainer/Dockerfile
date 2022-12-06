@@ -11,8 +11,9 @@ RUN git config --global --add push.autoSetupRemote true
 # Update Rust version to latest.
 RUN rustup update stable
 
-# Install cargo ws
+# Install useful crates
 RUN cargo install cargo-workspaces
+RUN cargo install cargo-outdated
 
 # Install cargo nextest
 RUN curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
