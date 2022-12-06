@@ -120,6 +120,7 @@ async fn main() -> Result<()> {
                         credentials: None,
                         resource_limits: ResourceLimits::default(),
                         pull_policy: Default::default(),
+                        port: None,
                     },
                     require_bearer_token: false,
                 })
