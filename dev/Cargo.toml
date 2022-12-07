@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.62"
-async-nats = "0.23.0"
+async-nats = "0.24.0"
 bollard = {version = "0.13.0", git="https://github.com/drifting-in-space/bollard.git", branch = "paulgb/update-serde-with-version"}
 chrono = "0.4.22"
 plane-core = {path = "../core"}
@@ -28,7 +28,7 @@ tracing = "0.1.36"
 tracing-appender = "0.2.2"
 tracing-subscriber = { version = "0.3.15", features = ["env-filter", "ansi"] }
 tokio-rustls = "0.23.4"
-tokio-tungstenite = "0.17.2"
+tokio-tungstenite = "0.18.0"
 url = "2.0.0"
 trust-dns-resolver = "0.22.0"
 trust-dns-server = "0.22.0"

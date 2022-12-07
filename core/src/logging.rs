@@ -11,7 +11,6 @@ use tracing::{
     span::Attributes,
     Id,
 };
-use tracing_stackdriver::Stackdriver;
 use tracing_subscriber::{layer::Context, util::SubscriberInitExt, EnvFilter, Layer};
 use tracing_subscriber::{layer::SubscriberExt, registry::LookupSpan};
 
@@ -43,7 +42,7 @@ impl TracingHandle {
 
         let trace_stackdriver = std::env::var(TRACE_STACKDRIVER).is_ok();
         if trace_stackdriver {
-            registry.with(Stackdriver::layer()).init();
+            registry.with(tracing_stackdriver::layer()).init();
         } else {
             registry.with(tracing_subscriber::fmt::layer()).init();
         };
