@@ -329,10 +329,7 @@ impl<E: Engine> Executor<E> {
                 Ok(Some(BackendState::Starting))
             }
             BackendState::Starting => {
-                let status = self
-                    .engine
-                    .backend_status(spawn_request)
-                    .await?;
+                let status = self.engine.backend_status(spawn_request).await?;
 
                 let backend_addr = match status {
                     EngineBackendStatus::Running { addr } => addr,
@@ -353,11 +350,7 @@ impl<E: Engine> Executor<E> {
                 Ok(Some(BackendState::Ready))
             }
             BackendState::Ready => {
-                match self
-                    .engine
-                    .backend_status(spawn_request)
-                    .await?
-                {
+                match self.engine.backend_status(spawn_request).await? {
                     EngineBackendStatus::Failed => return Ok(Some(BackendState::Failed)),
                     EngineBackendStatus::Exited => return Ok(Some(BackendState::Exited)),
                     EngineBackendStatus::Terminated => return Ok(Some(BackendState::Swept)),

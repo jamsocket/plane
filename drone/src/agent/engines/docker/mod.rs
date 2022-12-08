@@ -5,7 +5,7 @@ use self::util::{
 use crate::{
     agent::{
         engine::{Engine, EngineBackendStatus},
-        engines::docker::util::{make_exposed_ports, MinuteExt},
+        engines::docker::util::MinuteExt,
     },
     config::{DockerConfig, DockerConnection},
 };
@@ -18,7 +18,7 @@ use bollard::{
         StatsOptions, StopContainerOptions,
     },
     image::CreateImageOptions,
-    models::{HostConfig, PortBinding, ResourcesUlimits},
+    models::{HostConfig, ResourcesUlimits},
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
@@ -175,7 +175,6 @@ impl DockerInterface {
             .iter()
             .map(|(k, v)| format!("{}={}", k, v))
             .collect();
-        let port = executable_config.port.unwrap_or(DEFAULT_CONTAINER_PORT);
 
         // Build the container.
         let container_id = {
@@ -188,7 +187,6 @@ impl DockerInterface {
             let config: Config<String> = Config {
                 image: Some(executable_config.image.to_string()),
                 env: Some(env),
-                exposed_ports: make_exposed_ports(port),
                 labels: Some(
                     vec![
                         ("dev.plane.managed".to_string(), "true".to_string()),
@@ -198,17 +196,6 @@ impl DockerInterface {
                     .collect(),
                 ),
                 host_config: Some(HostConfig {
-                    port_bindings: Some(
-                        vec![(
-                            format!("{}/tcp", port),
-                            Some(vec![PortBinding {
-                                host_ip: None,
-                                host_port: Some("0".to_string()),
-                            }]),
-                        )]
-                        .into_iter()
-                        .collect(),
-                    ),
                     network_mode: self.network.clone(),
                     runtime: self.runtime.clone(),
                     cpu_period: executable_config
@@ -319,10 +306,7 @@ impl Engine for DockerInterface {
         Ok(())
     }
 
-    async fn backend_status(
-        &self,
-        spawn_request: &SpawnRequest
-    ) -> Result<EngineBackendStatus> {
+    async fn backend_status(&self, spawn_request: &SpawnRequest) -> Result<EngineBackendStatus> {
         let container_name = spawn_request.backend_id.to_resource_name();
         let container = match self.docker.inspect_container(&container_name, None).await {
             Ok(container) => container,
@@ -342,8 +326,13 @@ impl Engine for DockerInterface {
 
         if running {
             let ip = get_ip_of_container(&container)?;
-            let addr =
-                SocketAddr::new(ip, spawn_request.executable.port.unwrap_or(DEFAULT_CONTAINER_PORT));
+            let addr = SocketAddr::new(
+                ip,
+                spawn_request
+                    .executable
+                    .port
+                    .unwrap_or(DEFAULT_CONTAINER_PORT),
+            );
 
             Ok(EngineBackendStatus::Running { addr })
         } else {
