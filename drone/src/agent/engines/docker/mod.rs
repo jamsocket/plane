@@ -5,7 +5,7 @@ use self::util::{
 use crate::{
     agent::{
         engine::{Engine, EngineBackendStatus},
-        engines::docker::util::{make_exposed_ports, MinuteExt},
+        engines::docker::util::MinuteExt,
     },
     config::{DockerConfig, DockerConnection},
 };
@@ -18,22 +18,24 @@ use bollard::{
         StatsOptions, StopContainerOptions,
     },
     image::CreateImageOptions,
-    models::{HostConfig, PortBinding, ResourcesUlimits},
+    models::{HostConfig, ResourcesUlimits},
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
 use plane_core::{
-    messages::agent::ResourceLimits,
-    messages::agent::{BackendStatsMessage, DockerPullPolicy, DroneLogMessage, SpawnRequest},
+    messages::agent::{
+        BackendStatsMessage, DockerExecutableConfig, DockerPullPolicy, DroneLogMessage,
+        SpawnRequest,
+    },
     timing::Timer,
     types::BackendId,
 };
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 use std::{net::SocketAddr, pin::Pin};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
 /// The port in the container which is exposed.
-const CONTAINER_PORT: u16 = 8080;
+const DEFAULT_CONTAINER_PORT: u16 = 8080;
 const DEFAULT_DOCKER_TIMEOUT_SECONDS: u64 = 30;
 /// Interval between reporting stats of a running backend.
 /// NOTE: the minimum possible interval is 1 second.
@@ -166,11 +168,13 @@ impl DockerInterface {
     async fn run_container(
         &self,
         name: &str,
-        image: &str,
-        env: &HashMap<String, String>,
-        resource_limits: &ResourceLimits,
+        executable_config: &DockerExecutableConfig,
     ) -> Result<()> {
-        let env: Vec<String> = env.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
+        let env: Vec<String> = executable_config
+            .env
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect();
 
         // Build the container.
         let container_id = {
@@ -181,9 +185,8 @@ impl DockerInterface {
             });
 
             let config: Config<String> = Config {
-                image: Some(image.to_string()),
+                image: Some(executable_config.image.to_string()),
                 env: Some(env),
-                exposed_ports: make_exposed_ports(CONTAINER_PORT),
                 labels: Some(
                     vec![
                         ("dev.plane.managed".to_string(), "true".to_string()),
@@ -193,26 +196,18 @@ impl DockerInterface {
                     .collect(),
                 ),
                 host_config: Some(HostConfig {
-                    port_bindings: Some(
-                        vec![(
-                            format!("{}/tcp", CONTAINER_PORT),
-                            Some(vec![PortBinding {
-                                host_ip: None,
-                                host_port: Some("0".to_string()),
-                            }]),
-                        )]
-                        .into_iter()
-                        .collect(),
-                    ),
                     network_mode: self.network.clone(),
                     runtime: self.runtime.clone(),
-                    cpu_period: resource_limits
+                    cpu_period: executable_config
+                        .resource_limits
                         .cpu_period
                         .map(|cpu_period| cpu_period.as_micros() as i64),
-                    cpu_quota: resource_limits
+                    cpu_quota: executable_config
+                        .resource_limits
                         .cpu_period_percent
                         .and_then(|cpu_period_percent| {
-                            let cpu_period = resource_limits
+                            let cpu_period = executable_config
+                                .resource_limits
                                 .cpu_period
                                 .unwrap_or(std::time::Duration::from_millis(100));
                             cpu_period
@@ -220,20 +215,22 @@ impl DockerInterface {
                                 .checked_div(100)
                                 .map(|cpu_period_time| cpu_period_time.as_micros() as i64)
                         }),
-                    ulimits: resource_limits.cpu_time_limit.map(|cpu_time_limit| {
-                        vec![ResourcesUlimits {
-                            name: Some("cpu".to_string()),
-                            soft: Some(cpu_time_limit.as_minutes() as i64),
-                            hard: Some(cpu_time_limit.as_minutes() as i64),
-                        }]
-                    }),
+                    ulimits: executable_config.resource_limits.cpu_time_limit.map(
+                        |cpu_time_limit| {
+                            vec![ResourcesUlimits {
+                                name: Some("cpu".to_string()),
+                                soft: Some(cpu_time_limit.as_minutes() as i64),
+                                hard: Some(cpu_time_limit.as_minutes() as i64),
+                            }]
+                        },
+                    ),
                     ..HostConfig::default()
                 }),
                 ..Config::default()
             };
 
             let result = self.docker.create_container(options, config).await?;
-            tracing::info!(duration=?timer.duration(), %image, "Created container.");
+            tracing::info!(duration=?timer.duration(), image=%executable_config.image, "Created container.");
             result.id
         };
 
@@ -302,20 +299,15 @@ impl Engine for DockerInterface {
         }
 
         let backend_id = spawn_request.backend_id.to_resource_name();
-        self.run_container(
-            &backend_id,
-            &spawn_request.executable.image,
-            &spawn_request.executable.env,
-            &spawn_request.executable.resource_limits,
-        )
-        .await?;
+        self.run_container(&backend_id, &spawn_request.executable)
+            .await?;
         tracing::info!(%backend_id, "Container is running.");
 
         Ok(())
     }
 
-    async fn backend_status(&self, backend: &BackendId) -> Result<EngineBackendStatus> {
-        let container_name = backend.to_resource_name();
+    async fn backend_status(&self, spawn_request: &SpawnRequest) -> Result<EngineBackendStatus> {
+        let container_name = spawn_request.backend_id.to_resource_name();
         let container = match self.docker.inspect_container(&container_name, None).await {
             Ok(container) => container,
             Err(bollard::errors::Error::DockerResponseServerError {
@@ -334,7 +326,13 @@ impl Engine for DockerInterface {
 
         if running {
             let ip = get_ip_of_container(&container)?;
-            let addr = SocketAddr::new(ip, CONTAINER_PORT);
+            let addr = SocketAddr::new(
+                ip,
+                spawn_request
+                    .executable
+                    .port
+                    .unwrap_or(DEFAULT_CONTAINER_PORT),
+            );
 
             Ok(EngineBackendStatus::Running { addr })
         } else {

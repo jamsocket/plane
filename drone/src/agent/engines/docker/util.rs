@@ -3,7 +3,7 @@ use bollard::container::Stats;
 use bollard::service::{ContainerInspectResponse, EventMessage};
 use futures::Stream;
 use plane_core::{messages::agent::BackendStatsMessage, types::BackendId};
-use std::{collections::HashMap, net::IpAddr, pin::Pin, task::Poll};
+use std::{net::IpAddr, pin::Pin, task::Poll};
 
 pub trait MinuteExt {
     fn as_minutes(&self) -> u128;
@@ -13,11 +13,6 @@ impl MinuteExt for std::time::Duration {
     fn as_minutes(&self) -> u128 {
         (self.as_secs() / 60).into()
     }
-}
-
-pub fn make_exposed_ports(port: u16) -> Option<HashMap<String, HashMap<(), ()>>> {
-    let dummy: HashMap<(), ()> = vec![].into_iter().collect();
-    Some(vec![(format!("{}/tcp", port), dummy)].into_iter().collect())
 }
 
 /// Helper trait for swallowing Docker not found errors.

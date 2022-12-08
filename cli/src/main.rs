@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
@@ -31,6 +31,10 @@ enum Command {
         /// Grace period with no connections before shutting down the drone.
         #[clap(long, default_value = "300")]
         timeout: u64,
+        #[clap(long, short)]
+        port: Option<u16>,
+        #[clap(long, short)]
+        env: Option<String>,
     },
     Status {
         backend: Option<String>,
@@ -107,7 +111,24 @@ async fn main() -> Result<()> {
             image,
             cluster,
             timeout,
+            port,
+            env,
         } => {
+            let env: Result<HashMap<String, String>> = env
+                .iter()
+                .map(|d| {
+                    let (key, value) = d.split_once('=').ok_or_else(|| {
+                        anyhow!(
+                            "Expected environment variables in the form KEY=VALUE, instead got {}",
+                            d
+                        )
+                    })?;
+
+                    Ok((key.to_string(), value.to_string()))
+                })
+                .collect();
+            let env = env?;
+
             let result = nats
                 .request(&ScheduleRequest {
                     backend_id: None,
@@ -116,10 +137,11 @@ async fn main() -> Result<()> {
                     metadata: HashMap::new(),
                     executable: DockerExecutableConfig {
                         image,
-                        env: HashMap::new(),
+                        env,
                         credentials: None,
                         resource_limits: ResourceLimits::default(),
                         pull_policy: Default::default(),
+                        port,
                     },
                     require_bearer_token: false,
                 })
