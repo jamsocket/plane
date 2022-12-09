@@ -18,7 +18,6 @@ use plane_drone::database::DroneDatabase;
 use plane_drone::proxy::ProxyOptions;
 use reqwest::Response;
 use reqwest::{Certificate, ClientBuilder};
-use std::net::SocketAddrV4;
 use std::sync::Arc;
 use std::{net::SocketAddr, time::Duration};
 use tokio::net::TcpStream;
@@ -69,7 +68,7 @@ impl Proxy {
 
         let options = ProxyOptions {
             db: db.clone(),
-            bind_ip: std::net::IpAddr::V4(bind_ip),
+            bind_ip,
             bind_port: 4040,
             key_pair: Some(certs.path_pair.clone()),
             cluster_domain: CLUSTER.into(),
@@ -78,7 +77,7 @@ impl Proxy {
 
         let proxy = Proxy {
             guard,
-            bind_address: SocketAddr::V4(SocketAddrV4::new(bind_ip, 4040)),
+            bind_address: SocketAddr::new(bind_ip, 4040),
             certs,
             db,
         };

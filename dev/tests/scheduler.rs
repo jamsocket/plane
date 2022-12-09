@@ -4,7 +4,7 @@ use plane_controller::run_scheduler;
 use plane_core::{
     messages::{
         agent::{DroneState, DroneStatusMessage, SpawnRequest},
-        scheduler::ScheduleResponse,
+        scheduler::ScheduleResponse, PLANE_VERSION,
     },
     nats::TypedNats,
     types::{ClusterName, DroneId},
@@ -16,8 +16,6 @@ use plane_dev::{
 };
 use std::time::Duration;
 use tokio::time::sleep;
-
-const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 struct MockAgent {
     nats: TypedNats,

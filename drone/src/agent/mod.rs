@@ -10,10 +10,10 @@ use plane_core::{
     logging::LogError,
     messages::{
         agent::{
-            DroneConnectRequest, DroneState, DroneStatusMessage, SpawnRequest, TerminationRequest,
+            DroneConnectRequest, DroneState, SpawnRequest, TerminationRequest,
         },
         scheduler::DrainDrone,
-        state::StateUpdate,
+        state::StateUpdate, PLANE_VERSION,
     },
     nats::TypedNats,
     retry::do_with_retry,
@@ -25,8 +25,6 @@ use std::{
     time::Duration,
 };
 use tokio::sync::watch::{self, Receiver, Sender};
-
-const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod backend;
 mod engine;
@@ -107,34 +105,20 @@ async fn listen_for_termination_requests(
     }
 }
 
-/// Repeatedly publish a status message advertising this drone as available.
-async fn ready_loop(
+/// Repeatedly publish a heartbeat message about this drone.
+async fn heartbeat_loop(
     nc: TypedNats,
     drone_id: &DroneId,
     cluster: ClusterName,
     recv_state: Receiver<DroneState>,
-    db: DroneDatabase,
     ip: IpAddr,
 ) -> NeverResult {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
     loop {
         let state = *recv_state.borrow();
-        let ready = state == DroneState::Ready;
-
-        let running_backends = db.running_backends().await?;
-
-        nc.publish_jetstream(&DroneStatusMessage {
-            drone_id: drone_id.clone(),
-            cluster: cluster.clone(),
-            drone_version: PLANE_VERSION.to_string(),
-            ready,
-            state,
-            running_backends: Some(running_backends as u32),
-        })
-        .await
-        .log_error("Error in ready loop.");
-
+        tracing::info!(state=?state, "Publishing heartbeat.");
+        
         nc.publish_jetstream(&StateUpdate::DroneStatus {
             cluster: cluster.clone(),
             drone: drone_id.clone(),
@@ -161,7 +145,7 @@ async fn listen_for_drain(
         .await?;
 
     while let Some(req) = sub.next().await {
-        tracing::info!(req=?req.message(), "Received request to drain drone.");
+        tracing::info!(req=?req.value, "Received request to drain drone.");
         req.respond(&()).await?;
 
         let state = if req.value.drain {
@@ -201,12 +185,11 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
     let (send_state, recv_state) = watch::channel(DroneState::Ready);
 
     tokio::select!(
-        result = ready_loop(
+        result = heartbeat_loop(
             nats.clone(),
             &agent_opts.drone_id,
             cluster.clone(),
             recv_state.clone(),
-            db,
             ip,
         ) => result,
 

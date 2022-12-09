@@ -7,7 +7,7 @@ use plane_core::types::DroneId;
 use rand::distributions::Alphanumeric;
 use rand::thread_rng;
 use rand::Rng;
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, IpAddr};
 use std::time::SystemTime;
 use std::{
     net::{SocketAddr, SocketAddrV4},
@@ -30,13 +30,13 @@ pub fn random_prefix(suffix: &str) -> String {
     format!("{}-{}", prefix, suffix)
 }
 
-pub fn random_loopback_ip() -> Ipv4Addr {
+pub fn random_loopback_ip() -> IpAddr {
     let mut rng = thread_rng();
     let v1 = rng.gen_range(1..254);
     let v2 = rng.gen_range(1..254);
     let v3 = rng.gen_range(1..254);
 
-    Ipv4Addr::new(127, v1, v2, v3)
+    IpAddr::V4(Ipv4Addr::new(127, v1, v2, v3))
 }
 
 pub async fn wait_for_port(addr: SocketAddrV4, timeout_ms: u128) -> Result<()> {

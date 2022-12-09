@@ -13,7 +13,7 @@ use time::OffsetDateTime;
 
 pub mod replica;
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct DroneView {
     /// The most recent heartbeat we've received for this drone.
     pub last_heartbeat: Option<(DroneState, OffsetDateTime)>,
@@ -55,15 +55,12 @@ impl ClusterView {
                 drone_version,
                 ..
             } => {
-                if state == DroneState::Stopped {
-                    self.drones.remove(&drone);
-                    return;
-                }
                 let mut drone = self.drones.entry(drone.clone()).or_default();
 
                 drone.last_heartbeat = Some((state, timestamp));
                 drone.ip = Some(ip);
                 drone.version = Some(drone_version);
+                tracing::info!(?drone, "Drone status update");
             }
             StateUpdate::BackendStatus {
                 drone,
@@ -114,9 +111,9 @@ impl SystemView {
 #[cfg(test)]
 mod test {
     use std::net::Ipv4Addr;
+    use crate::messages::PLANE_VERSION;
 
     use super::*;
-    const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
     #[test]
     fn test_drone_status() {

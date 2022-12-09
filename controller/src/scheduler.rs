@@ -84,10 +84,8 @@ impl Scheduler {
 
 #[cfg(test)]
 mod tests {
-    use plane_core::messages::agent::DroneState;
-
+    use plane_core::messages::{agent::DroneState, PLANE_VERSION};
     use super::*;
-    const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
     fn date(date: &str) -> DateTime<Utc> {
         DateTime::parse_from_rfc3339(date).unwrap().into()

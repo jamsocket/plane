@@ -1,12 +1,12 @@
 use super::agent::{BackendState, DroneState};
 use crate::{
-    nats::{JetStreamable, NoReply, TypedMessage},
+    nats::{JetStreamable, NoReply, TypedMessage, SubscribeSubject},
     types::{BackendId, ClusterName, DroneId},
 };
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum StateUpdate {
     /// A drone heartbeat, sent periodically as long as the drone is alive.
     /// Also sent immediately when the state changes.
@@ -76,5 +76,9 @@ impl StateUpdate {
             StateUpdate::DroneStatus { cluster, .. } => cluster,
             StateUpdate::BackendStatus { cluster, .. } => cluster,
         }
+    }
+
+    pub fn subscribe_subject() -> SubscribeSubject<Self> {
+        SubscribeSubject::new("cluster.*.drone.*.sm.>".to_string())
     }
 }

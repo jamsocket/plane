@@ -43,6 +43,7 @@ impl SystemViewReplica {
 
             tokio::spawn(async move {
                 while let Some((update, meta)) = sub.next().await {
+                    tracing::info!(?update, "SystemViewReplica update");
                     view.write()
                         .expect("SystemView RwLock was poisoned.")
                         .update_state(update, meta.timestamp);
