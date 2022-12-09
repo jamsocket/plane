@@ -1,6 +1,6 @@
 use crate::{config::ControllerConfig, dns::rname_format::format_rname};
 use anyhow::{Context, Result};
-use plane_core::nats::TypedNats;
+use plane_core::{nats::TypedNats, views::replica::SystemViewReplica};
 use std::net::IpAddr;
 use trust_dns_server::client::rr::Name;
 
@@ -10,6 +10,7 @@ pub struct DnsPlan {
     pub port: u16,
     pub bind_ip: IpAddr,
     pub soa_email: Option<Name>,
+    pub view: SystemViewReplica,
     pub nc: TypedNats,
 }
 
@@ -22,6 +23,8 @@ pub struct ControllerPlan {
 impl ControllerPlan {
     pub async fn from_controller_config(config: ControllerConfig) -> Result<Self> {
         let nats = config.nats.connect_with_retry().await?;
+
+        let view = SystemViewReplica::new(nats.clone()).await?;
 
         let scheduler_plan = config.scheduler.map(|_| SchedulerPlan);
         let dns_plan = if let Some(options) = config.dns {
@@ -41,6 +44,7 @@ impl ControllerPlan {
                 port: options.port,
                 bind_ip: options.bind_ip,
                 soa_email,
+                view,
                 nc: nats.clone(),
             })
         } else {

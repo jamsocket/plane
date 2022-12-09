@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use integration_test::integration_test;
 use plane_core::{
     messages::{
@@ -6,7 +6,6 @@ use plane_core::{
             BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
             DroneStatusMessage, SpawnRequest, TerminationRequest,
         },
-        dns::{DnsRecordType, SetDnsRecord},
         scheduler::DrainDrone,
     },
     nats::{TypedNats, TypedSubscription},
@@ -62,7 +61,6 @@ impl Agent {
 struct MockController {
     nats: TypedNats,
     drone_connect_response_subscription: TypedSubscription<DroneConnectRequest>,
-    dns_subscription: TypedSubscription<SetDnsRecord>,
 }
 
 impl MockController {
@@ -71,26 +69,12 @@ impl MockController {
             .subscribe(DroneConnectRequest::subscribe_subject())
             .await?;
 
-        let dns_subscription = nats.subscribe(SetDnsRecord::subscribe_subject()).await?;
-
         sleep(Duration::from_secs(2)).await;
 
         Ok(MockController {
             nats,
             drone_connect_response_subscription,
-            dns_subscription,
         })
-    }
-
-    pub async fn next_dns_record(&mut self) -> Result<SetDnsRecord> {
-        timeout(
-            5_000,
-            "Should receive DNS message.",
-            self.dns_subscription.next(),
-        )
-        .await?
-        .map(|d| d.value)
-        .ok_or_else(|| anyhow!("Expected a DNS record."))
     }
 
     /// Complete the initial handshake between the drone and the platform, mocking the
@@ -328,17 +312,6 @@ async fn spawn_with_agent() {
         .expect_backend_status_message(BackendState::Ready, 5_000)
         .await
         .unwrap();
-
-    let dns_record = controller_mock.next_dns_record().await.unwrap();
-    assert_eq!(
-        SetDnsRecord {
-            cluster: ClusterName::new("plane.test"),
-            kind: DnsRecordType::A,
-            name: request.backend_id.to_string(),
-            value: agent.ip.to_string(),
-        },
-        dns_record
-    );
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 1)

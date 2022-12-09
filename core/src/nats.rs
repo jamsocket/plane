@@ -327,7 +327,7 @@ impl TypedNats {
 
     async fn add_jetstream_stream<T: JetStreamable>(&self) -> Result<()> {
         let config = T::config();
-        tracing::debug!(name = config.name, "Creating jetstream stream.");
+        tracing::info!(name = config.name, "Creating jetstream stream.");
         self.jetstream
             .get_or_create_stream(config)
             .await

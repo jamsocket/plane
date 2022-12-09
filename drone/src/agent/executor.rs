@@ -179,13 +179,7 @@ impl<E: Engine> Executor<E> {
             if state.running() {
                 self.backend_to_monitor.insert(
                     backend_id.clone(),
-                    BackendMonitor::new(
-                        &backend_id,
-                        &self.cluster,
-                        self.ip,
-                        self.engine.as_ref(),
-                        &self.nc,
-                    ),
+                    BackendMonitor::new(&backend_id, self.engine.as_ref(), &self.nc),
                 );
             }
             tokio::spawn(async move { executor.run_backend(&spec, state).await });
@@ -248,8 +242,6 @@ impl<E: Engine> Executor<E> {
                             spawn_request.backend_id.clone(),
                             BackendMonitor::new(
                                 &spawn_request.backend_id,
-                                &self.cluster,
-                                self.ip,
                                 self.engine.as_ref(),
                                 &self.nc,
                             ),

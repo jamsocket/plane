@@ -15,7 +15,6 @@ pub mod dns;
 pub mod plan;
 pub mod run;
 mod scheduler;
-pub mod ttl_store;
 
 pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
     let scheduler = Scheduler::default();

@@ -2,10 +2,8 @@ use anyhow::Result;
 use integration_test::integration_test;
 use plane_controller::{dns::serve_dns, plan::DnsPlan};
 use plane_core::{
-    messages::dns::{DnsRecordType, SetDnsRecord},
-    nats::TypedNats,
-    types::ClusterName,
-    Never,
+    messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName,
+    views::replica::SystemViewReplica, Never,
 };
 use plane_dev::{
     resources::nats::Nats,
@@ -51,12 +49,14 @@ impl DnsServer {
         let ip = random_loopback_ip();
         let nats = Nats::new().await?;
         let nc = nats.connection().await?;
+        let view = SystemViewReplica::new(nc.clone()).await?;
 
         let plan = DnsPlan {
             bind_ip: ip.into(),
             port: DNS_PORT,
             soa_email: Some(Name::from_ascii("admin.plane.test.")?),
             nc: nc.clone(),
+            view,
         };
         let guard = expect_to_stay_alive(serve_dns(plan));
 
@@ -115,10 +115,8 @@ async fn dns_txt_record() {
     let dns = DnsServer::new().await.unwrap();
 
     dns.nc
-        .publish_jetstream(&SetDnsRecord {
+        .publish_jetstream(&SetAcmeDnsRecord {
             cluster: ClusterName::new("plane.test"),
-            kind: DnsRecordType::TXT,
-            name: "_acme-challenge".into(),
             value: "foobar".into(),
         })
         .await
@@ -135,20 +133,16 @@ async fn dns_multi_txt_record() {
     let dns = DnsServer::new().await.unwrap();
 
     dns.nc
-        .publish_jetstream(&SetDnsRecord {
+        .publish_jetstream(&SetAcmeDnsRecord {
             cluster: ClusterName::new("plane.test"),
-            kind: DnsRecordType::TXT,
-            name: "_acme-challenge".into(),
             value: "foobar".into(),
         })
         .await
         .unwrap();
 
     dns.nc
-        .publish_jetstream(&SetDnsRecord {
+        .publish_jetstream(&SetAcmeDnsRecord {
             cluster: ClusterName::new("plane.test"),
-            kind: DnsRecordType::TXT,
-            name: "_acme-challenge".into(),
             value: "foobaz".into(),
         })
         .await
@@ -158,61 +152,6 @@ async fn dns_multi_txt_record() {
 
     let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
     assert_eq!(vec!["foobar".to_string(), "foobaz".to_string()], result);
-}
-
-#[integration_test]
-async fn dns_a_record() {
-    let dns = DnsServer::new().await.unwrap();
-
-    dns.nc
-        .publish_jetstream(&SetDnsRecord {
-            cluster: ClusterName::new("plane.test"),
-            kind: DnsRecordType::A,
-            name: "louie".into(),
-            value: "12.12.12.12".into(),
-        })
-        .await
-        .expect("Error publishing to Jetstream");
-
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
-    let result = dns
-        .a_record("louie.plane.test")
-        .await
-        .expect("Couldn't fetch DNS record.");
-    assert_eq!(vec![Ipv4Addr::new(12, 12, 12, 12)], result);
-}
-
-#[integration_test]
-async fn dns_multi_a_record() {
-    let dns = DnsServer::new().await.unwrap();
-
-    dns.nc
-        .publish_jetstream(&SetDnsRecord {
-            cluster: ClusterName::new("plane.test"),
-            kind: DnsRecordType::A,
-            name: "louie".into(),
-            value: "12.12.12.12".into(),
-        })
-        .await
-        .unwrap();
-
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
-    dns.nc
-        .publish_jetstream(&SetDnsRecord {
-            cluster: ClusterName::new("plane.test"),
-            kind: DnsRecordType::A,
-            name: "louie".into(),
-            value: "14.14.14.14".into(),
-        })
-        .await
-        .unwrap();
-
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
-    let result = dns.a_record("louie.plane.test").await.unwrap();
-    assert_eq!(vec![Ipv4Addr::new(14, 14, 14, 14)], result);
 }
 
 #[integration_test]
