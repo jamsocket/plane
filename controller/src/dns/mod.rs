@@ -12,6 +12,7 @@ use plane_core::messages::cert::SetAcmeDnsRecord;
 use plane_core::types::BackendId;
 use plane_core::types::ClusterName;
 use plane_core::views::replica::SystemViewReplica;
+use plane_core::AbortOnDrop;
 use plane_core::Never;
 use std::collections::VecDeque;
 use std::net::IpAddr;
@@ -19,7 +20,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
-use tokio::task::JoinHandle;
 use tokio::{
     self,
     net::{TcpListener, UdpSocket},
@@ -86,7 +86,9 @@ struct ClusterDnsServer {
     txt_record_map: MultiRecordMap,
     view: SystemViewReplica,
     soa_email: Option<Name>,
-    _handle: JoinHandle<anyhow::Result<()>>,
+
+    /// Handle to the background task that listens for SetAcmeDnsRecord messages.
+    _handle: AbortOnDrop,
 }
 
 impl ClusterDnsServer {
@@ -98,20 +100,22 @@ impl ClusterDnsServer {
             let txt_record_map = txt_record_map.clone();
 
             tokio::spawn(async move {
-                tracing::info!("In SetDnsRecord subscription loop.");
-
                 loop {
-                    let mut stream = nc.subscribe(SetAcmeDnsRecord::subscribe_subject()).await?;
+                    if let Ok(mut stream) =
+                        nc.subscribe(SetAcmeDnsRecord::subscribe_subject()).await
+                    {
+                        while let Some(v) = stream.next().await {
+                            let v = v.value;
+                            tracing::info!(?v, "Got SetAcmeDnsRecord request.");
 
-                    while let Some(v) = stream.next().await {
-                        let v = v.value;
-                        tracing::info!(?v, "Got SetAcmeDnsRecord request.");
+                            txt_record_map.insert(Instant::now(), v.cluster, v.value);
+                        }
 
-                        // let value = RData::TXT(TXT::new(vec![v.value]));
-                        txt_record_map.insert(Instant::now(), v.cluster, v.value);
+                        tracing::warn!("SetDnsRecord connection lost; reconnecting.");
+                    } else {
+                        tracing::warn!("Failed to subscribe to SetDnsRecord; retrying.");
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                     }
-
-                    tracing::warn!("SetDnsRecord connection lost; reconnecting.");
                 }
             })
         };
@@ -120,7 +124,7 @@ impl ClusterDnsServer {
             txt_record_map,
             soa_email: plan.soa_email.clone(),
             view: plan.view,
-            _handle: handle,
+            _handle: AbortOnDrop::new(handle),
         }
     }
 
@@ -160,18 +164,13 @@ impl ClusterDnsServer {
                     if let Some(ip) = cluster.route(&BackendId::new(hostname.to_string())) {
                         let name = request.query().name().clone();
 
-                        match ip {
-                            IpAddr::V4(ip) => {
-                                let rdata = RData::A(ip);
-                                let record = Record::from_rdata(name.into(), DNS_RECORD_TTL, rdata);
-                                vec![record]
-                            }
-                            IpAddr::V6(ip) => {
-                                let rdata = RData::AAAA(ip);
-                                let record = Record::from_rdata(name.into(), DNS_RECORD_TTL, rdata);
-                                vec![record]
-                            }
-                        }
+                        let rdata = match ip {
+                            IpAddr::V4(ip) => RData::A(ip),
+                            IpAddr::V6(ip) => RData::AAAA(ip),
+                        };
+
+                        let record = Record::from_rdata(name.into(), DNS_RECORD_TTL, rdata);
+                        vec![record]
                     } else {
                         vec![]
                     }

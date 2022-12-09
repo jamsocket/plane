@@ -1,20 +1,11 @@
 use crate::agent::engine::Engine;
-use plane_core::{logging::LogError, nats::TypedNats, types::BackendId};
+use plane_core::{logging::LogError, nats::TypedNats, types::BackendId, AbortOnDrop};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 
-/// JoinHandle does not abort when it is dropped; this wrapper does.
-struct AbortOnDrop<T>(JoinHandle<T>);
-
-impl<T> Drop for AbortOnDrop<T> {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
-}
-
 pub struct BackendMonitor {
-    _log_loop: AbortOnDrop<()>,
-    _stats_loop: AbortOnDrop<()>,
+    _log_loop: AbortOnDrop,
+    _stats_loop: AbortOnDrop,
 }
 
 impl BackendMonitor {
@@ -23,8 +14,8 @@ impl BackendMonitor {
         let stats_loop = Self::stats_loop(backend_id, engine, nc);
 
         BackendMonitor {
-            _log_loop: AbortOnDrop(log_loop),
-            _stats_loop: AbortOnDrop(stats_loop),
+            _log_loop: AbortOnDrop::new(log_loop),
+            _stats_loop: AbortOnDrop::new(stats_loop),
         }
     }
 

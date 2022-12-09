@@ -1,3 +1,4 @@
+use tokio::task::JoinHandle;
 pub mod cli;
 pub mod logging;
 pub mod messages;
@@ -19,3 +20,18 @@ pub enum Never {}
 /// It is used as a return value to represent functions that are expected
 /// to run forever, but may error-out.
 pub type NeverResult = anyhow::Result<Never>;
+
+/// JoinHandle does not abort when it is dropped; this wrapper does.
+pub struct AbortOnDrop(JoinHandle<()>);
+
+impl AbortOnDrop {
+    pub fn new(handle: JoinHandle<()>) -> Self {
+        Self(handle)
+    }
+}
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}

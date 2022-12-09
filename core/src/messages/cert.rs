@@ -17,13 +17,13 @@ impl TypedMessage for SetAcmeDnsRecord {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        "acme.set_dns_record".to_string()
+        "acme.set_acme_dns_record".to_string()
     }
 }
 
 impl SetAcmeDnsRecord {
     pub fn subscribe_subject() -> SubscribeSubject<Self> {
-        SubscribeSubject::new("acme.set_dns_record".to_string())
+        SubscribeSubject::new("acme.set_acme_dns_record".to_string())
     }
 
     pub fn ttl() -> Duration {
@@ -33,13 +33,13 @@ impl SetAcmeDnsRecord {
 
 impl JetStreamable for SetAcmeDnsRecord {
     fn stream_name() -> &'static str {
-        "acme_set_dns_record"
+        "acme_set_acme_dns_record"
     }
 
     fn config() -> async_nats::jetstream::stream::Config {
         async_nats::jetstream::stream::Config {
             name: Self::stream_name().to_string(),
-            subjects: vec!["acme.set_dns_record".to_string()],
+            subjects: vec!["acme.set_acme_dns_record".to_string()],
             max_age: Self::ttl(),
             ..Default::default()
         }
