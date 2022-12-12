@@ -77,7 +77,12 @@ impl MockController {
             .ok_or_else(|| anyhow!("Drone {} not found in cluster", drone_id))
     }
 
-    pub async fn wait_for_drone(&self, drone_id: &DroneId, deadline: Instant) -> Result<Arc<RwLock<DroneView>>> {
+    pub async fn wait_for_drone(
+        &self,
+        drone_id: &DroneId,
+        timeout_seconds: u64,
+    ) -> Result<Arc<RwLock<DroneView>>> {
+        let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
         loop {
             let drone = self.drone(drone_id);
             match drone {
@@ -92,7 +97,7 @@ impl MockController {
                     }
 
                     tokio::time::sleep(Duration::from_millis(100)).await;
-                },
+                }
             }
         }
     }
@@ -120,7 +125,13 @@ impl MockController {
         Ok(backend.clone())
     }
 
-    pub async fn wait_for_backend(&self, drone_id: &DroneId, backend_id: &BackendId, deadline: Instant) -> Result<Arc<RwLock<BackendView>>> {
+    pub async fn wait_for_backend(
+        &self,
+        drone_id: &DroneId,
+        backend_id: &BackendId,
+        timeout_seconds: u64,
+    ) -> Result<Arc<RwLock<BackendView>>> {
+        let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
         loop {
             let backend = self.backend(drone_id, backend_id);
             match backend {
@@ -135,7 +146,7 @@ impl MockController {
                     }
 
                     tokio::time::sleep(Duration::from_millis(100)).await;
-                },
+                }
             }
         }
     }
@@ -184,7 +195,9 @@ impl MockController {
             .checked_add(Duration::from_secs(timeout_seconds))
             .unwrap();
 
-        let backend = self.wait_for_backend(drone_id, backend_id, deadline).await?;
+        let backend = self
+            .wait_for_backend(drone_id, backend_id, timeout_seconds)
+            .await?;
         let mut subscription = backend.write().unwrap().stream();
 
         loop {
@@ -210,34 +223,6 @@ impl MockController {
             }
         }
     }
-
-    // pub async fn wait_for_backend_removed(
-    //     &self,
-    //     drone_id: &DroneId,
-    //     backend_id: &BackendId,
-    //     timeout_seconds: u64,
-    // ) -> Result<()> {
-    //     let start = Instant::now();
-    //     loop {
-    //         let result = self.drone(drone_id);
-    //         if let Ok(drone) = &result {
-    //             if drone.backends.get(backend_id).is_none() {
-    //                 return Ok(());
-    //             }
-    //         }
-
-    //         if start.elapsed() > Duration::from_secs(timeout_seconds) {
-    //             return Err(anyhow!(
-    //                 "Backend {} was not removed after {} seconds. Last result: {:?}",
-    //                 backend_id,
-    //                 timeout_seconds,
-    //                 result
-    //             ));
-    //         }
-
-    //         tokio::time::sleep(Duration::from_millis(100)).await;
-    //     }
-    // }
 
     pub async fn spawn_backend(&self, request: &SpawnRequest) -> Result<()> {
         let result = timeout(
@@ -420,53 +405,79 @@ async fn use_ip_lookup_api() {
     assert_eq!("123.11.22.33".parse::<IpAddr>().unwrap(), result);
 }
 
-// #[integration_test]
-// async fn handle_error_during_start() {
-//     let nats = Nats::new().await.unwrap();
-//     let connection = nats.connection().await.unwrap();
-//     let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
-//     let drone_id = DroneId::new_random();
-//     let agent = Agent::new(&nats, &drone_id).await.unwrap();
-//     controller_mock
-//         .expect_drone_status(&drone_id, agent.ip)
-//         .await
-//         .unwrap();
+#[integration_test]
+async fn handle_error_during_start() {
+    let nats = Nats::new().await.unwrap();
+    let controller_mock = MockController::new(&nats).await.unwrap();
+    let drone_id = DroneId::new_random();
+    let _agent = Agent::new(&nats, &drone_id).await.unwrap();
 
-//     controller_mock
-//         .expect_backend_status(&drone_id, &ClusterName::new("plane.test"), true, 0)
-//         .await
-//         .unwrap();
+    controller_mock
+        .wait_for_drone_state(&drone_id, DroneState::Ready, 10)
+        .await
+        .unwrap();
 
-//     let mut request = base_spawn_request();
-//     request.drone_id = drone_id;
-//     // Exit with error code 1 after 100ms.
-//     request
-//         .executable
-//         .env
-//         .insert("EXIT_CODE".into(), "1".into());
-//     request
-//         .executable
-//         .env
-//         .insert("EXIT_TIMEOUT".into(), "100".into());
+    let mut request = base_spawn_request();
+    request.drone_id = drone_id;
+    // Exit with error code 1 after 100ms.
+    request
+        .executable
+        .env
+        .insert("EXIT_CODE".into(), "1".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_TIMEOUT".into(), "100".into());
 
-//     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
-//         .await
-//         .unwrap();
-//     controller_mock.spawn_backend(&request).await.unwrap();
+    controller_mock.spawn_backend(&request).await.unwrap();
 
-//     state_subscription
-//         .expect_backend_status_message(BackendState::Loading, 5_000)
-//         .await
-//         .unwrap();
-//     state_subscription
-//         .expect_backend_status_message(BackendState::Starting, 30_000)
-//         .await
-//         .unwrap();
-//     state_subscription
-//         .expect_backend_status_message(BackendState::ErrorStarting, 5_000)
-//         .await
-//         .unwrap();
-// }
+    let mut state_stream = controller_mock
+        .wait_for_backend(&request.drone_id, &request.backend_id, 10)
+        .await
+        .unwrap()
+        .write()
+        .unwrap()
+        .stream();
+
+    assert_eq!(
+        timeout(
+            5_000,
+            "Waiting for backend to be in Loading state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::Loading
+    );
+
+    assert_eq!(
+        timeout(
+            30_000,
+            "Waiting for backend to be in Starting state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::Starting
+    );
+
+    assert_eq!(
+        timeout(
+            5_000,
+            "Waiting for backend to be in ErrorStarting state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::ErrorStarting
+    );
+}
 
 // #[integration_test]
 // async fn handle_failure_after_ready() {

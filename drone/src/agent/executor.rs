@@ -198,6 +198,7 @@ impl<E: Engine> Executor<E> {
                 "Spawn request included bearer token, which is not currently supported."
             );
         }
+        self.update_backend_state(spawn_request, state).await;
 
         loop {
             tracing::info!(
