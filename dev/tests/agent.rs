@@ -47,10 +47,7 @@ impl Agent {
 
         let agent_guard = expect_to_stay_alive(plane_drone::agent::run_agent(agent_opts));
 
-        Ok(Agent {
-            agent_guard,
-            db,
-        })
+        Ok(Agent { agent_guard, db })
     }
 }
 
@@ -73,31 +70,6 @@ impl MockController {
             .ok_or_else(|| anyhow!("Cluster not found"))?
             .drone(drone_id)
             .ok_or_else(|| anyhow!("Drone {} not found in cluster", drone_id))
-    }
-
-    pub async fn wait_for_drone(
-        &self,
-        drone_id: &DroneId,
-        timeout_seconds: u64,
-    ) -> Result<Arc<RwLock<DroneView>>> {
-        let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
-        loop {
-            let drone = self.drone(drone_id);
-            match drone {
-                Ok(drone) => return Ok(drone),
-                Err(error) => {
-                    if Instant::now() > deadline {
-                        return Err(anyhow!(
-                            "Drone {} did not appear in system view after 10 seconds. Last error: {}",
-                            drone_id,
-                            error
-                        ));
-                    }
-
-                    tokio::time::sleep(Duration::from_millis(100)).await;
-                }
-            }
-        }
     }
 
     pub fn backend(
@@ -615,7 +587,7 @@ async fn handle_successful_termination() {
     assert_eq!(
         timeout(
             30_000,
-            "Waiting for backend to be in Starting state.",
+            "Waiting for backend to be in Ready state.",
             state_stream.next()
         )
         .await
@@ -651,54 +623,96 @@ async fn handle_successful_termination() {
     );
 }
 
-// #[integration_test]
-// async fn handle_agent_restart() {
-//     let nats_con = Nats::new().await.unwrap();
-//     let nats = nats_con.connection().await.unwrap();
-//     let mut controller_mock = MockController::new(nats.clone()).await.unwrap();
+#[integration_test]
+async fn handle_agent_restart() {
+    let nats_con = Nats::new().await.unwrap();
+    // let nats = nats_con.connection().await.unwrap();
+    let controller_mock = MockController::new(&nats_con).await.unwrap();
 
-//     let mut state_subscription = {
-//         let drone_id = DroneId::new_random();
-//         let agent = Agent::new(&nats_con, &drone_id).await.unwrap();
-//         controller_mock
-//             .expect_drone_status(&drone_id, agent.ip)
-//             .await
-//             .unwrap();
+    let mut state_stream = {
+        let drone_id = DroneId::new_random();
+        let _agent = Agent::new(&nats_con, &drone_id).await.unwrap();
 
-//         controller_mock
-//             .expect_backend_status(&drone_id, &ClusterName::new("plane.test"), true, 0)
-//             .await
-//             .unwrap();
+        controller_mock
+            .wait_for_drone_state(&drone_id, DroneState::Ready, 10)
+            .await
+            .unwrap();
 
-//         let mut request = base_spawn_request();
-//         request.drone_id = drone_id;
+        let mut request = base_spawn_request();
+        request.max_idle_secs = Duration::from_secs(5);
+        request.drone_id = drone_id;
 
-//         let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id)
-//             .await
-//             .unwrap();
-//         controller_mock.spawn_backend(&request).await.unwrap();
-//         state_subscription
-//             .wait_for_state(BackendState::Ready, 60_000)
-//             .await
-//             .unwrap();
-//         state_subscription
-//     };
+        controller_mock.spawn_backend(&request).await.unwrap();
 
-//     // Original agent goes away when it goes out of scope.
-//     {
-//         let drone_id = DroneId::new_random();
-//         let agent = Agent::new(&nats_con, &drone_id).await.unwrap();
-//         controller_mock
-//             .expect_drone_status(&drone_id, agent.ip)
-//             .await
-//             .unwrap();
+        let mut state_stream = controller_mock
+            .wait_for_backend(&request.drone_id, &request.backend_id, 10)
+            .await
+            .unwrap()
+            .write()
+            .unwrap()
+            .stream();
 
-//         state_subscription
-//             .wait_for_state(BackendState::Swept, 20_000)
-//             .await
-//             .unwrap();
-//     }
-// }
+        assert_eq!(
+            timeout(
+                30_000,
+                "Waiting for backend to be in Loading state.",
+                state_stream.next()
+            )
+            .await
+            .unwrap()
+            .unwrap()
+            .0,
+            BackendState::Loading
+        );
+
+        assert_eq!(
+            timeout(
+                30_000,
+                "Waiting for backend to be in Starting state.",
+                state_stream.next()
+            )
+            .await
+            .unwrap()
+            .unwrap()
+            .0,
+            BackendState::Starting
+        );
+
+        assert_eq!(
+            timeout(
+                30_000,
+                "Waiting for backend to be in Ready state.",
+                state_stream.next()
+            )
+            .await
+            .unwrap()
+            .unwrap()
+            .0,
+            BackendState::Ready
+        );
+
+        state_stream
+    };
+
+    // Original agent goes away when it goes out of scope.
+    {
+        let drone_id = DroneId::new_random();
+        let _agent = Agent::new(&nats_con, &drone_id).await.unwrap();
+
+        assert_eq!(
+            timeout(
+                30_000,
+                "Waiting for backend to be in Swept state.",
+                state_stream.next()
+            )
+            .await
+            .unwrap()
+            .unwrap()
+            .0,
+            BackendState::Swept
+        );
+    }
+}
 
 #[integration_test]
 async fn handle_termination_request() {

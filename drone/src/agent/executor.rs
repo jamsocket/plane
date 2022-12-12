@@ -135,14 +135,8 @@ impl<E: Engine> Executor<E> {
             .await
             .log_error();
 
-        self.nc
-            .publish_jetstream(&BackendStateMessage::new(
-                BackendState::Loading,
-                spawn_request.cluster.clone(),
-                spawn_request.backend_id.clone(),
-            ))
-            .await
-            .log_error();
+        self.update_backend_state(spawn_request, BackendState::Loading)
+            .await;
 
         self.run_backend(spawn_request, BackendState::Loading).await
     }
@@ -198,7 +192,6 @@ impl<E: Engine> Executor<E> {
                 "Spawn request included bearer token, which is not currently supported."
             );
         }
-        self.update_backend_state(spawn_request, state).await;
 
         loop {
             tracing::info!(
