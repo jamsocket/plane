@@ -1,6 +1,6 @@
 use super::agent::{BackendState, DroneState};
 use crate::{
-    nats::{JetStreamable, NoReply, TypedMessage, SubscribeSubject},
+    nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
 use serde::{Deserialize, Serialize};

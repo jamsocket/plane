@@ -7,7 +7,7 @@ use plane_core::types::DroneId;
 use rand::distributions::Alphanumeric;
 use rand::thread_rng;
 use rand::Rng;
-use std::net::{Ipv4Addr, IpAddr};
+use std::net::{IpAddr, Ipv4Addr};
 use std::time::SystemTime;
 use std::{
     net::{SocketAddr, SocketAddrV4},

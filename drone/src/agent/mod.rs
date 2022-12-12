@@ -9,11 +9,10 @@ use hyper::Client;
 use plane_core::{
     logging::LogError,
     messages::{
-        agent::{
-            DroneConnectRequest, DroneState, SpawnRequest, TerminationRequest,
-        },
+        agent::{DroneConnectRequest, DroneState, SpawnRequest, TerminationRequest},
         scheduler::DrainDrone,
-        state::StateUpdate, PLANE_VERSION,
+        state::StateUpdate,
+        PLANE_VERSION,
     },
     nats::TypedNats,
     retry::do_with_retry,
@@ -118,7 +117,7 @@ async fn heartbeat_loop(
     loop {
         let state = *recv_state.borrow();
         tracing::info!(state=?state, "Publishing heartbeat.");
-        
+
         nc.publish_jetstream(&StateUpdate::DroneStatus {
             cluster: cluster.clone(),
             drone: drone_id.clone(),

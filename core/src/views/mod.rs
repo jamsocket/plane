@@ -1,28 +1,27 @@
+use self::backend_view::BackendView;
 use crate::{
-    messages::{
-        agent::{BackendState, DroneState},
-        state::StateUpdate,
-    },
+    messages::{agent::DroneState, state::StateUpdate},
     types::{BackendId, ClusterName, DroneId},
 };
 use std::{
     collections::{BTreeMap, HashMap},
     net::IpAddr,
+    sync::{Arc, RwLock},
 };
 use time::OffsetDateTime;
 
+pub mod backend_view;
 pub mod replica;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Debug)]
 pub struct DroneView {
     /// The most recent heartbeat we've received for this drone.
     pub last_heartbeat: Option<(DroneState, OffsetDateTime)>,
     pub ip: Option<IpAddr>,
     pub version: Option<String>,
 
-    /// A map of backends relevant to scheduling or routing.
-    /// When backends terminate, they are removed from this map.
-    pub backends: HashMap<BackendId, BackendState>,
+    /// A map of backends.
+    pub backends: HashMap<BackendId, Arc<RwLock<BackendView>>>,
 }
 
 impl DroneView {
@@ -32,7 +31,20 @@ impl DroneView {
     }
 
     pub fn num_backends(&self) -> usize {
-        self.backends.len()
+        // Count the number of backends that are not in a terminal state.
+        // TODO: This is O(n) in the number of backends. We could make it O(1) by
+        // keeping a separate counter.
+        self.backends
+            .iter()
+            .filter(|(_, backend)| {
+                backend
+                    .read()
+                    .unwrap()
+                    .state()
+                    .map(|d| !d.terminal())
+                    .unwrap_or_default()
+            })
+            .count()
     }
 }
 
@@ -42,7 +54,7 @@ pub struct ClusterView {
     pub routes: BTreeMap<BackendId, DroneId>,
 
     /// Maps drones to their status.
-    pub drones: BTreeMap<DroneId, DroneView>,
+    pub drones: BTreeMap<DroneId, Arc<RwLock<DroneView>>>,
 }
 
 impl ClusterView {
@@ -55,11 +67,15 @@ impl ClusterView {
                 drone_version,
                 ..
             } => {
-                let mut drone = self.drones.entry(drone.clone()).or_default();
+                let drone = self.drones.entry(drone).or_default();
 
-                drone.last_heartbeat = Some((state, timestamp));
-                drone.ip = Some(ip);
-                drone.version = Some(drone_version);
+                {
+                    let mut drone = drone.write().unwrap();
+                    drone.last_heartbeat = Some((state, timestamp));
+                    drone.ip = Some(ip);
+                    drone.version = Some(drone_version);
+                }
+
                 tracing::info!(?drone, "Drone status update");
             }
             StateUpdate::BackendStatus {
@@ -68,25 +84,38 @@ impl ClusterView {
                 state,
                 ..
             } => {
-                let drone_view = self.drones.entry(drone.clone()).or_default();
+                let mut drone_view = self
+                    .drones
+                    .entry(drone.clone())
+                    .or_default()
+                    .write()
+                    .unwrap();
                 if state.terminal() {
                     self.routes.remove(&backend);
-                    drone_view.backends.remove(&backend);
                 } else {
                     self.routes.insert(backend.clone(), drone);
-                    drone_view.backends.insert(backend, state);
                 }
+
+                drone_view
+                    .backends
+                    .entry(backend)
+                    .or_default()
+                    .write()
+                    .unwrap()
+                    .update_state(state, timestamp);
             }
         }
     }
 
-    pub fn drone(&self, drone: &DroneId) -> Option<&DroneView> {
-        self.drones.get(drone)
+    pub fn drone(&self, drone: &DroneId) -> Option<Arc<RwLock<DroneView>>> {
+        self.drones.get(drone).cloned()
     }
 
     pub fn route(&self, backend: &BackendId) -> Option<IpAddr> {
         let drone_id = self.routes.get(backend)?;
         let drone = self.drone(drone_id)?;
+        let drone = drone.read().unwrap();
+
         drone.ip
     }
 }
@@ -110,10 +139,9 @@ impl SystemView {
 
 #[cfg(test)]
 mod test {
-    use std::net::Ipv4Addr;
-    use crate::messages::PLANE_VERSION;
-
     use super::*;
+    use crate::messages::{agent::BackendState, PLANE_VERSION};
+    use std::net::Ipv4Addr;
 
     #[test]
     fn test_drone_status() {
@@ -140,11 +168,13 @@ mod test {
                 .expect("Expected to find cluster.")
                 .drone(&drone)
                 .expect("Expected to find drone.")
+                .read()
+                .unwrap()
                 .state()
                 .expect("Expected state.")
         );
 
-        // Drone view is removed when the drone is stopped.
+        // Drone view is updated when the drone is stopped.
         system.update_state(
             StateUpdate::DroneStatus {
                 cluster: cluster.clone(),
@@ -156,11 +186,18 @@ mod test {
             OffsetDateTime::UNIX_EPOCH,
         );
 
-        assert!(system
-            .cluster(&cluster)
-            .expect("Expected to find cluster.")
-            .drone(&drone)
-            .is_none());
+        assert_eq!(
+            DroneState::Stopped,
+            system
+                .cluster(&cluster)
+                .expect("Expected to find cluster.")
+                .drone(&drone)
+                .expect("Expected to find drone.")
+                .read()
+                .unwrap()
+                .state()
+                .expect("Expected state.")
+        );
     }
 
     #[test]
@@ -239,6 +276,8 @@ mod test {
                 .expect("Expected cluster.")
                 .drone(&drone)
                 .expect("Expected drone")
+                .read()
+                .unwrap()
                 .num_backends()
         );
 
@@ -259,6 +298,8 @@ mod test {
                 .expect("Expected cluster.")
                 .drone(&drone)
                 .expect("Expected drone")
+                .read()
+                .unwrap()
                 .num_backends()
         );
 
@@ -279,6 +320,8 @@ mod test {
                 .expect("Expected cluster.")
                 .drone(&drone)
                 .expect("Expected drone")
+                .read()
+                .unwrap()
                 .num_backends()
         );
     }

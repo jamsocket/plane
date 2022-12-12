@@ -4,7 +4,8 @@ use plane_controller::run_scheduler;
 use plane_core::{
     messages::{
         agent::{DroneState, DroneStatusMessage, SpawnRequest},
-        scheduler::ScheduleResponse, PLANE_VERSION,
+        scheduler::ScheduleResponse,
+        PLANE_VERSION,
     },
     nats::TypedNats,
     types::{ClusterName, DroneId},

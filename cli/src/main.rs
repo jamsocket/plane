@@ -99,6 +99,8 @@ async fn main() -> Result<()> {
                         drone_id.to_string().bright_green(),
                         cluster_name.to_string().bright_cyan(),
                         drone
+                            .read()
+                            .unwrap()
                             .state()
                             .map(|d| format!("{:?}", d))
                             .unwrap_or_default()

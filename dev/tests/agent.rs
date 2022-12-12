@@ -2,25 +2,26 @@ use anyhow::{anyhow, Result};
 use integration_test::integration_test;
 use plane_core::{
     messages::{
-        agent::{BackendState, DroneState, SpawnRequest, TerminationRequest, BackendStatsMessage},
+        agent::{BackendState, BackendStatsMessage, DroneState, SpawnRequest, TerminationRequest},
         scheduler::DrainDrone,
     },
     nats::TypedNats,
     types::{BackendId, ClusterName, DroneId},
-    views::{replica::SystemViewReplica, DroneView},
+    views::{backend_view::BackendView, replica::SystemViewReplica, DroneView},
     NeverResult,
 };
 use plane_dev::{
     resources::{nats::Nats, server::Server},
     scratch_dir,
-    timeout::{self, expect_to_stay_alive, timeout, LivenessGuard},
+    timeout::{expect_to_stay_alive, timeout, LivenessGuard},
     util::{base_spawn_request, random_loopback_ip},
 };
 use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
-use std::net::IpAddr;
-use std::time::Duration;
+use std::{net::IpAddr, sync::Arc};
+use std::{sync::RwLock, time::Duration};
 use tokio::time::Instant;
+use tokio_stream::StreamExt;
 
 const CLUSTER_DOMAIN: &str = "plane.test";
 
@@ -67,14 +68,76 @@ impl MockController {
         Ok(MockController { view, nats })
     }
 
-    pub fn drone(&self, drone_id: &DroneId) -> Result<DroneView> {
+    pub fn drone(&self, drone_id: &DroneId) -> Result<Arc<RwLock<DroneView>>> {
         self.view
             .view()
             .cluster(&ClusterName::new(CLUSTER_DOMAIN))
             .ok_or_else(|| anyhow!("Cluster not found"))?
             .drone(drone_id)
             .ok_or_else(|| anyhow!("Drone {} not found in cluster", drone_id))
-            .map(|drone| drone.clone())
+    }
+
+    pub async fn wait_for_drone(&self, drone_id: &DroneId, deadline: Instant) -> Result<Arc<RwLock<DroneView>>> {
+        loop {
+            let drone = self.drone(drone_id);
+            match drone {
+                Ok(drone) => return Ok(drone),
+                Err(error) => {
+                    if Instant::now() > deadline {
+                        return Err(anyhow!(
+                            "Drone {} did not appear in system view after 10 seconds. Last error: {}",
+                            drone_id,
+                            error
+                        ));
+                    }
+
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                },
+            }
+        }
+    }
+
+    pub fn backend(
+        &self,
+        drone_id: &DroneId,
+        backend_id: &BackendId,
+    ) -> Result<Arc<RwLock<BackendView>>> {
+        let drone = self
+            .view
+            .view()
+            .cluster(&ClusterName::new(CLUSTER_DOMAIN))
+            .ok_or_else(|| anyhow!("Cluster not found"))?
+            .drone(drone_id)
+            .ok_or_else(|| anyhow!("Drone {} not found in cluster", drone_id))?;
+
+        let drone = drone.read().unwrap();
+
+        let backend = drone
+            .backends
+            .get(backend_id)
+            .ok_or_else(|| anyhow!("Backend {} not found in drone {}", backend_id, drone_id))?;
+
+        Ok(backend.clone())
+    }
+
+    pub async fn wait_for_backend(&self, drone_id: &DroneId, backend_id: &BackendId, deadline: Instant) -> Result<Arc<RwLock<BackendView>>> {
+        loop {
+            let backend = self.backend(drone_id, backend_id);
+            match backend {
+                Ok(backend) => return Ok(backend),
+                Err(error) => {
+                    if Instant::now() > deadline {
+                        return Err(anyhow!(
+                            "Backend {} did not appear in system view after 10 seconds. Last error: {}",
+                            backend_id,
+                            error
+                        ));
+                    }
+
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                },
+            }
+        }
     }
 
     /// Waits for the given drone to be in the given state. Returns an error if the drone is not in
@@ -89,7 +152,7 @@ impl MockController {
         loop {
             let result = self.drone(drone_id);
             if let Ok(drone) = &result {
-                if drone.state() == Some(state) {
+                if drone.read().unwrap().state() == Some(state) {
                     return Ok(());
                 }
             }
@@ -117,28 +180,34 @@ impl MockController {
         state: BackendState,
         timeout_seconds: u64,
     ) -> Result<()> {
-        let start = Instant::now();
+        let deadline = Instant::now()
+            .checked_add(Duration::from_secs(timeout_seconds))
+            .unwrap();
+
+        let backend = self.wait_for_backend(drone_id, backend_id, deadline).await?;
+        let mut subscription = backend.write().unwrap().stream();
+
         loop {
-            let result = self.drone(drone_id);
-            if let Ok(drone) = &result {
-                if let Some(backend_state) = drone.backends.get(backend_id) {
-                    if *backend_state == state {
+            let result = tokio::time::timeout_at(deadline, subscription.next()).await;
+
+            match result {
+                Ok(Some((current_state, _))) => {
+                    if current_state == state {
                         return Ok(());
                     }
                 }
+                Ok(None) => {
+                    panic!("Backend status stream should not end until dropped.")
+                }
+                Err(_) => {
+                    return Err(anyhow!(
+                        "Backend {} did not reach state {:?} after {} seconds",
+                        backend_id,
+                        state,
+                        timeout_seconds
+                    ));
+                }
             }
-
-            if start.elapsed() > Duration::from_secs(timeout_seconds) {
-                return Err(anyhow!(
-                    "Backend {} did not reach state {:?} after {} seconds. Last result: {:?}",
-                    backend_id,
-                    state,
-                    timeout_seconds,
-                    result
-                ));
-            }
-
-            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
 
@@ -291,7 +360,10 @@ async fn stats_are_acquired() {
     let controller_mock = MockController::new(&nats).await.unwrap();
     let drone_id = DroneId::new_random();
     let _agent = Agent::new(&nats, &drone_id).await.unwrap();
-    controller_mock.wait_for_drone_state(&drone_id, DroneState::Ready, 10).await.unwrap();
+    controller_mock
+        .wait_for_drone_state(&drone_id, DroneState::Ready, 10)
+        .await
+        .unwrap();
 
     let mut request = base_spawn_request();
     request.drone_id = drone_id;
@@ -299,7 +371,15 @@ async fn stats_are_acquired() {
     request.max_idle_secs = Duration::from_secs(30);
 
     controller_mock.spawn_backend(&request).await.unwrap();
-    controller_mock.wait_for_backend_state(&request.drone_id, &request.backend_id, BackendState::Ready, 60).await.unwrap();
+    controller_mock
+        .wait_for_backend_state(
+            &request.drone_id,
+            &request.backend_id,
+            BackendState::Ready,
+            60,
+        )
+        .await
+        .unwrap();
 
     let mut stats_subscription = connection
         .subscribe(BackendStatsMessage::subscribe_subject(&request.backend_id))
@@ -317,7 +397,15 @@ async fn stats_are_acquired() {
     assert!(stat.value.cpu_use_percent >= 0.);
     assert!(stat.value.mem_use_percent >= 0.);
 
-    controller_mock.wait_for_backend_state(&request.drone_id, &request.backend_id, BackendState::Swept, 30).await.unwrap();
+    controller_mock
+        .wait_for_backend_state(
+            &request.drone_id,
+            &request.backend_id,
+            BackendState::Swept,
+            30,
+        )
+        .await
+        .unwrap();
 }
 
 #[integration_test]

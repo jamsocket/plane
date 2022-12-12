@@ -52,7 +52,7 @@ impl DnsServer {
         let view = SystemViewReplica::new(nc.clone()).await?;
 
         let plan = DnsPlan {
-            bind_ip: ip.into(),
+            bind_ip: ip,
             port: DNS_PORT,
             soa_email: Some(Name::from_ascii("admin.plane.test.")?),
             nc: nc.clone(),
@@ -62,7 +62,7 @@ impl DnsServer {
 
         let mut config = ResolverConfig::new();
         config.add_name_server(NameServerConfig::new(
-            SocketAddr::new(ip.into(), DNS_PORT),
+            SocketAddr::new(ip, DNS_PORT),
             Protocol::Tcp,
         ));
         let resolver = TokioAsyncResolver::tokio(config, ResolverOpts::default())?;
