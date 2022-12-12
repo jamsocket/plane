@@ -479,52 +479,93 @@ async fn handle_error_during_start() {
     );
 }
 
-// #[integration_test]
-// async fn handle_failure_after_ready() {
-//     let nats = Nats::new().await.unwrap();
-//     let connection = nats.connection().await.unwrap();
-//     let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
-//     let drone_id = DroneId::new_random();
-//     let agent = Agent::new(&nats, &drone_id).await.unwrap();
-//     controller_mock
-//         .expect_drone_status(&drone_id, agent.ip)
-//         .await
-//         .unwrap();
+#[integration_test]
+async fn handle_failure_after_ready() {
+    let nats = Nats::new().await.unwrap();
+    let controller_mock = MockController::new(&nats).await.unwrap();
 
-//     controller_mock
-//         .expect_backend_status(&drone_id, &ClusterName::new("plane.test"), true, 0)
-//         .await
-//         .unwrap();
+    let drone_id = DroneId::new_random();
+    let agent = Agent::new(&nats, &drone_id).await.unwrap();
+    controller_mock
+        .wait_for_drone_state(&drone_id, DroneState::Ready, 10)
+        .await
+        .unwrap();
 
-//     let mut request = base_spawn_request();
-//     request.drone_id = drone_id;
+    let mut request = base_spawn_request();
+    request.drone_id = drone_id;
+    controller_mock.spawn_backend(&request).await.unwrap();
 
-//     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
-//         .await
-//         .unwrap();
-//     controller_mock.spawn_backend(&request).await.unwrap();
+    let mut state_stream = controller_mock
+        .wait_for_backend(&request.drone_id, &request.backend_id, 10)
+        .await
+        .unwrap()
+        .write()
+        .unwrap()
+        .stream();
 
-//     state_subscription
-//         .wait_for_state(BackendState::Ready, 60_000)
-//         .await
-//         .unwrap();
+    assert_eq!(
+        timeout(
+            5_000,
+            "Waiting for backend to be in Loading state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::Loading
+    );
 
-//     let proxy_route = agent
-//         .db
-//         .get_proxy_route(request.backend_id.id())
-//         .await
-//         .unwrap()
-//         .expect("Expected proxy route.");
-//     // A get request to this URL will cause the container to exit with status 1.
-//     // We don't check the status, because the request itself is expected to fail
-//     // (the process exits immediately, so the response is not sent).
-//     let _ = reqwest::get(format!("http://{}/exit/1", proxy_route)).await;
+    assert_eq!(
+        timeout(
+            30_000,
+            "Waiting for backend to be in Starting state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::Starting
+    );
 
-//     state_subscription
-//         .expect_backend_status_message(BackendState::Failed, 5_000)
-//         .await
-//         .unwrap();
-// }
+    assert_eq!(
+        timeout(
+            30_000,
+            "Waiting for backend to be in Starting state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::Ready
+    );
+
+    let proxy_route = agent
+        .db
+        .get_proxy_route(request.backend_id.id())
+        .await
+        .unwrap()
+        .expect("Expected proxy route.");
+    // A get request to this URL will cause the container to exit with status 1.
+    // We don't check the status, because the request itself is expected to fail
+    // (the process exits immediately, so the response is not sent).
+    let _ = reqwest::get(format!("http://{}/exit/1", proxy_route)).await;
+
+    assert_eq!(
+        timeout(
+            30_000,
+            "Waiting for backend to be in Starting state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::Failed
+    );
+}
 
 // #[integration_test]
 // async fn handle_successful_termination() {
