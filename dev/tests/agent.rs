@@ -20,8 +20,9 @@ use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
 use std::{net::IpAddr, sync::Arc};
 use std::{sync::RwLock, time::Duration};
+use time::OffsetDateTime;
 use tokio::time::Instant;
-use tokio_stream::StreamExt;
+use tokio_stream::{Stream, StreamExt};
 
 const CLUSTER_DOMAIN: &str = "plane.test";
 
@@ -121,6 +122,16 @@ impl MockController {
         }
     }
 
+    pub async fn backend_status_stream(
+        &self,
+        drone_id: &DroneId,
+        backend_id: &BackendId,
+    ) -> Result<impl Stream<Item = (BackendState, OffsetDateTime)>> {
+        let backend = self.wait_for_backend(drone_id, backend_id, 10).await?;
+        let mut backend = backend.write().unwrap();
+        Ok(backend.stream())
+    }
+
     /// Waits for the given drone to be in the given state. Returns an error if the drone is not in
     /// the given state after the given timeout.
     pub async fn wait_for_drone_state(
@@ -165,13 +176,10 @@ impl MockController {
             .checked_add(Duration::from_secs(timeout_seconds))
             .unwrap();
 
-        let backend = self
-            .wait_for_backend(drone_id, backend_id, timeout_seconds)
-            .await?;
-        let mut subscription = backend.write().unwrap().stream();
+        let mut stream = self.backend_status_stream(drone_id, backend_id).await?;
 
         loop {
-            let result = tokio::time::timeout_at(deadline, subscription.next()).await;
+            let result = tokio::time::timeout_at(deadline, stream.next()).await;
 
             match result {
                 Ok(Some((current_state, _))) => {
@@ -402,12 +410,9 @@ async fn handle_error_during_start() {
     controller_mock.spawn_backend(&request).await.unwrap();
 
     let mut state_stream = controller_mock
-        .wait_for_backend(&request.drone_id, &request.backend_id, 10)
+        .backend_status_stream(&request.drone_id, &request.backend_id)
         .await
-        .unwrap()
-        .write()
-        .unwrap()
-        .stream();
+        .unwrap();
 
     assert_eq!(
         timeout(
@@ -466,12 +471,9 @@ async fn handle_failure_after_ready() {
     controller_mock.spawn_backend(&request).await.unwrap();
 
     let mut state_stream = controller_mock
-        .wait_for_backend(&request.drone_id, &request.backend_id, 10)
+        .backend_status_stream(&request.drone_id, &request.backend_id)
         .await
-        .unwrap()
-        .write()
-        .unwrap()
-        .stream();
+        .unwrap();
 
     assert_eq!(
         timeout(
@@ -553,12 +555,9 @@ async fn handle_successful_termination() {
 
     controller_mock.spawn_backend(&request).await.unwrap();
     let mut state_stream = controller_mock
-        .wait_for_backend(&request.drone_id, &request.backend_id, 10)
+        .backend_status_stream(&request.drone_id, &request.backend_id)
         .await
-        .unwrap()
-        .write()
-        .unwrap()
-        .stream();
+        .unwrap();
 
     assert_eq!(
         timeout(
@@ -645,12 +644,9 @@ async fn handle_agent_restart() {
         controller_mock.spawn_backend(&request).await.unwrap();
 
         let mut state_stream = controller_mock
-            .wait_for_backend(&request.drone_id, &request.backend_id, 10)
+            .backend_status_stream(&request.drone_id, &request.backend_id)
             .await
-            .unwrap()
-            .write()
-            .unwrap()
-            .stream();
+            .unwrap();
 
         assert_eq!(
             timeout(
@@ -736,12 +732,9 @@ async fn handle_termination_request() {
     controller_mock.spawn_backend(&request).await.unwrap();
 
     let mut state_stream = controller_mock
-        .wait_for_backend(&request.drone_id, &request.backend_id, 10)
+        .backend_status_stream(&request.drone_id, &request.backend_id)
         .await
-        .unwrap()
-        .write()
-        .unwrap()
-        .stream();
+        .unwrap();
 
     assert_eq!(
         timeout(
