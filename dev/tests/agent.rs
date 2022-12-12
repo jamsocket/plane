@@ -26,6 +26,22 @@ use tokio_stream::{Stream, StreamExt};
 
 const CLUSTER_DOMAIN: &str = "plane.test";
 
+async fn expect_state(
+    stream: &mut (impl Stream<Item = (BackendState, OffsetDateTime)> + Unpin),
+    state: BackendState,
+) -> Result<()> {
+    let (s, _) = tokio::time::timeout(Duration::from_secs(30), stream.next())
+        .await
+        .unwrap()
+        .unwrap();
+
+    if s != state {
+        Err(anyhow!("Expected state {:?}, got {:?}", state, s))
+    } else {
+        Ok(())
+    }
+}
+
 struct Agent {
     #[allow(unused)]
     agent_guard: LivenessGuard<NeverResult>,
@@ -414,44 +430,15 @@ async fn handle_error_during_start() {
         .await
         .unwrap();
 
-    assert_eq!(
-        timeout(
-            5_000,
-            "Waiting for backend to be in Loading state.",
-            state_stream.next()
-        )
+    expect_state(&mut state_stream, BackendState::Loading)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Loading
-    );
-
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Starting state.",
-            state_stream.next()
-        )
+        .unwrap();
+    expect_state(&mut state_stream, BackendState::Starting)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Starting
-    );
-
-    assert_eq!(
-        timeout(
-            5_000,
-            "Waiting for backend to be in ErrorStarting state.",
-            state_stream.next()
-        )
+        .unwrap();
+    expect_state(&mut state_stream, BackendState::ErrorStarting)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::ErrorStarting
-    );
+        .unwrap();
 }
 
 #[integration_test]
@@ -475,44 +462,15 @@ async fn handle_failure_after_ready() {
         .await
         .unwrap();
 
-    assert_eq!(
-        timeout(
-            5_000,
-            "Waiting for backend to be in Loading state.",
-            state_stream.next()
-        )
+    expect_state(&mut state_stream, BackendState::Loading)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Loading
-    );
-
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Starting state.",
-            state_stream.next()
-        )
+        .unwrap();
+    expect_state(&mut state_stream, BackendState::Starting)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Starting
-    );
-
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Starting state.",
-            state_stream.next()
-        )
+        .unwrap();
+    expect_state(&mut state_stream, BackendState::Ready)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Ready
-    );
+        .unwrap();
 
     let proxy_route = agent
         .db
@@ -525,18 +483,9 @@ async fn handle_failure_after_ready() {
     // (the process exits immediately, so the response is not sent).
     let _ = reqwest::get(format!("http://{}/exit/1", proxy_route)).await;
 
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Starting state.",
-            state_stream.next()
-        )
+    expect_state(&mut state_stream, BackendState::Failed)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Failed
-    );
+        .unwrap();
 }
 
 #[integration_test]
@@ -559,42 +508,15 @@ async fn handle_successful_termination() {
         .await
         .unwrap();
 
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Starting state.",
-            state_stream.next()
-        )
+    expect_state(&mut state_stream, BackendState::Loading)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Loading
-    );
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Starting state.",
-            state_stream.next()
-        )
+        .unwrap();
+    expect_state(&mut state_stream, BackendState::Starting)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Starting
-    );
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Ready state.",
-            state_stream.next()
-        )
+        .unwrap();
+    expect_state(&mut state_stream, BackendState::Ready)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Ready
-    );
+        .unwrap();
 
     let proxy_route = agent
         .db
@@ -608,18 +530,9 @@ async fn handle_successful_termination() {
     // (the process exits immediately, so the response is not sent).
     let _ = reqwest::get(format!("http://{}/exit/0", proxy_route)).await;
 
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Starting state.",
-            state_stream.next()
-        )
+    expect_state(&mut state_stream, BackendState::Exited)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Exited
-    );
+        .unwrap();
 }
 
 #[integration_test]
@@ -648,44 +561,15 @@ async fn handle_agent_restart() {
             .await
             .unwrap();
 
-        assert_eq!(
-            timeout(
-                30_000,
-                "Waiting for backend to be in Loading state.",
-                state_stream.next()
-            )
+        expect_state(&mut state_stream, BackendState::Loading)
             .await
-            .unwrap()
-            .unwrap()
-            .0,
-            BackendState::Loading
-        );
-
-        assert_eq!(
-            timeout(
-                30_000,
-                "Waiting for backend to be in Starting state.",
-                state_stream.next()
-            )
+            .unwrap();
+        expect_state(&mut state_stream, BackendState::Starting)
             .await
-            .unwrap()
-            .unwrap()
-            .0,
-            BackendState::Starting
-        );
-
-        assert_eq!(
-            timeout(
-                30_000,
-                "Waiting for backend to be in Ready state.",
-                state_stream.next()
-            )
+            .unwrap();
+        expect_state(&mut state_stream, BackendState::Ready)
             .await
-            .unwrap()
-            .unwrap()
-            .0,
-            BackendState::Ready
-        );
+            .unwrap();
 
         state_stream
     };
@@ -695,18 +579,9 @@ async fn handle_agent_restart() {
         let drone_id = DroneId::new_random();
         let _agent = Agent::new(&nats_con, &drone_id).await.unwrap();
 
-        assert_eq!(
-            timeout(
-                30_000,
-                "Waiting for backend to be in Swept state.",
-                state_stream.next()
-            )
+        expect_state(&mut state_stream, BackendState::Swept)
             .await
-            .unwrap()
-            .unwrap()
-            .0,
-            BackendState::Swept
-        );
+            .unwrap();
     }
 }
 
@@ -736,44 +611,15 @@ async fn handle_termination_request() {
         .await
         .unwrap();
 
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Loading state.",
-            state_stream.next()
-        )
+    expect_state(&mut state_stream, BackendState::Loading)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Loading
-    );
-
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Starting state.",
-            state_stream.next()
-        )
+        .unwrap();
+    expect_state(&mut state_stream, BackendState::Starting)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Starting
-    );
-
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Ready state.",
-            state_stream.next()
-        )
+        .unwrap();
+    expect_state(&mut state_stream, BackendState::Ready)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Ready
-    );
+        .unwrap();
 
     let termination_request = TerminationRequest {
         backend_id: request.backend_id.clone(),
@@ -784,16 +630,7 @@ async fn handle_termination_request() {
         .await
         .unwrap();
 
-    assert_eq!(
-        timeout(
-            30_000,
-            "Waiting for backend to be in Terminated state.",
-            state_stream.next()
-        )
+    expect_state(&mut state_stream, BackendState::Terminated)
         .await
-        .unwrap()
-        .unwrap()
-        .0,
-        BackendState::Terminated
-    );
+        .unwrap();
 }

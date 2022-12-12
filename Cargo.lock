@@ -1736,6 +1736,7 @@ version = "0.3.5"
 dependencies = [
  "anyhow",
  "async-nats",
+ "async-trait",
  "bollard",
  "chrono",
  "futures",
