@@ -28,7 +28,6 @@ const CLUSTER_DOMAIN: &str = "plane.test";
 struct Agent {
     #[allow(unused)]
     agent_guard: LivenessGuard<NeverResult>,
-    pub ip: IpAddr,
     pub db: DroneDatabase,
 }
 
@@ -50,7 +49,6 @@ impl Agent {
 
         Ok(Agent {
             agent_guard,
-            ip,
             db,
         })
     }
@@ -702,50 +700,93 @@ async fn handle_successful_termination() {
 //     }
 // }
 
-// #[integration_test]
-// async fn handle_termination_request() {
-//     let nats = Nats::new().await.unwrap();
-//     let connection = nats.connection().await.unwrap();
-//     let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
-//     let drone_id = DroneId::new_random();
-//     let agent = Agent::new(&nats, &drone_id).await.unwrap();
+#[integration_test]
+async fn handle_termination_request() {
+    let nats = Nats::new().await.unwrap();
+    let controller_mock = MockController::new(&nats).await.unwrap();
+    let drone_id = DroneId::new_random();
+    let _agent = Agent::new(&nats, &drone_id).await.unwrap();
 
-//     let mut request = base_spawn_request();
-//     // Ensure spawnee lives long enough to be terminated.
-//     request.drone_id = drone_id.clone();
-//     request.max_idle_secs = Duration::from_secs(10_000);
+    let mut request = base_spawn_request();
+    request.drone_id = drone_id.clone();
+    // Ensure spawnee lives long enough to be terminated.
+    request.max_idle_secs = Duration::from_secs(10_000);
 
-//     controller_mock
-//         .expect_drone_status(&drone_id, agent.ip)
-//         .await
-//         .unwrap();
-//     controller_mock
-//         .expect_backend_status(&request.drone_id, &ClusterName::new("plane.test"), true, 0)
-//         .await
-//         .unwrap();
+    controller_mock
+        .wait_for_drone_state(&drone_id, DroneState::Ready, 10)
+        .await
+        .unwrap();
 
-//     request.max_idle_secs = Duration::from_secs(1000);
-//     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
-//         .await
-//         .unwrap();
+    request.max_idle_secs = Duration::from_secs(1000);
 
-//     controller_mock.spawn_backend(&request).await.unwrap();
-//     state_subscription
-//         .wait_for_state(BackendState::Ready, 20_000)
-//         .await
-//         .unwrap();
+    controller_mock.spawn_backend(&request).await.unwrap();
 
-//     let termination_request = TerminationRequest {
-//         backend_id: request.backend_id.clone(),
-//         cluster_id: ClusterName::new(CLUSTER_DOMAIN),
-//     };
-//     controller_mock
-//         .terminate_backend(&termination_request)
-//         .await
-//         .unwrap();
+    let mut state_stream = controller_mock
+        .wait_for_backend(&request.drone_id, &request.backend_id, 10)
+        .await
+        .unwrap()
+        .write()
+        .unwrap()
+        .stream();
 
-//     state_subscription
-//         .wait_for_state(BackendState::Terminated, 20_000)
-//         .await
-//         .unwrap();
-// }
+    assert_eq!(
+        timeout(
+            30_000,
+            "Waiting for backend to be in Loading state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::Loading
+    );
+
+    assert_eq!(
+        timeout(
+            30_000,
+            "Waiting for backend to be in Starting state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::Starting
+    );
+
+    assert_eq!(
+        timeout(
+            30_000,
+            "Waiting for backend to be in Ready state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::Ready
+    );
+
+    let termination_request = TerminationRequest {
+        backend_id: request.backend_id.clone(),
+        cluster_id: ClusterName::new(CLUSTER_DOMAIN),
+    };
+    controller_mock
+        .terminate_backend(&termination_request)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        timeout(
+            30_000,
+            "Waiting for backend to be in Terminated state.",
+            state_stream.next()
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+        BackendState::Terminated
+    );
+}
