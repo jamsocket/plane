@@ -36,6 +36,9 @@ pub struct DockerConfig {
     pub connection: DockerConnection,
 
     pub network: Option<String>,
+
+    #[serde(default)]
+    pub insecure_gpu: bool,
 }
 
 #[derive(Serialize, Deserialize)]
