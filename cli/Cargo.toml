@@ -1,6 +1,6 @@
 [package]
 name = "plane-cli"
-version = "0.3.6"
+version = "0.3.7"
 edition = "2021"
 authors = ["Paul Butler <paul@driftingin.space>"]
 homepage = "https://plane.dev"
