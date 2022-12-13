@@ -34,7 +34,7 @@ enum Command {
         #[clap(long, short)]
         port: Option<u16>,
         #[clap(long, short)]
-        env: Option<String>,
+        env: Vec<String>,
     },
     Status {
         backend: Option<String>,
