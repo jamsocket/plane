@@ -20,7 +20,7 @@ use bollard::{
     image::CreateImageOptions,
     models::{HostConfig, ResourcesUlimits},
     system::EventsOptions,
-    Docker, API_DEFAULT_VERSION,
+    Docker, API_DEFAULT_VERSION, service::DeviceRequest,
 };
 use plane_core::{
     messages::agent::{
@@ -46,6 +46,7 @@ pub struct DockerInterface {
     docker: Docker,
     runtime: Option<String>,
     network: Option<String>,
+    gpu: bool,
 }
 
 impl DockerInterface {
@@ -67,6 +68,7 @@ impl DockerInterface {
             docker,
             runtime: config.runtime.clone(),
             network: config.network.clone(),
+            gpu: config.insecure_gpu,
         })
     }
 
@@ -176,6 +178,16 @@ impl DockerInterface {
             .map(|(k, v)| format!("{}={}", k, v))
             .collect();
 
+        let device_requests = if self.gpu {
+            Some(vec![DeviceRequest {
+                count: Some(-1),
+                capabilities: Some(vec![vec!["gpu".to_string()]]),
+                ..Default::default()
+            }])
+        } else {
+            None
+        };
+
         // Build the container.
         let container_id = {
             let timer = Timer::new();
@@ -224,6 +236,7 @@ impl DockerInterface {
                             }]
                         },
                     ),
+                    device_requests,
                     ..HostConfig::default()
                 }),
                 ..Config::default()
