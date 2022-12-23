@@ -9,7 +9,7 @@ use hyper::server::conn::AddrStream;
 use hyper::Client;
 use hyper::{service::Service, Body, Request, Response, StatusCode};
 use std::io::ErrorKind;
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::{
@@ -47,15 +47,22 @@ pub struct MakeProxyService {
     client: Client<HttpConnector, Body>,
     cluster: String,
     connection_tracker: ConnectionTracker,
+    passthrough: Option<SocketAddr>,
 }
 
 impl MakeProxyService {
-    pub fn new(db: DroneDatabase, cluster: String, connection_tracker: ConnectionTracker) -> Self {
+    pub fn new(
+        db: DroneDatabase,
+        cluster: String,
+        connection_tracker: ConnectionTracker,
+        passthrough: Option<SocketAddr>,
+    ) -> Self {
         MakeProxyService {
             db,
             client: Client::new(),
             cluster,
             connection_tracker,
+            passthrough,
         }
     }
 }
@@ -80,6 +87,7 @@ impl<'a> Service<&'a AddrStream> for MakeProxyService {
             cluster: self.cluster.clone(),
             connection_tracker: self.connection_tracker.clone(),
             remote_ip,
+            passthrough: self.passthrough,
         }))
     }
 }
@@ -104,6 +112,7 @@ impl<'a> Service<&'a TlsStream> for MakeProxyService {
             cluster: self.cluster.clone(),
             connection_tracker: self.connection_tracker.clone(),
             remote_ip,
+            passthrough: self.passthrough,
         }))
     }
 }
@@ -115,6 +124,7 @@ pub struct ProxyService {
     cluster: String,
     connection_tracker: ConnectionTracker,
     remote_ip: IpAddr,
+    passthrough: Option<SocketAddr>,
 }
 
 #[allow(unused)]
@@ -209,7 +219,14 @@ impl ProxyService {
             // TODO: we shouldn't need to allocate a string just to strip a prefix.
             if let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) {
                 let subdomain = subdomain.to_string();
-                if let Some(addr) = self.db.get_proxy_route(&subdomain).await? {
+
+                let route = self
+                    .db
+                    .get_proxy_route(&subdomain)
+                    .await?
+                    .or_else(|| self.passthrough.map(|d| d.to_string()));
+
+                if let Some(addr) = route {
                     self.connection_tracker.track_request(&subdomain);
                     *req.uri_mut() = Self::rewrite_uri(&addr, req.uri())?;
 

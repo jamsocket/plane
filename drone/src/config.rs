@@ -2,7 +2,7 @@ use crate::{cert::acme::AcmeConfiguration, ip::IpSource, keys::KeyCertPathPair};
 use plane_core::{nats_connection::NatsConnectionSpec, types::DroneId};
 use serde::{Deserialize, Serialize};
 use std::{
-    net::{IpAddr, Ipv4Addr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
 };
 
@@ -52,6 +52,8 @@ pub struct ProxyOptions {
     pub bind_ip: IpAddr,
     #[serde(default = "default_https_port")]
     pub https_port: u16,
+
+    pub passthrough: Option<SocketAddr>,
 }
 
 fn default_bind_address() -> IpAddr {

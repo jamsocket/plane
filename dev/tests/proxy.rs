@@ -62,7 +62,7 @@ impl Proxy {
         }
     }
 
-    pub async fn new() -> Result<Proxy> {
+    pub async fn new(passthrough: Option<SocketAddr>) -> Result<Proxy> {
         let certs = SelfSignedCert::new("proxy", vec!["*.plane.test".into(), "plane.test".into()])?;
         let bind_ip = random_loopback_ip();
         let db = DroneDatabase::new(&scratch_dir("proxy").join("drone.db")).await?;
@@ -73,6 +73,7 @@ impl Proxy {
             bind_port: 4040,
             key_pair: Some(certs.path_pair.clone()),
             cluster_domain: CLUSTER.into(),
+            passthrough,
         };
         let guard = expect_to_stay_alive(plane_drone::proxy::serve(options));
 
@@ -172,15 +173,27 @@ impl Proxy {
 
 #[integration_test]
 async fn backend_not_exist_404s() {
-    let proxy = Proxy::new().await.unwrap();
+    let proxy = Proxy::new(None).await.unwrap();
 
     let result = proxy.http_get("foobar", "/").await.unwrap();
     assert_eq!(StatusCode::NOT_FOUND, result.status());
 }
 
 #[integration_test]
+async fn backend_not_exist_passthrough() {
+    let server = Server::new(|_| async { "Hello World".into() })
+        .await
+        .unwrap();
+
+    let proxy = Proxy::new(Some(server.address)).await.unwrap();
+
+    let result = proxy.http_get("foobar", "/").await.unwrap();
+    assert_eq!(StatusCode::OK, result.status());
+}
+
+#[integration_test]
 async fn simple_backend_proxy() {
-    let proxy = Proxy::new().await.unwrap();
+    let proxy = Proxy::new(None).await.unwrap();
     let server = Server::new(|_| async { "Hello World".into() })
         .await
         .unwrap();
@@ -205,7 +218,7 @@ async fn simple_backend_proxy() {
 
 #[integration_test]
 async fn simple_ws_backend_proxy() {
-    let proxy = Proxy::new().await.unwrap();
+    let proxy = Proxy::new(None).await.unwrap();
     let server = Server::serve_web_sockets().await.unwrap();
 
     let sr = base_spawn_request();
@@ -261,7 +274,7 @@ async fn simple_ws_backend_proxy() {
 
 #[integration_test]
 async fn connection_status_is_recorded() {
-    let proxy = Proxy::new().await.unwrap();
+    let proxy = Proxy::new(None).await.unwrap();
     let server = Server::new(|_| async { "Hello World".into() })
         .await
         .unwrap();
@@ -333,7 +346,7 @@ async fn connection_status_is_recorded() {
 
 #[integration_test]
 async fn host_header_is_set() {
-    let proxy = Proxy::new().await.unwrap();
+    let proxy = Proxy::new(None).await.unwrap();
     let server = Server::new(|req| async move {
         req.headers()
             .get("host")
@@ -365,7 +378,7 @@ async fn host_header_is_set() {
 
 #[integration_test]
 async fn update_certificates() {
-    let mut proxy = Proxy::new().await.unwrap();
+    let mut proxy = Proxy::new(None).await.unwrap();
     let server = Server::new(|_| async { "Hello World".into() })
         .await
         .unwrap();
