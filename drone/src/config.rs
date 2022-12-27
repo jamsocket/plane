@@ -39,6 +39,10 @@ pub struct DockerConfig {
 
     #[serde(default)]
     pub insecure_gpu: bool,
+
+    /// The name or uid of the user to run backends as.
+    #[serde(default)]
+    pub user: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]

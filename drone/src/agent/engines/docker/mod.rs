@@ -46,6 +46,7 @@ pub struct DockerInterface {
     docker: Docker,
     runtime: Option<String>,
     network: Option<String>,
+    user: Option<String>,
     gpu: bool,
 }
 
@@ -69,6 +70,7 @@ impl DockerInterface {
             runtime: config.runtime.clone(),
             network: config.network.clone(),
             gpu: config.insecure_gpu,
+            user: config.user.clone(),
         })
     }
 
@@ -198,6 +200,7 @@ impl DockerInterface {
 
             let config: Config<String> = Config {
                 image: Some(executable_config.image.to_string()),
+                user: self.user.clone(),
                 env: Some(env),
                 labels: Some(
                     vec![
