@@ -21,6 +21,7 @@ pub struct ProxyOptions {
     pub bind_port: u16,
     pub key_pair: Option<KeyCertPathPair>,
     pub cluster_domain: String,
+    pub passthrough: Option<SocketAddr>,
 }
 
 async fn record_connections(
@@ -42,6 +43,7 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
         options.db,
         options.cluster_domain,
         connection_tracker.clone(),
+        options.passthrough,
     );
     let bind_address = SocketAddr::new(options.bind_ip, options.bind_port);
 

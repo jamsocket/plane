@@ -51,6 +51,7 @@ impl DronePlan {
                 bind_ip: proxy_config.bind_ip,
                 bind_port: proxy_config.https_port,
                 key_pair: config.cert.clone(),
+                passthrough: proxy_config.passthrough,
             })
         } else {
             None
