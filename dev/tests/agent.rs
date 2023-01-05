@@ -773,8 +773,7 @@ async fn attempt_to_spawn_with_allowed_volume_mount() {
     let mut request = base_spawn_request();
     request.drone_id = drone_id.clone();
     request.executable.volume_mounts = vec![json!({
-        "Type": "bind",
-        "Source": "/etc",
+        "Type": "tmpfs",
         "Target": "/bar",
     })];
 
