@@ -161,19 +161,17 @@ where
     }
 
     pub async fn next(&mut self) -> Option<MessageWithResponseHandle<T>> {
-        loop {
-            if let Some(message) = self.subscription.next().await {
-                let result = MessageWithResponseHandle::new(message, self.nc.clone());
-                match result {
-                    Ok(v) => return Some(v),
-                    Err(error) => {
-                        tracing::error!(?error, "Error parsing message; message ignored.")
-                    }
+        while let Some(message) = self.subscription.next().await {
+            let result = MessageWithResponseHandle::new(message, self.nc.clone());
+            match result {
+                Ok(v) => return Some(v),
+                Err(error) => {
+                    tracing::error!(?error, "Error parsing message; message ignored.")
                 }
-            } else {
-                return None;
             }
         }
+
+        None
     }
 }
 
