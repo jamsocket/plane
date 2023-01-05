@@ -142,6 +142,7 @@ async fn main() -> Result<()> {
                         resource_limits: ResourceLimits::default(),
                         pull_policy: Default::default(),
                         port,
+                        volume_mounts: Vec::new(),
                     },
                     require_bearer_token: false,
                 })

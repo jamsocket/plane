@@ -117,6 +117,7 @@ pub fn base_spawn_request() -> SpawnRequest {
             resource_limits: Default::default(),
             pull_policy: Default::default(),
             port: None,
+            volume_mounts: vec![],
         },
         bearer_token: None,
     }
@@ -135,6 +136,7 @@ pub fn base_scheduler_request() -> ScheduleRequest {
             resource_limits: Default::default(),
             pull_policy: Default::default(),
             port: None,
+            volume_mounts: vec![],
         },
         require_bearer_token: false,
     }

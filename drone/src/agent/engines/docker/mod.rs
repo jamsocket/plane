@@ -19,8 +19,9 @@ use bollard::{
     },
     image::CreateImageOptions,
     models::{HostConfig, ResourcesUlimits},
+    service::{DeviceRequest, Mount},
     system::EventsOptions,
-    Docker, API_DEFAULT_VERSION, service::DeviceRequest,
+    Docker, API_DEFAULT_VERSION,
 };
 use plane_core::{
     messages::agent::{
@@ -47,6 +48,7 @@ pub struct DockerInterface {
     runtime: Option<String>,
     network: Option<String>,
     gpu: bool,
+    allow_volume_mounts: bool,
 }
 
 impl DockerInterface {
@@ -69,6 +71,7 @@ impl DockerInterface {
             runtime: config.runtime.clone(),
             network: config.network.clone(),
             gpu: config.insecure_gpu,
+            allow_volume_mounts: config.allow_volume_mounts,
         })
     }
 
@@ -188,6 +191,22 @@ impl DockerInterface {
             None
         };
 
+        let mounts = if self.allow_volume_mounts {
+            let c: std::result::Result<Vec<Mount>, serde_json::Error> = executable_config
+                .volume_mounts
+                .iter()
+                .map(|value| serde_json::from_value(value.clone()))
+                .collect();
+
+            Some(c?)
+        } else {
+            if !executable_config.volume_mounts.is_empty() {
+                return Err(anyhow::anyhow!("Spawn attempt named volume mounts, but these are not enabled on this drone. Set `allow_volume_mounts` to true in the `docker` section of the Plane config to enable."));
+            }
+
+            None
+        };
+
         // Build the container.
         let container_id = {
             let timer = Timer::new();
@@ -237,6 +256,7 @@ impl DockerInterface {
                         },
                     ),
                     device_requests,
+                    mounts,
                     ..HostConfig::default()
                 }),
                 ..Config::default()

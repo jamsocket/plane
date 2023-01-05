@@ -39,6 +39,11 @@ pub struct DockerConfig {
 
     #[serde(default)]
     pub insecure_gpu: bool,
+
+    /// If true, spawn requests will be allowed to pass volume mounts on to
+    /// docker.
+    #[serde(default)]
+    pub allow_volume_mounts: bool,
 }
 
 #[derive(Serialize, Deserialize)]
