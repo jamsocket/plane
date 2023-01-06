@@ -22,6 +22,7 @@ use plane_dev::{
 };
 use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
+use serde_json::json;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use tokio::time::{sleep, Instant};
@@ -36,7 +37,11 @@ struct Agent {
 }
 
 impl Agent {
-    pub async fn new(nats: &Nats, drone_id: &DroneId) -> Result<Agent> {
+    pub async fn new(
+        nats: &Nats,
+        drone_id: &DroneId,
+        docker_options: DockerConfig,
+    ) -> Result<Agent> {
         let ip = random_loopback_ip();
         let db = DroneDatabase::new(&scratch_dir("agent").join("drone.db")).await?;
 
@@ -46,7 +51,7 @@ impl Agent {
             nats: nats.connection().await?,
             cluster_domain: ClusterName::new(CLUSTER_DOMAIN),
             ip: IpSource::Literal(IpAddr::V4(ip)),
-            docker_options: DockerConfig::default(),
+            docker_options,
         };
 
         let agent_guard = expect_to_stay_alive(plane_drone::agent::run_agent(agent_opts));
@@ -233,7 +238,9 @@ async fn drone_sends_status_messages() {
         .await
         .unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await.unwrap();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
 
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
@@ -260,7 +267,9 @@ async fn drone_sends_draining_status() {
     let nats_connection = nats.connection().await.unwrap();
     let mut controller_mock = MockController::new(nats_connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await.unwrap();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
 
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
@@ -297,7 +306,9 @@ async fn spawn_with_agent() {
     let connection = nats.connection().await.unwrap();
     let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await.unwrap();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
         .await
@@ -384,7 +395,9 @@ async fn stats_are_acquired() {
     let connection = nats.connection().await.unwrap();
     let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await.unwrap();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
         .await
@@ -449,7 +462,9 @@ async fn handle_error_during_start() {
     let connection = nats.connection().await.unwrap();
     let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await.unwrap();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
         .await
@@ -497,7 +512,9 @@ async fn handle_failure_after_ready() {
     let connection = nats.connection().await.unwrap();
     let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await.unwrap();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
         .await
@@ -544,7 +561,9 @@ async fn handle_successful_termination() {
     let connection = nats.connection().await.unwrap();
     let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await.unwrap();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
     controller_mock
         .expect_handshake(&drone_id, agent.ip)
         .await
@@ -593,7 +612,9 @@ async fn handle_agent_restart() {
 
     let mut state_subscription = {
         let drone_id = DroneId::new_random();
-        let agent = Agent::new(&nats_con, &drone_id).await.unwrap();
+        let agent = Agent::new(&nats_con, &drone_id, DockerConfig::default())
+            .await
+            .unwrap();
         controller_mock
             .expect_handshake(&drone_id, agent.ip)
             .await
@@ -621,7 +642,9 @@ async fn handle_agent_restart() {
     // Original agent goes away when it goes out of scope.
     {
         let drone_id = DroneId::new_random();
-        let agent = Agent::new(&nats_con, &drone_id).await.unwrap();
+        let agent = Agent::new(&nats_con, &drone_id, DockerConfig::default())
+            .await
+            .unwrap();
         controller_mock
             .expect_handshake(&drone_id, agent.ip)
             .await
@@ -640,7 +663,9 @@ async fn handle_termination_request() {
     let connection = nats.connection().await.unwrap();
     let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id).await.unwrap();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
 
     let mut request = base_spawn_request();
     // Ensure spawnee lives long enough to be terminated.
@@ -678,6 +703,102 @@ async fn handle_termination_request() {
 
     state_subscription
         .wait_for_state(BackendState::Terminated, 20_000)
+        .await
+        .unwrap();
+}
+
+#[integration_test]
+async fn attempt_to_spawn_with_disallowed_volume_mount() {
+    let nats = Nats::new().await.unwrap();
+    let connection = nats.connection().await.unwrap();
+    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let drone_id = DroneId::new_random();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
+    controller_mock
+        .expect_handshake(&drone_id, agent.ip)
+        .await
+        .unwrap();
+
+    controller_mock
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
+        .await
+        .unwrap();
+
+    let mut request = base_spawn_request();
+    request.drone_id = drone_id.clone();
+    request.executable.volume_mounts = vec![json!({
+        "source": "/foo",
+        "target": "/bar",
+    })];
+
+    let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+        .await
+        .unwrap();
+    controller_mock.spawn_backend(&request).await.unwrap();
+
+    state_subscription
+        .expect_backend_status_message(BackendState::Loading, 5_000)
+        .await
+        .unwrap();
+
+    state_subscription
+        .expect_backend_status_message(BackendState::ErrorLoading, 5_000)
+        .await
+        .unwrap();
+}
+
+#[integration_test]
+async fn attempt_to_spawn_with_allowed_volume_mount() {
+    let nats = Nats::new().await.unwrap();
+    let connection = nats.connection().await.unwrap();
+    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let drone_id = DroneId::new_random();
+    let docker_config = DockerConfig {
+        allow_volume_mounts: true,
+        ..DockerConfig::default()
+    };
+    let agent = Agent::new(&nats, &drone_id, docker_config).await.unwrap();
+    controller_mock
+        .expect_handshake(&drone_id, agent.ip)
+        .await
+        .unwrap();
+
+    controller_mock
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
+        .await
+        .unwrap();
+
+    let mut request = base_spawn_request();
+    request.drone_id = drone_id.clone();
+    request.executable.volume_mounts = vec![json!({
+        "Type": "tmpfs",
+        "Target": "/bar",
+    })];
+
+    let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+        .await
+        .unwrap();
+    controller_mock.spawn_backend(&request).await.unwrap();
+
+    state_subscription
+        .expect_backend_status_message(BackendState::Loading, 5_000)
+        .await
+        .unwrap();
+
+    state_subscription
+        .expect_backend_status_message(BackendState::Starting, 5_000)
+        .await
+        .unwrap();
+
+    state_subscription
+        .expect_backend_status_message(BackendState::Ready, 5_000)
+        .await
+        .unwrap();
+
+    state_subscription
+        .expect_backend_status_message(BackendState::Swept, 50_000)
         .await
         .unwrap();
 }
