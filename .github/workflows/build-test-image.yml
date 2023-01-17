@@ -52,5 +52,5 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: ${{ github.repository == 'drifting-in-space/plane' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          platforms: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'drifting-in-space/plane' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           buildx-fallback: true
