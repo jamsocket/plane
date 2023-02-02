@@ -10,6 +10,16 @@
     },
     "query": "\n                update route\n                set last_active = unixepoch()\n                where subdomain = ?\n                "
   },
+  "44601d326ea4878cdc8d615d41d827f38730fc9c4ff4727f6b6ac908d904aa59": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 4
+      }
+    },
+    "query": "\n            insert or replace into route\n            (backend, subdomain, address, last_active, bearer_token)\n            values\n            (?, ?, ?, unixepoch(), ?)\n            "
+  },
   "4d40d5ab7036ae0a6cf6e49e133ad531d3260c27c1bdf0745f869d7567d6c07d": {
     "describe": {
       "columns": [],
@@ -19,16 +29,6 @@
       }
     },
     "query": "\n            insert into backend\n            (name, spec, state)\n            values\n            (?, ?, 'Loading')\n            "
-  },
-  "960a424e5c893f7e0014c8b4d54fb41c996724552c0810f87f3644497c445fba": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Right": 3
-      }
-    },
-    "query": "\n            insert or replace into route\n            (backend, subdomain, address, last_active)\n            values\n            (?, ?, ?, unixepoch())\n            "
   },
   "9bde1570de3c5e831902027cc3d86457d3fef08176acb3d5aedc8eaec1f607b7": {
     "describe": {
@@ -65,6 +65,30 @@
       }
     },
     "query": "\n            select count(1) as c from backend\n            where state in ('Loading', 'Starting', 'Ready')\n            "
+  },
+  "c0242e29d36c0a4d049f21732902848b8caa73d9d4862773d18e7ff7f598a28d": {
+    "describe": {
+      "columns": [
+        {
+          "name": "address",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "bearer_token",
+          "ordinal": 1,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        true
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n            select address, bearer_token\n            from route\n            left join backend\n            on route.backend = backend.name\n            where subdomain = ?\n            and state = 'Ready'\n            "
   },
   "c9f1d28a8a6adb1c5d83095a09e88788c6d6382977073db81b5f4b0e3522481f": {
     "describe": {
@@ -105,23 +129,5 @@
       }
     },
     "query": "\n            update backend\n            set state = ?\n            where name = ?\n            "
-  },
-  "f03435ecffdc1bde6190bb77ea3d053709097982e979115f962933aad826eff4": {
-    "describe": {
-      "columns": [
-        {
-          "name": "address",
-          "ordinal": 0,
-          "type_info": "Text"
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Right": 1
-      }
-    },
-    "query": "\n            select address\n            from route\n            left join backend\n            on route.backend = backend.name\n            where subdomain = ?\n            and state = 'Ready'\n            "
   }
 }

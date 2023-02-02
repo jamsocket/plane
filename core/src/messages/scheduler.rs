@@ -3,6 +3,7 @@ use crate::{
     nats::{SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
+use rand::{Rng, distributions::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
@@ -38,9 +39,17 @@ impl ScheduleRequest {
             .clone()
             .unwrap_or_else(BackendId::new_random);
 
-        if self.require_bearer_token {
-            tracing::warn!("Scheduler received request with auth_token, which is not yet implemented. Ignoring.");
-        }
+        let bearer_token = if self.require_bearer_token {
+            let bearer_token: String = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(30)
+                .map(char::from)
+                .collect();
+
+            Some(bearer_token)
+        } else {
+            None
+        };
 
         SpawnRequest {
             cluster: Some(self.cluster.clone()),
@@ -49,7 +58,7 @@ impl ScheduleRequest {
             max_idle_secs: self.max_idle_secs,
             metadata: self.metadata.clone(),
             executable: self.executable.clone(),
-            bearer_token: None,
+            bearer_token,
         }
     }
 }
