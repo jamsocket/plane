@@ -219,7 +219,6 @@ async fn schedule_request_bearer_token() {
         .unwrap();
 
     let result = mock_agent.schedule_drone(&drone_id, true).await.unwrap();
-    println!("result {:?}", result);
     
     if let ScheduleResponse::Scheduled { drone, bearer_token, .. } = result {
         assert_eq!(drone, drone_id);
