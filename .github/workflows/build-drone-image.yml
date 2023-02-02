@@ -27,6 +27,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Set up Depot
+        uses: depot/setup-action@v1
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -53,7 +56,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
+        uses: depot/build-push-action@v1
         with:
           context: "."
           build-args: |
@@ -64,4 +67,5 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
+          platforms: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'drifting-in-space/plane' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          buildx-fallback: true
