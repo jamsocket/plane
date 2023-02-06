@@ -199,12 +199,6 @@ impl<E: Engine> Executor<E> {
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
 
-        if spawn_request.bearer_token.is_some() {
-            tracing::warn!(
-                "Spawn request included bearer token, which is not currently supported."
-            );
-        }
-
         loop {
             tracing::info!(
                 ?state,

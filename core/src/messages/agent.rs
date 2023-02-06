@@ -356,8 +356,6 @@ pub struct SpawnRequest {
     /// If set, the proxy will check for the given bearer token in requests (as
     /// a Bearer Authorization header, HTTP cookie, or query parameter) before
     /// allowing requests through.
-    ///
-    /// NOT YET IMPLEMENTED.
     #[serde(default)]
     pub bearer_token: Option<String>,
 }
