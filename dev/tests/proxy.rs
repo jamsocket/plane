@@ -15,8 +15,8 @@ use plane_dev::{
     util::random_loopback_ip,
 };
 use plane_drone::database::DroneDatabase;
-use plane_drone::proxy::PLANE_AUTH_COOKIE;
 use plane_drone::proxy::ProxyOptions;
+use plane_drone::proxy::PLANE_AUTH_COOKIE;
 use reqwest::Response;
 use reqwest::{Certificate, ClientBuilder};
 use std::net::SocketAddrV4;
@@ -126,7 +126,7 @@ impl Proxy {
         if let Some(cookie_token) = cookie_token {
             req = req.header("Cookie", format!("{}={}", PLANE_AUTH_COOKIE, cookie_token));
         }
-        
+
         req.send().await
     }
 
@@ -443,7 +443,12 @@ async fn simple_missing_bearer_token() {
 
     proxy
         .db
-        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string(), Some("foobar"))
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
         .await
         .unwrap();
 
@@ -468,11 +473,19 @@ async fn simple_bearer_token() {
 
     proxy
         .db
-        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string(), Some("foobar"))
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
         .await
         .unwrap();
 
-    let result = proxy.http_get("foobar", "/", Some("foobar"), None).await.unwrap();
+    let result = proxy
+        .http_get("foobar", "/", Some("foobar"), None)
+        .await
+        .unwrap();
     assert_eq!(StatusCode::OK, result.status());
 }
 
@@ -493,11 +506,19 @@ async fn simple_wrong_bearer_token() {
 
     proxy
         .db
-        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string(), Some("foobaz"))
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobaz"),
+        )
         .await
         .unwrap();
 
-    let result = proxy.http_get("foobar", "/", Some("foobar"), None).await.unwrap();
+    let result = proxy
+        .http_get("foobar", "/", Some("foobar"), None)
+        .await
+        .unwrap();
     assert_eq!(StatusCode::FORBIDDEN, result.status());
 }
 
@@ -518,11 +539,19 @@ async fn simple_cookie_bearer_token() {
 
     proxy
         .db
-        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string(), Some("foobar"))
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
         .await
         .unwrap();
 
-    let result = proxy.http_get("foobar", "/", None, Some("foobar")).await.unwrap();
+    let result = proxy
+        .http_get("foobar", "/", None, Some("foobar"))
+        .await
+        .unwrap();
     assert_eq!(StatusCode::OK, result.status());
 }
 
@@ -543,11 +572,58 @@ async fn simple_cookie_set() {
 
     proxy
         .db
-        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string(), Some("foobar"))
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
         .await
         .unwrap();
 
-    let result = proxy.http_get("foobar", "/_plane_auth?token=foobar", None, None).await.unwrap();
+    let result = proxy
+        .http_get("foobar", "/_plane_auth?token=foobar", None, None)
+        .await
+        .unwrap();
     assert_eq!(StatusCode::OK, result.status());
     assert_eq!("Hello World", result.text().await.unwrap());
+}
+
+#[integration_test]
+async fn custom_path_cookie_set() {
+    let proxy = Proxy::new(None).await.unwrap();
+    let server = Server::new(|req| async move { format!("Hello World {}", req.uri().path_and_query().unwrap()) })
+        .await
+        .unwrap();
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await.unwrap();
+    proxy
+        .db
+        .update_backend_state(&sr.backend_id, BackendState::Ready)
+        .await
+        .unwrap();
+
+    proxy
+        .db
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
+        .await
+        .unwrap();
+
+    let result = proxy
+        .http_get(
+            "foobar",
+            "/_plane_auth?token=foobar&redirect=blahblah%3Fa%3Db",
+            None,
+            None,
+        ) // blahblah?a=b
+        .await
+        .unwrap();
+    assert_eq!(StatusCode::OK, result.status());
+    assert_eq!("Hello World /blahblah?a=b", result.text().await.unwrap());
 }

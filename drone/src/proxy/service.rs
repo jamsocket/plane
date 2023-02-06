@@ -9,6 +9,7 @@ use hyper::client::HttpConnector;
 use hyper::server::conn::AddrStream;
 use hyper::Client;
 use hyper::{service::Service, Body, Request, Response, StatusCode};
+use serde::Deserialize;
 use std::io::ErrorKind;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
@@ -271,15 +272,17 @@ impl ProxyService {
                 });
 
                 if req.uri().path() == "/_plane_auth" {
-                    if let Some(query) = req.uri().query() {
-                        if let Some(token) = query.strip_prefix("token=") {
-                            return Ok(Response::builder()
-                                .status(StatusCode::FOUND)
-                                .header("Location", "/")
-                                .header("Set-Cookie", format!("{}={}", PLANE_AUTH_COOKIE, token))
-                                .body(Body::empty())?);
-                        }
-                    }
+                    let params: PlaneAuthParams =
+                        serde_html_form::from_str(req.uri().query().unwrap_or_default())?;
+
+                    return Ok(Response::builder()
+                        .status(StatusCode::FOUND)
+                        .header("Location", params.redirect.as_deref().unwrap_or("/"))
+                        .header(
+                            "Set-Cookie",
+                            format!("{}={}", PLANE_AUTH_COOKIE, params.token),
+                        )
+                        .body(Body::empty())?);
 
                     return Ok(Response::builder()
                         .status(StatusCode::BAD_REQUEST)
@@ -356,4 +359,10 @@ impl Service<Request<Body>> for ProxyService {
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         Box::pin(self.clone().warn_handle(req))
     }
+}
+
+#[derive(Deserialize)]
+struct PlaneAuthParams {
+    token: String,
+    redirect: Option<String>,
 }
