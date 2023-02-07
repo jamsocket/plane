@@ -362,7 +362,7 @@ async fn spawn_with_agent() {
         .await
         .unwrap()
         .expect("Expected proxy route.");
-    let result = reqwest::get(format!("http://{}/", proxy_route))
+    let result = reqwest::get(format!("http://{}/", proxy_route.address))
         .await
         .unwrap();
     assert_eq!("Hello World!", result.text().await.unwrap());
@@ -547,7 +547,7 @@ async fn handle_failure_after_ready() {
     // A get request to this URL will cause the container to exit with status 1.
     // We don't check the status, because the request itself is expected to fail
     // (the process exits immediately, so the response is not sent).
-    let _ = reqwest::get(format!("http://{}/exit/1", proxy_route)).await;
+    let _ = reqwest::get(format!("http://{}/exit/1", proxy_route.address)).await;
 
     state_subscription
         .expect_backend_status_message(BackendState::Failed, 5_000)
@@ -596,7 +596,7 @@ async fn handle_successful_termination() {
     // A get request to this URL will cause the container to exit with status 1.
     // We don't check the status, because the request itself is expected to fail
     // (the process exits immediately, so the response is not sent).
-    let _ = reqwest::get(format!("http://{}/exit/0", proxy_route)).await;
+    let _ = reqwest::get(format!("http://{}/exit/0", proxy_route.address)).await;
 
     state_subscription
         .expect_backend_status_message(BackendState::Exited, 5_000)
@@ -802,3 +802,4 @@ async fn attempt_to_spawn_with_allowed_volume_mount() {
         .await
         .unwrap();
 }
+

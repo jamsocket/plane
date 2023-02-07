@@ -16,6 +16,7 @@ use plane_dev::{
 };
 use plane_drone::database::DroneDatabase;
 use plane_drone::proxy::ProxyOptions;
+use plane_drone::proxy::PLANE_AUTH_COOKIE;
 use reqwest::Response;
 use reqwest::{Certificate, ClientBuilder};
 use std::net::SocketAddrV4;
@@ -98,12 +99,15 @@ impl Proxy {
         &self,
         subdomain: &str,
         path: &str,
+        bearer_token: Option<&str>,
+        cookie_token: Option<&str>,
     ) -> std::result::Result<Response, reqwest::Error> {
         let cert = Certificate::from_pem(self.certs.cert_pem.as_bytes()).unwrap();
         let hostname = format!("{}.{}", subdomain, CLUSTER);
         let client = ClientBuilder::new()
             .add_root_certificate(cert)
             .resolve(&hostname, self.bind_address)
+            .cookie_store(true)
             .build()?;
 
         let path = if let Some(path) = path.strip_prefix('/') {
@@ -113,7 +117,17 @@ impl Proxy {
         };
 
         let url = format!("https://{}:{}/{}", hostname, self.bind_address.port(), path);
-        client.get(url).send().await
+        let mut req = client.get(url);
+
+        if let Some(bearer_token) = bearer_token {
+            req = req.bearer_auth(bearer_token);
+        }
+
+        if let Some(cookie_token) = cookie_token {
+            req = req.header("Cookie", format!("{}={}", PLANE_AUTH_COOKIE, cookie_token));
+        }
+
+        req.send().await
     }
 
     pub async fn https_websocket(
@@ -175,7 +189,7 @@ impl Proxy {
 async fn backend_not_exist_404s() {
     let proxy = Proxy::new(None).await.unwrap();
 
-    let result = proxy.http_get("foobar", "/").await.unwrap();
+    let result = proxy.http_get("foobar", "/", None, None).await.unwrap();
     assert_eq!(StatusCode::NOT_FOUND, result.status());
 }
 
@@ -187,7 +201,7 @@ async fn backend_not_exist_passthrough() {
 
     let proxy = Proxy::new(Some(server.address)).await.unwrap();
 
-    let result = proxy.http_get("foobar", "/").await.unwrap();
+    let result = proxy.http_get("foobar", "/", None, None).await.unwrap();
     assert_eq!(StatusCode::OK, result.status());
 }
 
@@ -208,11 +222,11 @@ async fn simple_backend_proxy() {
 
     proxy
         .db
-        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string(), None)
         .await
         .unwrap();
 
-    let result = proxy.http_get("foobar", "/").await.unwrap();
+    let result = proxy.http_get("foobar", "/", None, None).await.unwrap();
     assert_eq!("Hello World", result.text().await.unwrap());
 }
 
@@ -231,7 +245,7 @@ async fn simple_ws_backend_proxy() {
 
     proxy
         .db
-        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string(), None)
         .await
         .unwrap();
 
@@ -288,7 +302,7 @@ async fn connection_status_is_recorded() {
         .unwrap();
     proxy
         .db
-        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string(), None)
         .await
         .unwrap();
 
@@ -305,7 +319,7 @@ async fn connection_status_is_recorded() {
 
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    proxy.http_get("foobar", "/").await.unwrap();
+    proxy.http_get("foobar", "/", None, None).await.unwrap();
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     let t2_last_active = proxy
@@ -330,7 +344,7 @@ async fn connection_status_is_recorded() {
         "Last active timestamp shouldn't change without new activity."
     );
 
-    proxy.http_get("foobar", "/").await.unwrap();
+    proxy.http_get("foobar", "/", None, None).await.unwrap();
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     let t4_last_active = proxy
@@ -368,11 +382,11 @@ async fn host_header_is_set() {
 
     proxy
         .db
-        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string(), None)
         .await
         .unwrap();
 
-    let result = proxy.http_get("foobar", "/").await.unwrap();
+    let result = proxy.http_get("foobar", "/", None, None).await.unwrap();
     assert_eq!("foobar.plane.test:4040", result.text().await.unwrap());
 }
 
@@ -395,19 +409,262 @@ async fn update_certificates() {
 
     proxy
         .db
-        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string())
+        .insert_proxy_route(&sr.backend_id, "foobar", &server.address.to_string(), None)
         .await
         .unwrap();
 
-    let result = proxy.http_get("foobar", "/").await.unwrap();
+    let result = proxy.http_get("foobar", "/", None, None).await.unwrap();
     assert_eq!("Hello World", result.text().await.unwrap());
 
     proxy.update_cert().unwrap();
     let new_cert = proxy.certs.cert_pem.clone();
 
-    let result = proxy.http_get("foobar", "/").await.unwrap();
+    let result = proxy.http_get("foobar", "/", None, None).await.unwrap();
     assert_eq!("Hello World", result.text().await.unwrap());
 
     // Ensure the certs are actually different.
     assert_ne!(original_cert, new_cert);
+}
+
+#[integration_test]
+async fn simple_missing_bearer_token() {
+    let proxy = Proxy::new(None).await.unwrap();
+    let server = Server::new(|_| async { "Hello World".into() })
+        .await
+        .unwrap();
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await.unwrap();
+    proxy
+        .db
+        .update_backend_state(&sr.backend_id, BackendState::Ready)
+        .await
+        .unwrap();
+
+    proxy
+        .db
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
+        .await
+        .unwrap();
+
+    let result = proxy.http_get("foobar", "/", None, None).await.unwrap();
+    assert_eq!(StatusCode::UNAUTHORIZED, result.status());
+}
+
+#[integration_test]
+async fn simple_bearer_token() {
+    let proxy = Proxy::new(None).await.unwrap();
+    let server = Server::new(|_| async { "Hello World".into() })
+        .await
+        .unwrap();
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await.unwrap();
+    proxy
+        .db
+        .update_backend_state(&sr.backend_id, BackendState::Ready)
+        .await
+        .unwrap();
+
+    proxy
+        .db
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
+        .await
+        .unwrap();
+
+    let result = proxy
+        .http_get("foobar", "/", Some("foobar"), None)
+        .await
+        .unwrap();
+    assert_eq!(StatusCode::OK, result.status());
+}
+
+#[integration_test]
+async fn simple_wrong_bearer_token() {
+    let proxy = Proxy::new(None).await.unwrap();
+    let server = Server::new(|_| async { "Hello World".into() })
+        .await
+        .unwrap();
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await.unwrap();
+    proxy
+        .db
+        .update_backend_state(&sr.backend_id, BackendState::Ready)
+        .await
+        .unwrap();
+
+    proxy
+        .db
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobaz"),
+        )
+        .await
+        .unwrap();
+
+    let result = proxy
+        .http_get("foobar", "/", Some("foobar"), None)
+        .await
+        .unwrap();
+    assert_eq!(StatusCode::FORBIDDEN, result.status());
+}
+
+#[integration_test]
+async fn simple_cookie_bearer_token() {
+    let proxy = Proxy::new(None).await.unwrap();
+    let server = Server::new(|_| async { "Hello World".into() })
+        .await
+        .unwrap();
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await.unwrap();
+    proxy
+        .db
+        .update_backend_state(&sr.backend_id, BackendState::Ready)
+        .await
+        .unwrap();
+
+    proxy
+        .db
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
+        .await
+        .unwrap();
+
+    let result = proxy
+        .http_get("foobar", "/", None, Some("foobar"))
+        .await
+        .unwrap();
+    assert_eq!(StatusCode::OK, result.status());
+}
+
+#[integration_test]
+async fn simple_cookie_set() {
+    let proxy = Proxy::new(None).await.unwrap();
+    let server = Server::new(|_| async { "Hello World".into() })
+        .await
+        .unwrap();
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await.unwrap();
+    proxy
+        .db
+        .update_backend_state(&sr.backend_id, BackendState::Ready)
+        .await
+        .unwrap();
+
+    proxy
+        .db
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
+        .await
+        .unwrap();
+
+    let result = proxy
+        .http_get("foobar", "/_plane_auth?token=foobar", None, None)
+        .await
+        .unwrap();
+    assert_eq!(StatusCode::OK, result.status());
+    assert_eq!("Hello World", result.text().await.unwrap());
+}
+
+#[integration_test]
+async fn custom_path_cookie_set() {
+    let proxy = Proxy::new(None).await.unwrap();
+    let server = Server::new(|req| async move { format!("Hello World {}", req.uri().path_and_query().unwrap()) })
+        .await
+        .unwrap();
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await.unwrap();
+    proxy
+        .db
+        .update_backend_state(&sr.backend_id, BackendState::Ready)
+        .await
+        .unwrap();
+
+    proxy
+        .db
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
+        .await
+        .unwrap();
+
+    let result = proxy
+        .http_get(
+            "foobar",
+            "/_plane_auth?token=foobar&redirect=/blahblah%3Fa%3Db",
+            None,
+            None,
+        ) // blahblah?a=b
+        .await
+        .unwrap();
+    assert_eq!(StatusCode::OK, result.status());
+    assert_eq!("Hello World /blahblah?a=b", result.text().await.unwrap());
+}
+
+
+#[integration_test]
+async fn custom_path_cookie_set_invalid_redirect() {
+    let proxy = Proxy::new(None).await.unwrap();
+    let server = Server::new(|req| async move { format!("Hello World {}", req.uri().path_and_query().unwrap()) })
+        .await
+        .unwrap();
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await.unwrap();
+    proxy
+        .db
+        .update_backend_state(&sr.backend_id, BackendState::Ready)
+        .await
+        .unwrap();
+
+    proxy
+        .db
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
+        .await
+        .unwrap();
+
+    let result = proxy
+        .http_get(
+            "foobar",
+            "/_plane_auth?token=foobar&redirect=https://blahblah%3Fa%3Db",
+            None,
+            None,
+        ) // blahblah?a=b
+        .await
+        .unwrap();
+    
+    assert_eq!(StatusCode::BAD_REQUEST, result.status());
+    assert_eq!("Redirect must be relative and start with a slash.", result.text().await.unwrap());
 }

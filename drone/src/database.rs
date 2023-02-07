@@ -29,6 +29,11 @@ pub struct Backend {
     pub spec: SpawnRequest,
 }
 
+pub struct ProxyRoute {
+    pub address: String,
+    pub bearer_token: Option<String>,
+}
+
 #[allow(unused)]
 impl DroneDatabase {
     pub async fn new(db_path: &Path) -> Result<DroneDatabase> {
@@ -119,10 +124,11 @@ impl DroneDatabase {
     }
 
     /// Get the downstream source to direct a request on an incoming subdomain to.
-    pub async fn get_proxy_route(&self, subdomain: &str) -> Result<Option<String>> {
-        Ok(sqlx::query!(
+    pub async fn get_proxy_route(&self, subdomain: &str) -> Result<Option<ProxyRoute>> {
+        sqlx::query_as!(
+            ProxyRoute,
             r"
-            select address
+            select address, bearer_token
             from route
             left join backend
             on route.backend = backend.name
@@ -132,8 +138,7 @@ impl DroneDatabase {
             subdomain
         )
         .fetch_optional(&self.pool)
-        .await?
-        .map(|d| d.address))
+        .await
     }
 
     pub async fn insert_proxy_route(
@@ -141,18 +146,20 @@ impl DroneDatabase {
         backend: &BackendId,
         subdomain: &str,
         address: &str,
+        bearer_token: Option<&str>,
     ) -> Result<()> {
         let backend_id = backend.id().to_string();
         sqlx::query!(
             r"
             insert or replace into route
-            (backend, subdomain, address, last_active)
+            (backend, subdomain, address, last_active, bearer_token)
             values
-            (?, ?, ?, unixepoch())
+            (?, ?, ?, unixepoch(), ?)
             ",
             backend_id,
             subdomain,
-            address
+            address,
+            bearer_token,
         )
         .execute(&self.pool)
         .await?;

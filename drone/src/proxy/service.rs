@@ -1,6 +1,7 @@
 use super::connection_tracker::ConnectionTracker;
 use super::tls::TlsStream;
-use crate::database::DroneDatabase;
+use super::PLANE_AUTH_COOKIE;
+use crate::database::{DroneDatabase, ProxyRoute};
 use anyhow::{anyhow, Context, Result};
 use http::uri::{Authority, Scheme};
 use http::Uri;
@@ -8,6 +9,7 @@ use hyper::client::HttpConnector;
 use hyper::server::conn::AddrStream;
 use hyper::Client;
 use hyper::{service::Service, Body, Request, Response, StatusCode};
+use serde::Deserialize;
 use std::io::ErrorKind;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
@@ -127,6 +129,49 @@ pub struct ProxyService {
     passthrough: Option<SocketAddr>,
 }
 
+fn check_auth<T>(req: &Request<T>, expected_token: &str) -> Result<Option<Response<Body>>> {
+    let req_bearer_token = req.headers().get(http::header::AUTHORIZATION);
+
+    if let Some(req_bearer_token) = req_bearer_token {
+        let token_bytes = req_bearer_token.as_bytes();
+        if (&token_bytes[0..7] == b"Bearer " || &token_bytes[0..7] == b"bearer ")
+            && &token_bytes[7..] == expected_token.as_bytes()
+        {
+            return Ok(None);
+        } else {
+            return Ok(Some(
+                Response::builder()
+                    .status(StatusCode::FORBIDDEN)
+                    .body(Body::empty())
+                    .unwrap(),
+            ));
+        }
+    }
+
+    let cookies = req.headers().get_all(http::header::COOKIE);
+    let expected_prefix = format!("{}=", PLANE_AUTH_COOKIE);
+
+    for cookie in cookies {
+        let cookie = cookie.to_str().unwrap();
+
+        for cookie in cookie.split(';') {
+            let cookie = cookie.trim();
+
+            if let Some(cookie) = cookie.strip_prefix(&expected_prefix) {
+                if cookie == expected_token {
+                    return Ok(None);
+                }
+            }
+        }
+    }
+
+    let result = Response::builder()
+        .status(StatusCode::UNAUTHORIZED)
+        .body(Body::from("Expected bearer token."))?;
+
+    Ok(Some(result))
+}
+
 #[allow(unused)]
 impl ProxyService {
     fn rewrite_uri(authority: &str, uri: &Uri) -> anyhow::Result<Uri> {
@@ -216,19 +261,51 @@ impl ProxyService {
 
             tracing::info!(ip=%self.remote_ip, url=%req.uri(), "Proxy Request");
 
-            // TODO: we shouldn't need to allocate a string just to strip a prefix.
             if let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) {
                 let subdomain = subdomain.to_string();
 
-                let route = self
-                    .db
-                    .get_proxy_route(&subdomain)
-                    .await?
-                    .or_else(|| self.passthrough.map(|d| d.to_string()));
+                let route = self.db.get_proxy_route(&subdomain).await?.or_else(|| {
+                    self.passthrough.map(|d| ProxyRoute {
+                        address: d.to_string(),
+                        bearer_token: None,
+                    })
+                });
 
-                if let Some(addr) = route {
+                if req.uri().path() == "/_plane_auth" {
+                    let params: PlaneAuthParams =
+                        serde_html_form::from_str(req.uri().query().unwrap_or_default())?;
+
+                    if let Some(redirect) = params.redirect.as_deref() {
+                        if !redirect.starts_with('/') {
+                            return Ok(Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .body("Redirect must be relative and start with a slash.".into()).unwrap());
+                        }
+                    }
+
+                    return Ok(Response::builder()
+                        .status(StatusCode::FOUND)
+                        .header("Location", params.redirect.as_deref().unwrap_or("/"))
+                        .header(
+                            "Set-Cookie",
+                            format!("{}={}", PLANE_AUTH_COOKIE, params.token),
+                        )
+                        .body(Body::empty())?);
+
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body("Missing token.".into())?);
+                }
+
+                if let Some(proxy_route) = route {
                     self.connection_tracker.track_request(&subdomain);
-                    *req.uri_mut() = Self::rewrite_uri(&addr, req.uri())?;
+                    *req.uri_mut() = Self::rewrite_uri(&proxy_route.address, req.uri())?;
+
+                    if let Some(token) = proxy_route.bearer_token {
+                        if let Some(response) = check_auth(&req, &token)? {
+                            return Ok(response);
+                        }
+                    }
 
                     if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
                         if connection
@@ -290,4 +367,10 @@ impl Service<Request<Body>> for ProxyService {
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         Box::pin(self.clone().warn_handle(req))
     }
+}
+
+#[derive(Deserialize)]
+struct PlaneAuthParams {
+    token: String,
+    redirect: Option<String>,
 }

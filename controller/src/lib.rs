@@ -19,7 +19,7 @@ pub mod ttl_store;
 
 pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
     let scheduler = Scheduler::default();
-    let mut spawn_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
+    let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
 
     let mut status_sub = nats
@@ -38,8 +38,8 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                 }
             },
 
-            spawn_request = spawn_request_sub.next() => {
-                match spawn_request {
+            schedule_request = schedule_request_sub.next() => {
+                match schedule_request {
                     Some(schedule_request) => {
                         tracing::info!(spawn_request=?schedule_request.value, "Got spawn request");
                         let result = match scheduler.schedule(&schedule_request.value.cluster, Utc::now()) {
@@ -57,7 +57,7 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                                         ScheduleResponse::Scheduled {
                                             drone: drone_id,
                                             backend_id: spawn_request.backend_id,
-                                            bearer_token: None,
+                                            bearer_token: spawn_request.bearer_token,
                                         }
                                     }
                                     Ok(false) => {

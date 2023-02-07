@@ -15,6 +15,8 @@ mod connection_tracker;
 mod service;
 mod tls;
 
+pub const PLANE_AUTH_COOKIE: &str = "_plane_auth";
+
 pub struct ProxyOptions {
     pub db: DroneDatabase,
     pub bind_ip: IpAddr,
