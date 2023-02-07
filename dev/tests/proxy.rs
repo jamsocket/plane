@@ -618,7 +618,7 @@ async fn custom_path_cookie_set() {
     let result = proxy
         .http_get(
             "foobar",
-            "/_plane_auth?token=foobar&redirect=blahblah%3Fa%3Db",
+            "/_plane_auth?token=foobar&redirect=/blahblah%3Fa%3Db",
             None,
             None,
         ) // blahblah?a=b
@@ -626,4 +626,45 @@ async fn custom_path_cookie_set() {
         .unwrap();
     assert_eq!(StatusCode::OK, result.status());
     assert_eq!("Hello World /blahblah?a=b", result.text().await.unwrap());
+}
+
+
+#[integration_test]
+async fn custom_path_cookie_set_invalid_redirect() {
+    let proxy = Proxy::new(None).await.unwrap();
+    let server = Server::new(|req| async move { format!("Hello World {}", req.uri().path_and_query().unwrap()) })
+        .await
+        .unwrap();
+
+    let sr = base_spawn_request();
+    proxy.db.insert_backend(&sr).await.unwrap();
+    proxy
+        .db
+        .update_backend_state(&sr.backend_id, BackendState::Ready)
+        .await
+        .unwrap();
+
+    proxy
+        .db
+        .insert_proxy_route(
+            &sr.backend_id,
+            "foobar",
+            &server.address.to_string(),
+            Some("foobar"),
+        )
+        .await
+        .unwrap();
+
+    let result = proxy
+        .http_get(
+            "foobar",
+            "/_plane_auth?token=foobar&redirect=https://blahblah%3Fa%3Db",
+            None,
+            None,
+        ) // blahblah?a=b
+        .await
+        .unwrap();
+    
+    assert_eq!(StatusCode::BAD_REQUEST, result.status());
+    assert_eq!("Redirect must be relative and start with a slash.", result.text().await.unwrap());
 }

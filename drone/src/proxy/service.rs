@@ -275,6 +275,14 @@ impl ProxyService {
                     let params: PlaneAuthParams =
                         serde_html_form::from_str(req.uri().query().unwrap_or_default())?;
 
+                    if let Some(redirect) = params.redirect.as_deref() {
+                        if !redirect.starts_with('/') {
+                            return Ok(Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .body("Redirect must be relative and start with a slash.".into()).unwrap());
+                        }
+                    }
+
                     return Ok(Response::builder()
                         .status(StatusCode::FOUND)
                         .header("Location", params.redirect.as_deref().unwrap_or("/"))
