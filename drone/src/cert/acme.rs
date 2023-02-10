@@ -39,7 +39,7 @@ where
     D: Deserializer<'de>,
 {
     let result = String::deserialize(deserializer)?;
-    base64::decode_config(&result, base64::URL_SAFE).map_err(|err| Error::custom(err.to_string()))
+    base64::decode_config(result, base64::URL_SAFE).map_err(|err| Error::custom(err.to_string()))
 }
 
 impl AcmeEabConfiguration {

@@ -30,7 +30,7 @@ impl ControllerPlan {
                     "soa_email provided in configuration was not a valid email address.",
                 )?;
                 Some(
-                    Name::from_ascii(&soa_email)
+                    Name::from_ascii(soa_email)
                         .context("soa_email contained non-ascii characters.")?,
                 )
             } else {
