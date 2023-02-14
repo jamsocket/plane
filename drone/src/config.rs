@@ -32,6 +32,7 @@ impl Default for DockerConnection {
 #[derive(Serialize, Deserialize, Default)]
 pub struct DockerConfig {
     pub runtime: Option<String>,
+    
     #[serde(default)]
     pub connection: DockerConnection,
 
@@ -44,6 +45,8 @@ pub struct DockerConfig {
     /// docker.
     #[serde(default)]
     pub allow_volume_mounts: bool,
+
+    pub syslog: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
