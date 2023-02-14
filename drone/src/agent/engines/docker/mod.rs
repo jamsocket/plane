@@ -19,7 +19,7 @@ use bollard::{
     },
     image::CreateImageOptions,
     models::{HostConfig, ResourcesUlimits},
-    service::{DeviceRequest, Mount},
+    service::{DeviceRequest, Mount, HostConfigLogConfig},
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
@@ -49,6 +49,7 @@ pub struct DockerInterface {
     network: Option<String>,
     gpu: bool,
     allow_volume_mounts: bool,
+    syslog: Option<String>,
 }
 
 impl DockerInterface {
@@ -72,6 +73,7 @@ impl DockerInterface {
             network: config.network.clone(),
             gpu: config.insecure_gpu,
             allow_volume_mounts: config.allow_volume_mounts,
+            syslog: config.syslog.clone(),
         })
     }
 
@@ -257,6 +259,20 @@ impl DockerInterface {
                     ),
                     device_requests,
                     mounts,
+
+                    log_config: self.syslog.as_ref().map(|d| {
+                        HostConfigLogConfig {
+                            typ: Some("syslog".to_string()),
+                            config: Some(vec![
+                                ("syslog-address".to_string(), d.to_string()),
+                                ("syslog-format".to_string(), "rfc5424".to_string()),
+                                ("tag".to_string(), name.to_string()),
+                            ]
+                            .into_iter()
+                            .collect()),
+                        }
+                    }),
+
                     ..HostConfig::default()
                 }),
                 ..Config::default()
