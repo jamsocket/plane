@@ -11,8 +11,10 @@ use chrono::Utc;
 use dashmap::DashMap;
 use plane_core::{
     messages::{
-        agent::{BackendState, BackendStateMessage, SpawnRequest, TerminationRequest},
-        state::StateUpdate,
+        agent::{
+            BackendState, BackendStateMessage, SpawnRequest, TerminationRequest,
+            UpdateBackendStateMessage,
+        },
     },
     nats::TypedNats,
     types::{BackendId, ClusterName},
@@ -89,6 +91,28 @@ impl<E: Engine> Clone for Executor<E> {
     }
 }
 
+fn update_backend_state(
+    nc: &TypedNats,
+    state: BackendState,
+    cluster: ClusterName,
+    backend: BackendId,
+) {
+    let message = UpdateBackendStateMessage {
+        state,
+        cluster,
+        backend,
+        time: Utc::now(),
+    };
+    let nc = nc.clone();
+
+    tokio::spawn(async move {
+        while let Err(error) = nc.request(&message).await {
+            tracing::error!(?error, "Failed to update backend state, retrying.");
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    });    
+}
+
 impl<E: Engine> Executor<E> {
     pub fn new(
         engine: E,
@@ -135,14 +159,12 @@ impl<E: Engine> Executor<E> {
             .await
             .log_error();
 
-        self.nc
-            .publish_jetstream(&BackendStateMessage::new(
-                BackendState::Loading,
-                spawn_request.cluster.clone(),
-                spawn_request.backend_id.clone(),
-            ))
-            .await
-            .log_error();
+        update_backend_state(
+            &self.nc,
+            BackendState::Loading,
+            self.cluster.clone(),
+            spawn_request.backend_id.clone(),
+        );
 
         self.run_backend(spawn_request, BackendState::Loading).await
     }
@@ -297,18 +319,12 @@ impl<E: Engine> Executor<E> {
             .await
             .log_error();
 
-        self.nc
-            .publish_jetstream(&StateUpdate::BackendStatus {
-                cluster: spawn_request
-                    .cluster
-                    .clone()
-                    .unwrap_or_else(|| self.cluster.clone()),
-                drone: spawn_request.drone_id.clone(),
-                backend: spawn_request.backend_id.clone(),
-                state,
-            })
-            .await
-            .log_error();
+        update_backend_state(
+            &self.nc,
+            state,
+            self.cluster.clone(),
+            spawn_request.backend_id.clone(),
+        );
     }
 
     pub async fn step(

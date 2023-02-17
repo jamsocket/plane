@@ -124,7 +124,7 @@ async fn ready_loop(
 
         let running_backends = db.running_backends().await?;
 
-        nc.publish_jetstream(&DroneStatusMessage {
+        nc.publish(&DroneStatusMessage {
             drone_id: drone_id.clone(),
             cluster: cluster.clone(),
             drone_version: PLANE_VERSION.to_string(),
@@ -135,7 +135,7 @@ async fn ready_loop(
         .await
         .log_error("Error in ready loop.");
 
-        nc.publish_jetstream(&StateUpdate::DroneStatus {
+        nc.publish(&StateUpdate::DroneStatus {
             cluster: cluster.clone(),
             drone: drone_id.clone(),
             state,

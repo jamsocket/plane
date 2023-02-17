@@ -3,8 +3,8 @@ use integration_test::integration_test;
 use plane_core::{
     messages::{
         agent::{
-            BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
-            DroneStatusMessage, SpawnRequest, TerminationRequest,
+            BackendState, BackendStatsMessage, DroneConnectRequest, DroneStatusMessage,
+            SpawnRequest, TerminationRequest, UpdateBackendStateMessage,
         },
         dns::{DnsRecordType, SetDnsRecord},
         scheduler::DrainDrone,
@@ -169,13 +169,16 @@ impl MockController {
 }
 
 struct BackendStateSubscription {
-    sub: TypedSubscription<BackendStateMessage>,
+    sub: TypedSubscription<UpdateBackendStateMessage>,
 }
 
 impl BackendStateSubscription {
     pub async fn new(nats: &TypedNats, backend_id: &BackendId) -> Result<Self> {
         let sub = nats
-            .subscribe(BackendStateMessage::subscribe_subject(backend_id))
+            .subscribe(UpdateBackendStateMessage::backend_subject(
+                &ClusterName::new(CLUSTER_DOMAIN),
+                backend_id,
+            ))
             .await?;
         Ok(BackendStateSubscription { sub })
     }
@@ -802,4 +805,3 @@ async fn attempt_to_spawn_with_allowed_volume_mount() {
         .await
         .unwrap();
 }
-
