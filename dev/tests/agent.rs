@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use integration_test::integration_test;
+use plane_controller::run::update_backend_state_loop;
 use plane_core::{
     messages::{
         agent::{
@@ -34,6 +35,8 @@ struct Agent {
     agent_guard: LivenessGuard<NeverResult>,
     pub ip: Ipv4Addr,
     pub db: DroneDatabase,
+    #[allow(unused)]
+    loop_guard: LivenessGuard<NeverResult>,
 }
 
 impl Agent {
@@ -44,22 +47,25 @@ impl Agent {
     ) -> Result<Agent> {
         let ip = random_loopback_ip();
         let db = DroneDatabase::new(&scratch_dir("agent").join("drone.db")).await?;
+        let nc = nats.connection().await?;
 
         let agent_opts = AgentOptions {
             db: db.clone(),
             drone_id: drone_id.clone(),
-            nats: nats.connection().await?,
+            nats: nc.clone(),
             cluster_domain: ClusterName::new(CLUSTER_DOMAIN),
             ip: IpSource::Literal(IpAddr::V4(ip)),
             docker_options,
         };
 
         let agent_guard = expect_to_stay_alive(plane_drone::agent::run_agent(agent_opts));
+        let loop_guard = expect_to_stay_alive(update_backend_state_loop(nc));
 
         Ok(Agent {
             agent_guard,
             ip,
             db,
+            loop_guard,
         })
     }
 }
