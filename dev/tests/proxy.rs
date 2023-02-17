@@ -592,7 +592,10 @@ async fn simple_cookie_set() {
 #[integration_test]
 async fn custom_path_cookie_set() {
     let proxy = Proxy::new(None).await.unwrap();
-    let server = Server::new(|req| async move { format!("Hello World {}", req.uri().path_and_query().unwrap()) })
+    let server =
+        Server::new(
+            |req| async move { format!("Hello World {}", req.uri().path_and_query().unwrap()) },
+        )
         .await
         .unwrap();
 
@@ -628,11 +631,13 @@ async fn custom_path_cookie_set() {
     assert_eq!("Hello World /blahblah?a=b", result.text().await.unwrap());
 }
 
-
 #[integration_test]
 async fn custom_path_cookie_set_invalid_redirect() {
     let proxy = Proxy::new(None).await.unwrap();
-    let server = Server::new(|req| async move { format!("Hello World {}", req.uri().path_and_query().unwrap()) })
+    let server =
+        Server::new(
+            |req| async move { format!("Hello World {}", req.uri().path_and_query().unwrap()) },
+        )
         .await
         .unwrap();
 
@@ -664,7 +669,10 @@ async fn custom_path_cookie_set_invalid_redirect() {
         ) // blahblah?a=b
         .await
         .unwrap();
-    
+
     assert_eq!(StatusCode::BAD_REQUEST, result.status());
-    assert_eq!("Redirect must be relative and start with a slash.", result.text().await.unwrap());
+    assert_eq!(
+        "Redirect must be relative and start with a slash.",
+        result.text().await.unwrap()
+    );
 }

@@ -375,6 +375,8 @@ pub struct ResourceLimits {
     /// Total cpu time allocated to container    
     #[serde_as(as = "Option<DurationSeconds>")]
     pub cpu_time_limit: Option<Duration>,
+
+    pub memory_limit: Option<i64>,
 }
 
 impl TypedMessage for SpawnRequest {
