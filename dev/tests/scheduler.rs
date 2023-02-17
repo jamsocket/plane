@@ -244,6 +244,7 @@ async fn schedule_request_bearer_token() {
     } else {
         panic!("Expected ScheduleResponse::Scheduled, got {:?}", result);
     }
+}
 
 #[integration_test]
 async fn test_update_backend_stats_message() {
