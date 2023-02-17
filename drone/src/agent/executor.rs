@@ -17,7 +17,7 @@ use plane_core::{
         },
     },
     nats::TypedNats,
-    types::{BackendId, ClusterName},
+    types::{BackendId, ClusterName, DroneId},
 };
 use serde_json::json;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
@@ -96,12 +96,14 @@ fn update_backend_state(
     state: BackendState,
     cluster: ClusterName,
     backend: BackendId,
+    drone: DroneId,
 ) {
     let message = UpdateBackendStateMessage {
         state,
         cluster,
         backend,
         time: Utc::now(),
+        drone,
     };
     let nc = nc.clone();
 
@@ -164,6 +166,7 @@ impl<E: Engine> Executor<E> {
             BackendState::Loading,
             self.cluster.clone(),
             spawn_request.backend_id.clone(),
+            spawn_request.drone_id.clone(),
         );
 
         self.run_backend(spawn_request, BackendState::Loading).await
@@ -324,6 +327,7 @@ impl<E: Engine> Executor<E> {
             state,
             self.cluster.clone(),
             spawn_request.backend_id.clone(),
+            spawn_request.drone_id.clone(),
         );
     }
 

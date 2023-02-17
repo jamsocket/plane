@@ -530,6 +530,8 @@ pub struct UpdateBackendStateMessage {
 
     /// The time the state change was observed.
     pub time: DateTime<Utc>,
+
+    pub drone: DroneId,
 }
 
 impl TypedMessage for UpdateBackendStateMessage {
@@ -556,7 +558,7 @@ impl UpdateBackendStateMessage {
 /// **DEPRECATED** for drone-side use by UpdateBackendStateMessage.
 /// Drones will send an UpdateBackendStateMessage and the controller
 /// will publish a BackendStateMessage.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct BackendStateMessage {
     /// The cluster the backend belongs to.
     pub cluster: Option<ClusterName>,
