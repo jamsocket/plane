@@ -91,7 +91,7 @@ impl<E: Engine> Clone for Executor<E> {
     }
 }
 
-fn update_backend_state(
+async fn update_backend_state(
     nc: &TypedNats,
     state: BackendState,
     cluster: ClusterName,
@@ -107,12 +107,10 @@ fn update_backend_state(
     };
     let nc = nc.clone();
 
-    tokio::spawn(async move {
-        while let Err(error) = nc.request(&message).await {
-            tracing::error!(?error, "Failed to update backend state, retrying.");
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        }
-    });    
+    while let Err(error) = nc.request(&message).await {
+        tracing::error!(?error, "Failed to update backend state, retrying.");
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
 }
 
 impl<E: Engine> Executor<E> {
@@ -167,7 +165,7 @@ impl<E: Engine> Executor<E> {
             self.cluster.clone(),
             spawn_request.backend_id.clone(),
             spawn_request.drone_id.clone(),
-        );
+        ).await;
 
         self.run_backend(spawn_request, BackendState::Loading).await
     }
@@ -319,7 +317,7 @@ impl<E: Engine> Executor<E> {
             self.cluster.clone(),
             spawn_request.backend_id.clone(),
             spawn_request.drone_id.clone(),
-        );
+        ).await;
     }
 
     pub async fn step(
