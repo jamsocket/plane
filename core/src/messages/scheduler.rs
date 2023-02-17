@@ -3,7 +3,7 @@ use crate::{
     nats::{SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
-use rand::{Rng, distributions::Alphanumeric};
+use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;

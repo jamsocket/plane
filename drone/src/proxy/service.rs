@@ -279,7 +279,8 @@ impl ProxyService {
                         if !redirect.starts_with('/') {
                             return Ok(Response::builder()
                                 .status(StatusCode::BAD_REQUEST)
-                                .body("Redirect must be relative and start with a slash.".into()).unwrap());
+                                .body("Redirect must be relative and start with a slash.".into())
+                                .unwrap());
                         }
                     }
 

@@ -538,7 +538,11 @@ impl TypedMessage for UpdateBackendStateMessage {
     type Response = ();
 
     fn subject(&self) -> String {
-        format!("cluster.{}.backend.{}.status", self.cluster.subject_name(), self.backend.id())
+        format!(
+            "cluster.{}.backend.{}.status",
+            self.cluster.subject_name(),
+            self.backend.id()
+        )
     }
 }
 
@@ -549,8 +553,15 @@ impl UpdateBackendStateMessage {
     }
 
     #[must_use]
-    pub fn backend_subject(cluster: &ClusterName, backend: &BackendId) -> SubscribeSubject<UpdateBackendStateMessage> {
-        SubscribeSubject::new(format!("cluster.{}.backend.{}.status", cluster.subject_name(), backend.id()))
+    pub fn backend_subject(
+        cluster: &ClusterName,
+        backend: &BackendId,
+    ) -> SubscribeSubject<UpdateBackendStateMessage> {
+        SubscribeSubject::new(format!(
+            "cluster.{}.backend.{}.status",
+            cluster.subject_name(),
+            backend.id()
+        ))
     }
 }
 

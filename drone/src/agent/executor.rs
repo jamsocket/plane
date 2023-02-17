@@ -10,12 +10,7 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use plane_core::{
-    messages::{
-        agent::{
-            BackendState, SpawnRequest, TerminationRequest,
-            UpdateBackendStateMessage,
-        },
-    },
+    messages::agent::{BackendState, SpawnRequest, TerminationRequest, UpdateBackendStateMessage},
     nats::TypedNats,
     types::{BackendId, ClusterName, DroneId},
 };
@@ -165,7 +160,8 @@ impl<E: Engine> Executor<E> {
             self.cluster.clone(),
             spawn_request.backend_id.clone(),
             spawn_request.drone_id.clone(),
-        ).await;
+        )
+        .await;
 
         self.run_backend(spawn_request, BackendState::Loading).await
     }
@@ -317,7 +313,8 @@ impl<E: Engine> Executor<E> {
             self.cluster.clone(),
             spawn_request.backend_id.clone(),
             spawn_request.drone_id.clone(),
-        ).await;
+        )
+        .await;
     }
 
     pub async fn step(
