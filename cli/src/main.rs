@@ -8,7 +8,6 @@ use plane_core::{
     },
     nats_connection::NatsConnectionSpec,
     types::{BackendId, ClusterName, DroneId},
-    views::replica::SystemViewReplica,
 };
 use std::{collections::HashMap, time::Duration};
 
@@ -83,29 +82,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListDrones => {
-            let sys = SystemViewReplica::snapshot(nats).await?;
-
-            println!("Found {} clusters:", sys.clusters.len());
-            for (cluster_name, cluster) in sys.clusters {
-                println!(
-                    "Found {} drones in cluster {}:",
-                    cluster.drones.len(),
-                    cluster_name.hostname().bright_cyan()
-                );
-
-                for (drone_id, drone) in cluster.drones {
-                    println!(
-                        "{}\t{}\t{}",
-                        drone_id.to_string().bright_green(),
-                        cluster_name.to_string().bright_cyan(),
-                        drone
-                            .state()
-                            .map(|d| format!("{:?}", d))
-                            .unwrap_or_default()
-                            .bright_yellow(),
-                    );
-                }
-            }
+            todo!("Implement list drones");
         }
         Command::Spawn {
             image,
@@ -171,22 +148,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListDns => {
-            let sys = SystemViewReplica::snapshot(nats).await?;
-
-            println!("Found {} clusters:", sys.clusters.len());
-            for (cluster_name, cluster) in sys.clusters {
-                println!(
-                    "Found {} live routes in cluster {}:",
-                    cluster.routes.len(),
-                    cluster_name.hostname().bright_cyan()
-                );
-
-                for backend in cluster.routes.keys() {
-                    if let Some(route) = cluster.route(backend) {
-                        println!("{}.{}\t{}", backend.id(), cluster_name.hostname(), route);
-                    }
-                }
-            }
+            todo!("Implement list dns");
         }
         Command::Terminate {
             cluster, backend, ..
