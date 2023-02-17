@@ -25,7 +25,7 @@ jobs:
       run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
 
     - name: Run tests
-      run: cargo nextest run -j 10
+      run: cargo nextest run -j 4
 
     - uses: actions/upload-artifact@v3
       if: always()
