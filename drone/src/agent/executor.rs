@@ -12,7 +12,7 @@ use dashmap::DashMap;
 use plane_core::{
     messages::{
         agent::{
-            BackendState, BackendStateMessage, SpawnRequest, TerminationRequest,
+            BackendState, SpawnRequest, TerminationRequest,
             UpdateBackendStateMessage,
         },
     },
@@ -310,15 +310,6 @@ impl<E: Engine> Executor<E> {
     async fn update_backend_state(&self, spawn_request: &SpawnRequest, state: BackendState) {
         self.database
             .update_backend_state(&spawn_request.backend_id, state)
-            .await
-            .log_error();
-
-        self.nc
-            .publish_jetstream(&BackendStateMessage::new(
-                state,
-                spawn_request.cluster.clone(),
-                spawn_request.backend_id.clone(),
-            ))
             .await
             .log_error();
 

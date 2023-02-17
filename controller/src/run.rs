@@ -16,6 +16,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::thread;
 
+/// Receive UpdateBackendStateMessages over core NATS, and turn them into
+/// BackendStateMessages over JetStream.
 pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
     let mut sub = nc
         .subscribe(UpdateBackendStateMessage::subscribe_subject())
