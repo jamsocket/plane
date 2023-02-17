@@ -376,7 +376,8 @@ pub struct ResourceLimits {
     #[serde_as(as = "Option<DurationSeconds>")]
     pub cpu_time_limit: Option<Duration>,
 
-    pub memory_limit: Option<i64>,
+    /// Maximum amount of memory container can use (in bytes)
+    pub memory_limit_bytes: Option<i64>,
 }
 
 impl TypedMessage for SpawnRequest {
