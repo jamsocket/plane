@@ -231,6 +231,7 @@ impl DockerInterface {
                 host_config: Some(HostConfig {
                     network_mode: self.network.clone(),
                     runtime: self.runtime.clone(),
+                    memory: executable_config.resource_limits.memory_limit_bytes,
                     cpu_period: executable_config
                         .resource_limits
                         .cpu_period
