@@ -28,7 +28,11 @@ impl MockAgent {
         MockAgent { nats }
     }
 
-    pub async fn schedule_drone(&self, drone_id: &DroneId, request_bearer_token: bool) -> Result<ScheduleResponse> {
+    pub async fn schedule_drone(
+        &self,
+        drone_id: &DroneId,
+        request_bearer_token: bool,
+    ) -> Result<ScheduleResponse> {
         // Subscribe to spawn requests for this drone, to ensure that the
         // scheduler sends them.
         let mut sub = self
@@ -219,8 +223,13 @@ async fn schedule_request_bearer_token() {
         .unwrap();
 
     let result = mock_agent.schedule_drone(&drone_id, true).await.unwrap();
-    
-    if let ScheduleResponse::Scheduled { drone, bearer_token, .. } = result {
+
+    if let ScheduleResponse::Scheduled {
+        drone,
+        bearer_token,
+        ..
+    } = result
+    {
         assert_eq!(drone, drone_id);
 
         if let Some(bearer_token) = bearer_token {
@@ -228,8 +237,7 @@ async fn schedule_request_bearer_token() {
         } else {
             panic!("Bearer token should be present");
         }
-
     } else {
         panic!("Expected ScheduleResponse::Scheduled, got {:?}", result);
-    }    
+    }
 }

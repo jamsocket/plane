@@ -19,7 +19,7 @@ use bollard::{
     },
     image::CreateImageOptions,
     models::{HostConfig, ResourcesUlimits},
-    service::{DeviceRequest, Mount, HostConfigLogConfig},
+    service::{DeviceRequest, HostConfigLogConfig, Mount},
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
@@ -231,6 +231,7 @@ impl DockerInterface {
                 host_config: Some(HostConfig {
                     network_mode: self.network.clone(),
                     runtime: self.runtime.clone(),
+                    memory: executable_config.resource_limits.memory_limit_bytes,
                     cpu_period: executable_config
                         .resource_limits
                         .cpu_period
@@ -260,17 +261,17 @@ impl DockerInterface {
                     device_requests,
                     mounts,
 
-                    log_config: self.syslog.as_ref().map(|d| {
-                        HostConfigLogConfig {
-                            typ: Some("syslog".to_string()),
-                            config: Some(vec![
+                    log_config: self.syslog.as_ref().map(|d| HostConfigLogConfig {
+                        typ: Some("syslog".to_string()),
+                        config: Some(
+                            vec![
                                 ("syslog-address".to_string(), d.to_string()),
                                 ("syslog-format".to_string(), "rfc5424".to_string()),
                                 ("tag".to_string(), name.to_string()),
                             ]
                             .into_iter()
-                            .collect()),
-                        }
+                            .collect(),
+                        ),
                     }),
 
                     ..HostConfig::default()
