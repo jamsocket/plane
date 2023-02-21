@@ -13,17 +13,13 @@ use plane_core::{
             DroneConnectRequest, DroneState, DroneStatusMessage, SpawnRequest, TerminationRequest,
         },
         scheduler::DrainDrone,
-        state::StateUpdate,
     },
     nats::TypedNats,
     retry::do_with_retry,
     types::{ClusterName, DroneId},
     NeverResult,
 };
-use std::{
-    net::{IpAddr, SocketAddr},
-    time::Duration,
-};
+use std::{net::SocketAddr, time::Duration};
 use tokio::sync::watch::{self, Receiver, Sender};
 
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -114,7 +110,6 @@ async fn ready_loop(
     cluster: ClusterName,
     recv_state: Receiver<DroneState>,
     db: DroneDatabase,
-    ip: IpAddr,
 ) -> NeverResult {
     let mut interval = tokio::time::interval(Duration::from_secs(4));
 
@@ -124,7 +119,7 @@ async fn ready_loop(
 
         let running_backends = db.running_backends().await?;
 
-        nc.publish_jetstream(&DroneStatusMessage {
+        nc.publish(&DroneStatusMessage {
             drone_id: drone_id.clone(),
             cluster: cluster.clone(),
             drone_version: PLANE_VERSION.to_string(),
@@ -134,16 +129,6 @@ async fn ready_loop(
         })
         .await
         .log_error("Error in ready loop.");
-
-        nc.publish_jetstream(&StateUpdate::DroneStatus {
-            cluster: cluster.clone(),
-            drone: drone_id.clone(),
-            state,
-            ip,
-            drone_version: PLANE_VERSION.to_string(),
-        })
-        .await
-        .log_error("Error publishing StateUpdate::DroneStatus.");
 
         interval.tick().await;
     }
@@ -207,7 +192,6 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
             cluster.clone(),
             recv_state.clone(),
             db,
-            ip,
         ) => result,
 
         result = listen_for_spawn_requests(

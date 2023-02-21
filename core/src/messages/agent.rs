@@ -520,9 +520,59 @@ impl BackendState {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateBackendStateMessage {
+    /// The cluster the backend belongs to.
+    pub cluster: ClusterName,
+
+    /// The new state.
+    pub state: BackendState,
+
+    /// The backend id.
+    pub backend: BackendId,
+
+    /// The time the state change was observed.
+    pub time: DateTime<Utc>,
+
+    pub drone: DroneId,
+}
+
+impl TypedMessage for UpdateBackendStateMessage {
+    type Response = ();
+
+    fn subject(&self) -> String {
+        format!(
+            "cluster.{}.backend.{}.status",
+            self.cluster.subject_name(),
+            self.backend.id()
+        )
+    }
+}
+
+impl UpdateBackendStateMessage {
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<UpdateBackendStateMessage> {
+        SubscribeSubject::new("cluster.*.backend.*.status".into())
+    }
+
+    #[must_use]
+    pub fn backend_subject(
+        cluster: &ClusterName,
+        backend: &BackendId,
+    ) -> SubscribeSubject<UpdateBackendStateMessage> {
+        SubscribeSubject::new(format!(
+            "cluster.{}.backend.{}.status",
+            cluster.subject_name(),
+            backend.id()
+        ))
+    }
+}
+
 /// An message representing a change in the state of a backend.
-/// **DEPRECATED**. Will be removed in a future version of Plane.
-#[derive(Serialize, Deserialize, Debug)]
+/// **DEPRECATED** for drone-side use by UpdateBackendStateMessage.
+/// Drones will send an UpdateBackendStateMessage and the controller
+/// will publish a BackendStateMessage.
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct BackendStateMessage {
     /// The cluster the backend belongs to.
     pub cluster: Option<ClusterName>,

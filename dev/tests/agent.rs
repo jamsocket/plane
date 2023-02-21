@@ -1,10 +1,11 @@
 use anyhow::{anyhow, Result};
 use integration_test::integration_test;
+use plane_controller::run::update_backend_state_loop;
 use plane_core::{
     messages::{
         agent::{
-            BackendState, BackendStateMessage, BackendStatsMessage, DroneConnectRequest,
-            DroneStatusMessage, SpawnRequest, TerminationRequest,
+            BackendState, BackendStatsMessage, DroneConnectRequest, DroneStatusMessage,
+            SpawnRequest, TerminationRequest, UpdateBackendStateMessage,
         },
         dns::{DnsRecordType, SetDnsRecord},
         scheduler::DrainDrone,
@@ -34,6 +35,8 @@ struct Agent {
     agent_guard: LivenessGuard<NeverResult>,
     pub ip: Ipv4Addr,
     pub db: DroneDatabase,
+    #[allow(unused)]
+    loop_guard: LivenessGuard<NeverResult>,
 }
 
 impl Agent {
@@ -44,22 +47,25 @@ impl Agent {
     ) -> Result<Agent> {
         let ip = random_loopback_ip();
         let db = DroneDatabase::new(&scratch_dir("agent").join("drone.db")).await?;
+        let nc = nats.connection().await?;
 
         let agent_opts = AgentOptions {
             db: db.clone(),
             drone_id: drone_id.clone(),
-            nats: nats.connection().await?,
+            nats: nc.clone(),
             cluster_domain: ClusterName::new(CLUSTER_DOMAIN),
             ip: IpSource::Literal(IpAddr::V4(ip)),
             docker_options,
         };
 
         let agent_guard = expect_to_stay_alive(plane_drone::agent::run_agent(agent_opts));
+        let loop_guard = expect_to_stay_alive(update_backend_state_loop(nc));
 
         Ok(Agent {
             agent_guard,
             ip,
             db,
+            loop_guard,
         })
     }
 }
@@ -169,13 +175,16 @@ impl MockController {
 }
 
 struct BackendStateSubscription {
-    sub: TypedSubscription<BackendStateMessage>,
+    sub: TypedSubscription<UpdateBackendStateMessage>,
 }
 
 impl BackendStateSubscription {
     pub async fn new(nats: &TypedNats, backend_id: &BackendId) -> Result<Self> {
         let sub = nats
-            .subscribe(BackendStateMessage::subscribe_subject(backend_id))
+            .subscribe(UpdateBackendStateMessage::backend_subject(
+                &ClusterName::new(CLUSTER_DOMAIN),
+                backend_id,
+            ))
             .await?;
         Ok(BackendStateSubscription { sub })
     }

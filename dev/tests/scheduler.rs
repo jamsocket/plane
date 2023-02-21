@@ -1,13 +1,17 @@
 use anyhow::Result;
+use chrono::Utc;
 use integration_test::integration_test;
-use plane_controller::run_scheduler;
+use plane_controller::{run::update_backend_state_loop, run_scheduler};
 use plane_core::{
     messages::{
-        agent::{DroneState, DroneStatusMessage, SpawnRequest},
+        agent::{
+            BackendState, BackendStateMessage, DroneState, DroneStatusMessage, SpawnRequest,
+            UpdateBackendStateMessage,
+        },
         scheduler::ScheduleResponse,
     },
     nats::TypedNats,
-    types::{ClusterName, DroneId},
+    types::{BackendId, ClusterName, DroneId},
 };
 use plane_dev::{
     resources::nats::Nats,
@@ -240,4 +244,47 @@ async fn schedule_request_bearer_token() {
     } else {
         panic!("Expected ScheduleResponse::Scheduled, got {:?}", result);
     }
+}
+
+#[integration_test]
+async fn test_update_backend_stats_message() {
+    let nats = Nats::new().await.unwrap();
+    let nats_conn = nats.connection().await.unwrap();
+    let _scheduler_guard = expect_to_stay_alive(update_backend_state_loop(nats_conn.clone()));
+    sleep(Duration::from_millis(100)).await;
+
+    let backend_id = BackendId::new_random();
+    let drone_id = DroneId::new_random();
+    let time = Utc::now();
+
+    let mut sub = nats_conn
+        .subscribe_jetstream_subject(BackendStateMessage::subscribe_subject(&backend_id))
+        .await
+        .unwrap();
+
+    nats_conn
+        .request(&UpdateBackendStateMessage {
+            backend: backend_id.clone(),
+            state: BackendState::Ready,
+            time,
+            cluster: ClusterName::new("plane.test"),
+            drone: drone_id.clone(),
+        })
+        .await
+        .unwrap();
+
+    let result = timeout(10_000, "Did not receive BackendStateMessage", sub.next())
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        BackendStateMessage {
+            backend: backend_id,
+            state: BackendState::Ready,
+            time,
+            cluster: Some(ClusterName::new("plane.test")),
+        },
+        result.0
+    );
 }

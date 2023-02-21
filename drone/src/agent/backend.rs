@@ -56,7 +56,7 @@ impl BackendMonitor {
 
         tokio::spawn(async move {
             loop {
-                nc.publish_jetstream(&SetDnsRecord {
+                nc.publish(&SetDnsRecord {
                     cluster: cluster.clone(),
                     kind: DnsRecordType::A,
                     name: backend_id.to_string(),

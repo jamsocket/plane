@@ -4,7 +4,9 @@ use crate::plan::ControllerPlan;
 use crate::run_scheduler;
 use anyhow::{anyhow, Result};
 use futures::future::try_join_all;
+use plane_core::messages::agent::{BackendStateMessage, UpdateBackendStateMessage};
 use plane_core::messages::logging::Component;
+use plane_core::nats::TypedNats;
 use plane_core::{cli::init_cli, logging::TracingHandle, NeverResult};
 use signal_hook::{
     consts::{SIGINT, SIGTERM},
@@ -13,6 +15,36 @@ use signal_hook::{
 use std::future::Future;
 use std::pin::Pin;
 use std::thread;
+
+/// Receive UpdateBackendStateMessages over core NATS, and turn them into
+/// BackendStateMessages over JetStream.
+pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
+    let mut sub = nc
+        .subscribe(UpdateBackendStateMessage::subscribe_subject())
+        .await?;
+    loop {
+        let msg = sub
+            .next()
+            .await
+            .ok_or_else(|| anyhow!("UpdateBackendStateMessage subscription ended."))?;
+        let value = msg.value.clone();
+
+        let value = BackendStateMessage {
+            backend: value.backend,
+            state: value.state,
+            cluster: Some(value.cluster),
+            time: value.time,
+        };
+
+        if let Err(e) = nc.publish_jetstream(&value).await {
+            tracing::error!(error=%e, "Failed to publish backend state message.");
+            continue;
+        }
+
+        // Ack the message so that the drone doesn't keep retrying.
+        msg.respond(&()).await?;
+    }
+}
 
 async fn controller_main() -> NeverResult {
     let mut tracing_handle = TracingHandle::init(Component::Controller)?;
@@ -30,11 +62,13 @@ async fn controller_main() -> NeverResult {
     let mut futs: Vec<Pin<Box<dyn Future<Output = NeverResult>>>> = vec![];
 
     if scheduler_plan.is_some() {
-        futs.push(Box::pin(run_scheduler(nats.clone())))
+        futs.push(Box::pin(run_scheduler(nats.clone())));
+
+        futs.push(Box::pin(update_backend_state_loop(nats.clone())));
     }
 
     if let Some(dns_plan) = dns_plan {
-        futs.push(Box::pin(serve_dns(dns_plan)))
+        futs.push(Box::pin(serve_dns(dns_plan)));
     }
 
     try_join_all(futs.into_iter()).await?;
