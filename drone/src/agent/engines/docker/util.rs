@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use bollard::container::Stats;
 use bollard::service::{ContainerInspectResponse, EventMessage};
 use futures::Stream;
+use plane_core::types::ClusterName;
 use plane_core::{messages::agent::BackendStatsMessage, types::BackendId};
 use std::{net::IpAddr, pin::Pin, task::Poll};
 
@@ -164,14 +165,16 @@ pub struct StatsStream<T: Stream<Item = Stats> + Unpin> {
     stream: T,
     last: Option<Stats>,
     backend_id: BackendId,
+    cluster: ClusterName,
 }
 
 impl<T: Stream<Item = Stats> + Unpin> StatsStream<T> {
-    pub fn new(backend_id: BackendId, stream: T) -> StatsStream<T> {
+    pub fn new(backend_id: BackendId, cluster: ClusterName, stream: T) -> StatsStream<T> {
         StatsStream {
             stream,
             last: None,
             backend_id,
+            cluster,
         }
     }
 }
@@ -190,7 +193,7 @@ impl<T: Stream<Item = Stats> + Unpin> Stream for StatsStream<T> {
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Ready(Some(stat)) => {
                 if let Some(last) = &self.last {
-                    let v = BackendStatsMessage::from_stats_messages(&self.backend_id, last, &stat)
+                    let v = BackendStatsMessage::from_stats_messages(&self.backend_id, &self.cluster, last, &stat)
                         .unwrap();
 
                     self.last = Some(stat);

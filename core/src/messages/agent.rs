@@ -107,6 +107,7 @@ impl JetStreamable for DroneLogMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BackendStatsMessage {
+    cluster: Option<ClusterName>,
     backend_id: BackendId,
     /// Fraction of maximum CPU.
     pub cpu_use_percent: f64,
@@ -132,6 +133,7 @@ impl BackendStatsMessage {
     #[cfg(feature = "bollard")]
     pub fn from_stats_messages(
         backend_id: &BackendId,
+        cluster: &ClusterName,
         prev_stats_message: &Stats,
         cur_stats_message: &Stats,
     ) -> Result<BackendStatsMessage, Error> {
@@ -179,6 +181,7 @@ impl BackendStatsMessage {
 
         Ok(BackendStatsMessage {
             backend_id: backend_id.clone(),
+            cluster: Some(cluster.clone()),
             cpu_use_percent,
             mem_use_percent,
         })
