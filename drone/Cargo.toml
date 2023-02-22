@@ -13,7 +13,7 @@ readme = "README.md"
 acme2-eab = "0.5.1"
 anyhow = "1.0.57"
 base64 = "0.13.0"
-bollard = {version = "0.13.0", git="https://github.com/drifting-in-space/bollard.git", branch = "paulgb/update-serde-with-version"}
+bollard = "0.14.0"
 chrono = { version = "0.4.21", features = ["serde"], default_features=false }
 clap = { version = "4.0.4", features = ["derive"] }
 config = { version = "0.13.2", default_features = false, features = ["toml"] }

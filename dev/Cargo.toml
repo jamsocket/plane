@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 anyhow = "1.0.62"
 async-nats = "0.24.0"
-bollard = {version = "0.13.0", git="https://github.com/drifting-in-space/bollard.git", branch = "paulgb/update-serde-with-version"}
+bollard = "0.14.0"
 chrono = "0.4.22"
 plane-core = {path = "../core"}
 plane-drone = {path = "../drone"}
