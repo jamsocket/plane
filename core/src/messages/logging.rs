@@ -59,6 +59,10 @@ impl TypedMessage for LogMessage {
             Component::Drone { drone_id } => format!("logs.drone.{}", drone_id.id()),
         }
     }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        None
+    }
 }
 
 #[cfg(test)]

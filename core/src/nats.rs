@@ -13,6 +13,7 @@ use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
 use dashmap::DashSet;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tokio::select;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -51,6 +52,10 @@ pub trait TypedMessage: Serialize + DeserializeOwned {
     /// Subjects must be deterministically generated from the message
     /// body.
     fn subject(&self) -> String;
+
+    /// Temporary alternate subject. If this returns a Some value, the message
+    /// is sent to this subject as well as the regular subject().
+    fn tmp_alt_subject(&self) -> Option<String>;
 }
 
 pub trait JetStreamable: TypedMessage {
@@ -312,10 +317,19 @@ impl TypedNats {
         self.nc
             .publish_with_reply(
                 message.subject(),
-                inbox,
+                inbox.clone(),
                 Bytes::from(serde_json::to_vec(&message)?),
             )
             .await?;
+        if let Some(tmp_alt_subject) = message.tmp_alt_subject() {
+            self.nc
+                .publish_with_reply(
+                    tmp_alt_subject,
+                    inbox.clone(),
+                    Bytes::from(serde_json::to_vec(&message)?),
+                )
+                .await?;
+        }
 
         Ok(DelayedReply {
             subscription,
@@ -393,6 +407,16 @@ impl TypedNats {
                 Bytes::from(serde_json::to_vec(value)?),
             )
             .await?;
+
+        if let Some(tmp_alt_subject) = value.tmp_alt_subject() {
+            self.nc
+                .publish(
+                    tmp_alt_subject,
+                    Bytes::from(serde_json::to_vec(value)?),
+                )
+                .await?;
+        }
+
         Ok(())
     }
 
@@ -401,6 +425,10 @@ impl TypedNats {
         T: TypedMessage<Response = NoReply> + JetStreamable,
     {
         self.ensure_jetstream_exists::<T>().await?;
+
+        if value.tmp_alt_subject().is_some() {
+            panic!("tmp_alt_subject not supported for publish_jetstream. subject: {}", value.subject());
+        }
 
         let sequence = self
             .jetstream
@@ -421,11 +449,22 @@ impl TypedNats {
     where
         T: TypedMessage,
     {
-        let result = self
+        let bytes = Bytes::from(serde_json::to_vec(value)?);
+        let result1 = self
             .nc
-            .request(value.subject(), Bytes::from(serde_json::to_vec(value)?))
-            .await
-            .to_anyhow()?;
+            .request(value.subject(), bytes.clone());
+        
+        let result = if let Some(tmp_alt_subject) = value.tmp_alt_subject() {
+            let result2 = self.nc
+                .request(tmp_alt_subject, bytes);
+
+            select! {
+                result = result1 => result.to_anyhow()?,
+                result = result2 => result.to_anyhow()?,
+            }
+        } else {
+            result1.await.to_anyhow()?
+        };
 
         let value: T::Response = serde_json::from_slice(&result.payload)?;
         Ok(value)

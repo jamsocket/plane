@@ -80,6 +80,10 @@ impl TypedMessage for ScheduleRequest {
     fn subject(&self) -> String {
         format!("cluster.{}.schedule", self.cluster.subject_name())
     }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        None
+    }
 }
 
 impl ScheduleRequest {
@@ -105,6 +109,10 @@ impl TypedMessage for DrainDrone {
             self.cluster.subject_name(),
             self.drone.id()
         )
+    }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        None
     }
 }
 
