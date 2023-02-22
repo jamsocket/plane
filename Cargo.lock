@@ -14,11 +14,11 @@ dependencies = [
 
 [[package]]
 name = "acme2-eab"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af625ef0dd0ff8693b103b90ceaccdc258886ddb688671572f11df70d78684be"
+checksum = "5558047548cd686ed99f2d8fe7deb7e5441daeb3aef68c56707078c23ee93e30"
 dependencies = [
- "base64 0.13.1",
+ "base64 0.21.0",
  "hyper",
  "openssl",
  "reqwest",
@@ -1791,7 +1791,7 @@ dependencies = [
  "acme2-eab",
  "anyhow",
  "async-trait",
- "base64 0.13.1",
+ "base64 0.21.0",
  "bollard",
  "chrono",
  "clap",
