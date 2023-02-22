@@ -18,6 +18,10 @@ impl TypedMessage for SetAcmeDnsRecord {
     fn subject(&self) -> String {
         "acme.set_dns_record".to_string()
     }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        Some(format!("cluster.{}.set_acme_record", self.cluster))
+    }
 }
 
 impl SetAcmeDnsRecord {

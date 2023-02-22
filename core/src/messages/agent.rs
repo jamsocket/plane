@@ -51,6 +51,10 @@ impl TypedMessage for DroneLogMessage {
     fn subject(&self) -> String {
         format!("backend.{}.log", self.backend_id.id())
     }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        None
+    }
 }
 
 impl DroneLogMessage {
@@ -120,6 +124,14 @@ impl TypedMessage for BackendStatsMessage {
 
     fn subject(&self) -> String {
         format!("backend.{}.stats", self.backend_id.id())
+    }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        Some(format!(
+            "cluster.{}.backend.{}.stats",
+            self.cluster.as_ref().unwrap().subject_name(),
+            self.backend_id.id()
+        ))
     }
 }
 
@@ -243,6 +255,14 @@ impl TypedMessage for DroneStatusMessage {
     fn subject(&self) -> String {
         format!("drone.{}.status", self.drone_id.id())
     }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        Some(format!(
+            "cluster.{}.drone.{}.status",
+            self.cluster.subject_name(),
+            self.drone_id.id()
+        ))
+    }
 }
 
 impl JetStreamable for DroneStatusMessage {
@@ -285,6 +305,13 @@ impl TypedMessage for DroneConnectRequest {
 
     fn subject(&self) -> String {
         "drone.register".to_string()
+    }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        Some(format!(
+            "cluster.{}.drone.register",
+            self.cluster.subject_name()
+        ))
     }
 }
 
@@ -389,6 +416,16 @@ impl TypedMessage for SpawnRequest {
     fn subject(&self) -> String {
         format!("drone.{}.spawn", self.drone_id.id())
     }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        self.cluster.as_ref().map(|cluster| {
+            format!(
+                "cluster.{}.drone.{}.spawn",
+                cluster.subject_name(),
+                self.drone_id.id()
+            )
+        })
+    }
 }
 
 impl SpawnRequest {
@@ -413,6 +450,10 @@ impl TypedMessage for TerminationRequest {
             self.cluster_id.subject_name(),
             self.backend_id.id()
         )
+    }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        None
     }
 }
 
@@ -550,6 +591,10 @@ impl TypedMessage for UpdateBackendStateMessage {
             self.backend.id()
         )
     }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        None
+    }
 }
 
 impl UpdateBackendStateMessage {
@@ -609,6 +654,14 @@ impl TypedMessage for BackendStateMessage {
 
     fn subject(&self) -> String {
         format!("backend.{}.status", self.backend.id())
+    }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        Some(format!(
+            "cluster.{}.backend.{}.status",
+            self.cluster.as_ref().unwrap().subject_name(),
+            self.backend.id()
+        ))
     }
 }
 

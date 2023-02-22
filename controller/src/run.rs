@@ -36,7 +36,7 @@ pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
             time: value.time,
         };
 
-        if let Err(e) = nc.publish_jetstream(&value).await {
+        if let Err(e) = nc.publish(&value).await {
             tracing::error!(error=%e, "Failed to publish backend state message.");
             continue;
         }

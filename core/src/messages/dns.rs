@@ -36,6 +36,10 @@ impl TypedMessage for SetDnsRecord {
     fn subject(&self) -> String {
         format!("cluster.{}.dns.{}", self.cluster.subject_name(), self.kind)
     }
+
+    fn tmp_alt_subject(&self) -> Option<String> {
+        None
+    }
 }
 
 impl JetStreamable for SetDnsRecord {
