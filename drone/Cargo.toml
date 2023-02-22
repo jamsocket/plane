@@ -1,6 +1,6 @@
 [package]
 name = "plane-drone"
-version = "0.3.11"
+version = "0.3.12"
 edition = "2021"
 authors = ["Paul Butler <paul@driftingin.space>"]
 homepage = "https://plane.dev"
@@ -10,9 +10,9 @@ license = "MIT"
 readme = "README.md"
 
 [dependencies]
-acme2-eab = "0.5.1"
+acme2-eab = "0.5.2"
 anyhow = "1.0.57"
-base64 = "0.13.0"
+base64 = "0.21.0"
 bollard = "0.14.0"
 chrono = { version = "0.4.21", features = ["serde"], default_features=false }
 clap = { version = "4.0.4", features = ["derive"] }

@@ -30,7 +30,7 @@ impl Nats {
     }
 
     pub async fn connection(&self) -> Result<TypedNats> {
-        self.connection_spec().connect().await
+        self.connection_spec().connect("test.inbox").await
     }
 
     pub async fn new() -> Result<Nats> {
