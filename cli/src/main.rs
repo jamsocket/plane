@@ -58,7 +58,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().init();
 
     let nats = NatsConnectionSpec::from_url(opts.nats.as_deref().unwrap_or("nats://localhost"))?
-        .connect()
+        .connect("cli.inbox")
         .await?;
 
     match opts.command {

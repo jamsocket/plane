@@ -20,8 +20,11 @@ impl DronePlan {
         let drone_id = config.drone_id.unwrap_or_else(DroneId::new_random);
         tracing::info!(?drone_id, "Starting drone.");
 
+        let cluster: ClusterName = ClusterName::new(&config.cluster_domain);
+        let inbox_prefix = format!("cluster.{}.inbox", cluster.subject_name());
+
         let nats = if let Some(nats) = config.nats {
-            Some(nats.connect_with_retry().await?)
+            Some(nats.connect_with_retry(&inbox_prefix).await?)
         } else {
             None
         };
