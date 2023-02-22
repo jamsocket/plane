@@ -29,7 +29,7 @@ use plane_core::{
         SpawnRequest,
     },
     timing::Timer,
-    types::BackendId,
+    types::{BackendId, ClusterName},
 };
 use std::time::Duration;
 use std::{net::SocketAddr, pin::Pin};
@@ -411,11 +411,12 @@ impl Engine for DockerInterface {
     fn stats_stream(
         &self,
         backend: &BackendId,
+        cluster: &ClusterName,
     ) -> Pin<Box<dyn Stream<Item = BackendStatsMessage> + Send>> {
         let stream = Box::pin(self.get_stats(backend));
         let backend = backend.clone();
 
-        Box::pin(StatsStream::new(backend, stream))
+        Box::pin(StatsStream::new(backend, cluster.clone(), stream))
     }
 
     async fn stop(&self, backend: &BackendId) -> Result<()> {

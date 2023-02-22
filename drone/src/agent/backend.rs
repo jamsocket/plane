@@ -34,7 +34,7 @@ impl BackendMonitor {
         nc: &TypedNats,
     ) -> Self {
         let log_loop = Self::log_loop(backend_id, engine, nc);
-        let stats_loop = Self::stats_loop(backend_id, engine, nc);
+        let stats_loop = Self::stats_loop(backend_id, cluster, engine, nc);
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
         BackendMonitor {
@@ -88,8 +88,8 @@ impl BackendMonitor {
         })
     }
 
-    fn stats_loop<E: Engine>(backend_id: &BackendId, engine: &E, nc: &TypedNats) -> JoinHandle<()> {
-        let mut stream = Box::pin(engine.stats_stream(backend_id));
+    fn stats_loop<E: Engine>(backend_id: &BackendId, cluster: &ClusterName, engine: &E, nc: &TypedNats) -> JoinHandle<()> {
+        let mut stream = Box::pin(engine.stats_stream(backend_id, cluster));
         let nc = nc.clone();
         let backend_id = backend_id.clone();
 
