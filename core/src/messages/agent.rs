@@ -657,11 +657,7 @@ impl TypedMessage for BackendStateMessage {
     }
 
     fn tmp_alt_subject(&self) -> Option<String> {
-        Some(format!(
-            "cluster.{}.backend.{}.status",
-            self.cluster.as_ref().unwrap().subject_name(),
-            self.backend.id()
-        ))
+        None
     }
 }
 
