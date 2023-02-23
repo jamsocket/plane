@@ -460,12 +460,16 @@ impl TypedNats {
         };
 
         while let Some(result) = futs.next().await {
-            let Ok(result) = result else {
-                continue;
-            };
-            
-            let value: T::Response = serde_json::from_slice(&result.payload)?;
-            return Ok(value);
+            match result {
+                Ok(result) => {
+                    let value: T::Response = serde_json::from_slice(&result.payload)?;
+                    return Ok(value);
+                }
+                Err(err) => {
+                    tracing::warn!(error = ?err, "One future failed while waiting for response");
+                    continue
+                }
+            }
         }
 
         Err(anyhow!("No responses received"))
