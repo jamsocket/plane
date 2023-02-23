@@ -193,8 +193,13 @@ impl<T: Stream<Item = Stats> + Unpin> Stream for StatsStream<T> {
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Ready(Some(stat)) => {
                 if let Some(last) = &self.last {
-                    let v = BackendStatsMessage::from_stats_messages(&self.backend_id, &self.cluster, last, &stat)
-                        .unwrap();
+                    let v = BackendStatsMessage::from_stats_messages(
+                        &self.backend_id,
+                        &self.cluster,
+                        last,
+                        &stat,
+                    )
+                    .unwrap();
 
                     self.last = Some(stat);
                     Poll::Ready(Some(v))
