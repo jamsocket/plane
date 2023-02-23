@@ -13,12 +13,12 @@ use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
 use dashmap::DashSet;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio::select;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use time::OffsetDateTime;
 use tokio_stream::StreamExt;
+use futures::stream::FuturesUnordered;
 
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
@@ -410,10 +410,7 @@ impl TypedNats {
 
         if let Some(tmp_alt_subject) = value.tmp_alt_subject() {
             self.nc
-                .publish(
-                    tmp_alt_subject,
-                    Bytes::from(serde_json::to_vec(value)?),
-                )
+                .publish(tmp_alt_subject, Bytes::from(serde_json::to_vec(value)?))
                 .await?;
         }
 
@@ -427,7 +424,10 @@ impl TypedNats {
         self.ensure_jetstream_exists::<T>().await?;
 
         if value.tmp_alt_subject().is_some() {
-            panic!("tmp_alt_subject not supported for publish_jetstream. subject: {}", value.subject());
+            panic!(
+                "tmp_alt_subject not supported for publish_jetstream. subject: {}",
+                value.subject()
+            );
         }
 
         let sequence = self
@@ -450,24 +450,29 @@ impl TypedNats {
         T: TypedMessage,
     {
         let bytes = Bytes::from(serde_json::to_vec(value)?);
-        let result1 = self
-            .nc
-            .request(value.subject(), bytes.clone());
-        
-        let result = if let Some(tmp_alt_subject) = value.tmp_alt_subject() {
-            let result2 = self.nc
-                .request(tmp_alt_subject, bytes);
 
-            select! {
-                result = result1 => result.to_anyhow()?,
-                result = result2 => result.to_anyhow()?,
-            }
-        } else {
-            result1.await.to_anyhow()?
+        let mut futs = FuturesUnordered::new();
+
+        futs.push(self.nc.request(value.subject(), bytes.clone()));
+        if let Some(tmp_alt_subject) = value.tmp_alt_subject() {
+            let result = self.nc.request(tmp_alt_subject, bytes);
+            futs.push(result);
         };
 
-        let value: T::Response = serde_json::from_slice(&result.payload)?;
-        Ok(value)
+        while let Some(result) = futs.next().await {
+            match result {
+                Ok(result) => {
+                    let value: T::Response = serde_json::from_slice(&result.payload)?;
+                    return Ok(value);
+                }
+                Err(err) => {
+                    tracing::warn!(error = ?err, "One future failed while waiting for response");
+                    continue
+                }
+            }
+        }
+
+        Err(anyhow!("No responses received"))
     }
 
     pub async fn subscribe<T>(&self, subject: SubscribeSubject<T>) -> Result<TypedSubscription<T>>

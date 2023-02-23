@@ -49,8 +49,8 @@ pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
 async fn controller_main() -> NeverResult {
     let mut tracing_handle = TracingHandle::init(Component::Controller)?;
     let config: ControllerConfig = init_cli()?;
-
     let plan = ControllerPlan::from_controller_config(config).await?;
+
     let ControllerPlan {
         nats,
         dns_plan,

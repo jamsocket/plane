@@ -88,7 +88,12 @@ impl BackendMonitor {
         })
     }
 
-    fn stats_loop<E: Engine>(backend_id: &BackendId, cluster: &ClusterName, engine: &E, nc: &TypedNats) -> JoinHandle<()> {
+    fn stats_loop<E: Engine>(
+        backend_id: &BackendId,
+        cluster: &ClusterName,
+        engine: &E,
+        nc: &TypedNats,
+    ) -> JoinHandle<()> {
         let mut stream = Box::pin(engine.stats_stream(backend_id, cluster));
         let nc = nc.clone();
         let backend_id = backend_id.clone();

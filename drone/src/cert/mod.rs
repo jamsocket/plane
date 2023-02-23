@@ -1,3 +1,4 @@
+use crate::keys::KeyCertPathPair;
 use acme::AcmeEabConfiguration;
 use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
@@ -20,8 +21,6 @@ use plane_core::{
 use reqwest::Client;
 use std::io::Write;
 use std::{fs::File, path::Path, time::Duration};
-
-use crate::keys::KeyCertPathPair;
 
 pub mod acme;
 
@@ -52,7 +51,8 @@ pub async fn get_certificate(
     let dir = DirectoryBuilder::new(acme_server_url.to_string())
         .http_client(client.clone())
         .build()
-        .await?;
+        .await
+        .context("Building directory")?;
 
     let mut builder = AccountBuilder::new(dir);
     builder.contact(vec![format!("mailto:{}", mailto_email)]);
@@ -62,21 +62,25 @@ pub async fn get_certificate(
     }
 
     builder.terms_of_service_agreed(true);
-    let account = builder.build().await?;
+    let account = builder.build().await.context("Building account")?;
 
     let mut builder = OrderBuilder::new(account);
     builder.add_dns_identifier(format!("*.{}", cluster_domain));
-    let order = builder.build().await?;
+    let order = builder.build().await.context("Building order")?;
 
-    let authorizations = order.authorizations().await?;
+    let authorizations = order
+        .authorizations()
+        .await
+        .context("Fetching authorizations")?;
     for auth in authorizations {
         tracing::info!("Requesting challenge.");
         let challenge = auth
             .get_challenge(DNS_01)
-            .ok_or_else(|| anyhow!("Couldn't obtain dns-01 challenge."))?;
+            .context("Obtaining dns-01 challenge")?;
 
         let value = challenge
-            .key_authorization_encoded()?
+            .key_authorization_encoded()
+            .context("Encoding authorization")?
             .ok_or_else(|| anyhow!("No authorization value."))?;
 
         tracing::info!("Requesting TXT record from platform.");
@@ -89,7 +93,12 @@ pub async fn get_certificate(
                 cluster: ClusterName::new(cluster_domain),
                 value: value.clone(),
             })
-            .await?;
+            .await
+            .context("Setting ACME DNS record")?;
+
+        if !result {
+            return Err(anyhow!("Platform rejected TXT record."));
+        }
 
         nats.publish(&SetDnsRecord {
             cluster: ClusterName::new(cluster_domain),
@@ -97,36 +106,48 @@ pub async fn get_certificate(
             name: "_acme-challenge".to_string(),
             value,
         })
-        .await?;
-
-        if !result {
-            return Err(anyhow!("Platform rejected TXT record."));
-        }
+        .await
+        .context("Sending SetDnsRecord")?;
 
         tracing::info!("Validating challenge.");
-        let challenge = challenge.validate().await?;
-        let challenge = challenge.wait_done(Duration::from_secs(5), 3).await?;
+        let challenge = challenge.validate().await.context("Validating challenge")?;
+        let challenge = challenge
+            .wait_done(Duration::from_secs(5), 3)
+            .await
+            .context("Waiting for challenge")?;
         if challenge.status != ChallengeStatus::Valid {
             return Err(anyhow!("ACME challenge failed."));
         }
 
         tracing::info!("Validating authorization.");
-        let authorization = auth.wait_done(Duration::from_secs(5), 3).await?;
+        let authorization = auth
+            .wait_done(Duration::from_secs(5), 3)
+            .await
+            .context("Waiting for authorization")?;
         if authorization.status != AuthorizationStatus::Valid {
             return Err(anyhow!("ACME authorization failed."));
         }
     }
 
     tracing::info!("Waiting for order to become ready.");
-    let order = order.wait_ready(Duration::from_secs(5), 3).await?;
+    let order = order
+        .wait_ready(Duration::from_secs(5), 3)
+        .await
+        .context("Waiting for order ready")?;
     if order.status != OrderStatus::Ready {
         return Err(anyhow!("ACME order failed."));
     }
 
     tracing::info!("Waiting for order to become done.");
     let pkey = gen_rsa_private_key(4096)?;
-    let order = order.finalize(Csr::Automatic(pkey.clone())).await?;
-    let order = order.wait_done(Duration::from_secs(5), 3).await?;
+    let order = order
+        .finalize(Csr::Automatic(pkey.clone()))
+        .await
+        .context("Finalizing CSR")?;
+    let order = order
+        .wait_done(Duration::from_secs(5), 3)
+        .await
+        .context("Waiting for order to become done")?;
 
     if order.status != OrderStatus::Valid {
         return Err(anyhow!("ACME order not valid."));
@@ -135,8 +156,9 @@ pub async fn get_certificate(
     tracing::info!("Waiting for certificate.");
     let cert = order
         .certificate()
-        .await?
-        .ok_or_else(|| anyhow!("ACME order response didn't include certificate."))?;
+        .await
+        .context("Getting certificate")?
+        .context("ACME order response didn't include certificate.")?;
 
     if cert.is_empty() {
         return Err(anyhow!("Certificate list is empty."));
@@ -158,23 +180,28 @@ pub async fn refresh_certificate(cert_options: &CertOptions, client: &Client) ->
         client,
         cert_options.acme_eab_keypair.as_ref(),
     )
-    .await?;
+    .await
+    .context("Getting certificate")?;
 
     {
         let mut fh = File::options()
             .create(true)
             .write(true)
-            .open(&cert_options.key_paths.cert_path)?;
+            .open(&cert_options.key_paths.cert_path)
+            .context("Opening certificate file")?;
 
         for cert in certs {
-            fh.write_all(&cert.to_pem()?)?;
+            fh.write_all(&cert.to_pem().context("Converting cert to PEM")?)
+                .context("Writing cert")?;
         }
     }
 
     std::fs::write(
         &cert_options.key_paths.key_path,
-        pkey.private_key_to_pem_pkcs8()?,
-    )?;
+        pkey.private_key_to_pem_pkcs8()
+            .context("Converting private key to pkcs8")?,
+    )
+    .context("Writing private key")?;
 
     Ok(())
 }

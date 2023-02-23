@@ -18,6 +18,7 @@ chrono = { version = "0.4.22", features = ["serde", "clock"], default_features=f
 clap = { version = "4.0.15", features = ["derive"] }
 config = { version = "0.13.2", default_features = false, features = ["toml"] }
 dashmap = "5.4.0"
+futures = "0.3.26"
 rand = "0.8.5"
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = "1.0.83"
