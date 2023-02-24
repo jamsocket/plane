@@ -13,7 +13,7 @@ pub struct AcmeEabConfiguration {
 
 impl AcmeEabConfiguration {
     pub fn new(key_id: &str, key_b64: &str) -> Result<Self> {
-        let key = base64::engine::general_purpose::URL_SAFE.decode(key_b64)?;
+        let key = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(key_b64)?;
         Ok(AcmeEabConfiguration {
             key_id: key_id.into(),
             key,
@@ -32,7 +32,7 @@ fn as_base64<S>(key: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    let enc = base64::engine::general_purpose::URL_SAFE.encode(key);
+    let enc = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(key);
     serializer.serialize_str(&enc)
 }
 
@@ -41,13 +41,29 @@ where
     D: Deserializer<'de>,
 {
     let result = String::deserialize(deserializer)?;
-    base64::engine::general_purpose::URL_SAFE
+    base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(result)
-        .map_err(|err| Error::custom(err.to_string()))
+        .map_err(|err| Error::custom(format!("Error decoding base64 string: {}", err.to_string())))
 }
 
 impl AcmeEabConfiguration {
     pub fn eab_key_b64(&self) -> String {
-        base64::engine::general_purpose::URL_SAFE.encode(&self.key)
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&self.key)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_base64() {
+        let value = json!({
+            "key_id": "key-id",
+            "key": "ZmRzYWppbw"
+        });
+        let _: AcmeEabConfiguration = serde_json::from_value(value).unwrap();
     }
 }
