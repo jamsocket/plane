@@ -64,6 +64,8 @@ mod test {
             "key_id": "key-id",
             "key": "ZmRzYWppbw"
         });
-        let _: AcmeEabConfiguration = serde_json::from_value(value).unwrap();
+        let result: AcmeEabConfiguration = serde_json::from_value(value).unwrap();
+        assert_eq!(result.key_id, "key-id");
+        assert_eq!(result.key, b"fdsajio");
     }
 }
