@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use bollard::container::Stats;
 use bollard::service::{ContainerInspectResponse, EventMessage};
 use futures::Stream;
@@ -128,7 +128,7 @@ pub fn get_ip_of_container(inspect_response: &ContainerInspectResponse) -> Resul
     let network_settings = inspect_response
         .network_settings
         .as_ref()
-        .ok_or_else(|| anyhow!("Inspect did not return network settings."))?;
+        .context("Inspect did not return network settings.")?;
 
     if let Some(ip_addr) = network_settings.ip_address.as_ref() {
         if !ip_addr.is_empty() {
@@ -139,7 +139,7 @@ pub fn get_ip_of_container(inspect_response: &ContainerInspectResponse) -> Resul
     let networks = network_settings
         .networks
         .as_ref()
-        .ok_or_else(|| anyhow!("Inspect did not return an IP or networks."))?;
+        .context("Inspect did not return an IP or networks.")?;
     if networks.len() != 1 {
         return Err(anyhow!(
             "Expected exactly one network, got {}",
@@ -156,7 +156,7 @@ pub fn get_ip_of_container(inspect_response: &ContainerInspectResponse) -> Resul
     let ip = network
         .ip_address
         .as_ref()
-        .ok_or_else(|| anyhow!("One network found, but did not have IP address."))?;
+        .context("One network found, but did not have IP address.")?;
 
     Ok(ip.parse()?)
 }

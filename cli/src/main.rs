@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, Context};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
@@ -94,12 +94,9 @@ async fn main() -> Result<()> {
             let env: Result<HashMap<String, String>> = env
                 .iter()
                 .map(|d| {
-                    let (key, value) = d.split_once('=').ok_or_else(|| {
-                        anyhow!(
-                            "Expected environment variables in the form KEY=VALUE, instead got {}",
-                            d
-                        )
-                    })?;
+                    let (key, value) = d
+                        .split_once('=')
+                        .context("Expected environment variables in the form KEY=VALUE")?;
 
                     Ok((key.to_string(), value.to_string()))
                 })

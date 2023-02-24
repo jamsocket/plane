@@ -2,7 +2,7 @@ use crate::{
     messages::logging::{Component, LogMessage, SerializableLevel},
     nats::TypedNats,
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use chrono::Utc;
 use std::{collections::BTreeMap, fmt::Debug};
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -51,9 +51,10 @@ impl TracingHandle {
     }
 
     pub fn attach_nats(&mut self, nats: TypedNats) -> Result<()> {
-        let recv = self.recv.take().ok_or_else(|| {
-            anyhow!("connect_nats on TracingHandle should not be called more than once.")
-        })?;
+        let recv = anyhow::Context::context(
+            self.recv.take(),
+            "connect_nats on TracingHandle should not be called more than once.",
+        )?;
         tokio::spawn(async move {
             do_logs(&nats, recv).await;
             tracing::error!("do_logs terminated.");

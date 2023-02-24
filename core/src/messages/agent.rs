@@ -150,18 +150,20 @@ impl BackendStatsMessage {
         cur_stats_message: &Stats,
     ) -> Result<BackendStatsMessage, Error> {
         // Based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
+
+        use anyhow::Context;
         let mem_naive_usage = cur_stats_message
             .memory_stats
             .usage
-            .ok_or_else(|| anyhow!("no memory stats.usage"))?;
+            .context("no memory stats.usage")?;
         let mem_available = cur_stats_message
             .memory_stats
             .limit
-            .ok_or_else(|| anyhow!("no memory stats.limit"))?;
+            .context("no memory stats.limit")?;
         let mem_stats = cur_stats_message
             .memory_stats
             .stats
-            .ok_or_else(|| anyhow!("no memory stats.stats"))?;
+            .context("no memory stats.stats")?;
         let cache_mem = match mem_stats {
             bollard::container::MemoryStatsStats::V1(stats) => stats.cache,
             bollard::container::MemoryStatsStats::V2(stats) => stats.inactive_file,
@@ -177,11 +179,10 @@ impl BackendStatsMessage {
         let cpu_delta = cpu_stats.cpu_usage.total_usage - prev_cpu_stats.cpu_usage.total_usage;
         let sys_cpu_delta = (cpu_stats
             .system_cpu_usage
-            .ok_or_else(|| anyhow!("no cpu_stats.system_cpu_usage"))?
-            as f64)
+            .context("no cpu_stats.system_cpu_usage")? as f64)
             - (prev_cpu_stats
                 .system_cpu_usage
-                .ok_or_else(|| anyhow!("no cpu_stats.system_cpu_usage"))? as f64);
+                .context("no cpu_stats.system_cpu_usage")? as f64);
         // NOTE: we deviate from docker's formula here by not multiplying by num_cpus
         //       This is because what we actually want to know from this stat
         //       is what proportion of total cpu resource is consumed, and not knowing

@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Context, Result};
 
 pub fn format_rname(email: &str) -> Result<String> {
     let (pre, post) = email
         .split_once('@')
-        .ok_or_else(|| anyhow!("Email address must include '@'."))?;
+        .context("Email address must include '@'.")?;
     let pre = pre.replace('.', r"\.");
 
     Ok(format!("{}.{}", pre, post))

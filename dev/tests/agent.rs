@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use integration_test::integration_test;
 use plane_controller::run::update_backend_state_loop;
 use plane_core::{

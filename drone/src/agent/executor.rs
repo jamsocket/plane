@@ -6,7 +6,7 @@ use crate::{
     agent::wait_port_ready,
     database::{Backend, DroneDatabase},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use plane_core::{
@@ -368,7 +368,7 @@ impl<E: Engine> Executor<E> {
                         .checked_add_signed(chrono::Duration::from_std(
                             spawn_request.max_idle_secs,
                         )?)
-                        .ok_or_else(|| anyhow!("Checked add error."))?;
+                        .context("Checked add error.")?;
 
                     if next_check < Utc::now() {
                         break;

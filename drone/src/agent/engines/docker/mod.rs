@@ -9,7 +9,7 @@ use crate::{
     },
     config::{DockerConfig, DockerConnection},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use bollard::{
     auth::DockerCredentials,
@@ -368,11 +368,11 @@ impl Engine for DockerInterface {
         let state = container
             .state
             .as_ref()
-            .ok_or_else(|| anyhow!("No state found for container."))?;
+            .context("No state found for container.")?;
 
         let running = state
             .running
-            .ok_or_else(|| anyhow!("State found but no running field for container."))?;
+            .context("State found but no running field for container.")?;
 
         if running {
             let ip = get_ip_of_container(&container)?;

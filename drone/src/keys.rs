@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use rustls::{
     sign::{any_supported_type, CertifiedKey},
     Certificate, PrivateKey,
@@ -18,9 +18,9 @@ pub struct KeyCertPathPair {
 
 impl KeyCertPathPair {
     pub fn load_certified_key(&self) -> Result<CertifiedKey> {
-        let certificate = load_certs(&self.cert_path)?;
-        let private_key = load_private_key(&self.key_path)?;
-        let private_key = any_supported_type(&private_key)?;
+        let certificate = load_certs(&self.cert_path).context("Loading certificates")?;
+        let private_key = load_private_key(&self.key_path).context("Loading private key")?;
+        let private_key = any_supported_type(&private_key).context("Parsing private key")?;
 
         Ok(CertifiedKey::new(certificate, private_key))
     }
@@ -58,11 +58,11 @@ impl KeyCertPathPair {
 // Source: https://github.com/rustls/hyper-rustls/blob/main/examples/server.rs
 pub fn load_certs(filename: &Path) -> Result<Vec<Certificate>> {
     // Open certificate file.
-    let certfile = File::open(filename)?;
+    let certfile = File::open(filename).context("Opening certificate file")?;
     let mut reader = BufReader::new(certfile);
 
     // Load and return certificate.
-    let certs = rustls_pemfile::certs(&mut reader)?;
+    let certs = rustls_pemfile::certs(&mut reader).context("Reading certificates")?;
     Ok(certs.into_iter().map(rustls::Certificate).collect())
 }
 
@@ -70,11 +70,11 @@ pub fn load_certs(filename: &Path) -> Result<Vec<Certificate>> {
 // Source: https://github.com/rustls/hyper-rustls/blob/main/examples/server.rs
 pub fn load_private_key(filename: &Path) -> Result<PrivateKey> {
     // Open keyfile.
-    let keyfile = File::open(filename)?;
+    let keyfile = File::open(filename).context("Reading keyfile")?;
     let mut reader = BufReader::new(keyfile);
 
     // Load and return a single private key.
-    let keys = rustls_pemfile::pkcs8_private_keys(&mut reader)?;
+    let keys = rustls_pemfile::pkcs8_private_keys(&mut reader).context("Loading private keys")?;
     if keys.len() != 1 {
         return Err(anyhow!("expected a single private key"));
     }

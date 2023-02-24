@@ -81,7 +81,7 @@ pub async fn get_certificate(
         let value = challenge
             .key_authorization_encoded()
             .context("Encoding authorization")?
-            .ok_or_else(|| anyhow!("No authorization value."))?;
+            .context("No authorization value.")?;
 
         tracing::info!("Requesting TXT record from platform.");
 
@@ -223,11 +223,9 @@ pub async fn refresh_if_not_valid(cert_options: &CertOptions) -> Result<Option<D
     if let Some(valid_until) = cert_validity(&cert_options.key_paths.cert_path) {
         let refresh_at = valid_until
             .checked_sub_signed(chrono::Duration::from_std(REFRESH_MARGIN)?)
-            .ok_or_else(|| {
-                anyhow!(
-                    "Date subtraction would result in over/underflow, this should never happen."
-                )
-            })?;
+            .context(
+                "Date subtraction would result in over/underflow, this should never happen.",
+            )?;
         let time_until_refresh = refresh_at.signed_duration_since(Utc::now());
 
         if time_until_refresh > chrono::Duration::zero() {
