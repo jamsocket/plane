@@ -2,7 +2,7 @@ use crate::config::ControllerConfig;
 use crate::dns::serve_dns;
 use crate::plan::ControllerPlan;
 use crate::run_scheduler;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::future::try_join_all;
 use plane_core::messages::agent::{BackendStateMessage, UpdateBackendStateMessage};
 use plane_core::messages::logging::Component;
@@ -26,7 +26,7 @@ pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
         let msg = sub
             .next()
             .await
-            .ok_or_else(|| anyhow!("UpdateBackendStateMessage subscription ended."))?;
+            .context("UpdateBackendStateMessage subscription ended.")?;
         let value = msg.value.clone();
 
         let value = BackendStateMessage {

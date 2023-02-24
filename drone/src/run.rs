@@ -5,7 +5,7 @@ use crate::{
     plan::DronePlan,
     proxy::serve,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::future::try_join_all;
 use futures::Future;
 use plane_core::cli::init_cli;
@@ -21,7 +21,8 @@ use signal_hook::{
 use std::{pin::Pin, thread};
 
 async fn drone_main() -> NeverResult {
-    let mut config: DroneConfig = init_cli()?;
+    tracing::info!("Starting drone");
+    let mut config: DroneConfig = init_cli().context("Initializing CLI")?;
 
     // Extract drone ID, or generate one if necessary.
     // DronePlan::from_drone_config will do this if we don't do it here,
@@ -34,9 +35,12 @@ async fn drone_main() -> NeverResult {
         config.drone_id = Some(drone_id.clone());
         drone_id
     };
-    let mut tracing_handle = TracingHandle::init(Component::Drone { drone_id })?;
+    let mut tracing_handle = TracingHandle::init(Component::Drone { drone_id })
+        .context("Initializing tracing handle")?;
 
-    let plan = DronePlan::from_drone_config(config).await?;
+    let plan = DronePlan::from_drone_config(config)
+        .await
+        .context("Constructing drone config")?;
     let DronePlan {
         proxy_options,
         agent_options,
@@ -46,7 +50,9 @@ async fn drone_main() -> NeverResult {
     } = plan;
 
     if let Some(nats) = &nats {
-        tracing_handle.attach_nats(nats.clone())?;
+        tracing_handle
+            .attach_nats(nats.clone())
+            .context("Attaching NATS to tracing handle")?;
     }
 
     let mut futs: Vec<Pin<Box<dyn Future<Output = NeverResult>>>> = vec![];
@@ -57,7 +63,8 @@ async fn drone_main() -> NeverResult {
             5,
             std::time::Duration::from_secs(10),
         )
-        .await?;
+        .await
+        .context("Refreshing certificate.")?;
 
         futs.push(Box::pin(refresh_loop(cert_options)))
     }

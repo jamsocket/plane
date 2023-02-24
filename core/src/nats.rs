@@ -3,22 +3,21 @@
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
 use crate::logging::LogError;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::push::Messages;
 use async_nats::jetstream::consumer::DeliverPolicy;
 use async_nats::jetstream::stream::Config;
-use async_nats::jetstream::Context;
 use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
 use dashmap::DashSet;
+use futures::stream::FuturesUnordered;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use time::OffsetDateTime;
 use tokio_stream::StreamExt;
-use futures::stream::FuturesUnordered;
 
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
@@ -133,9 +132,7 @@ where
                 self.message
                     .reply
                     .as_ref()
-                    .ok_or_else(|| {
-                        anyhow!("Attempted to respond to a message with no reply subject.")
-                    })?
+                    .context("Attempted to respond to a message with no reply subject.")?
                     .to_string(),
                 Bytes::from(serde_json::to_vec(response)?),
             )
@@ -211,7 +208,7 @@ impl<T> NatsResultExt<T> for std::result::Result<T, async_nats::Error> {
 #[derive(Clone)]
 pub struct TypedNats {
     nc: Client,
-    jetstream: Context,
+    jetstream: jetstream::Context,
     /// A set of JetStream names which have been created by this client.
     /// JetStreams are lazily created by TypedNats the first time they
     /// are used, and then stored here to avoid a round-trip after that.
@@ -233,7 +230,7 @@ impl<T: DeserializeOwned> DelayedReply<T> {
             .subscription
             .next()
             .await
-            .ok_or_else(|| anyhow!("Expected response."))?;
+            .context("Expected response from DelayedReply.")?;
 
         Ok(serde_json::from_slice(&message.payload)?)
     }
@@ -467,7 +464,7 @@ impl TypedNats {
                 }
                 Err(err) => {
                     tracing::warn!(error = ?err, "One future failed while waiting for response");
-                    continue
+                    continue;
                 }
             }
         }
