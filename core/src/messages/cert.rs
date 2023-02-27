@@ -26,6 +26,6 @@ impl TypedMessage for SetAcmeDnsRecord {
 
 impl SetAcmeDnsRecord {
     pub fn subscribe_subject() -> SubscribeSubject<Self> {
-        SubscribeSubject::new("acme.set_dns_record".to_string())
+        SubscribeSubject::new("cluster.*.set_dns_record".to_string())
     }
 }

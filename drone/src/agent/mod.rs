@@ -53,12 +53,13 @@ pub async fn wait_port_ready(addr: &SocketAddr) -> Result<()> {
 }
 
 async fn listen_for_spawn_requests(
+    cluster: &ClusterName,
     drone_id: &DroneId,
     executor: Executor<DockerInterface>,
     nats: TypedNats,
 ) -> NeverResult {
     let mut sub = nats
-        .subscribe(SpawnRequest::subscribe_subject(drone_id))
+        .subscribe(SpawnRequest::subscribe_subject(cluster, drone_id))
         .await?;
     executor.resume_backends().await?;
     tracing::info!("Listening for spawn requests.");
@@ -195,6 +196,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
         ) => result,
 
         result = listen_for_spawn_requests(
+            &cluster,
             &agent_opts.drone_id,
             executor.clone(),
             nats.clone()
