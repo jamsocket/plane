@@ -105,12 +105,12 @@ where
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .unwrap()
+        .expect("Failed to build runtime")
         .block_on(future);
 
     TEST_CONTEXT.with(|cell| {
-        tokio::runtime::Runtime::new().unwrap().block_on(async {
-            let context = cell.borrow_mut().take().unwrap();
+        tokio::runtime::Runtime::new().expect("Failed to create runtime").block_on(async {
+            let context = cell.borrow_mut().take().expect("Test context not set.");
             context.teardown().await;
         })
     });
