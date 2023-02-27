@@ -15,6 +15,7 @@ use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, Debug)]
 pub enum DockerCredentials {
     UsernamePassword { username: String, password: String },
+    IdentityToken { identity_token: String },
 }
 
 #[cfg(feature = "bollard")]
@@ -27,7 +28,13 @@ impl From<&DockerCredentials> for bollard::auth::DockerCredentials {
                     password: Some(password.clone()),
                     ..bollard::auth::DockerCredentials::default()
                 }
-            }
+            },
+            DockerCredentials::IdentityToken { identity_token } => {
+                bollard::auth::DockerCredentials {
+                    identitytoken: Some(identity_token.clone()),
+                    ..bollard::auth::DockerCredentials::default()
+                }
+            },
         }
     }
 }
