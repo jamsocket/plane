@@ -43,7 +43,7 @@ where
     let result = String::deserialize(deserializer)?;
     base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(result)
-        .map_err(|err| Error::custom(format!("Error decoding base64 string: {}", err.to_string())))
+        .map_err(|err| Error::custom(format!("Error decoding base64 string: {}", err)))
 }
 
 impl AcmeEabConfiguration {

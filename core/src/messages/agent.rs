@@ -144,7 +144,7 @@ impl TypedMessage for BackendStatsMessage {
 
 impl BackendStatsMessage {
     pub fn subscribe_subject(backend_id: &BackendId) -> SubscribeSubject<Self> {
-        SubscribeSubject::new(format!("backend.{}.stats", backend_id.id()))
+        SubscribeSubject::new(format!("cluster.*.backend.{}.stats", backend_id.id()))
     }
 }
 
@@ -273,25 +273,9 @@ impl TypedMessage for DroneStatusMessage {
     }
 }
 
-impl JetStreamable for DroneStatusMessage {
-    fn config() -> async_nats::jetstream::stream::Config {
-        async_nats::jetstream::stream::Config {
-            name: Self::stream_name().into(),
-            subjects: vec!["drone.*.status".into()],
-            max_messages_per_subject: 1,
-            max_age: Duration::from_secs(5),
-            ..async_nats::jetstream::stream::Config::default()
-        }
-    }
-
-    fn stream_name() -> &'static str {
-        "drone_status"
-    }
-}
-
 impl DroneStatusMessage {
     pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage> {
-        SubscribeSubject::new("drone.*.status".to_string())
+        SubscribeSubject::new("cluster.*.drone.*.status".to_string())
     }
 }
 
@@ -325,7 +309,7 @@ impl TypedMessage for DroneConnectRequest {
 
 impl DroneConnectRequest {
     pub fn subscribe_subject() -> SubscribeSubject<Self> {
-        SubscribeSubject::new("drone.register".to_string())
+        SubscribeSubject::new("cluster.*.drone.register".to_string())
     }
 }
 
@@ -437,8 +421,8 @@ impl TypedMessage for SpawnRequest {
 }
 
 impl SpawnRequest {
-    pub fn subscribe_subject(drone_id: &DroneId) -> SubscribeSubject<Self> {
-        SubscribeSubject::new(format!("drone.{}.spawn", drone_id.id()))
+    pub fn subscribe_subject(cluster: &ClusterName, drone_id: &DroneId) -> SubscribeSubject<Self> {
+        SubscribeSubject::new(format!("cluster.{}.drone.{}.spawn", cluster.subject_name(), drone_id.id()))
     }
 }
 

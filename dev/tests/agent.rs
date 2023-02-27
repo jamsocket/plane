@@ -28,7 +28,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use tokio::time::{sleep, Instant};
 
-const CLUSTER_DOMAIN: &str = "plane.test";
+pub const CLUSTER_DOMAIN: &str = "plane.test";
 
 struct Agent {
     #[allow(unused)]

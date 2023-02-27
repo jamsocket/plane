@@ -20,12 +20,12 @@ impl TypedMessage for SetAcmeDnsRecord {
     }
 
     fn tmp_alt_subject(&self) -> Option<String> {
-        Some(format!("cluster.{}.set_acme_record", self.cluster))
+        Some(format!("cluster.{}.set_acme_record", self.cluster.subject_name()))
     }
 }
 
 impl SetAcmeDnsRecord {
     pub fn subscribe_subject() -> SubscribeSubject<Self> {
-        SubscribeSubject::new("acme.set_dns_record".to_string())
+        SubscribeSubject::new("cluster.*.set_acme_record".to_string())
     }
 }

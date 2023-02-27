@@ -21,6 +21,7 @@ use plane_dev::{
 use std::time::Duration;
 use tokio::time::sleep;
 
+pub const CLUSTER_DOMAIN: &str = "plane.test";
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 struct MockAgent {
@@ -39,9 +40,10 @@ impl MockAgent {
     ) -> Result<ScheduleResponse> {
         // Subscribe to spawn requests for this drone, to ensure that the
         // scheduler sends them.
+        let cluster = ClusterName::new(CLUSTER_DOMAIN);
         let mut sub = self
             .nats
-            .subscribe(SpawnRequest::subscribe_subject(drone_id))
+            .subscribe(SpawnRequest::subscribe_subject(&cluster, drone_id))
             .await?;
         sleep(Duration::from_millis(100)).await;
 
