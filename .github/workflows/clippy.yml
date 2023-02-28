@@ -6,7 +6,7 @@ on:
 name: Clippy check
 jobs:
   clippy_check:
-    runs-on: ubuntu-latest-16-cores
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
