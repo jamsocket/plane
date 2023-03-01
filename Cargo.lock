@@ -1737,7 +1737,6 @@ dependencies = [
  "clap",
  "config",
  "dashmap",
- "futures",
  "rand",
  "serde",
  "serde_json",

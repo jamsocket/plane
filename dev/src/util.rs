@@ -105,7 +105,7 @@ const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 
 pub fn base_spawn_request() -> SpawnRequest {
     SpawnRequest {
-        cluster: Some(ClusterName::new("plane.test")),
+        cluster: ClusterName::new("plane.test"),
         backend_id: BackendId::new_random(),
         drone_id: DroneId::new_random(),
         metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
