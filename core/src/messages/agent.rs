@@ -58,10 +58,6 @@ impl TypedMessage for DroneLogMessage {
     fn subject(&self) -> String {
         format!("backend.{}.log", self.backend_id.id())
     }
-
-    fn tmp_alt_subject(&self) -> Option<String> {
-        None
-    }
 }
 
 impl DroneLogMessage {
@@ -118,7 +114,7 @@ impl JetStreamable for DroneLogMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BackendStatsMessage {
-    cluster: Option<ClusterName>,
+    cluster: ClusterName,
     backend_id: BackendId,
     /// Fraction of maximum CPU.
     pub cpu_use_percent: f64,
@@ -130,15 +126,11 @@ impl TypedMessage for BackendStatsMessage {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        format!("backend.{}.stats", self.backend_id.id())
-    }
-
-    fn tmp_alt_subject(&self) -> Option<String> {
-        Some(format!(
+        format!(
             "cluster.{}.backend.{}.stats",
-            self.cluster.as_ref().unwrap().subject_name(),
+            self.cluster.subject_name(),
             self.backend_id.id()
-        ))
+        )
     }
 }
 
@@ -201,7 +193,7 @@ impl BackendStatsMessage {
 
         Ok(BackendStatsMessage {
             backend_id: backend_id.clone(),
-            cluster: Some(cluster.clone()),
+            cluster: cluster.clone(),
             cpu_use_percent,
             mem_use_percent,
         })
@@ -261,15 +253,11 @@ impl TypedMessage for DroneStatusMessage {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        format!("drone.{}.status", self.drone_id.id())
-    }
-
-    fn tmp_alt_subject(&self) -> Option<String> {
-        Some(format!(
+        format!(
             "cluster.{}.drone.{}.status",
             self.cluster.subject_name(),
             self.drone_id.id()
-        ))
+        )
     }
 }
 
@@ -296,14 +284,10 @@ impl TypedMessage for DroneConnectRequest {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        "drone.register".to_string()
-    }
-
-    fn tmp_alt_subject(&self) -> Option<String> {
-        Some(format!(
+        format!(
             "cluster.{}.drone.register",
             self.cluster.subject_name()
-        ))
+        )
     }
 }
 
@@ -357,7 +341,7 @@ pub struct DockerExecutableConfig {
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SpawnRequest {
-    pub cluster: Option<ClusterName>,
+    pub cluster: ClusterName,
 
     pub drone_id: DroneId,
 
@@ -406,17 +390,11 @@ impl TypedMessage for SpawnRequest {
     type Response = bool;
 
     fn subject(&self) -> String {
-        format!("drone.{}.spawn", self.drone_id.id())
-    }
-
-    fn tmp_alt_subject(&self) -> Option<String> {
-        self.cluster.as_ref().map(|cluster| {
-            format!(
-                "cluster.{}.drone.{}.spawn",
-                cluster.subject_name(),
-                self.drone_id.id()
-            )
-        })
+        format!(
+            "cluster.{}.drone.{}.spawn",
+            self.cluster.subject_name(),
+            self.drone_id.id()
+        )
     }
 }
 
@@ -442,10 +420,6 @@ impl TypedMessage for TerminationRequest {
             self.cluster_id.subject_name(),
             self.backend_id.id()
         )
-    }
-
-    fn tmp_alt_subject(&self) -> Option<String> {
-        None
     }
 }
 
@@ -583,10 +557,6 @@ impl TypedMessage for UpdateBackendStateMessage {
             self.backend.id()
         )
     }
-
-    fn tmp_alt_subject(&self) -> Option<String> {
-        None
-    }
 }
 
 impl UpdateBackendStateMessage {
@@ -646,10 +616,6 @@ impl TypedMessage for BackendStateMessage {
 
     fn subject(&self) -> String {
         format!("backend.{}.status", self.backend.id())
-    }
-
-    fn tmp_alt_subject(&self) -> Option<String> {
-        None
     }
 }
 

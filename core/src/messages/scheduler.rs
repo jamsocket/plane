@@ -52,7 +52,7 @@ impl ScheduleRequest {
         };
 
         SpawnRequest {
-            cluster: Some(self.cluster.clone()),
+            cluster: self.cluster.clone(),
             drone_id: drone_id.clone(),
             backend_id,
             max_idle_secs: self.max_idle_secs,
@@ -80,10 +80,6 @@ impl TypedMessage for ScheduleRequest {
     fn subject(&self) -> String {
         format!("cluster.{}.schedule", self.cluster.subject_name())
     }
-
-    fn tmp_alt_subject(&self) -> Option<String> {
-        None
-    }
 }
 
 impl ScheduleRequest {
@@ -109,10 +105,6 @@ impl TypedMessage for DrainDrone {
             self.cluster.subject_name(),
             self.drone.id()
         )
-    }
-
-    fn tmp_alt_subject(&self) -> Option<String> {
-        None
     }
 }
 
