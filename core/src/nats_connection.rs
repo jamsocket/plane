@@ -51,7 +51,9 @@ impl NatsConnectionSpec {
         let mut opts = match &self.auth {
             None => ConnectOptions::default(),
             Some(NatsAuthorization::Token { token }) => ConnectOptions::with_token(token.into()),
-            _ => todo!("Unsupported authentication."),
+            Some(NatsAuthorization::UserAndPassword { username, password }) => {
+                ConnectOptions::with_user_and_password(username.into(), password.into())
+            }
         };
 
         opts = opts.custom_inbox_prefix(inbox_prefix);
