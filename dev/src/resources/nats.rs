@@ -12,7 +12,9 @@ use std::net::SocketAddrV4;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 
-const NATS_TOKEN: &str = "mytoken";
+const NATS_USER: &str = "myuser";
+const NATS_PASS: &str = "mypass";
+
 pub struct Nats {
     container: ContainerResource,
     #[allow(unused)]
@@ -22,8 +24,9 @@ pub struct Nats {
 impl Nats {
     pub fn connection_spec(&self) -> NatsConnectionSpec {
         NatsConnectionSpec {
-            auth: Some(NatsAuthorization::Token {
-                token: NATS_TOKEN.into(),
+            auth: Some(NatsAuthorization::UserAndPassword {
+                username: NATS_USER.into(),
+                password: NATS_PASS.into(),
             }),
             hosts: vec![self.container.ip.to_string()],
         }
@@ -38,7 +41,13 @@ impl Nats {
             name: "nats".into(),
             image: "docker.io/nats:2.8".into(),
             environment: HashMap::new(),
-            command: vec!["--jetstream".into(), "--auth".into(), NATS_TOKEN.into()],
+            command: vec![
+                "--jetstream".into(),
+                "--user".into(),
+                NATS_USER.into(),
+                "--pass".into(),
+                NATS_PASS.into(),
+            ],
             volumes: Vec::new(),
         };
 
@@ -46,9 +55,10 @@ impl Nats {
 
         wait_for_port(SocketAddrV4::new(container.ip, 4222), 10_000).await?;
 
-        let conn = async_nats::ConnectOptions::with_token(NATS_TOKEN.into())
-            .connect(container.ip.to_string())
-            .await?;
+        let conn =
+            async_nats::ConnectOptions::with_user_and_password(NATS_USER.into(), NATS_PASS.into())
+                .connect(container.ip.to_string())
+                .await?;
 
         let mut output = File::create(scratch_dir("logs").join("nats-wiretap.txt"))?;
         let mut wiretap = conn
