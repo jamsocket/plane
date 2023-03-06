@@ -2,7 +2,7 @@ version: "3.9"
 services:
   drone:
     container_name: plane-drone
-    image: ghcr.io/drifting-in-space/plane-drone:latest
+    image: plane/drone:latest
     build:
       dockerfile: ./drone/Dockerfile
       context: ../..
@@ -21,7 +21,7 @@ services:
 
   controller:
     container_name: plane-controller
-    image: ghcr.io/drifting-in-space/plane-controller:latest
+    image: plane/controller:latest
     build:
       dockerfile: ./controller/Dockerfile
       context: ../..
