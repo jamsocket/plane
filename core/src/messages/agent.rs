@@ -585,7 +585,7 @@ impl UpdateBackendStateMessage {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct BackendStateMessage {
     /// The cluster the backend belongs to.
-    pub cluster: Option<ClusterName>,
+    pub cluster: ClusterName,
 
     /// The new state.
     pub state: BackendState,
@@ -632,7 +632,7 @@ impl BackendStateMessage {
 impl BackendStateMessage {
     /// Construct a status message using the current time as its timestamp.
     #[must_use]
-    pub fn new(state: BackendState, cluster: Option<ClusterName>, backend: BackendId) -> Self {
+    pub fn new(state: BackendState, cluster: ClusterName, backend: BackendId) -> Self {
         BackendStateMessage {
             cluster,
             state,

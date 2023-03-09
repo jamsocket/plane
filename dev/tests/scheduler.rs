@@ -285,7 +285,7 @@ async fn test_update_backend_stats_message() {
             backend: backend_id,
             state: BackendState::Ready,
             time,
-            cluster: Some(ClusterName::new("plane.test")),
+            cluster: ClusterName::new("plane.test"),
         },
         result.0
     );

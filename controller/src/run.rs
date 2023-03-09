@@ -32,7 +32,7 @@ pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
         let value = BackendStateMessage {
             backend: value.backend,
             state: value.state,
-            cluster: Some(value.cluster),
+            cluster: value.cluster,
             time: value.time,
         };
 
