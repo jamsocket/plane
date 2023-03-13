@@ -105,13 +105,28 @@ where
     nc: Client,
 }
 
+/// Parse the given Message, and verify that the subject it arrived over is the
+/// expected subject for that message.
+fn parse_and_verify_message<T: TypedMessage>(message: &Message) -> Result<T> {
+    let value: T = serde_json::from_slice(&message.payload)?;
+    if value.subject() != message.subject {
+        return Err(anyhow!(
+            "Message subject ({}) does not match expected subject ({})",
+            message.subject,
+            value.subject()
+        ));
+    }
+
+    Ok(value)
+}
+
 impl<T> MessageWithResponseHandle<T>
 where
     T: TypedMessage,
 {
     fn new(message: Message, nc: Client) -> Result<Self> {
         Ok(MessageWithResponseHandle {
-            value: serde_json::from_slice(&message.payload)?,
+            value: parse_and_verify_message(&message)?,
             message,
             nc,
         })
@@ -254,7 +269,7 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
                     .ack()
                     .await
                     .log_error("Error acking jetstream message.");
-                let value: Result<T, _> = serde_json::from_slice(&message.payload);
+                let value: Result<T, _> = parse_and_verify_message(&message);
                 let meta = match MessageMeta::try_from(message) {
                     Ok(meta) => meta,
                     Err(error) => {
