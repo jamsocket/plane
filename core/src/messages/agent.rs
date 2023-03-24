@@ -112,7 +112,7 @@ impl JetStreamable for DroneLogMessage {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BackendStatsMessage {
     pub cluster: ClusterName,
     pub backend_id: BackendId,
