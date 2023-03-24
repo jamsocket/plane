@@ -114,8 +114,8 @@ impl JetStreamable for DroneLogMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BackendStatsMessage {
-    cluster: ClusterName,
-    backend_id: BackendId,
+    pub cluster: ClusterName,
+    pub backend_id: BackendId,
     /// Fraction of maximum CPU.
     pub cpu_use_percent: f64,
     /// Fraction of maximum memory.
