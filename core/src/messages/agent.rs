@@ -28,13 +28,13 @@ impl From<&DockerCredentials> for bollard::auth::DockerCredentials {
                     password: Some(password.clone()),
                     ..bollard::auth::DockerCredentials::default()
                 }
-            },
+            }
             DockerCredentials::IdentityToken { identity_token } => {
                 bollard::auth::DockerCredentials {
                     identitytoken: Some(identity_token.clone()),
                     ..bollard::auth::DockerCredentials::default()
                 }
-            },
+            }
         }
     }
 }
@@ -284,10 +284,7 @@ impl TypedMessage for DroneConnectRequest {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        format!(
-            "cluster.{}.drone.register",
-            self.cluster.subject_name()
-        )
+        format!("cluster.{}.drone.register", self.cluster.subject_name())
     }
 }
 
@@ -400,7 +397,11 @@ impl TypedMessage for SpawnRequest {
 
 impl SpawnRequest {
     pub fn subscribe_subject(cluster: &ClusterName, drone_id: &DroneId) -> SubscribeSubject<Self> {
-        SubscribeSubject::new(format!("cluster.{}.drone.{}.spawn", cluster.subject_name(), drone_id.id()))
+        SubscribeSubject::new(format!(
+            "cluster.{}.drone.{}.spawn",
+            cluster.subject_name(),
+            drone_id.id()
+        ))
     }
 }
 
@@ -451,7 +452,7 @@ pub enum BackendState {
     /// The container is listening on the expected port.
     Ready,
 
-    /// A timeout occurred becfore the container was ready.
+    /// A timeout occurred before the container was ready.
     TimedOutBeforeReady,
 
     /// The container exited on its own initiative with a non-zero status.
