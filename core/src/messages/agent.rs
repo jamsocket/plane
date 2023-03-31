@@ -463,6 +463,9 @@ pub enum BackendState {
     /// The container was terminated because all connections were closed.
     Swept,
 
+    /// The container was marked as lost.
+    Lost,
+
     /// The container was terminated through the API.
     Terminated,
 }
@@ -481,6 +484,7 @@ impl FromStr for BackendState {
             "Failed" => Ok(BackendState::Failed),
             "Exited" => Ok(BackendState::Exited),
             "Swept" => Ok(BackendState::Swept),
+            "Lost" => Ok(BackendState::Lost),
             "Terminated" => Ok(BackendState::Terminated),
             _ => Err(anyhow!(
                 "The string {:?} does not describe a valid state.",
@@ -502,6 +506,7 @@ impl ToString for BackendState {
             BackendState::Failed => "Failed".to_string(),
             BackendState::Exited => "Exited".to_string(),
             BackendState::Swept => "Swept".to_string(),
+            BackendState::Lost => "Lost".to_string(),
             BackendState::Terminated => "Terminated".to_string(),
         }
     }
@@ -519,6 +524,7 @@ impl BackendState {
                 | BackendState::Failed
                 | BackendState::Exited
                 | BackendState::Swept
+                | BackendState::Lost
                 | BackendState::Terminated
         )
     }
