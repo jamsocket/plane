@@ -109,9 +109,11 @@ where
         .block_on(future);
 
     TEST_CONTEXT.with(|cell| {
-        tokio::runtime::Runtime::new().expect("Failed to create runtime").block_on(async {
-            let context = cell.borrow_mut().take().expect("Test context not set.");
-            context.teardown().await;
-        })
+        tokio::runtime::Runtime::new()
+            .expect("Failed to create runtime")
+            .block_on(async {
+                let context = cell.borrow_mut().take().expect("Test context not set.");
+                context.teardown().await;
+            })
     });
 }

@@ -1,4 +1,4 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{

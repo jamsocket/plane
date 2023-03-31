@@ -28,13 +28,13 @@ impl From<&DockerCredentials> for bollard::auth::DockerCredentials {
                     password: Some(password.clone()),
                     ..bollard::auth::DockerCredentials::default()
                 }
-            },
+            }
             DockerCredentials::IdentityToken { identity_token } => {
                 bollard::auth::DockerCredentials {
                     identitytoken: Some(identity_token.clone()),
                     ..bollard::auth::DockerCredentials::default()
                 }
-            },
+            }
         }
     }
 }
@@ -284,10 +284,7 @@ impl TypedMessage for DroneConnectRequest {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        format!(
-            "cluster.{}.drone.register",
-            self.cluster.subject_name()
-        )
+        format!("cluster.{}.drone.register", self.cluster.subject_name())
     }
 }
 
@@ -400,7 +397,11 @@ impl TypedMessage for SpawnRequest {
 
 impl SpawnRequest {
     pub fn subscribe_subject(cluster: &ClusterName, drone_id: &DroneId) -> SubscribeSubject<Self> {
-        SubscribeSubject::new(format!("cluster.{}.drone.{}.spawn", cluster.subject_name(), drone_id.id()))
+        SubscribeSubject::new(format!(
+            "cluster.{}.drone.{}.spawn",
+            cluster.subject_name(),
+            drone_id.id()
+        ))
     }
 }
 
@@ -451,7 +452,7 @@ pub enum BackendState {
     /// The container is listening on the expected port.
     Ready,
 
-    /// A timeout occurred becfore the container was ready.
+    /// A timeout occurred before the container was ready.
     TimedOutBeforeReady,
 
     /// The container exited on its own initiative with a non-zero status.
@@ -462,6 +463,9 @@ pub enum BackendState {
 
     /// The container was terminated because all connections were closed.
     Swept,
+
+    /// The container was marked as lost.
+    Lost,
 
     /// The container was terminated through the API.
     Terminated,
@@ -481,6 +485,7 @@ impl FromStr for BackendState {
             "Failed" => Ok(BackendState::Failed),
             "Exited" => Ok(BackendState::Exited),
             "Swept" => Ok(BackendState::Swept),
+            "Lost" => Ok(BackendState::Lost),
             "Terminated" => Ok(BackendState::Terminated),
             _ => Err(anyhow!(
                 "The string {:?} does not describe a valid state.",
@@ -502,6 +507,7 @@ impl ToString for BackendState {
             BackendState::Failed => "Failed".to_string(),
             BackendState::Exited => "Exited".to_string(),
             BackendState::Swept => "Swept".to_string(),
+            BackendState::Lost => "Lost".to_string(),
             BackendState::Terminated => "Terminated".to_string(),
         }
     }
@@ -519,6 +525,7 @@ impl BackendState {
                 | BackendState::Failed
                 | BackendState::Exited
                 | BackendState::Swept
+                | BackendState::Lost
                 | BackendState::Terminated
         )
     }

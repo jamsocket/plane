@@ -386,6 +386,7 @@ impl<E: Engine> Executor<E> {
             | BackendState::Failed
             | BackendState::Exited
             | BackendState::Swept
+            | BackendState::Lost
             | BackendState::Terminated => {
                 self.engine
                     .stop(&spawn_request.backend_id)
