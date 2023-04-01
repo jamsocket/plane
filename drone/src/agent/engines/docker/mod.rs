@@ -386,11 +386,15 @@ impl Engine for DockerInterface {
 
             Ok(EngineBackendStatus::Running { addr })
         } else {
-            match state.exit_code {
-                None => Ok(EngineBackendStatus::Terminated),
-                Some(0) => Ok(EngineBackendStatus::Exited),
-                Some(_) => Ok(EngineBackendStatus::Failed),
-            }
+            let status = match state.exit_code {
+                None => EngineBackendStatus::Terminated,
+                Some(0) => EngineBackendStatus::Exited,
+                Some(_) => EngineBackendStatus::Failed,
+            };
+
+            tracing::info!(?status, ?state.exit_code, "Set to terminal state.");
+
+            Ok(status)
         }
     }
 
