@@ -1,18 +1,25 @@
 use anyhow::Result;
 use integration_test::integration_test;
 use plane_controller::{
-    dns::serve_dns, drone_state::monitor_drone_state, plan::DnsPlan, state::start_state_loop,
+    dns::serve_dns,
+    plan::DnsPlan,
+    state::{StateHandle, WorldState},
 };
-use plane_core::{messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName, Never};
+use plane_core::{
+    messages::state::{
+        AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
+        DroneMessageType, WorldStateMessage,
+    },
+    types::{BackendId, ClusterName, DroneId},
+    Never,
+};
 use plane_dev::{
-    resources::nats::Nats,
     timeout::{expect_to_stay_alive, LivenessGuard},
     util::random_loopback_ip,
 };
 use std::{
     net::{Ipv4Addr, SocketAddr},
     str::Utf8Error,
-    time::Duration,
 };
 use trust_dns_resolver::{
     config::{NameServerConfig, Protocol, ResolverConfig, ResolverOpts},
@@ -27,7 +34,6 @@ const DNS_PORT: u16 = 5353;
 struct DnsServer {
     _guard: LivenessGuard<Result<Never, anyhow::Error>>,
     resolver: TokioAsyncResolver,
-    pub nc: TypedNats,
 }
 
 trait DnsResultExt {
@@ -44,17 +50,14 @@ impl<T> DnsResultExt for Result<T, ResolveError> {
 }
 
 impl DnsServer {
-    async fn new() -> Result<Self> {
+    fn new(state: WorldState) -> Result<Self> {
         let ip = random_loopback_ip();
-        let nats = Nats::new().await?;
-        let nc = nats.connection().await?;
-        let state = start_state_loop(nc.clone()).await?;
+        let state = StateHandle::new(state);
 
         let plan = DnsPlan {
             bind_ip: ip.into(),
             port: DNS_PORT,
             soa_email: Some(Name::from_ascii("admin.plane.test.")?),
-            nats: nc.clone(),
             state,
         };
         let guard = expect_to_stay_alive(serve_dns(plan));
@@ -69,7 +72,6 @@ impl DnsServer {
         Ok(DnsServer {
             _guard: guard,
             resolver,
-            nc,
         })
     }
 
@@ -104,104 +106,82 @@ impl DnsServer {
 
 #[integration_test]
 async fn dns_bad_request() {
-    let dns = DnsServer::new().await.unwrap();
+    let state = WorldState::default();
+    let dns = DnsServer::new(state).unwrap();
 
     assert!(dns.a_record("foo.bar").await.is_nxdomain());
 }
 
 #[integration_test]
 async fn dns_txt_record() {
-    let dns = DnsServer::new().await.unwrap();
-
-    tokio::spawn(monitor_drone_state(dns.nc.clone()));
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    dns.nc
-        .request(&SetAcmeDnsRecord {
-            cluster: ClusterName::new("plane.test"),
+    let mut state = WorldState::default();
+    state.apply(WorldStateMessage {
+        cluster: ClusterName::new("plane.test"),
+        message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
             value: "foobar".into(),
-        })
-        .await
-        .unwrap();
-
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
+        }),
+    });
+    let dns = DnsServer::new(state).unwrap();
     let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
     assert_eq!(vec!["foobar".to_string()], result);
 }
 
 #[integration_test]
 async fn dns_multi_txt_record() {
-    let dns = DnsServer::new().await.unwrap();
-
-    tokio::spawn(monitor_drone_state(dns.nc.clone()));
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    dns.nc
-        .request(&SetAcmeDnsRecord {
-            cluster: ClusterName::new("plane.test"),
+    let mut state = WorldState::default();
+    state.apply(WorldStateMessage {
+        cluster: ClusterName::new("plane.test"),
+        message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
             value: "foobar".into(),
-        })
-        .await
-        .unwrap();
-
-    dns.nc
-        .request(&SetAcmeDnsRecord {
-            cluster: ClusterName::new("plane.test"),
+        }),
+    });
+    state.apply(WorldStateMessage {
+        cluster: ClusterName::new("plane.test"),
+        message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
             value: "foobaz".into(),
-        })
-        .await
-        .unwrap();
-
-    tokio::time::sleep(Duration::from_secs(1)).await;
+        }),
+    });
+    let dns = DnsServer::new(state).unwrap();
 
     let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
     assert_eq!(vec!["foobar".to_string(), "foobaz".to_string()], result);
 }
 
-// #[integration_test]
-// async fn dns_a_record() {
-//     let dns = DnsServer::new().await.unwrap();
+#[integration_test]
+async fn dns_a_record() {
+    let drone_id = DroneId::new_random();
+    let mut state = WorldState::default();
+    state.apply(WorldStateMessage {
+        cluster: ClusterName::new("plane.test"),
+        message: ClusterStateMessage::DroneMessage(DroneMessage {
+            drone: drone_id.clone(),
+            message: DroneMessageType::Metadata {
+                ip: Ipv4Addr::new(12, 12, 12, 12).into(),
+            },
+        }),
+    });
+    state.apply(WorldStateMessage {
+        cluster: ClusterName::new("plane.test"),
+        message: ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: BackendId::new("louie".to_string()),
+            message: BackendMessageType::Assignment {
+                drone: drone_id.clone(),
+            },
+        }),
+    });
 
-//     dns.nc
-//         .publish(&DroneConnectRequest {
-//             cluster: ClusterName::new("plane.test"),
-//             ip: std::net::IpAddr::V4(Ipv4Addr::new(12, 12, 12, 12)),
-//             drone_id: DroneId::new("louie".to_string()),
-//         })
-//         .await
-//         .unwrap();
+    let dns = DnsServer::new(state).unwrap();
 
-//     dns.nc.request(&SpawnRequest {
-//         backend_id: BackendId::new("foobar".to_string()),
-//         cluster: ClusterName::new("plane.test"),
-//         drone_id: DroneId::new("louie".to_string()),
-//         bearer_token: None,
-//         max_idle_secs: Duration::from_secs(60),
-//         executable: DockerExecutableConfig {
-//             credentials: None,
-//             image: "alpine".into(),
-//             env: [].into_iter().collect(),
-//             port: None,
-//             resource_limits: ResourceLimits::default(),
-//             pull_policy: DockerPullPolicy::IfNotPresent,
-//             volume_mounts: vec![],
-//         },
-//         metadata: [].into_iter().collect(),
-//     }).await.unwrap();
-
-//     tokio::time::sleep(Duration::from_secs(1)).await;
-
-//     let result = dns
-//         .a_record("louie.plane.test")
-//         .await
-//         .expect("Couldn't fetch DNS record.");
-//     assert_eq!(vec![Ipv4Addr::new(12, 12, 12, 12)], result);
-// }
+    let result = dns
+        .a_record("louie.plane.test")
+        .await
+        .expect("Couldn't fetch DNS record.");
+    assert_eq!(vec![Ipv4Addr::new(12, 12, 12, 12)], result);
+}
 
 #[integration_test]
 async fn dns_soa_record() {
-    let dns = DnsServer::new().await.unwrap();
+    let dns = DnsServer::new(WorldState::default()).unwrap();
 
     let result = dns.soa_record("plane.test").await.unwrap();
 

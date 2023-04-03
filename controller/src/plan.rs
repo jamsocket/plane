@@ -14,7 +14,6 @@ pub struct DnsPlan {
     pub port: u16,
     pub bind_ip: IpAddr,
     pub soa_email: Option<Name>,
-    pub nats: TypedNats,
     pub state: StateHandle,
 }
 
@@ -48,7 +47,6 @@ impl ControllerPlan {
                 port: options.port,
                 bind_ip: options.bind_ip,
                 soa_email,
-                nats: nats.clone(),
                 state: state.clone(),
             })
         } else {
