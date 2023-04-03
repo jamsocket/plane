@@ -392,7 +392,9 @@ impl Engine for DockerInterface {
                 Some(_) => EngineBackendStatus::Failed,
             };
 
-            tracing::info!(?status, ?state.exit_code, "Set to terminal state.");
+            let state_json = serde_json::to_string(&state).ok();
+
+            tracing::info!(?status, state=?state_json, "Set to terminal state.");
 
             Ok(status)
         }
