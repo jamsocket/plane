@@ -2,8 +2,10 @@ use anyhow::Result;
 use chrono::Utc;
 use integration_test::integration_test;
 use plane_controller::{
-    drone_state::monitor_drone_state, run::update_backend_state_loop, run_scheduler,
-    state::start_state_loop,
+    drone_state::monitor_drone_state,
+    run::update_backend_state_loop,
+    run_scheduler,
+    state::{start_state_loop, StateHandle},
 };
 use plane_core::{
     messages::{
@@ -28,6 +30,7 @@ const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 struct MockAgent {
     nats: TypedNats,
+    state: StateHandle,
     _state_monitor: LivenessGuard<NeverResult>,
 }
 
@@ -41,6 +44,8 @@ impl MockAgent {
             ip,
         };
 
+        let state = start_state_loop(nats.clone()).await.unwrap();
+
         let state_monitor = expect_to_stay_alive(monitor_drone_state(nats.clone()));
 
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -50,6 +55,7 @@ impl MockAgent {
 
         MockAgent {
             nats,
+            state,
             _state_monitor: state_monitor,
         }
     }
@@ -96,6 +102,24 @@ impl MockAgent {
             response_handle.response(),
         )
         .await??;
+
+        // If the schedule request was successful, the state data structure
+        // should be updated.
+        if let ScheduleResponse::Scheduled { backend_id, .. } = &result {
+            // Sleep here first.
+            let state = self.state.state();
+            let backend = state
+                .cluster(&cluster)
+                .unwrap()
+                .backends
+                .get(&backend_id)
+                .unwrap();
+            assert_eq!(
+                Some(drone_id),
+                backend.drone.as_ref(),
+                "Backend should be scheduled on the expected drone."
+            );
+        }
 
         Ok(result)
     }

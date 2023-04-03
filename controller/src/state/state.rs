@@ -128,7 +128,7 @@ impl DroneState {
 
 #[derive(Default, Debug)]
 pub struct BackendState {
-    drone: Option<DroneId>,
+    pub drone: Option<DroneId>,
     state: Option<agent::BackendState>,
 }
 
