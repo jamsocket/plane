@@ -11,6 +11,8 @@ use plane_core::{
 
 mod state;
 
+/// Start a loop which reads the state stream and applies the messages to the world state.
+/// Returns a handle to the world state.
 pub async fn start_state_loop(nc: TypedNats) -> Result<StateHandle> {
     let mut sub: JetstreamSubscription<WorldStateMessage> = nc.subscribe_jetstream().await?;
     let mut world_state = WorldState::default();

@@ -136,6 +136,14 @@ where
         &self.message
     }
 
+    pub async fn try_respond(&self, response: &T::Response) -> Result<()> {
+        if self.message.reply.is_some() {
+            self.respond(response).await
+        } else {
+            Ok(())
+        }
+    }
+
     pub async fn respond(&self, response: &T::Response) -> Result<()> {
         let reply_inbox = self
             .message

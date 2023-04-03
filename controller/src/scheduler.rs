@@ -1,16 +1,11 @@
-use crate::state::{update_drone_state, StateHandle};
+use crate::state::StateHandle;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use plane_core::{
-    messages::drone_state::DroneStatusMessage,
-    nats::TypedNats,
-    types::{ClusterName, DroneId},
-};
+use plane_core::types::{ClusterName, DroneId};
 use rand::{seq::SliceRandom, thread_rng};
 use std::{error::Error, fmt::Display};
 
 pub struct Scheduler {
-    nats: TypedNats,
     state: StateHandle,
 }
 
@@ -28,17 +23,8 @@ impl Display for SchedulerError {
 impl Error for SchedulerError {}
 
 impl Scheduler {
-    pub fn new(nats: TypedNats, state: StateHandle) -> Self {
-        Self { nats, state }
-    }
-
-    pub async fn update_status(
-        &self,
-        timestamp: DateTime<Utc>,
-        status: &DroneStatusMessage,
-    ) -> Result<()> {
-        update_drone_state(&self.nats, &status, timestamp).await?;
-        Ok(())
+    pub fn new(state: StateHandle) -> Self {
+        Self { state }
     }
 
     pub fn schedule(
