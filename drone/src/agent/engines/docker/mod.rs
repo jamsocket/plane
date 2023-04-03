@@ -386,11 +386,18 @@ impl Engine for DockerInterface {
 
             Ok(EngineBackendStatus::Running { addr })
         } else {
-            match state.exit_code {
-                None => Ok(EngineBackendStatus::Terminated),
-                Some(0) => Ok(EngineBackendStatus::Exited),
-                Some(_) => Ok(EngineBackendStatus::Failed),
-            }
+            let status = match state.exit_code {
+                None => EngineBackendStatus::Terminated,
+                Some(0) => EngineBackendStatus::Exited,
+                Some(_) => EngineBackendStatus::Failed,
+            };
+
+            let state_json = serde_json::to_string(&state)
+                .unwrap_or_else(|_| "Failed to serialize container state.".into());
+
+            tracing::info!(?status, state=?state_json, "Set to terminal state.");
+
+            Ok(status)
         }
     }
 
