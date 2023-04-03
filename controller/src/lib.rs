@@ -10,14 +10,13 @@ use plane_core::{
 use scheduler::Scheduler;
 use state::StateHandle;
 
-pub mod config;
+mod config;
 pub mod dns;
 pub mod drone_state;
 pub mod plan;
 pub mod run;
 mod scheduler;
 pub mod state;
-pub mod ttl_store;
 
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     let scheduler = Scheduler::new(state);

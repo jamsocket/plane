@@ -1,11 +1,7 @@
 pub use self::state::{StateHandle, WorldState};
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Utc};
 use plane_core::{
-    messages::{
-        drone_state::DroneStatusMessage,
-        state::{ClusterStateMessage, DroneMessage, DroneMessageType, WorldStateMessage},
-    },
+    messages::state::WorldStateMessage,
     nats::{JetstreamSubscription, TypedNats},
 };
 
@@ -38,32 +34,4 @@ pub async fn start_state_loop(nc: TypedNats) -> Result<StateHandle> {
     }
 
     Ok(state_handle)
-}
-
-pub async fn update_drone_state(
-    nc: &TypedNats,
-    message: &DroneStatusMessage,
-    time: DateTime<Utc>,
-) -> Result<()> {
-    nc.publish_jetstream(&WorldStateMessage {
-        cluster: message.cluster.clone(),
-        message: ClusterStateMessage::DroneMessage(DroneMessage {
-            drone: message.drone_id.clone(),
-            message: DroneMessageType::State {
-                state: message.state.clone(),
-            },
-        }),
-    })
-    .await?;
-
-    nc.publish_jetstream(&WorldStateMessage {
-        cluster: message.cluster.clone(),
-        message: ClusterStateMessage::DroneMessage(DroneMessage {
-            drone: message.drone_id.clone(),
-            message: DroneMessageType::KeepAlive { timestamp: time },
-        }),
-    })
-    .await?;
-
-    Ok(())
 }
