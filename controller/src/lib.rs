@@ -1,24 +1,31 @@
 use anyhow::anyhow;
 use chrono::Utc;
 use plane_core::{
-    messages::agent::DroneStatusMessage,
-    messages::scheduler::{ScheduleRequest, ScheduleResponse},
+    messages::{
+        drone_state::DroneStatusMessage,
+        scheduler::{ScheduleRequest, ScheduleResponse},
+    },
     nats::TypedNats,
     timing::Timer,
     NeverResult,
 };
 use scheduler::Scheduler;
+use state::StateHandle;
 use tokio::select;
+
+use crate::scheduler::SchedulerError;
 
 pub mod config;
 pub mod dns;
+pub mod drone_state;
 pub mod plan;
 pub mod run;
 mod scheduler;
+pub mod state;
 pub mod ttl_store;
 
-pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
-    let scheduler = Scheduler::default();
+pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
+    let scheduler = Scheduler::new(nats.clone(), state);
     let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
 
@@ -32,7 +39,9 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
             status_msg = status_sub.next() => {
                 if let Some(status_msg) = status_msg {
                     tracing::debug!(status_msg=?status_msg.value, "Got drone status");
-                    scheduler.update_status(Utc::now(), &status_msg.value);
+                    let time = Utc::now();
+
+                    scheduler.update_status(time, &status_msg.value).await?;
                 } else {
                     return Err(anyhow!("status_sub.next() returned None."));
                 }
@@ -71,8 +80,12 @@ pub async fn run_scheduler(nats: TypedNats) -> NeverResult {
                                 }
                             },
                             Err(error) => {
-                                tracing::warn!(?error, "Communication error during scheduling.");
-                                ScheduleResponse::NoDroneAvailable
+                                match error {
+                                    SchedulerError::NoDroneAvailable => {
+                                        tracing::warn!("No drone available.");
+                                        ScheduleResponse::NoDroneAvailable
+                                    },
+                                }
                             },
                         };
 

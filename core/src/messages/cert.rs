@@ -1,7 +1,4 @@
-use crate::{
-    nats::{SubscribeSubject, TypedMessage},
-    types::ClusterName,
-};
+use crate::{nats::TypedMessage, types::ClusterName};
 use serde::{Deserialize, Serialize};
 
 /// A request from the drone to the DNS server telling it to set
@@ -17,11 +14,5 @@ impl TypedMessage for SetAcmeDnsRecord {
 
     fn subject(&self) -> String {
         format!("cluster.{}.set_acme_record", self.cluster.subject_name())
-    }
-}
-
-impl SetAcmeDnsRecord {
-    pub fn subscribe_subject() -> SubscribeSubject<Self> {
-        SubscribeSubject::new("cluster.*.set_acme_record".to_string())
     }
 }

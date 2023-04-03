@@ -1,4 +1,8 @@
-use crate::{config::ControllerConfig, dns::rname_format::format_rname};
+use crate::{
+    config::ControllerConfig,
+    dns::rname_format::format_rname,
+    state::{start_state_loop, StateHandle},
+};
 use anyhow::{Context, Result};
 use plane_core::nats::TypedNats;
 use std::net::IpAddr;
@@ -10,18 +14,21 @@ pub struct DnsPlan {
     pub port: u16,
     pub bind_ip: IpAddr,
     pub soa_email: Option<Name>,
-    pub nc: TypedNats,
+    pub nats: TypedNats,
+    pub state: StateHandle,
 }
 
 pub struct ControllerPlan {
     pub nats: TypedNats,
     pub scheduler_plan: Option<SchedulerPlan>,
     pub dns_plan: Option<DnsPlan>,
+    pub state: StateHandle,
 }
 
 impl ControllerPlan {
     pub async fn from_controller_config(config: ControllerConfig) -> Result<Self> {
         let nats = config.nats.connect_with_retry("controller.inbox").await?;
+        let state = start_state_loop(nats.clone()).await?;
 
         let scheduler_plan = config.scheduler.map(|_| SchedulerPlan);
         let dns_plan = if let Some(options) = config.dns {
@@ -41,7 +48,8 @@ impl ControllerPlan {
                 port: options.port,
                 bind_ip: options.bind_ip,
                 soa_email,
-                nc: nats.clone(),
+                nats: nats.clone(),
+                state: state.clone(),
             })
         } else {
             None
@@ -51,6 +59,7 @@ impl ControllerPlan {
             nats,
             scheduler_plan,
             dns_plan,
+            state,
         })
     }
 }

@@ -1,24 +1,22 @@
 use anyhow::Result;
 use chrono::Utc;
 use integration_test::integration_test;
-use plane_controller::{run::update_backend_state_loop, run_scheduler};
+use plane_controller::{run::update_backend_state_loop, run_scheduler, state::start_state_loop, drone_state::monitor_drone_state};
 use plane_core::{
     messages::{
-        agent::{
-            BackendState, BackendStateMessage, DroneState, DroneStatusMessage, SpawnRequest,
-            UpdateBackendStateMessage,
-        },
+        agent::{BackendState, BackendStateMessage, DroneState, SpawnRequest},
+        drone_state::{DroneConnectRequest, DroneStatusMessage, UpdateBackendStateMessage},
         scheduler::ScheduleResponse,
     },
     nats::TypedNats,
-    types::{BackendId, ClusterName, DroneId},
+    types::{BackendId, ClusterName, DroneId}, NeverResult,
 };
 use plane_dev::{
     resources::nats::Nats,
-    timeout::{expect_to_stay_alive, timeout},
-    util::base_scheduler_request,
+    timeout::{expect_to_stay_alive, timeout, LivenessGuard},
+    util::{base_scheduler_request, random_loopback_ip},
 };
-use std::time::Duration;
+use std::{net::IpAddr, time::Duration};
 use tokio::time::sleep;
 
 pub const CLUSTER_DOMAIN: &str = "plane.test";
@@ -26,11 +24,27 @@ const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 struct MockAgent {
     nats: TypedNats,
+    _state_monitor: LivenessGuard<NeverResult>,
 }
 
 impl MockAgent {
-    pub fn new(nats: TypedNats) -> Self {
-        MockAgent { nats }
+    pub async fn new(nats: TypedNats, drone_id: &DroneId) -> Self {
+        let ip: IpAddr = random_loopback_ip().into();
+        let cluster = ClusterName::new(CLUSTER_DOMAIN);
+        let request = DroneConnectRequest {
+            drone_id: drone_id.clone(),
+            cluster: cluster.clone(),
+            ip,
+        };
+
+        let state_monitor = expect_to_stay_alive(monitor_drone_state(nats.clone()));
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let result = nats.request(&request).await.unwrap();
+        assert_eq!(true, result, "Drone connect request should succeed.");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        MockAgent { nats, _state_monitor: state_monitor }
     }
 
     pub async fn schedule_drone(
@@ -84,7 +98,8 @@ impl MockAgent {
 async fn no_drone_available() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
+    let state = start_state_loop(nats_conn.clone()).await.unwrap();
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
     sleep(Duration::from_millis(100)).await;
 
     let request = base_scheduler_request();
@@ -105,9 +120,13 @@ async fn no_drone_available() {
 async fn one_drone_available() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
+
+    let state = start_state_loop(nats_conn.clone()).await.unwrap();
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
+
     let drone_id = DroneId::new_random();
-    let mock_agent = MockAgent::new(nats_conn.clone());
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id).await;
+
     sleep(Duration::from_millis(100)).await;
 
     nats_conn
@@ -122,6 +141,7 @@ async fn one_drone_available() {
         .await
         .unwrap();
 
+    sleep(Duration::from_millis(100)).await;
     let result = mock_agent.schedule_drone(&drone_id, false).await.unwrap();
     assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));
 }
@@ -131,7 +151,8 @@ async fn drone_not_ready() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
     let drone_id = DroneId::new_random();
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
+    let state = start_state_loop(nats_conn.clone()).await.unwrap();
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
     sleep(Duration::from_millis(100)).await;
 
     nats_conn
@@ -165,7 +186,8 @@ async fn drone_becomes_not_ready() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
     let drone_id = DroneId::new_random();
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
+    let state = start_state_loop(nats_conn.clone()).await.unwrap();
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
     sleep(Duration::from_millis(100)).await;
 
     nats_conn
@@ -211,9 +233,10 @@ async fn drone_becomes_not_ready() {
 async fn schedule_request_bearer_token() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
+    let state = start_state_loop(nats_conn.clone()).await.unwrap();
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
     let drone_id = DroneId::new_random();
-    let mock_agent = MockAgent::new(nats_conn.clone());
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone()));
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id).await;
     sleep(Duration::from_millis(100)).await;
 
     nats_conn

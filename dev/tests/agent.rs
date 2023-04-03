@@ -1,13 +1,10 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use integration_test::integration_test;
-use plane_controller::run::update_backend_state_loop;
+use plane_controller::{run::update_backend_state_loop, drone_state::monitor_drone_state};
 use plane_core::{
     messages::{
-        agent::{
-            BackendState, BackendStatsMessage, DroneConnectRequest, DroneStatusMessage,
-            SpawnRequest, TerminationRequest, UpdateBackendStateMessage,
-        },
-        dns::{DnsRecordType, SetDnsRecord},
+        agent::{BackendState, BackendStatsMessage, SpawnRequest, TerminationRequest},
+        drone_state::{DroneStatusMessage, UpdateBackendStateMessage},
         scheduler::DrainDrone,
     },
     nats::{TypedNats, TypedSubscription},
@@ -24,16 +21,15 @@ use plane_dev::{
 use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
 use serde_json::json;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use std::time::Duration;
-use tokio::time::{sleep, Instant};
+use tokio::time::Instant;
 
 pub const CLUSTER_DOMAIN: &str = "plane.test";
 
 struct Agent {
     #[allow(unused)]
     agent_guard: LivenessGuard<NeverResult>,
-    pub ip: Ipv4Addr,
     pub db: DroneDatabase,
     #[allow(unused)]
     loop_guard: LivenessGuard<NeverResult>,
@@ -63,7 +59,6 @@ impl Agent {
 
         Ok(Agent {
             agent_guard,
-            ip,
             db,
             loop_guard,
         })
@@ -72,58 +67,14 @@ impl Agent {
 
 struct MockController {
     nats: TypedNats,
-    drone_connect_response_subscription: TypedSubscription<DroneConnectRequest>,
-    dns_subscription: TypedSubscription<SetDnsRecord>,
+    _state_handle: LivenessGuard<NeverResult>,
 }
 
 impl MockController {
     pub async fn new(nats: TypedNats) -> Result<Self> {
-        let drone_connect_response_subscription = nats
-            .subscribe(DroneConnectRequest::subscribe_subject())
-            .await?;
+        let state_handle = expect_to_stay_alive(monitor_drone_state(nats.clone()));
 
-        let dns_subscription = nats.subscribe(SetDnsRecord::subscribe_subject()).await?;
-
-        sleep(Duration::from_secs(2)).await;
-
-        Ok(MockController {
-            nats,
-            drone_connect_response_subscription,
-            dns_subscription,
-        })
-    }
-
-    pub async fn next_dns_record(&mut self) -> Result<SetDnsRecord> {
-        timeout(
-            5_000,
-            "Should receive DNS message.",
-            self.dns_subscription.next(),
-        )
-        .await?
-        .map(|d| d.value)
-        .ok_or_else(|| anyhow!("Expected a DNS record."))
-    }
-
-    /// Complete the initial handshake between the drone and the platform, mocking the
-    /// platform.
-    pub async fn expect_handshake(
-        &mut self,
-        expect_drone_id: &DroneId,
-        expect_ip: Ipv4Addr,
-    ) -> Result<()> {
-        let message = timeout(
-            5_000,
-            "Should receive drone connect message.",
-            self.drone_connect_response_subscription.next(),
-        )
-        .await?
-        .unwrap();
-
-        assert_eq!(ClusterName::new(CLUSTER_DOMAIN), message.value.cluster);
-        assert_eq!(expect_ip, message.value.ip);
-        assert_eq!(expect_drone_id, &message.value.drone_id);
-
-        Ok(())
+        Ok(MockController { nats, _state_handle: state_handle })
     }
 
     /// Expect to receive a status message from a live drone.
@@ -243,16 +194,11 @@ impl BackendStateSubscription {
 #[integration_test]
 async fn drone_sends_status_messages() {
     let nats = Nats::new().await.unwrap();
-    let mut controller_mock = MockController::new(nats.connection().await.unwrap())
+    let controller_mock = MockController::new(nats.connection().await.unwrap())
         .await
         .unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
-        .await
-        .unwrap();
-
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
+    let _agent = Agent::new(&nats, &drone_id, DockerConfig::default())
         .await
         .unwrap();
 
@@ -274,14 +220,9 @@ async fn drone_sends_status_messages() {
 async fn drone_sends_draining_status() {
     let nats = Nats::new().await.unwrap();
     let nats_connection = nats.connection().await.unwrap();
-    let mut controller_mock = MockController::new(nats_connection.clone()).await.unwrap();
+    let controller_mock = MockController::new(nats_connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
-        .await
-        .unwrap();
-
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
+    let _agent = Agent::new(&nats, &drone_id, DockerConfig::default())
         .await
         .unwrap();
 
@@ -313,13 +254,9 @@ async fn drone_sends_draining_status() {
 async fn spawn_with_agent() {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
-    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
     let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
-        .await
-        .unwrap();
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
         .await
         .unwrap();
 
@@ -348,17 +285,6 @@ async fn spawn_with_agent() {
         .expect_backend_status_message(BackendState::Ready, 5_000)
         .await
         .unwrap();
-
-    let dns_record = controller_mock.next_dns_record().await.unwrap();
-    assert_eq!(
-        SetDnsRecord {
-            cluster: ClusterName::new("plane.test"),
-            kind: DnsRecordType::A,
-            name: request.backend_id.to_string(),
-            value: agent.ip.to_string(),
-        },
-        dns_record
-    );
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 1)
@@ -402,15 +328,12 @@ async fn spawn_with_agent() {
 async fn stats_are_acquired() {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
-    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+    let _agent = Agent::new(&nats, &drone_id, DockerConfig::default())
         .await
         .unwrap();
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
-        .await
-        .unwrap();
+
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
         .await
@@ -469,13 +392,9 @@ async fn use_ip_lookup_api() {
 async fn handle_error_during_start() {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
-    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
-        .await
-        .unwrap();
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
+    let _agent = Agent::new(&nats, &drone_id, DockerConfig::default())
         .await
         .unwrap();
 
@@ -519,13 +438,9 @@ async fn handle_error_during_start() {
 async fn handle_failure_after_ready() {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
-    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
     let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
-        .await
-        .unwrap();
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
         .await
         .unwrap();
 
@@ -568,13 +483,9 @@ async fn handle_failure_after_ready() {
 async fn handle_successful_termination() {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
-    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
     let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
-        .await
-        .unwrap();
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
         .await
         .unwrap();
 
@@ -617,15 +528,11 @@ async fn handle_successful_termination() {
 async fn handle_agent_restart() {
     let nats_con = Nats::new().await.unwrap();
     let nats = nats_con.connection().await.unwrap();
-    let mut controller_mock = MockController::new(nats.clone()).await.unwrap();
+    let controller_mock = MockController::new(nats.clone()).await.unwrap();
 
     let mut state_subscription = {
         let drone_id = DroneId::new_random();
-        let agent = Agent::new(&nats_con, &drone_id, DockerConfig::default())
-            .await
-            .unwrap();
-        controller_mock
-            .expect_handshake(&drone_id, agent.ip)
+        let _agent = Agent::new(&nats_con, &drone_id, DockerConfig::default())
             .await
             .unwrap();
 
@@ -651,11 +558,7 @@ async fn handle_agent_restart() {
     // Original agent goes away when it goes out of scope.
     {
         let drone_id = DroneId::new_random();
-        let agent = Agent::new(&nats_con, &drone_id, DockerConfig::default())
-            .await
-            .unwrap();
-        controller_mock
-            .expect_handshake(&drone_id, agent.ip)
+        let _agent = Agent::new(&nats_con, &drone_id, DockerConfig::default())
             .await
             .unwrap();
 
@@ -670,9 +573,9 @@ async fn handle_agent_restart() {
 async fn handle_termination_request() {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
-    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+    let _agent = Agent::new(&nats, &drone_id, DockerConfig::default())
         .await
         .unwrap();
 
@@ -681,10 +584,6 @@ async fn handle_termination_request() {
     request.drone_id = drone_id.clone();
     request.max_idle_secs = Duration::from_secs(10_000);
 
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
-        .await
-        .unwrap();
     controller_mock
         .expect_status_message(&request.drone_id, &ClusterName::new("plane.test"), true, 0)
         .await
@@ -720,13 +619,9 @@ async fn handle_termination_request() {
 async fn attempt_to_spawn_with_disallowed_volume_mount() {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
-    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
-        .await
-        .unwrap();
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
+    let _agent = Agent::new(&nats, &drone_id, DockerConfig::default())
         .await
         .unwrap();
 
@@ -762,17 +657,13 @@ async fn attempt_to_spawn_with_disallowed_volume_mount() {
 async fn attempt_to_spawn_with_allowed_volume_mount() {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
-    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
     let docker_config = DockerConfig {
         allow_volume_mounts: true,
         ..DockerConfig::default()
     };
-    let agent = Agent::new(&nats, &drone_id, docker_config).await.unwrap();
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
-        .await
-        .unwrap();
+    let _agent = Agent::new(&nats, &drone_id, docker_config).await.unwrap();
 
     controller_mock
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)

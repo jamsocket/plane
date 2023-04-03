@@ -10,7 +10,10 @@ use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use plane_core::{
-    messages::agent::{BackendState, SpawnRequest, TerminationRequest, UpdateBackendStateMessage},
+    messages::{
+        agent::{BackendState, SpawnRequest, TerminationRequest},
+        drone_state::UpdateBackendStateMessage,
+    },
     nats::TypedNats,
     types::{BackendId, ClusterName, DroneId},
 };
@@ -198,13 +201,7 @@ impl<E: Engine> Executor<E> {
             if state.running() {
                 self.backend_to_monitor.insert(
                     backend_id.clone(),
-                    BackendMonitor::new(
-                        &backend_id,
-                        &self.cluster,
-                        self.ip,
-                        self.engine.as_ref(),
-                        &self.nc,
-                    ),
+                    BackendMonitor::new(&backend_id, &self.cluster, self.engine.as_ref(), &self.nc),
                 );
             }
             tokio::spawn(async move { executor.run_backend(&spec, state).await });
@@ -262,7 +259,6 @@ impl<E: Engine> Executor<E> {
                             BackendMonitor::new(
                                 &spawn_request.backend_id,
                                 &self.cluster,
-                                self.ip,
                                 self.engine.as_ref(),
                                 &self.nc,
                             ),

@@ -137,16 +137,19 @@ where
     }
 
     pub async fn respond(&self, response: &T::Response) -> Result<()> {
+        let reply_inbox = self
+            .message
+            .reply
+            .as_ref()
+            .context("Attempted to respond to a message with no reply subject.")?
+            .to_string();
+
+        tracing::info!("Responding to message on {}", reply_inbox);
+
         self.nc
-            .publish(
-                self.message
-                    .reply
-                    .as_ref()
-                    .context("Attempted to respond to a message with no reply subject.")?
-                    .to_string(),
-                Bytes::from(serde_json::to_vec(response)?),
-            )
+            .publish(reply_inbox, Bytes::from(serde_json::to_vec(response)?))
             .await?;
+
         Ok(())
     }
 }
@@ -446,6 +449,7 @@ impl TypedNats {
     where
         T: TypedMessage,
     {
+        tracing::info!(stream=%subject.subject, "Subscribing to NATS stream.");
         let subscription = self.nc.subscribe(subject.subject).await.to_anyhow()?;
         Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }

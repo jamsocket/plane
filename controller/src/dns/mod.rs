@@ -3,24 +3,17 @@ pub mod rname_format;
 
 use self::error::OrDnsError;
 use crate::plan::DnsPlan;
-use crate::ttl_store::ttl_map::TtlMap;
-use crate::ttl_store::ttl_multistore::TtlMultistore;
+use crate::state::StateHandle;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use error::Result;
-use plane_core::messages::dns::DnsRecordType;
-use plane_core::messages::dns::SetDnsRecord;
-use plane_core::types::ClusterName;
+use plane_core::types::{BackendId, ClusterName};
 use plane_core::Never;
-use std::net::Ipv4Addr;
-use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
-use tokio::task::JoinHandle;
+use std::net::IpAddr;
 use tokio::{
     self,
     net::{TcpListener, UdpSocket},
 };
-use trust_dns_server::client::rr::rdata::{SOA, TXT};
 use trust_dns_server::client::rr::Name;
 use trust_dns_server::{
     authority::MessageResponseBuilder,
@@ -32,6 +25,7 @@ use trust_dns_server::{
     server::{Request, RequestHandler, ResponseHandler, ResponseInfo},
     ServerFuture,
 };
+use trust_dns_server::{client::rr::rdata::SOA, proto::rr::rdata::TXT};
 
 const TCP_TIMEOUT_SECONDS: u64 = 10;
 
@@ -46,125 +40,48 @@ struct RecordKey {
 }
 
 struct ClusterDnsServer {
-    a_record_map: Arc<Mutex<TtlMap<RecordKey, RData>>>,
-    txt_record_map: Arc<Mutex<TtlMultistore<RecordKey, RData>>>,
+    state: StateHandle,
     soa_email: Option<Name>,
-    _handle: JoinHandle<anyhow::Result<()>>,
 }
 
 impl ClusterDnsServer {
     pub async fn new(plan: &DnsPlan) -> Self {
-        let nc = plan.nc.clone();
-        let a_record_map: Arc<Mutex<TtlMap<RecordKey, RData>>> =
-            Arc::new(Mutex::new(TtlMap::new(SetDnsRecord::ttl())));
-        let txt_record_map: Arc<Mutex<TtlMultistore<RecordKey, RData>>> =
-            Arc::new(Mutex::new(TtlMultistore::new(SetDnsRecord::ttl())));
-
-        let handle = {
-            let a_record_map = a_record_map.clone();
-            let txt_record_map = txt_record_map.clone();
-
-            tokio::spawn(async move {
-                tracing::info!("In SetDnsRecord subscription loop.");
-
-                loop {
-                    let mut stream = nc.subscribe(SetDnsRecord::subscribe_subject()).await?;
-
-                    while let Some(v) = stream.next().await {
-                        let v = v.value;
-                        tracing::info!(?v, "Got SetDnsRecord request.");
-
-                        match v.kind {
-                            DnsRecordType::A => {
-                                let ip: Ipv4Addr = match v.value.parse() {
-                                    Ok(v) => v,
-                                    Err(error) => {
-                                        tracing::warn!(
-                                            ?error,
-                                            ip = v.value,
-                                            "Error parsing IP in SetDnsRecord request."
-                                        );
-                                        continue;
-                                    }
-                                };
-                                let value = RData::A(ip);
-                                a_record_map
-                                    .lock()
-                                    .expect("a_record_map was poisoned")
-                                    .insert(
-                                        RecordKey {
-                                            cluster: v.cluster.clone(),
-                                            name: v.name.clone(),
-                                        },
-                                        value,
-                                        SystemTime::now(),
-                                    )
-                            }
-                            DnsRecordType::TXT => {
-                                let value = RData::TXT(TXT::new(vec![v.value]));
-                                txt_record_map
-                                    .lock()
-                                    .expect("txt_record_map was poisoned")
-                                    .insert(
-                                        RecordKey {
-                                            cluster: v.cluster.clone(),
-                                            name: v.name.clone(),
-                                        },
-                                        value,
-                                        SystemTime::now(),
-                                    );
-                            }
-                        }
-                    }
-
-                    tracing::warn!("SetDnsRecord connection lost; reconnecting.");
-                }
-            })
-        };
+        let state = plan.state.clone();
 
         ClusterDnsServer {
-            a_record_map,
-            txt_record_map,
+            state,
             soa_email: plan.soa_email.clone(),
-            _handle: handle,
         }
     }
 
     async fn do_lookup(&self, request: &Request) -> Result<Vec<Record>> {
         let name = request.query().name().to_string();
-        let (hostname, cluster_name) = name
+        let (backend_id, cluster_name) = name
             .split_once('.')
             .or_dns_error(ResponseCode::NXDomain, || {
                 format!("Invalid name for this server {}", name)
             })?;
+        let backend_id = BackendId::new(backend_id.into());
         let cluster_name = if let Some(cluster_name) = cluster_name.strip_suffix('.') {
             ClusterName::new(cluster_name)
         } else {
             ClusterName::new(cluster_name)
         };
 
-        tracing::info!(?cluster_name, %hostname, "Received DNS record request.");
+        tracing::info!(?cluster_name, %backend_id, "Received DNS record request.");
 
         match request.query().query_type() {
             RecordType::TXT => {
                 let mut responses = Vec::new();
 
-                if let Some(v) = self
-                    .txt_record_map
-                    .lock()
-                    .expect("txt_record_map was poisoned")
-                    .iter(
-                        &RecordKey {
-                            cluster: cluster_name,
-                            name: hostname.into(),
-                        },
-                        SystemTime::now(),
-                    )
-                {
-                    let name: Name = request.query().name().clone().into();
-                    for rdata in v {
-                        let record =
-                            Record::from_rdata(name.clone(), DNS_RECORD_TTL, rdata.clone());
+                if let Some(cluster_state) = self.state.state().cluster(&cluster_name) {
+                    for value in &cluster_state.txt_records {
+                        let rdata = RData::TXT(TXT::new(vec![value.clone()]));
+                        let record = Record::from_rdata(
+                            request.query().name().into(),
+                            DNS_RECORD_TTL,
+                            rdata,
+                        );
                         responses.push(record);
                     }
                 }
@@ -174,22 +91,17 @@ impl ClusterDnsServer {
             RecordType::A => {
                 let mut responses = Vec::new();
 
-                if let Some(v) = self
-                    .a_record_map
-                    .lock()
-                    .expect("a_record_map was poisoned")
-                    .get(
-                        &RecordKey {
-                            cluster: cluster_name,
-                            name: hostname.into(),
-                        },
-                        SystemTime::now(),
-                    )
-                {
-                    let name = request.query().name().clone();
-                    let rdata = v.clone();
-                    let record = Record::from_rdata(name.into(), DNS_RECORD_TTL, rdata);
-                    responses.push(record);
+                if let Some(cluster_state) = self.state.state().cluster(&cluster_name) {
+                    if let Some(ip) = cluster_state.a_record_lookup(&backend_id) {
+                        let name = request.query().name().clone();
+                        let rdata = match ip {
+                            IpAddr::V4(ip) => RData::A(ip),
+                            IpAddr::V6(ip) => RData::AAAA(ip),
+                        };
+
+                        let record = Record::from_rdata(name.into(), DNS_RECORD_TTL, rdata);
+                        responses.push(record);
+                    }
                 }
 
                 Ok(responses)

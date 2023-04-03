@@ -1,12 +1,7 @@
 use anyhow::Result;
 use integration_test::integration_test;
 use openssl::x509::X509;
-use plane_core::{
-    messages::cert::SetAcmeDnsRecord,
-    messages::dns::{DnsRecordType, SetDnsRecord},
-    nats::TypedNats,
-    types::ClusterName,
-};
+use plane_core::{messages::drone_state::DroneStateUpdate, nats::TypedNats, types::ClusterName};
 use plane_dev::{
     resources::{nats::Nats, pebble::Pebble},
     scratch_dir,
@@ -23,48 +18,31 @@ fn collect_alt_names(cert: &X509) -> Vec<String> {
 }
 
 struct DummyDnsHandler {
-    new_handle: JoinHandle<Result<()>>,
-    old_handle: JoinHandle<Result<()>>,
+    handle: JoinHandle<Result<()>>,
 }
 
 impl DummyDnsHandler {
     pub async fn new(conn: &TypedNats, expect_domain: &str) -> Result<DummyDnsHandler> {
-        let old_handle = {
+        let handle = {
             // Old DNS message
             let expect_domain = ClusterName::new(expect_domain);
             let mut dns_sub = conn
-                .subscribe(SetAcmeDnsRecord::subscribe_subject())
+                .subscribe(DroneStateUpdate::subscribe_subject_acme())
                 .await?;
             spawn_timeout(10_000, "Should get ACME DNS request.", async move {
                 let message = dns_sub.next().await.unwrap();
-                assert_eq!(expect_domain, message.value.cluster);
+                let DroneStateUpdate::AcmeMessage(acme_message) = &message.value else {panic!()};
+                assert_eq!(expect_domain, acme_message.cluster);
                 message.respond(&true).await?;
                 Ok(())
             })
         };
 
-        let new_handle = {
-            // New DNS message
-            let expect_domain = ClusterName::new(expect_domain);
-            let mut dns_sub = conn.subscribe(SetDnsRecord::subscribe_subject()).await?;
-            spawn_timeout(10_000, "Should get ACME DNS request.", async move {
-                let message = dns_sub.next().await.unwrap();
-                assert_eq!(expect_domain, message.value.cluster);
-                assert_eq!("_acme-challenge", &message.value.name);
-                assert_eq!(DnsRecordType::TXT, message.value.kind);
-                Ok(())
-            })
-        };
-
-        Ok(DummyDnsHandler {
-            new_handle,
-            old_handle,
-        })
+        Ok(DummyDnsHandler { handle })
     }
 
     pub async fn finish(self) -> Result<()> {
-        self.new_handle.await??;
-        self.old_handle.await??;
+        self.handle.await??;
         Ok(())
     }
 }

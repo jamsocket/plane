@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
-use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
+use std::{collections::HashMap, str::FromStr, time::Duration, net::IpAddr};
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, Debug)]
 pub enum DockerCredentials {
@@ -534,54 +534,6 @@ impl BackendState {
     #[must_use]
     pub fn running(self) -> bool {
         matches!(self, BackendState::Starting | BackendState::Ready)
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct UpdateBackendStateMessage {
-    /// The cluster the backend belongs to.
-    pub cluster: ClusterName,
-
-    /// The new state.
-    pub state: BackendState,
-
-    /// The backend id.
-    pub backend: BackendId,
-
-    /// The time the state change was observed.
-    pub time: DateTime<Utc>,
-
-    pub drone: DroneId,
-}
-
-impl TypedMessage for UpdateBackendStateMessage {
-    type Response = ();
-
-    fn subject(&self) -> String {
-        format!(
-            "cluster.{}.backend.{}.status",
-            self.cluster.subject_name(),
-            self.backend.id()
-        )
-    }
-}
-
-impl UpdateBackendStateMessage {
-    #[must_use]
-    pub fn subscribe_subject() -> SubscribeSubject<UpdateBackendStateMessage> {
-        SubscribeSubject::new("cluster.*.backend.*.status".into())
-    }
-
-    #[must_use]
-    pub fn backend_subject(
-        cluster: &ClusterName,
-        backend: &BackendId,
-    ) -> SubscribeSubject<UpdateBackendStateMessage> {
-        SubscribeSubject::new(format!(
-            "cluster.{}.backend.{}.status",
-            cluster.subject_name(),
-            backend.id()
-        ))
     }
 }
 
