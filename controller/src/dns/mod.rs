@@ -14,6 +14,7 @@ use tokio::{
     self,
     net::{TcpListener, UdpSocket},
 };
+use trust_dns_server::client::rr::rdata::{SOA, TXT};
 use trust_dns_server::client::rr::Name;
 use trust_dns_server::{
     authority::MessageResponseBuilder,
@@ -25,8 +26,6 @@ use trust_dns_server::{
     server::{Request, RequestHandler, ResponseHandler, ResponseInfo},
     ServerFuture,
 };
-use trust_dns_server::{client::rr::rdata::SOA, proto::rr::rdata::TXT};
-
 const TCP_TIMEOUT_SECONDS: u64 = 10;
 
 /// Time-to-live value set on records returned from the DNS server.

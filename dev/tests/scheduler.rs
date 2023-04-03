@@ -1,7 +1,10 @@
 use anyhow::Result;
 use chrono::Utc;
 use integration_test::integration_test;
-use plane_controller::{run::update_backend_state_loop, run_scheduler, state::start_state_loop, drone_state::monitor_drone_state};
+use plane_controller::{
+    drone_state::monitor_drone_state, run::update_backend_state_loop, run_scheduler,
+    state::start_state_loop,
+};
 use plane_core::{
     messages::{
         agent::{BackendState, BackendStateMessage, DroneState, SpawnRequest},
@@ -9,7 +12,8 @@ use plane_core::{
         scheduler::ScheduleResponse,
     },
     nats::TypedNats,
-    types::{BackendId, ClusterName, DroneId}, NeverResult,
+    types::{BackendId, ClusterName, DroneId},
+    NeverResult,
 };
 use plane_dev::{
     resources::nats::Nats,
@@ -44,7 +48,10 @@ impl MockAgent {
         assert_eq!(true, result, "Drone connect request should succeed.");
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        MockAgent { nats, _state_monitor: state_monitor }
+        MockAgent {
+            nats,
+            _state_monitor: state_monitor,
+        }
     }
 
     pub async fn schedule_drone(

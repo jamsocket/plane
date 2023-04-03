@@ -1,6 +1,7 @@
 use crate::{
     config::ControllerConfig,
-    state::{start_state_loop, StateHandle}, dns::rname_format::format_rname,
+    dns::rname_format::format_rname,
+    state::{start_state_loop, StateHandle},
 };
 use anyhow::{Context, Result};
 use plane_core::nats::TypedNats;

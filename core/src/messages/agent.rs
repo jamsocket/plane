@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
-use std::{collections::HashMap, str::FromStr, time::Duration, net::IpAddr};
+use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, Debug)]
 pub enum DockerCredentials {

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use integration_test::integration_test;
-use plane_controller::{run::update_backend_state_loop, drone_state::monitor_drone_state};
+use plane_controller::{drone_state::monitor_drone_state, run::update_backend_state_loop};
 use plane_core::{
     messages::{
         agent::{BackendState, BackendStatsMessage, SpawnRequest, TerminationRequest},
@@ -74,7 +74,10 @@ impl MockController {
     pub async fn new(nats: TypedNats) -> Result<Self> {
         let state_handle = expect_to_stay_alive(monitor_drone_state(nats.clone()));
 
-        Ok(MockController { nats, _state_handle: state_handle })
+        Ok(MockController {
+            nats,
+            _state_handle: state_handle,
+        })
     }
 
     /// Expect to receive a status message from a live drone.
