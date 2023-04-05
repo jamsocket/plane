@@ -30,6 +30,7 @@ fn convert_to_state_message(
                 drone: msg.drone_id.clone(),
                 message: DroneMessageType::Metadata(DroneMeta {
                     ip: msg.ip,
+                    git_hash: msg.git_hash.clone(),
                     version: msg
                         .version
                         .clone()
@@ -173,6 +174,7 @@ mod test {
             drone_id: DroneId::new("drone1234".to_string()),
             ip: IpAddr::V4(Ipv4Addr::new(12, 12, 12, 12)),
             version: Some("0.1.0".to_string()),
+            git_hash: None,
         });
 
         let state_message = convert_to_state_message(Utc::now(), &msg);
@@ -184,6 +186,7 @@ mod test {
                 message: plane_core::messages::state::DroneMessageType::Metadata(DroneMeta {
                     ip: IpAddr::V4(Ipv4Addr::new(12, 12, 12, 12)),
                     version: "0.1.0".to_string(),
+                    git_hash: None,
                 }),
             }),
         }];

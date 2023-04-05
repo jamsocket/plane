@@ -109,6 +109,9 @@ pub struct DroneConnectRequest {
     /// The version of Plane the drone is running.
     pub version: Option<String>,
 
+    /// The git hash of the drone's version.
+    pub git_hash: Option<String>,
+
     /// The cluster the drone is requesting to join.
     pub cluster: ClusterName,
 
@@ -211,6 +214,7 @@ mod tests {
             cluster: super::ClusterName::new("test-cluster"),
             ip: "12.12.12.12".parse().unwrap(),
             version: Some("0.1.0".to_string()),
+            git_hash: Some("abcde".to_string()),
         };
 
         let json = serde_json::to_value(&msg).unwrap();

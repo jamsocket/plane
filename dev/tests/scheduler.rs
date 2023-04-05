@@ -43,6 +43,7 @@ impl MockAgent {
             cluster: cluster.clone(),
             ip,
             version: Some("0.1.0".to_string()),
+            git_hash: None,
         };
 
         let state = start_state_loop(nats.clone()).await.unwrap();

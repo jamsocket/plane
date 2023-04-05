@@ -22,6 +22,7 @@ use std::{net::SocketAddr, time::Duration};
 use tokio::sync::watch::{self, Receiver, Sender};
 
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
+const GIT_HASH: Option<&str> = option_env!("GIT_HASH");
 
 mod backend;
 mod engine;
@@ -178,6 +179,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
         cluster: cluster.clone(),
         ip,
         version: Some(PLANE_VERSION.to_string()),
+        git_hash: GIT_HASH.map(|s| s.to_string()),
     };
 
     nats.request(&request).await?;

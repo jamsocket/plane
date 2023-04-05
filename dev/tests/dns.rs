@@ -158,6 +158,7 @@ async fn dns_a_record() {
             message: DroneMessageType::Metadata(DroneMeta {
                 ip: Ipv4Addr::new(12, 12, 12, 12).into(),
                 version: "0.1.0".into(),
+                git_hash: None,
             }),
         }),
     });

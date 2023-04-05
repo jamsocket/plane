@@ -33,6 +33,7 @@ pub struct DroneMessage {
 pub struct DroneMeta {
     pub ip: IpAddr,
     pub version: String,
+    pub git_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
