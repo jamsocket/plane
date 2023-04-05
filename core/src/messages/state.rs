@@ -93,7 +93,7 @@ impl TypedMessage for WorldStateMessage {
             ClusterStateMessage::BackendMessage(message) => match message.message {
                 BackendMessageType::Assignment { .. } => {
                     return format!(
-                        "state.cluster.{}.backend.{}.",
+                        "state.cluster.{}.backend.{}",
                         self.cluster.subject_name(),
                         message.backend
                     )

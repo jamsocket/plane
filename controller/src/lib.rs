@@ -2,7 +2,10 @@ use crate::scheduler::SchedulerError;
 use anyhow::anyhow;
 use chrono::Utc;
 use plane_core::{
-    messages::scheduler::{ScheduleRequest, ScheduleResponse},
+    messages::{
+        scheduler::{ScheduleRequest, ScheduleResponse},
+        state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
+    },
     nats::TypedNats,
     timing::Timer,
     NeverResult,
@@ -37,10 +40,22 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                             %drone_id,
                             "Drone accepted backend."
                         );
+
+                        nats.publish(&WorldStateMessage {
+                            cluster: schedule_request.value.cluster.clone(),
+                            message: ClusterStateMessage::BackendMessage(BackendMessage {
+                                backend: spawn_request.backend_id.clone(),
+                                message: BackendMessageType::Assignment {
+                                    drone: drone_id.clone(),
+                                },
+                            }),
+                        })
+                        .await?;
+
                         ScheduleResponse::Scheduled {
                             drone: drone_id,
                             backend_id: spawn_request.backend_id,
-                            bearer_token: spawn_request.bearer_token,
+                            bearer_token: spawn_request.bearer_token.clone(),
                         }
                     }
                     Ok(false) => {

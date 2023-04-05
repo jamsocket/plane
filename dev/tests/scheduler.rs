@@ -106,14 +106,15 @@ impl MockAgent {
         // If the schedule request was successful, the state data structure
         // should be updated.
         if let ScheduleResponse::Scheduled { backend_id, .. } = &result {
-            // Sleep here first.
+            sleep(Duration::from_millis(100)).await;
+
             let state = self.state.state();
             let backend = state
                 .cluster(&cluster)
-                .unwrap()
+                .expect("Cluster should exist.")
                 .backends
                 .get(&backend_id)
-                .unwrap();
+                .expect("Backend should exist.");
             assert_eq!(
                 Some(drone_id),
                 backend.drone.as_ref(),
@@ -282,6 +283,7 @@ async fn schedule_request_bearer_token() {
         .await
         .unwrap();
 
+    sleep(Duration::from_millis(100)).await;
     let result = mock_agent.schedule_drone(&drone_id, true).await.unwrap();
 
     if let ScheduleResponse::Scheduled {
