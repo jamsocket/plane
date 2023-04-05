@@ -29,11 +29,15 @@ pub struct DroneMessage {
     pub message: DroneMessageType,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct DroneMeta {
+    pub ip: IpAddr,
+    pub version: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DroneMessageType {
-    Metadata {
-        ip: IpAddr,
-    },
+    Metadata(DroneMeta),
     State {
         state: DroneState,
     },

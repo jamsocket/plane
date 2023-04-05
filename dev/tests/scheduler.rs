@@ -42,6 +42,7 @@ impl MockAgent {
             drone_id: drone_id.clone(),
             cluster: cluster.clone(),
             ip,
+            version: Some("0.1.0".to_string()),
         };
 
         let state = start_state_loop(nats.clone()).await.unwrap();

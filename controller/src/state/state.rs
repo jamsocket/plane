@@ -3,7 +3,9 @@ use chrono::{DateTime, Utc};
 use plane_core::{
     messages::{
         agent,
-        state::{BackendMessageType, ClusterStateMessage, DroneMessageType, WorldStateMessage},
+        state::{
+            BackendMessageType, ClusterStateMessage, DroneMessageType, DroneMeta, WorldStateMessage,
+        },
     },
     types::{BackendId, ClusterName, DroneId},
 };
@@ -39,7 +41,7 @@ impl StateHandle {
             .iter()
             .filter(|(_, drone)| {
                 drone.state == Some(agent::DroneState::Ready)
-                    && drone.ip.is_some()
+                    && drone.meta.is_some()
                     && drone.last_seen > Some(min_keepalive)
             })
             .map(|(drone_id, _)| drone_id.clone())
@@ -105,13 +107,13 @@ impl ClusterState {
         let drone = backend.drone.as_ref()?;
         let drone = self.drones.get(&drone)?;
 
-        drone.ip
+        drone.meta.as_ref().map(|d| d.ip)
     }
 }
 
 #[derive(Default, Debug)]
 pub struct DroneState {
-    pub ip: Option<IpAddr>,
+    pub meta: Option<DroneMeta>,
     pub state: Option<agent::DroneState>,
     pub last_seen: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -119,7 +121,7 @@ pub struct DroneState {
 impl DroneState {
     fn apply(&mut self, message: DroneMessageType) {
         match message {
-            DroneMessageType::Metadata { ip } => self.ip = Some(ip),
+            DroneMessageType::Metadata(meta) => self.meta = Some(meta),
             DroneMessageType::State { state } => self.state = Some(state),
             DroneMessageType::KeepAlive { timestamp } => self.last_seen = Some(timestamp),
         }

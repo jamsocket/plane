@@ -106,6 +106,9 @@ pub struct DroneConnectRequest {
     /// The ID of the drone.
     pub drone_id: DroneId,
 
+    /// The version of Plane the drone is running.
+    pub version: Option<String>,
+
     /// The cluster the drone is requesting to join.
     pub cluster: ClusterName,
 
@@ -207,6 +210,7 @@ mod tests {
             drone_id: super::DroneId::new("test-drone".into()),
             cluster: super::ClusterName::new("test-cluster"),
             ip: "12.12.12.12".parse().unwrap(),
+            version: Some("0.1.0".to_string()),
         };
 
         let json = serde_json::to_value(&msg).unwrap();

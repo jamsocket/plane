@@ -8,7 +8,7 @@ use plane_controller::{
 use plane_core::{
     messages::state::{
         AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
-        DroneMessageType, WorldStateMessage,
+        DroneMessageType, DroneMeta, WorldStateMessage,
     },
     types::{BackendId, ClusterName, DroneId},
     Never,
@@ -155,9 +155,10 @@ async fn dns_a_record() {
         cluster: ClusterName::new("plane.test"),
         message: ClusterStateMessage::DroneMessage(DroneMessage {
             drone: drone_id.clone(),
-            message: DroneMessageType::Metadata {
+            message: DroneMessageType::Metadata(DroneMeta {
                 ip: Ipv4Addr::new(12, 12, 12, 12).into(),
-            },
+                version: "0.1.0".into(),
+            }),
         }),
     });
     state.apply(WorldStateMessage {

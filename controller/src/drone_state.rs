@@ -4,7 +4,8 @@ use plane_core::{
     messages::{
         drone_state::DroneStateUpdate,
         state::{
-            AcmeDnsRecord, ClusterStateMessage, DroneMessage, DroneMessageType, WorldStateMessage,
+            AcmeDnsRecord, ClusterStateMessage, DroneMessage, DroneMessageType, DroneMeta,
+            WorldStateMessage,
         },
     },
     nats::TypedNats,
@@ -27,7 +28,13 @@ fn convert_to_state_message(
             cluster: msg.cluster.clone(),
             message: ClusterStateMessage::DroneMessage(DroneMessage {
                 drone: msg.drone_id.clone(),
-                message: DroneMessageType::Metadata { ip: msg.ip },
+                message: DroneMessageType::Metadata(DroneMeta {
+                    ip: msg.ip,
+                    version: msg
+                        .version
+                        .clone()
+                        .unwrap_or("missing_drone_id".to_string()), // Existing drones do not report a version in their connect message.
+                }),
             }),
         }],
         DroneStateUpdate::DroneStatusMessage(msg) => vec![
@@ -165,6 +172,7 @@ mod test {
             cluster: ClusterName::new("plane.test"),
             drone_id: DroneId::new("drone1234".to_string()),
             ip: IpAddr::V4(Ipv4Addr::new(12, 12, 12, 12)),
+            version: Some("0.1.0".to_string()),
         });
 
         let state_message = convert_to_state_message(Utc::now(), &msg);
@@ -173,9 +181,10 @@ mod test {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::DroneMessage(DroneMessage {
                 drone: DroneId::new("drone1234".to_string()),
-                message: plane_core::messages::state::DroneMessageType::Metadata {
+                message: plane_core::messages::state::DroneMessageType::Metadata(DroneMeta {
                     ip: IpAddr::V4(Ipv4Addr::new(12, 12, 12, 12)),
-                },
+                    version: "0.1.0".to_string(),
+                }),
             }),
         }];
 

@@ -177,6 +177,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
         drone_id: agent_opts.drone_id.clone(),
         cluster: cluster.clone(),
         ip,
+        version: Some(PLANE_VERSION.to_string()),
     };
 
     nats.request(&request).await?;
