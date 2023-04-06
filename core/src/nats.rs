@@ -14,9 +14,13 @@ use dashmap::DashSet;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::str::FromStr;
 use std::sync::Arc;
 use time::OffsetDateTime;
 use tokio_stream::StreamExt;
+
+/// This code is returned by NATS when an expected last sequence number is violated.
+const NATS_WRONG_LAST_SEQUENCE_CODE: &str = "10071";
 
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
@@ -331,7 +335,7 @@ impl TypedNats {
         T: TypedMessage,
     {
         let inbox = self.nc.new_inbox();
-        let subscription = self.nc.subscribe(inbox.clone()).await.to_anyhow()?;
+        let subscription = self.nc.subscribe(inbox.clone()).await?;
         self.nc
             .publish_with_reply(
                 message.subject(),
@@ -441,6 +445,44 @@ impl TypedNats {
         Ok(sequence)
     }
 
+    /// Publishes a message to jetstream, but only if the subject is empty.
+    pub async fn publish_jetstream_if_subject_empty<T>(&self, value: &T) -> Result<Option<u64>>
+    where
+        T: TypedMessage<Response = NoReply> + JetStreamable,
+    {
+        self.ensure_jetstream_exists::<T>().await?;
+        let mut headers = async_nats::HeaderMap::new();
+        headers.insert(
+            "Nats-Expected-Last-Subject-Sequence",
+            async_nats::HeaderValue::from_str("0").unwrap(),
+        );
+
+        let result = self
+            .jetstream
+            .publish_with_headers(
+                value.subject().clone(),
+                headers,
+                Bytes::from(serde_json::to_vec(value)?),
+            )
+            .await
+            .to_anyhow()?
+            .await
+            .to_anyhow();
+
+        match result {
+            Ok(result) => {
+                Ok(Some(result.sequence))
+            }
+            Err(e) => {
+                if e.to_string().contains(NATS_WRONG_LAST_SEQUENCE_CODE) {
+                    return Ok(None);
+                } else {
+                    return Err(e.into());
+                }
+            }
+        }
+    }
+
     pub async fn request<T>(&self, value: &T) -> Result<T::Response>
     where
         T: TypedMessage,
@@ -448,7 +490,7 @@ impl TypedNats {
         let bytes = Bytes::from(serde_json::to_vec(value)?);
 
         let fut = self.nc.request(value.subject(), bytes.clone());
-        let result = fut.await.to_anyhow()?;
+        let result = fut.await?;
         let value: T::Response = serde_json::from_slice(&result.payload)?;
         Ok(value)
     }
@@ -458,7 +500,7 @@ impl TypedNats {
         T: TypedMessage,
     {
         tracing::info!(stream=%subject.subject, "Subscribing to NATS stream.");
-        let subscription = self.nc.subscribe(subject.subject).await.to_anyhow()?;
+        let subscription = self.nc.subscribe(subject.subject).await?;
         Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }
 }

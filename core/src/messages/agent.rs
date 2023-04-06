@@ -10,7 +10,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
-use std::{collections::HashMap, net::IpAddr, str::FromStr, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display, Formatter},
+    net::IpAddr,
+    str::FromStr,
+    time::Duration,
+};
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, Debug)]
 pub enum DockerCredentials {
@@ -200,7 +206,7 @@ impl BackendStatsMessage {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 pub enum DroneState {
     /// The drone is starting and is not ready to spawn backends.
     Starting,
@@ -219,6 +225,19 @@ pub enum DroneState {
 
     /// The drone disappeared without a graceful shut-down and is assumed to be shut down.
     Lost,
+}
+
+impl Display for DroneState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DroneState::Starting => write!(f, "Starting"),
+            DroneState::Ready => write!(f, "Ready"),
+            DroneState::Draining => write!(f, "Draining"),
+            DroneState::Drained => write!(f, "Drained"),
+            DroneState::Stopped => write!(f, "Stopped"),
+            DroneState::Lost => write!(f, "Lost"),
+        }
+    }
 }
 
 fn drone_state_ready() -> DroneState {
@@ -434,7 +453,7 @@ impl TerminationRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BackendState {
     /// The backend has been created, and the image is being fetched.
     Loading,
@@ -471,6 +490,24 @@ pub enum BackendState {
     Terminated,
 }
 
+impl Display for BackendState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            BackendState::Loading => write!(f, "Loading"),
+            BackendState::ErrorLoading => write!(f, "ErrorLoading"),
+            BackendState::Starting => write!(f, "Starting"),
+            BackendState::ErrorStarting => write!(f, "ErrorStarting"),
+            BackendState::Ready => write!(f, "Ready"),
+            BackendState::TimedOutBeforeReady => write!(f, "TimedOutBeforeReady"),
+            BackendState::Failed => write!(f, "Failed"),
+            BackendState::Exited => write!(f, "Exited"),
+            BackendState::Swept => write!(f, "Swept"),
+            BackendState::Lost => write!(f, "Lost"),
+            BackendState::Terminated => write!(f, "Terminated"),
+        }
+    }
+}
+
 impl FromStr for BackendState {
     type Err = Error;
 
@@ -491,24 +528,6 @@ impl FromStr for BackendState {
                 "The string {:?} does not describe a valid state.",
                 s
             )),
-        }
-    }
-}
-
-impl ToString for BackendState {
-    fn to_string(&self) -> String {
-        match self {
-            BackendState::Loading => "Loading".to_string(),
-            BackendState::ErrorLoading => "ErrorLoading".to_string(),
-            BackendState::Starting => "Starting".to_string(),
-            BackendState::ErrorStarting => "ErrorStarting".to_string(),
-            BackendState::Ready => "Ready".to_string(),
-            BackendState::TimedOutBeforeReady => "TimedOutBeforeReady".to_string(),
-            BackendState::Failed => "Failed".to_string(),
-            BackendState::Exited => "Exited".to_string(),
-            BackendState::Swept => "Swept".to_string(),
-            BackendState::Lost => "Lost".to_string(),
-            BackendState::Terminated => "Terminated".to_string(),
         }
     }
 }

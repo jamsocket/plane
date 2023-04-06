@@ -10,7 +10,7 @@ use plane_core::{
     types::{BackendId, ClusterName, DroneId},
 };
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{BTreeSet, HashMap, VecDeque},
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
@@ -40,7 +40,7 @@ impl StateHandle {
             .drones
             .iter()
             .filter(|(_, drone)| {
-                drone.state == Some(agent::DroneState::Ready)
+                drone.state() == Some(agent::DroneState::Ready)
                     && drone.meta.is_some()
                     && drone.last_seen > Some(min_keepalive)
             })
@@ -109,12 +109,20 @@ impl ClusterState {
 
         drone.meta.as_ref().map(|d| d.ip)
     }
+
+    pub fn drone(&self, drone: &DroneId) -> Option<&DroneState> {
+        self.drones.get(drone)
+    }
+
+    pub fn backend(&self, backend: &BackendId) -> Option<&BackendState> {
+        self.backends.get(backend)
+    }
 }
 
 #[derive(Default, Debug)]
 pub struct DroneState {
     pub meta: Option<DroneMeta>,
-    pub state: Option<agent::DroneState>,
+    pub states: BTreeSet<(chrono::DateTime<chrono::Utc>, agent::DroneState)>,
     pub last_seen: Option<chrono::DateTime<chrono::Utc>>,
 }
 
@@ -122,23 +130,40 @@ impl DroneState {
     fn apply(&mut self, message: DroneMessageType) {
         match message {
             DroneMessageType::Metadata(meta) => self.meta = Some(meta),
-            DroneMessageType::State { state } => self.state = Some(state),
+            DroneMessageType::State { state, timestamp } => {
+                self.states.insert((timestamp, state));
+            }
             DroneMessageType::KeepAlive { timestamp } => self.last_seen = Some(timestamp),
         }
+    }
+
+    /// Return the most recent state, or None.
+    fn state(&self) -> Option<agent::DroneState> {
+        self.states.last().map(|(_, state)| *state)
     }
 }
 
 #[derive(Default, Debug)]
 pub struct BackendState {
     pub drone: Option<DroneId>,
-    state: Option<agent::BackendState>,
+    states: BTreeSet<(chrono::DateTime<chrono::Utc>, agent::BackendState)>,
 }
 
 impl BackendState {
     fn apply(&mut self, message: BackendMessageType) {
         match message {
             BackendMessageType::Assignment { drone } => self.drone = Some(drone),
-            BackendMessageType::State { status } => self.state = Some(status),
+            BackendMessageType::State { status, timestamp } => {
+                self.states.insert((timestamp, status));
+            }
         }
+    }
+
+    pub fn state(&self) -> Option<agent::BackendState> {
+        self.states.last().map(|(_, state)| *state)
+    }
+
+    pub fn state_timestamp(&self) -> Option<(chrono::DateTime<chrono::Utc>, agent::BackendState)> {
+        self.states.last().copied()
     }
 }

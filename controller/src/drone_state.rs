@@ -43,7 +43,10 @@ fn convert_to_state_message(
                 cluster: msg.cluster.clone(),
                 message: ClusterStateMessage::DroneMessage(DroneMessage {
                     drone: msg.drone_id.clone(),
-                    message: DroneMessageType::State { state: msg.state },
+                    message: DroneMessageType::State {
+                        state: msg.state,
+                        timestamp,
+                    },
                 }),
             },
             WorldStateMessage {
@@ -89,7 +92,14 @@ pub async fn monitor_drone_state(nats: TypedNats) -> NeverResult {
 
             let state_messages = convert_to_state_message(Utc::now(), &message.value);
             for state_message in state_messages {
-                nats.publish_jetstream(&state_message).await?;
+                let overwrite = state_message.overwrite();
+                tracing::info!(?state_message, ?overwrite, "Publishing state message.");
+                if overwrite {
+                    nats.publish_jetstream(&state_message).await?;
+                } else {
+                    nats.publish_jetstream_if_subject_empty(&state_message)
+                        .await?;
+                }
             }
 
             message.try_respond(&true).await?;
@@ -134,6 +144,7 @@ mod test {
                 message: ClusterStateMessage::DroneMessage(DroneMessage {
                     drone: drone_id.clone(),
                     message: DroneMessageType::State {
+                        timestamp,
                         state: DroneState::Ready,
                     },
                 }),
@@ -148,6 +159,8 @@ mod test {
         ];
 
         assert_eq!(state_message, expected);
+        assert!(!state_message.first().unwrap().overwrite()); // Drone state messages should not overwrite the previous state.
+        assert!(state_message.last().unwrap().overwrite());
     }
 
     #[test]
@@ -165,6 +178,7 @@ mod test {
         }];
 
         assert_eq!(state_message, expected);
+        assert!(state_message.first().unwrap().overwrite());
     }
 
     #[test]
@@ -192,5 +206,6 @@ mod test {
         }];
 
         assert_eq!(state_message, expected);
+        assert!(state_message.first().unwrap().overwrite());
     }
 }

@@ -11,7 +11,7 @@ readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.65"
-async-nats = "0.27.0"
+async-nats = "0.29.0"
 clap = { version = "4.0.4", features = ["derive"] }
 colored = "2.0.0"
 plane-core = {path = "../core", version="0.3.0"}

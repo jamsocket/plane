@@ -3,6 +3,7 @@ use crate::{
     nats::{JetStreamable, NoReply, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 
@@ -12,6 +13,23 @@ pub struct WorldStateMessage {
 
     #[serde(flatten)]
     pub message: ClusterStateMessage,
+}
+
+impl WorldStateMessage {
+    /// Whether this message can overwrite the previous message on the same subject.
+    pub fn overwrite(&self) -> bool {
+        match &self.message {
+            ClusterStateMessage::DroneMessage(DroneMessage {
+                message: DroneMessageType::State { .. },
+                ..
+            }) => false,
+            ClusterStateMessage::BackendMessage(BackendMessage {
+                message: BackendMessageType::State { .. },
+                ..
+            }) => false,
+            _ => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -40,10 +58,12 @@ pub struct DroneMeta {
 pub enum DroneMessageType {
     Metadata(DroneMeta),
     State {
+        #[serde(with = "chrono::serde::ts_milliseconds")]
+        timestamp: chrono::DateTime<chrono::Utc>,
         state: DroneState,
     },
     KeepAlive {
-        #[serde(with = "chrono::serde::ts_seconds")]
+        #[serde(with = "chrono::serde::ts_milliseconds")]
         timestamp: chrono::DateTime<chrono::Utc>,
     },
 }
@@ -59,7 +79,11 @@ pub struct BackendMessage {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BackendMessageType {
     Assignment { drone: DroneId },
-    State { status: BackendState },
+    State {
+        status: BackendState,
+        #[serde(with = "chrono::serde::ts_milliseconds")]
+        timestamp: DateTime<Utc>
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -80,11 +104,12 @@ impl TypedMessage for WorldStateMessage {
                         message.drone
                     )
                 }
-                DroneMessageType::State { .. } => {
+                DroneMessageType::State { state, .. } => {
                     return format!(
-                        "state.cluster.{}.drone.{}.status",
+                        "state.cluster.{}.drone.{}.status.{}",
                         self.cluster.subject_name(),
-                        message.drone
+                        message.drone,
+                        state,
                     )
                 }
                 DroneMessageType::KeepAlive { .. } => {
@@ -103,11 +128,12 @@ impl TypedMessage for WorldStateMessage {
                         message.backend
                     )
                 }
-                BackendMessageType::State { .. } => {
+                BackendMessageType::State { status, .. } => {
                     return format!(
-                        "state.cluster.{}.backend.{}.state",
+                        "state.cluster.{}.backend.{}.state.{}",
                         self.cluster.subject_name(),
-                        message.backend
+                        message.backend,
+                        status
                     )
                 }
             },
@@ -127,6 +153,7 @@ impl JetStreamable for WorldStateMessage {
         async_nats::jetstream::stream::Config {
             name: Self::stream_name().to_string(),
             subjects: vec!["state.>".to_string()],
+            max_messages_per_subject: 1,
             ..Default::default()
         }
     }
