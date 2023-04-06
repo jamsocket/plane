@@ -37,10 +37,10 @@ use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
 /// The port in the container which is exposed.
 const DEFAULT_CONTAINER_PORT: u16 = 8080;
-const DEFAULT_DOCKER_TIMEOUT_SECONDS: u64 = 30;
+const DOCKER_TIMEOUT_SECONDS: u64 = 30;
 /// Interval between reporting stats of a running backend.
 /// NOTE: the minimum possible interval is 1 second.
-const DEFAULT_DOCKER_STATS_INTERVAL_SECONDS: u64 = 10;
+const DOCKER_STATS_INTERVAL_SECONDS: u64 = 10;
 
 #[derive(Clone)]
 pub struct DockerInterface {
@@ -55,16 +55,12 @@ pub struct DockerInterface {
 impl DockerInterface {
     pub async fn try_new(config: &DockerConfig) -> Result<Self> {
         let docker = match &config.connection {
-            DockerConnection::Socket { socket } => Docker::connect_with_unix(
-                socket,
-                DEFAULT_DOCKER_TIMEOUT_SECONDS,
-                API_DEFAULT_VERSION,
-            )?,
-            DockerConnection::Http { http } => Docker::connect_with_http(
-                http,
-                DEFAULT_DOCKER_TIMEOUT_SECONDS,
-                API_DEFAULT_VERSION,
-            )?,
+            DockerConnection::Socket { socket } => {
+                Docker::connect_with_unix(socket, DOCKER_TIMEOUT_SECONDS, API_DEFAULT_VERSION)?
+            }
+            DockerConnection::Http { http } => {
+                Docker::connect_with_http(http, DOCKER_TIMEOUT_SECONDS, API_DEFAULT_VERSION)?
+            }
         };
 
         Ok(DockerInterface {
@@ -105,7 +101,7 @@ impl DockerInterface {
 
         let ticker = IntervalStream::new({
             let mut ticker =
-                tokio::time::interval(Duration::from_secs(DEFAULT_DOCKER_STATS_INTERVAL_SECONDS));
+                tokio::time::interval(Duration::from_secs(DOCKER_STATS_INTERVAL_SECONDS));
             // this prevents the stream from getting too big in case the ticker interval <1s
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             ticker
