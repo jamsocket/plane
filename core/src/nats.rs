@@ -7,6 +7,7 @@ use anyhow::{anyhow, Context, Result};
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::push::Messages;
 use async_nats::jetstream::consumer::DeliverPolicy;
+use async_nats::jetstream::context::Publish;
 use async_nats::jetstream::stream::Config;
 use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
@@ -14,7 +15,6 @@ use dashmap::DashSet;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::str::FromStr;
 use std::sync::Arc;
 use time::OffsetDateTime;
 use tokio_stream::StreamExt;
@@ -451,19 +451,14 @@ impl TypedNats {
         T: TypedMessage<Response = NoReply> + JetStreamable,
     {
         self.ensure_jetstream_exists::<T>().await?;
-        let mut headers = async_nats::HeaderMap::new();
-        headers.insert(
-            "Nats-Expected-Last-Subject-Sequence",
-            async_nats::HeaderValue::from_str("0").unwrap(),
-        );
+
+        let publish = Publish::build()
+            .payload(Bytes::from(serde_json::to_vec(value)?))
+            .expected_last_subject_sequence(0);
 
         let result = self
             .jetstream
-            .publish_with_headers(
-                value.subject().clone(),
-                headers,
-                Bytes::from(serde_json::to_vec(value)?),
-            )
+            .send_publish(value.subject().clone(), publish)
             .await
             .to_anyhow()?
             .await
