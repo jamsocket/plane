@@ -444,8 +444,8 @@ async fn stats_are_acquired() {
     .await
     .unwrap()
     .unwrap();
-    assert!(stat.value.cpu_utilization.unwrap() >= 0.);
-    assert!(stat.value.mem_utilization.unwrap() >= 0.);
+    assert!(stat.value.cpu_utilization >= 0.);
+    assert!(stat.value.mem_utilization >= 0.);
 
     state_subscription
         .wait_for_state(BackendState::Swept, 60_000)
