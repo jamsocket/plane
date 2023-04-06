@@ -307,6 +307,25 @@ async fn status_lifecycle() {
         let backend = cluster.backend(&backend).unwrap();
         assert_eq!(backend.state().unwrap(), BackendState::Swept);
     }
+
+    // Ensure that if we reconstruct the state from NATS, we have the same state history.
+    let state1 = start_state_loop(fixture.nats.clone()).await.unwrap();
+    {
+        let state = state1.state();
+        let cluster = state.cluster(&cluster).unwrap();
+        let backend = cluster.backend(&backend).unwrap();
+        let state_vec: Vec<(DateTime<Utc>, BackendState)> =
+            backend.states.iter().cloned().collect();
+        assert_eq!(
+            state_vec,
+            vec![
+                (timestamp(1), BackendState::Starting),
+                (timestamp(2), BackendState::Loading),
+                (timestamp(3), BackendState::Ready),
+                (timestamp(4), BackendState::Swept),
+            ]
+        );
+    }
 }
 
 #[integration_test]

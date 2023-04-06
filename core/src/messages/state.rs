@@ -78,11 +78,13 @@ pub struct BackendMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BackendMessageType {
-    Assignment { drone: DroneId },
+    Assignment {
+        drone: DroneId,
+    },
     State {
         status: BackendState,
         #[serde(with = "chrono::serde::ts_milliseconds")]
-        timestamp: DateTime<Utc>
+        timestamp: DateTime<Utc>,
     },
 }
 

@@ -470,9 +470,7 @@ impl TypedNats {
             .to_anyhow();
 
         match result {
-            Ok(result) => {
-                Ok(Some(result.sequence))
-            }
+            Ok(result) => Ok(Some(result.sequence)),
             Err(e) => {
                 if e.to_string().contains(NATS_WRONG_LAST_SEQUENCE_CODE) {
                     return Ok(None);

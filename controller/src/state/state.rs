@@ -146,7 +146,7 @@ impl DroneState {
 #[derive(Default, Debug)]
 pub struct BackendState {
     pub drone: Option<DroneId>,
-    states: BTreeSet<(chrono::DateTime<chrono::Utc>, agent::BackendState)>,
+    pub states: BTreeSet<(chrono::DateTime<chrono::Utc>, agent::BackendState)>,
 }
 
 impl BackendState {
