@@ -362,7 +362,8 @@ async fn stats_are_acquired() {
         .await
         .unwrap();
 
-    let stat = timeout(
+    // just make sure this generates an Ok() result
+    timeout(
         30_000,
         "Waiting for stats message.",
         stats_subscription.next(),
@@ -370,8 +371,6 @@ async fn stats_are_acquired() {
     .await
     .unwrap()
     .unwrap();
-    assert!(stat.value.cpu_use_percent >= 0.);
-    assert!(stat.value.mem_use_percent >= 0.);
 
     state_subscription
         .wait_for_state(BackendState::Swept, 60_000)

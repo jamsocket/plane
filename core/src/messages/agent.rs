@@ -2,9 +2,9 @@ use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Context, Error};
 #[cfg(feature = "bollard")]
-use bollard::{container::LogOutput, container::Stats};
+use bollard::container::{LogOutput, MemoryStatsStats, Stats};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -122,10 +122,14 @@ impl JetStreamable for DroneLogMessage {
 pub struct BackendStatsMessage {
     pub cluster: ClusterName,
     pub backend_id: BackendId,
-    /// Fraction of maximum CPU.
-    pub cpu_use_percent: f64,
-    /// Fraction of maximum memory.
-    pub mem_use_percent: f64,
+    /// Memory used by backend in bytes
+    pub mem_used: u64,
+    /// Total available memory for backend in bytes
+    pub mem_available: u64,
+    /// CPU cycles used by backend since last message
+    pub cpu_used: u64,
+    /// Total CPU cycles for system since last message
+    pub sys_cpu: u64,
 }
 
 impl TypedMessage for BackendStatsMessage {
@@ -155,8 +159,6 @@ impl BackendStatsMessage {
         cur_stats_message: &Stats,
     ) -> Result<BackendStatsMessage, Error> {
         // Based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
-
-        use anyhow::Context;
         let mem_naive_usage = cur_stats_message
             .memory_stats
             .usage
@@ -170,38 +172,36 @@ impl BackendStatsMessage {
             .stats
             .context("no memory stats.stats")?;
         let cache_mem = match mem_stats {
-            bollard::container::MemoryStatsStats::V1(stats) => stats.cache,
-            bollard::container::MemoryStatsStats::V2(stats) => stats.inactive_file,
+            MemoryStatsStats::V1(stats) => stats.cache,
+            MemoryStatsStats::V2(stats) => stats.inactive_file,
         };
-        let used_memory = mem_naive_usage - cache_mem;
-        let mem_use_percent = ((used_memory as f64) / (mem_available as f64)) * 100.0;
+        let mem_used = mem_naive_usage - cache_mem;
 
         // REF: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
-        // cpu
         let cpu_stats = &cur_stats_message.cpu_stats;
         let prev_cpu_stats = &prev_stats_message.cpu_stats;
         // NOTE: total_usage gives clock cycles, this is monotonically increasing
-        let cpu_delta = cpu_stats.cpu_usage.total_usage - prev_cpu_stats.cpu_usage.total_usage;
-        let sys_cpu_delta = (cpu_stats
-            .system_cpu_usage
-            .context("no cpu_stats.system_cpu_usage")? as f64)
-            - (prev_cpu_stats
-                .system_cpu_usage
-                .context("no cpu_stats.system_cpu_usage")? as f64);
-        // NOTE: we deviate from docker's formula here by not multiplying by num_cpus
-        //       This is because what we actually want to know from this stat
-        //       is what proportion of total cpu resource is consumed, and not knowing
-        //       the top bound makes that impossible
-        let cpu_use_percent = (cpu_delta as f64 / sys_cpu_delta) * 100.0;
+        let cpu_used = cpu_stats.cpu_usage.total_usage - prev_cpu_stats.cpu_usage.total_usage;
 
+        let prev_sys_cpu = prev_cpu_stats
+            .system_cpu_usage
+            .context("no cpu_stats.system_cpu_usage")?;
+        let cur_sys_cpu = cpu_stats
+            .system_cpu_usage
+            .context("no cpu_stats.system_cpu_usage")?;
+        let sys_cpu = cur_sys_cpu - prev_sys_cpu;
+
+        // TODO: implement network I/O stats
         // TODO: implement disk stats from stream at
         //       https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
         Ok(BackendStatsMessage {
             backend_id: backend_id.clone(),
             cluster: cluster.clone(),
-            cpu_use_percent,
-            mem_use_percent,
+            mem_used,
+            mem_available,
+            cpu_used,
+            sys_cpu,
         })
     }
 }
