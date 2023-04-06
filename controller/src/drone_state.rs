@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use plane_core::{
     messages::{
@@ -64,6 +64,16 @@ fn convert_to_state_message(
     }
 }
 
+pub async fn apply_state_message(nats: &TypedNats, message: &WorldStateMessage) -> Result<Option<u64>> {
+    let overwrite = message.overwrite();
+    tracing::info!(?message, ?overwrite, "Publishing state message.");
+    if overwrite {
+        nats.publish_jetstream(message).await.map(|d| Some(d))
+    } else {
+        nats.publish_jetstream_if_subject_empty(message).await
+    }
+}
+
 pub async fn monitor_drone_state(nats: TypedNats) -> NeverResult {
     let mut acme_sub = nats
         .subscribe(DroneStateUpdate::subscribe_subject_acme())
@@ -92,14 +102,7 @@ pub async fn monitor_drone_state(nats: TypedNats) -> NeverResult {
 
             let state_messages = convert_to_state_message(Utc::now(), &message.value);
             for state_message in state_messages {
-                let overwrite = state_message.overwrite();
-                tracing::info!(?state_message, ?overwrite, "Publishing state message.");
-                if overwrite {
-                    nats.publish_jetstream(&state_message).await?;
-                } else {
-                    nats.publish_jetstream_if_subject_empty(&state_message)
-                        .await?;
-                }
+                apply_state_message(&nats, &state_message).await?;
             }
 
             message.try_respond(&true).await?;

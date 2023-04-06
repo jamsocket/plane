@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use integration_test::integration_test;
 use plane_controller::{
-    drone_state::monitor_drone_state,
+    drone_state::{apply_state_message, monitor_drone_state},
     state::{start_state_loop, StateHandle},
 };
 use plane_core::{
@@ -153,9 +153,9 @@ async fn status_lifecycle() {
     let drone = DroneId::new_random();
     let backend = BackendId::new_random();
 
-    fixture
-        .nats
-        .publish(&WorldStateMessage {
+    apply_state_message(
+        &fixture.nats,
+        &WorldStateMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::DroneMessage(DroneMessage {
                 drone: drone.clone(),
@@ -165,9 +165,10 @@ async fn status_lifecycle() {
                     ip,
                 }),
             }),
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     {
         // Ensure that the drone exists.
@@ -179,9 +180,9 @@ async fn status_lifecycle() {
     }
 
     // Assign a backend to the drone.
-    fixture
-        .nats
-        .publish(&WorldStateMessage {
+    apply_state_message(
+        &fixture.nats,
+        &WorldStateMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -189,9 +190,10 @@ async fn status_lifecycle() {
                     drone: drone.clone(),
                 },
             }),
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     {
         // Ensure that the backend has been assigned to the drone.
@@ -203,9 +205,9 @@ async fn status_lifecycle() {
     }
 
     // Update the state of the backend to "starting".
-    fixture
-        .nats
-        .publish(&WorldStateMessage {
+    apply_state_message(
+        &fixture.nats,
+        &WorldStateMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -214,9 +216,10 @@ async fn status_lifecycle() {
                     timestamp: timestamp(1),
                 },
             }),
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     {
         // Ensure that the the backend is in "starting" state.
@@ -228,9 +231,9 @@ async fn status_lifecycle() {
     }
 
     // Update the state of the backend to "loading".
-    fixture
-        .nats
-        .publish(&WorldStateMessage {
+    apply_state_message(
+        &fixture.nats,
+        &WorldStateMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -239,9 +242,10 @@ async fn status_lifecycle() {
                     timestamp: timestamp(2),
                 },
             }),
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     {
         // Ensure that the the backend is in "loading" state.
@@ -253,9 +257,9 @@ async fn status_lifecycle() {
     }
 
     // Update the state of the backend to "ready".
-    fixture
-        .nats
-        .publish(&WorldStateMessage {
+    apply_state_message(
+        &fixture.nats,
+        &WorldStateMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -264,9 +268,10 @@ async fn status_lifecycle() {
                     timestamp: timestamp(3),
                 },
             }),
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     {
         // Ensure that the the backend is in "ready" state.
@@ -278,9 +283,9 @@ async fn status_lifecycle() {
     }
 
     // Update the state of the backend to "swept".
-    fixture
-        .nats
-        .publish(&WorldStateMessage {
+    apply_state_message(
+        &fixture.nats,
+        &WorldStateMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -289,9 +294,10 @@ async fn status_lifecycle() {
                     timestamp: timestamp(4),
                 },
             }),
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     {
         // Ensure that the the backend is in "swept" state.
@@ -310,9 +316,9 @@ async fn repeated_backend_state_not_overwritten() {
     let backend = BackendId::new_random();
 
     // Update the state of the backend to "starting".
-    let result = fixture
-        .nats
-        .publish_jetstream_if_subject_empty(&WorldStateMessage {
+    let result = apply_state_message(
+        &fixture.nats,
+        &WorldStateMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -321,9 +327,10 @@ async fn repeated_backend_state_not_overwritten() {
                     timestamp: timestamp(1),
                 },
             }),
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(result.is_some());
 
@@ -339,9 +346,9 @@ async fn repeated_backend_state_not_overwritten() {
         );
     }
 
-    let result = fixture
-        .nats
-        .publish_jetstream_if_subject_empty(&WorldStateMessage {
+    let result = apply_state_message(
+        &fixture.nats,
+        &WorldStateMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -350,9 +357,10 @@ async fn repeated_backend_state_not_overwritten() {
                     timestamp: timestamp(2),
                 },
             }),
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(result.is_none());
 
