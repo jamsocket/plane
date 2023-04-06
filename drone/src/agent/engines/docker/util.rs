@@ -149,7 +149,6 @@ pub fn get_ip_of_container(inspect_response: &ContainerInspectResponse) -> Resul
 
     let network = networks
         .values()
-        .into_iter()
         .next()
         .expect("next() should never fail after length check.");
 

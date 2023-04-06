@@ -1,11 +1,11 @@
-pub use self::state::{StateHandle, WorldState};
+pub use self::world_state::{StateHandle, WorldState};
 use anyhow::{anyhow, Result};
 use plane_core::{
     messages::state::WorldStateMessage,
     nats::{JetstreamSubscription, TypedNats},
 };
 
-mod state;
+mod world_state;
 
 /// Start a loop which reads the state stream and applies the messages to the world state.
 /// Returns a handle to the world state.

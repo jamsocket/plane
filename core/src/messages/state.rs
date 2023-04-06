@@ -18,17 +18,16 @@ pub struct WorldStateMessage {
 impl WorldStateMessage {
     /// Whether this message can overwrite the previous message on the same subject.
     pub fn overwrite(&self) -> bool {
-        match &self.message {
+        !matches!(
+            self.message,
             ClusterStateMessage::DroneMessage(DroneMessage {
                 message: DroneMessageType::State { .. },
                 ..
-            }) => false,
-            ClusterStateMessage::BackendMessage(BackendMessage {
+            }) | ClusterStateMessage::BackendMessage(BackendMessage {
                 message: BackendMessageType::State { .. },
                 ..
-            }) => false,
-            _ => true,
-        }
+            })
+        )
     }
 }
 
@@ -100,14 +99,14 @@ impl TypedMessage for WorldStateMessage {
         match &self.message {
             ClusterStateMessage::DroneMessage(message) => match message.message {
                 DroneMessageType::Metadata { .. } => {
-                    return format!(
+                    format!(
                         "state.cluster.{}.drone.{}.meta",
                         self.cluster.subject_name(),
                         message.drone
                     )
                 }
                 DroneMessageType::State { state, .. } => {
-                    return format!(
+                    format!(
                         "state.cluster.{}.drone.{}.status.{}",
                         self.cluster.subject_name(),
                         message.drone,
@@ -115,7 +114,7 @@ impl TypedMessage for WorldStateMessage {
                     )
                 }
                 DroneMessageType::KeepAlive { .. } => {
-                    return format!(
+                    format!(
                         "state.cluster.{}.drone.{}.keep_alive",
                         self.cluster.subject_name(),
                         message.drone
@@ -124,14 +123,14 @@ impl TypedMessage for WorldStateMessage {
             },
             ClusterStateMessage::BackendMessage(message) => match message.message {
                 BackendMessageType::Assignment { .. } => {
-                    return format!(
+                    format!(
                         "state.cluster.{}.backend.{}",
                         self.cluster.subject_name(),
                         message.backend
                     )
                 }
                 BackendMessageType::State { status, .. } => {
-                    return format!(
+                    format!(
                         "state.cluster.{}.backend.{}.state.{}",
                         self.cluster.subject_name(),
                         message.backend,

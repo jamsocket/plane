@@ -71,7 +71,7 @@ pub async fn apply_state_message(
     let overwrite = message.overwrite();
     tracing::info!(?message, ?overwrite, "Publishing state message.");
     if overwrite {
-        nats.publish_jetstream(message).await.map(|d| Some(d))
+        nats.publish_jetstream(message).await.map(Some)
     } else {
         nats.publish_jetstream_if_subject_empty(message).await
     }
