@@ -40,7 +40,7 @@ const DEFAULT_CONTAINER_PORT: u16 = 8080;
 const DOCKER_TIMEOUT_SECONDS: u64 = 30;
 /// Interval between reporting stats of a running backend.
 /// NOTE: the minimum possible interval is 1 second.
-const DOCKER_STATS_INTERVAL_SECONDS: u64 = 10;
+const DOCKER_STATS_INTERVAL_SECONDS: u64 = 5;
 
 #[derive(Clone)]
 pub struct DockerInterface {
