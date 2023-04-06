@@ -116,10 +116,6 @@ impl JetStreamable for DroneLogMessage {
 pub struct BackendStatsMessage {
     pub cluster: ClusterName,
     pub backend_id: BackendId,
-    /// Fraction of cpu_used / sys_cpu.
-    pub cpu_utilization: f64,
-    /// Fraction of mem_used / mem_available.
-    pub mem_utilization: f64,
     /// Memory used by backend in bytes
     pub mem_used: u64,
     /// Total available memory for backend in bytes
@@ -174,7 +170,6 @@ impl BackendStatsMessage {
             MemoryStatsStats::V2(stats) => stats.inactive_file,
         };
         let mem_used = mem_naive_usage - cache_mem;
-        let mem_utilization = mem_used as f64 / mem_available as f64;
 
         // REF: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
         let cpu_stats = &cur_stats_message.cpu_stats;
@@ -190,20 +185,13 @@ impl BackendStatsMessage {
             .context("no cpu_stats.system_cpu_usage")?;
         let sys_cpu = cur_sys_cpu - prev_sys_cpu;
 
-        // NOTE: we deviate from docker's formula here by not multiplying by num_cpus
-        //       This is because what we actually want to know from this stat
-        //       is what proportion of total cpu resource is consumed, and not knowing
-        //       the top bound makes that impossible
-        let cpu_utilization = cpu_used as f64 / sys_cpu as f64;
-
+        // TODO: implement network I/O stats
         // TODO: implement disk stats from stream at
         //       https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerInspect
 
         Ok(BackendStatsMessage {
             backend_id: backend_id.clone(),
             cluster: cluster.clone(),
-            cpu_utilization,
-            mem_utilization,
             mem_used,
             mem_available,
             cpu_used,
