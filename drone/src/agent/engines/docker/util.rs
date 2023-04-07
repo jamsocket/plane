@@ -202,7 +202,7 @@ impl<T: Stream<Item = Stats> + Unpin> Stream for StatsStream<T> {
                         .unwrap();
 
                         self.last = Some(stat);
-                        break Poll::Ready(Some(v))
+                        break Poll::Ready(Some(v));
                     } else {
                         self.last = Some(stat);
                     }

@@ -115,5 +115,5 @@ where
                 let context = cell.borrow_mut().take().expect("Test context not set.");
                 context.teardown().await;
             })
-    });    
+    });
 }

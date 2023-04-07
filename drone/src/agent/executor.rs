@@ -253,7 +253,11 @@ impl<E: Engine> Executor<E> {
                 Ok(Some(new_state)) => {
                     state = new_state;
 
-                    if state.running() && !self.backend_to_monitor.contains_key(&spawn_request.backend_id) {
+                    if state.running()
+                        && !self
+                            .backend_to_monitor
+                            .contains_key(&spawn_request.backend_id)
+                    {
                         self.backend_to_monitor.insert(
                             spawn_request.backend_id.clone(),
                             BackendMonitor::new(
