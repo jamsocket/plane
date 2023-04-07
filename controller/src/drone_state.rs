@@ -110,11 +110,17 @@ pub async fn monitor_drone_state(nats: TypedNats) -> NeverResult {
         .await?;
     tracing::info!("Subscribed to drone status messages.");
 
+    let mut backend_status_sub = nats
+        .subscribe(DroneStateUpdate::subscribe_subject_backend_status())
+        .await?;
+    tracing::info!("Subscribed to backend status messages.");
+
     loop {
         let message = select! {
             acme_msg = acme_sub.next() => acme_msg,
             connect_msg = connect_sub.next() => connect_msg,
             drone_status_msg = drone_status_sub.next() => drone_status_msg,
+            backend_status_msg = backend_status_sub.next() => backend_status_msg,
         };
 
         if let Some(message) = message {

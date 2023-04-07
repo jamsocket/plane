@@ -161,6 +161,11 @@ impl DroneStateUpdate {
     pub fn subscribe_subject_drone_status() -> SubscribeSubject<Self> {
         SubscribeSubject::new("cluster.*.drone.*.status".to_string())
     }
+
+    pub fn subscribe_subject_backend_status() -> SubscribeSubject<Self> {
+        SubscribeSubject::new("cluster.*.backend.*.status".to_string())
+    }
+
 }
 
 #[cfg(test)]
