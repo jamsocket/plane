@@ -153,7 +153,10 @@ impl BackendState {
     fn apply(&mut self, message: BackendMessageType) {
         match message {
             BackendMessageType::Assignment { drone } => self.drone = Some(drone),
-            BackendMessageType::State { status, timestamp } => {
+            BackendMessageType::State {
+                state: status,
+                timestamp,
+            } => {
                 self.states.insert((timestamp, status));
             }
         }

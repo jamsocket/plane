@@ -4,8 +4,8 @@ use plane_core::{
     messages::{
         drone_state::DroneStateUpdate,
         state::{
-            AcmeDnsRecord, ClusterStateMessage, DroneMessage, DroneMessageType, DroneMeta,
-            WorldStateMessage,
+            AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
+            DroneMessageType, DroneMeta, WorldStateMessage,
         },
     },
     nats::TypedNats,
@@ -57,10 +57,27 @@ fn convert_to_state_message(
                 }),
             },
         ],
-        _ => {
-            tracing::warn!(?update, "Got unhandled state machine update message.");
-            vec![]
-        }
+        DroneStateUpdate::BackendStateMessage(msg) => vec![
+            WorldStateMessage {
+                cluster: msg.cluster.clone(),
+                message: ClusterStateMessage::BackendMessage(BackendMessage {
+                    backend: msg.backend.clone(),
+                    message: BackendMessageType::State {
+                        state: msg.state,
+                        timestamp,
+                    },
+                }),
+            },
+            WorldStateMessage {
+                cluster: msg.cluster.clone(),
+                message: ClusterStateMessage::BackendMessage(BackendMessage {
+                    backend: msg.backend.clone(),
+                    message: BackendMessageType::Assignment {
+                        drone: msg.drone.clone(),
+                    },
+                }),
+            },
+        ],
     }
 }
 
@@ -120,11 +137,12 @@ mod test {
     use super::*;
     use plane_core::{
         messages::{
-            agent::DroneState,
+            agent::{BackendState, DroneState},
             cert::SetAcmeDnsRecord,
-            drone_state::{DroneConnectRequest, DroneStatusMessage},
+            drone_state::{DroneConnectRequest, DroneStatusMessage, UpdateBackendStateMessage},
+            state::{BackendMessage, BackendMessageType},
         },
-        types::{ClusterName, DroneId},
+        types::{BackendId, ClusterName, DroneId},
     };
     use std::net::{IpAddr, Ipv4Addr};
 
@@ -213,5 +231,47 @@ mod test {
 
         assert_eq!(state_message, expected);
         assert!(state_message.first().unwrap().overwrite());
+    }
+
+    #[test]
+    fn test_backend_state_message() {
+        let drone = DroneId::new_random();
+        let backend = BackendId::new_random();
+        let time = Utc::now();
+        let msg = DroneStateUpdate::BackendStateMessage(UpdateBackendStateMessage {
+            cluster: ClusterName::new("plane.test"),
+            drone: drone.clone(),
+            backend: backend.clone(),
+            time: time,
+            state: BackendState::Starting,
+        });
+
+        let state_message = convert_to_state_message(time, &msg);
+
+        let expected = vec![
+            WorldStateMessage {
+                cluster: ClusterName::new("plane.test"),
+                message: ClusterStateMessage::BackendMessage(BackendMessage {
+                    backend: backend.clone(),
+                    message: BackendMessageType::State {
+                        state: BackendState::Starting,
+                        timestamp: time,
+                    },
+                }),
+            },
+            WorldStateMessage {
+                cluster: ClusterName::new("plane.test"),
+                message: ClusterStateMessage::BackendMessage(BackendMessage {
+                    backend: backend.clone(),
+                    message: BackendMessageType::Assignment {
+                        drone: drone.clone(),
+                    },
+                }),
+            },
+        ];
+
+        assert_eq!(state_message, expected);
+        assert!(!state_message.first().unwrap().overwrite());
+        assert!(state_message.last().unwrap().overwrite());
     }
 }

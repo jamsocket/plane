@@ -212,7 +212,7 @@ async fn status_lifecycle() {
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
                 message: BackendMessageType::State {
-                    status: BackendState::Starting,
+                    state: BackendState::Starting,
                     timestamp: timestamp(1),
                 },
             }),
@@ -238,7 +238,7 @@ async fn status_lifecycle() {
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
                 message: BackendMessageType::State {
-                    status: BackendState::Loading,
+                    state: BackendState::Loading,
                     timestamp: timestamp(2),
                 },
             }),
@@ -264,7 +264,7 @@ async fn status_lifecycle() {
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
                 message: BackendMessageType::State {
-                    status: BackendState::Ready,
+                    state: BackendState::Ready,
                     timestamp: timestamp(3),
                 },
             }),
@@ -290,7 +290,7 @@ async fn status_lifecycle() {
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
                 message: BackendMessageType::State {
-                    status: BackendState::Swept,
+                    state: BackendState::Swept,
                     timestamp: timestamp(4),
                 },
             }),
@@ -342,7 +342,7 @@ async fn repeated_backend_state_not_overwritten() {
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
                 message: BackendMessageType::State {
-                    status: BackendState::Starting,
+                    state: BackendState::Starting,
                     timestamp: timestamp(1),
                 },
             }),
@@ -372,7 +372,7 @@ async fn repeated_backend_state_not_overwritten() {
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
                 message: BackendMessageType::State {
-                    status: BackendState::Starting,
+                    state: BackendState::Starting,
                     timestamp: timestamp(2),
                 },
             }),

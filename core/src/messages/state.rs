@@ -81,7 +81,7 @@ pub enum BackendMessageType {
         drone: DroneId,
     },
     State {
-        status: BackendState,
+        state: BackendState,
         #[serde(with = "chrono::serde::ts_milliseconds")]
         timestamp: DateTime<Utc>,
     },
@@ -129,7 +129,7 @@ impl TypedMessage for WorldStateMessage {
                         message.backend
                     )
                 }
-                BackendMessageType::State { status, .. } => {
+                BackendMessageType::State { state: status, .. } => {
                     format!(
                         "state.cluster.{}.backend.{}.state.{}",
                         self.cluster.subject_name(),

@@ -1,12 +1,13 @@
-use std::{net::IpAddr, time::Duration};
-use tokio::time::sleep;
 use crate::agent::engine::Engine;
 use plane_core::{
     logging::LogError,
+    messages::dns::{DnsRecordType, SetDnsRecord},
     nats::TypedNats,
-    types::{BackendId, ClusterName}, messages::dns::{SetDnsRecord, DnsRecordType},
+    types::{BackendId, ClusterName},
 };
+use std::{net::IpAddr, time::Duration};
 use tokio::task::JoinHandle;
+use tokio::time::sleep;
 use tokio_stream::StreamExt;
 
 /// JoinHandle does not abort when it is dropped; this wrapper does.
@@ -44,29 +45,29 @@ impl BackendMonitor {
     }
 
     fn dns_loop(
-        backend_id: &BackendId,	
-        ip: IpAddr,	
-        nc: &TypedNats,	
-        cluster: &ClusterName,	
-    ) -> JoinHandle<Result<(), anyhow::Error>> {	
-        let backend_id = backend_id.clone();	
-        let nc = nc.clone();	
-        let cluster = cluster.clone();	
+        backend_id: &BackendId,
+        ip: IpAddr,
+        nc: &TypedNats,
+        cluster: &ClusterName,
+    ) -> JoinHandle<Result<(), anyhow::Error>> {
+        let backend_id = backend_id.clone();
+        let nc = nc.clone();
+        let cluster = cluster.clone();
 
-        tokio::spawn(async move {	
-            loop {	
-                nc.publish(&SetDnsRecord {	
-                    cluster: cluster.clone(),	
-                    kind: DnsRecordType::A,	
-                    name: backend_id.to_string(),	
-                    value: ip.to_string(),	
-                })	
-                .await	
-                .log_error("Error publishing DNS record.");	
+        tokio::spawn(async move {
+            loop {
+                nc.publish(&SetDnsRecord {
+                    cluster: cluster.clone(),
+                    kind: DnsRecordType::A,
+                    name: backend_id.to_string(),
+                    value: ip.to_string(),
+                })
+                .await
+                .log_error("Error publishing DNS record.");
 
-                sleep(Duration::from_secs(SetDnsRecord::send_period())).await;	
-            }	
-        })	
+                sleep(Duration::from_secs(SetDnsRecord::send_period())).await;
+            }
+        })
     }
 
     fn log_loop<E: Engine>(backend_id: &BackendId, engine: &E, nc: &TypedNats) -> JoinHandle<()> {
