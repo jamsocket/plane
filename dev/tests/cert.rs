@@ -8,6 +8,7 @@ use plane_dev::{
     timeout::{spawn_timeout, timeout},
 };
 use plane_drone::{cert::acme::AcmeEabConfiguration, cert::CertOptions, keys::KeyCertPathPair};
+use serde_json::Value;
 use tokio::task::JoinHandle;
 
 fn collect_alt_names(cert: &X509) -> Vec<String> {
@@ -33,7 +34,7 @@ impl DummyDnsHandler {
                 let message = dns_sub.next().await.unwrap();
                 let DroneStateUpdate::AcmeMessage(acme_message) = &message.value else {panic!()};
                 assert_eq!(expect_domain, acme_message.cluster);
-                message.respond(&true).await?;
+                message.respond(&Value::Bool(true)).await?;
                 Ok(())
             })
         };

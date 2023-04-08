@@ -5,6 +5,7 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::net::IpAddr;
 
 fn drone_state_ready() -> DroneState {
@@ -137,7 +138,7 @@ pub enum DroneStateUpdate {
 }
 
 impl TypedMessage for DroneStateUpdate {
-    type Response = bool;
+    type Response = Value;
 
     fn subject(&self) -> String {
         match self {
@@ -165,7 +166,6 @@ impl DroneStateUpdate {
     pub fn subscribe_subject_backend_status() -> SubscribeSubject<Self> {
         SubscribeSubject::new("cluster.*.backend.*.status".to_string())
     }
-
 }
 
 #[cfg(test)]

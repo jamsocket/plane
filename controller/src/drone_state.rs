@@ -11,6 +11,7 @@ use plane_core::{
     nats::TypedNats,
     NeverResult,
 };
+use serde_json::Value;
 use tokio::select;
 
 fn convert_to_state_message(
@@ -131,7 +132,20 @@ pub async fn monitor_drone_state(nats: TypedNats) -> NeverResult {
                 apply_state_message(&nats, &state_message).await?;
             }
 
-            message.try_respond(&true).await?;
+            // Temporary: we've consolidated handling of multiple message types:
+            // - `SetAcmeDnsRecord` expects `true`
+            // - `DroneConnectRequest` expects `true`
+            // - `UpdateBackendStateMessage` expects `null`
+            // - `DroneStatusMessage` does not have a reply inbox
+            // These are all used to acknowledge the message and carry no other information.
+            // Eventually, these will return an Option<u64> containing the JetStream sequence number,
+            // but for now we return the appropriate type.
+            let response = match message.value {
+                DroneStateUpdate::BackendStateMessage(_) => Value::Null,
+                _ => Value::Bool(true)
+            };
+
+            message.try_respond(&response).await?;
         } else {
             return Err(anyhow!("Drone state subscription returned None."));
         }

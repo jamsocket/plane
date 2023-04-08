@@ -1783,6 +1783,7 @@ dependencies = [
  "plane-core",
  "rand",
  "serde",
+ "serde_json",
  "signal-hook",
  "tokio",
  "tokio-stream",
