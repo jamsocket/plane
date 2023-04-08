@@ -142,7 +142,7 @@ pub async fn monitor_drone_state(nats: TypedNats) -> NeverResult {
             // but for now we return the appropriate type.
             let response = match message.value {
                 DroneStateUpdate::BackendStateMessage(_) => Value::Null,
-                _ => Value::Bool(true)
+                _ => Value::Bool(true),
             };
 
             message.try_respond(&response).await?;
