@@ -6,8 +6,7 @@ use plane_core::{
     types::{BackendId, ClusterName},
 };
 use std::{net::IpAddr, time::Duration};
-use tokio::task::JoinHandle;
-use tokio::time::sleep;
+use tokio::{task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
 
 /// JoinHandle does not abort when it is dropped; this wrapper does.
