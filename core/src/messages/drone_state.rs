@@ -138,7 +138,7 @@ pub enum DroneStateUpdate {
 }
 
 impl TypedMessage for DroneStateUpdate {
-    type Response = Value;
+    type Response = Option<Value>;
 
     fn subject(&self) -> String {
         match self {

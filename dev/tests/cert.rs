@@ -34,7 +34,7 @@ impl DummyDnsHandler {
                 let message = dns_sub.next().await.unwrap();
                 let DroneStateUpdate::AcmeMessage(acme_message) = &message.value else {panic!()};
                 assert_eq!(expect_domain, acme_message.cluster);
-                message.respond(&Value::Bool(true)).await?;
+                message.respond(&Some(Value::Bool(true))).await?;
                 Ok(())
             })
         };

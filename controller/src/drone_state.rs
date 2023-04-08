@@ -141,8 +141,8 @@ pub async fn monitor_drone_state(nats: TypedNats) -> NeverResult {
             // Eventually, these will return an Option<u64> containing the JetStream sequence number,
             // but for now we return the appropriate type.
             let response = match message.value {
-                DroneStateUpdate::BackendStateMessage(_) => Value::Null,
-                _ => Value::Bool(true),
+                DroneStateUpdate::BackendStateMessage(_) => None,
+                _ => Some(Value::Bool(true)),
             };
 
             message.try_respond(&response).await?;
