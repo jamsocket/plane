@@ -97,7 +97,12 @@ async fn listen_for_termination_requests(
                 let executor = executor.clone();
 
                 req.respond(&()).await?;
-                tokio::spawn(async move { executor.kill_backend(&req.value).await });
+                tokio::spawn(async move {
+                    let result = executor.kill_backend(&req.value).await;
+                    if let Err(err) = result {
+                        tracing::warn!(?err, "Executor failed to kill backend.");
+                    }
+                });
             }
             None => return Err(anyhow!("Termination request subscription closed.")),
         }
