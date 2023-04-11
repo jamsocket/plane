@@ -149,7 +149,6 @@ pub fn get_ip_of_container(inspect_response: &ContainerInspectResponse) -> Resul
 
     let network = networks
         .values()
-        .into_iter()
         .next()
         .expect("next() should never fail after length check.");
 
@@ -186,26 +185,27 @@ impl<T: Stream<Item = Stats> + Unpin> Stream for StatsStream<T> {
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let next = futures::StreamExt::poll_next_unpin(&mut self.stream, cx);
+        loop {
+            let next = futures::StreamExt::poll_next_unpin(&mut self.stream, cx);
 
-        match next {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Ready(Some(stat)) => {
-                if let Some(last) = &self.last {
-                    let v = BackendStatsMessage::from_stats_messages(
-                        &self.backend_id,
-                        &self.cluster,
-                        last,
-                        &stat,
-                    )
-                    .unwrap();
+            match next {
+                Poll::Pending => break Poll::Pending,
+                Poll::Ready(None) => break Poll::Ready(None),
+                Poll::Ready(Some(stat)) => {
+                    if let Some(last) = &self.last {
+                        let v = BackendStatsMessage::from_stats_messages(
+                            &self.backend_id,
+                            &self.cluster,
+                            last,
+                            &stat,
+                        )
+                        .unwrap();
 
-                    self.last = Some(stat);
-                    Poll::Ready(Some(v))
-                } else {
-                    self.last = Some(stat);
-                    Poll::Pending
+                        self.last = Some(stat);
+                        break Poll::Ready(Some(v));
+                    } else {
+                        self.last = Some(stat);
+                    }
                 }
             }
         }

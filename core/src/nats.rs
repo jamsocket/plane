@@ -7,6 +7,7 @@ use anyhow::{anyhow, Context, Result};
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::push::Messages;
 use async_nats::jetstream::consumer::DeliverPolicy;
+use async_nats::jetstream::context::Publish;
 use async_nats::jetstream::stream::Config;
 use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
@@ -17,6 +18,9 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use time::OffsetDateTime;
 use tokio_stream::StreamExt;
+
+/// This code is returned by NATS when an expected last sequence number is violated.
+const NATS_WRONG_LAST_SEQUENCE_CODE: &str = "10071";
 
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
@@ -136,17 +140,28 @@ where
         &self.message
     }
 
+    pub async fn try_respond(&self, response: &T::Response) -> Result<()> {
+        if self.message.reply.is_some() {
+            self.respond(response).await
+        } else {
+            Ok(())
+        }
+    }
+
     pub async fn respond(&self, response: &T::Response) -> Result<()> {
+        let reply_inbox = self
+            .message
+            .reply
+            .as_ref()
+            .context("Attempted to respond to a message with no reply subject.")?
+            .to_string();
+
+        tracing::info!("Responding to message on {}", reply_inbox);
+
         self.nc
-            .publish(
-                self.message
-                    .reply
-                    .as_ref()
-                    .context("Attempted to respond to a message with no reply subject.")?
-                    .to_string(),
-                Bytes::from(serde_json::to_vec(response)?),
-            )
+            .publish(reply_inbox, Bytes::from(serde_json::to_vec(response)?))
             .await?;
+
         Ok(())
     }
 }
@@ -320,7 +335,7 @@ impl TypedNats {
         T: TypedMessage,
     {
         let inbox = self.nc.new_inbox();
-        let subscription = self.nc.subscribe(inbox.clone()).await.to_anyhow()?;
+        let subscription = self.nc.subscribe(inbox.clone()).await?;
         self.nc
             .publish_with_reply(
                 message.subject(),
@@ -430,6 +445,37 @@ impl TypedNats {
         Ok(sequence)
     }
 
+    /// Publishes a message to jetstream, but only if the subject is empty.
+    pub async fn publish_jetstream_if_subject_empty<T>(&self, value: &T) -> Result<Option<u64>>
+    where
+        T: TypedMessage<Response = NoReply> + JetStreamable,
+    {
+        self.ensure_jetstream_exists::<T>().await?;
+
+        let publish = Publish::build()
+            .payload(Bytes::from(serde_json::to_vec(value)?))
+            .expected_last_subject_sequence(0);
+
+        let result = self
+            .jetstream
+            .send_publish(value.subject().clone(), publish)
+            .await
+            .to_anyhow()?
+            .await
+            .to_anyhow();
+
+        match result {
+            Ok(result) => Ok(Some(result.sequence)),
+            Err(e) => {
+                if e.to_string().contains(NATS_WRONG_LAST_SEQUENCE_CODE) {
+                    Ok(None)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
     pub async fn request<T>(&self, value: &T) -> Result<T::Response>
     where
         T: TypedMessage,
@@ -437,7 +483,7 @@ impl TypedNats {
         let bytes = Bytes::from(serde_json::to_vec(value)?);
 
         let fut = self.nc.request(value.subject(), bytes.clone());
-        let result = fut.await.to_anyhow()?;
+        let result = fut.await?;
         let value: T::Response = serde_json::from_slice(&result.payload)?;
         Ok(value)
     }
@@ -446,7 +492,8 @@ impl TypedNats {
     where
         T: TypedMessage,
     {
-        let subscription = self.nc.subscribe(subject.subject).await.to_anyhow()?;
+        tracing::info!(stream=%subject.subject, "Subscribing to NATS stream.");
+        let subscription = self.nc.subscribe(subject.subject).await?;
         Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }
 }

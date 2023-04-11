@@ -1,5 +1,4 @@
 use crate::agent::engine::Engine;
-use anyhow::Result;
 use plane_core::{
     logging::LogError,
     messages::dns::{DnsRecordType, SetDnsRecord},

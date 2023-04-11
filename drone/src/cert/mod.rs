@@ -12,11 +12,7 @@ use openssl::{
     x509::X509,
 };
 use plane_core::{
-    messages::cert::SetAcmeDnsRecord,
-    messages::dns::{DnsRecordType, SetDnsRecord},
-    nats::TypedNats,
-    types::ClusterName,
-    NeverResult,
+    messages::cert::SetAcmeDnsRecord, nats::TypedNats, types::ClusterName, NeverResult,
 };
 use reqwest::Client;
 use std::io::Write;
@@ -85,9 +81,6 @@ pub async fn get_certificate(
 
         tracing::info!("Requesting TXT record from platform.");
 
-        // Temporarily, publish both the old-style SetAcmeDnsRecord
-        // and the new SetDnsRecord. This allows us to run both the
-        // new and old nameserver before switching over DNS.
         let result = nats
             .request(&SetAcmeDnsRecord {
                 cluster: ClusterName::new(cluster_domain),
@@ -99,15 +92,6 @@ pub async fn get_certificate(
         if !result {
             return Err(anyhow!("Platform rejected TXT record."));
         }
-
-        nats.publish(&SetDnsRecord {
-            cluster: ClusterName::new(cluster_domain),
-            kind: DnsRecordType::TXT,
-            name: "_acme-challenge".to_string(),
-            value,
-        })
-        .await
-        .context("Sending SetDnsRecord")?;
 
         tracing::info!("Validating challenge.");
         let challenge = challenge.validate().await.context("Validating challenge")?;

@@ -9,9 +9,8 @@ use hyper::Client;
 use plane_core::{
     logging::LogError,
     messages::{
-        agent::{
-            DroneConnectRequest, DroneState, DroneStatusMessage, SpawnRequest, TerminationRequest,
-        },
+        agent::{DroneState, SpawnRequest, TerminationRequest},
+        drone_state::{DroneConnectRequest, DroneStatusMessage},
         scheduler::DrainDrone,
     },
     nats::TypedNats,
@@ -23,6 +22,7 @@ use std::{net::SocketAddr, time::Duration};
 use tokio::sync::watch::{self, Receiver, Sender};
 
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
+const GIT_HASH: Option<&str> = option_env!("GIT_HASH");
 
 mod backend;
 mod engine;
@@ -178,9 +178,11 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
         drone_id: agent_opts.drone_id.clone(),
         cluster: cluster.clone(),
         ip,
+        version: Some(PLANE_VERSION.to_string()),
+        git_hash: GIT_HASH.map(|s| s.to_string()),
     };
 
-    nats.publish(&request).await?;
+    nats.request(&request).await?;
 
     let executor = Executor::new(docker, db.clone(), nats.clone(), ip, cluster.clone());
 

@@ -1,6 +1,6 @@
 [package]
 name = "plane-drone"
-version = "0.3.16"
+version = "0.3.17"
 edition = "2021"
 authors = ["Paul Butler <paul@driftingin.space>"]
 homepage = "https://plane.dev"
@@ -25,7 +25,7 @@ hyper = { version = "0.14.19", features = ["server", "client", "http1", "http2",
 notify = "5.0.0"
 openssl = "0.10.40"
 reqwest = { version = "0.11.11", features = ["native-tls"] }
-rustls = "0.20.6"
+rustls = "0.21.0"
 rustls-pemfile = "1.0.0"
 serde = { version = "1.0.144", features = ["derive"] }
 serde_json = "1.0.81"
@@ -38,7 +38,7 @@ sqlx = { version = "0.6.1", features = [
     "offline",
 ] }
 tokio = { version = "1.18.2", features = ["rt"] }
-tokio-rustls = "0.23.4"
+tokio-rustls = "0.24.0"
 tokio-stream = "0.1.8"
 tracing = "0.1.36"
 async-trait = "0.1.58"

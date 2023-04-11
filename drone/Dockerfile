@@ -3,6 +3,9 @@ FROM ghcr.io/drifting-in-space/rust-sccache:latest as build
 ARG SCCACHE_BUCKET=""
 ARG AWS_SECRET_ACCESS_KEY=""
 ARG AWS_ACCESS_KEY_ID=""
+ARG GIT_HASH
+
+ENV GIT_HASH=${GIT_HASH}
 
 WORKDIR /work
 

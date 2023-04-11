@@ -5,7 +5,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, time::Duration};
 
-/// Number of seconds “early” that a message with a TTL should be
+/// Number of seconds “early” that a message with a TTL should be
 /// re-sent, to account for network delay and variance.
 const TTL_BUFFER_SECONDS: u64 = 10;
 

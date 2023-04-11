@@ -1,10 +1,12 @@
 use crate::config::ControllerConfig;
 use crate::dns::serve_dns;
+use crate::drone_state::monitor_drone_state;
 use crate::plan::ControllerPlan;
 use crate::run_scheduler;
 use anyhow::{anyhow, Context, Result};
 use futures::future::try_join_all;
-use plane_core::messages::agent::{BackendStateMessage, UpdateBackendStateMessage};
+use plane_core::messages::agent::BackendStateMessage;
+use plane_core::messages::drone_state::UpdateBackendStateMessage;
 use plane_core::messages::logging::Component;
 use plane_core::nats::TypedNats;
 use plane_core::{cli::init_cli, logging::TracingHandle, NeverResult};
@@ -55,6 +57,7 @@ async fn controller_main() -> NeverResult {
         nats,
         dns_plan,
         scheduler_plan,
+        state,
     } = plan;
 
     tracing_handle.attach_nats(nats.clone())?;
@@ -62,9 +65,11 @@ async fn controller_main() -> NeverResult {
     let mut futs: Vec<Pin<Box<dyn Future<Output = NeverResult>>>> = vec![];
 
     if scheduler_plan.is_some() {
-        futs.push(Box::pin(run_scheduler(nats.clone())));
+        futs.push(Box::pin(run_scheduler(nats.clone(), state.clone())));
 
         futs.push(Box::pin(update_backend_state_loop(nats.clone())));
+
+        futs.push(Box::pin(monitor_drone_state(nats.clone())));
     }
 
     if let Some(dns_plan) = dns_plan {
