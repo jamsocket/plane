@@ -5,7 +5,6 @@ use plane_controller::{
     drone_state::monitor_drone_state,
     run::update_backend_state_loop,
     run_scheduler,
-    state::{start_state_loop, StateHandle},
 };
 use plane_core::{
     messages::{
@@ -15,7 +14,7 @@ use plane_core::{
     },
     nats::TypedNats,
     types::{BackendId, ClusterName, DroneId},
-    NeverResult,
+    NeverResult, state::{StateHandle, start_state_loop},
 };
 use plane_dev::{
     resources::nats::Nats,

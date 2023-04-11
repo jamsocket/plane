@@ -3,7 +3,6 @@ use integration_test::integration_test;
 use plane_controller::{
     dns::serve_dns,
     plan::DnsPlan,
-    state::{StateHandle, WorldState},
 };
 use plane_core::{
     messages::state::{
@@ -11,7 +10,7 @@ use plane_core::{
         DroneMessageType, DroneMeta, WorldStateMessage,
     },
     types::{BackendId, ClusterName, DroneId},
-    Never,
+    Never, state::{WorldState, StateHandle},
 };
 use plane_dev::{
     timeout::{expect_to_stay_alive, LivenessGuard},

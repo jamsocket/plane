@@ -1,9 +1,7 @@
+use crate::{nats::{TypedNats, JetstreamSubscription}, messages::state::WorldStateMessage};
+
 pub use self::world_state::{StateHandle, WorldState};
 use anyhow::{anyhow, Result};
-use plane_core::{
-    messages::state::WorldStateMessage,
-    nats::{JetstreamSubscription, TypedNats},
-};
 
 mod world_state;
 
