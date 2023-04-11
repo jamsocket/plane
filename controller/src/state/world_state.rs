@@ -32,8 +32,6 @@ impl StateHandle {
 
         let min_keepalive = timestamp - chrono::Duration::seconds(30);
 
-        tracing::info!(?world_state, "World state");
-
         Ok(world_state
             .cluster(cluster)
             .ok_or_else(|| anyhow!("Cluster not found."))?

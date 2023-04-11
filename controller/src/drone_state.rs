@@ -87,7 +87,6 @@ pub async fn apply_state_message(
     message: &WorldStateMessage,
 ) -> Result<Option<u64>> {
     let overwrite = message.overwrite();
-    tracing::info!(?message, ?overwrite, "Publishing state message.");
     if overwrite {
         nats.publish_jetstream(message).await.map(Some)
     } else {

@@ -391,7 +391,7 @@ impl Engine for DockerInterface {
             let state_json = serde_json::to_string(&state)
                 .unwrap_or_else(|_| "Failed to serialize container state.".into());
 
-            tracing::info!(?status, state=?state_json, "Set to terminal state.");
+            tracing::info!(?status, state=%state_json, "Set to terminal state.");
 
             Ok(status)
         }

@@ -1,0 +1,1 @@
+Sample config, also used for Docker compose.

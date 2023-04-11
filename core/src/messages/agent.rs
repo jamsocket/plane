@@ -159,6 +159,7 @@ impl BackendStatsMessage {
         cur_stats_message: &Stats,
     ) -> Result<BackendStatsMessage, Error> {
         // Based on docs here: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerStats
+
         let mem_naive_usage = cur_stats_message
             .memory_stats
             .usage

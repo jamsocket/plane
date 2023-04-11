@@ -1,0 +1,7 @@
+[nats]
+hosts = ["127.0.0.1"]
+
+[scheduler]
+
+[dns]
+port = 5353

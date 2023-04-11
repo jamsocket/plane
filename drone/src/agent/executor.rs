@@ -280,7 +280,7 @@ impl<E: Engine> Executor<E> {
                 }
                 Ok(None) => {
                     // Successful termination.
-                    tracing::info!("Terminated successfully.");
+                    tracing::info!("Backend terminated successfully.");
                     break;
                 }
                 Err(error) => {
