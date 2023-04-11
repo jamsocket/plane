@@ -1,0 +1,16 @@
+cluster_domain = "plane.test"
+
+[nats]
+hosts = ["127.0.0.1"]
+
+[agent]
+ip = "127.0.0.1"
+
+[proxy]
+bind_ip = "127.0.0.1"
+port = "8080"
+https_port = "4333"
+
+[cert]
+key_path = "sample-config/auth/site-key.pem"
+cert_path = "sample-config/auth/site-cert.pem"

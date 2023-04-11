@@ -156,8 +156,6 @@ where
             .context("Attempted to respond to a message with no reply subject.")?
             .to_string();
 
-        tracing::info!("Responding to message on {}", reply_inbox);
-
         self.nc
             .publish(reply_inbox, Bytes::from(serde_json::to_vec(response)?))
             .await?;

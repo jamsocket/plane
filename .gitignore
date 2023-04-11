@@ -1,3 +1,4 @@
 /target
 test-scratch
 lcov.info
+drone.sqlite3

@@ -49,3 +49,19 @@ Integration tests can be slow because they simulate entire workload lifecycles. 
 cargo install cargo-nextest
 cargo nextest run
 ```
+
+## Developing locally
+
+To develop locally, use the `./dev-*.sh` scripts in the root of this repo, in this order:
+
+- Start NATS with `./dev-nats.sh`
+- Start the controller with `./dev-controller.sh`
+- Start the drone with `./dev-drone.sh`
+
+Then, you can use the CLI with `./dev-cli.sh`. For example, you can spawn a hello-world image like this:
+
+    ./dev-cli.sh spawn plane.test ghcr.io/drifting-in-space/demo-image-hello-world:sha-3b58532
+
+And then access it with:
+
+    ./dev-curl.sh [URL returned after spawn]

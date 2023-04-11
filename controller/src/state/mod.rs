@@ -27,7 +27,6 @@ pub async fn start_state_loop(nc: TypedNats) -> Result<StateHandle> {
         let state_handle = state_handle.clone();
         tokio::spawn(async move {
             while let Some((message, _)) = sub.next().await {
-                tracing::info!(?message, "Applying state message");
                 state_handle.write_state().apply(message);
             }
         });
