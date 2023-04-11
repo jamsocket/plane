@@ -28,7 +28,7 @@ impl StateHandle {
         cluster: &ClusterName,
         timestamp: DateTime<Utc>,
     ) -> Result<Vec<DroneId>> {
-        let world_state = self.0.write().expect("Could not acquire world_state lock.");
+        let world_state = self.0.read().expect("Could not acquire world_state lock.");
 
         let min_keepalive = timestamp - chrono::Duration::seconds(30);
 
@@ -92,7 +92,7 @@ impl ClusterState {
                 backend.apply(message.message);
             }
             ClusterStateMessage::AcmeMessage(message) => {
-                if self.txt_records.len() > 10 {
+                if self.txt_records.len() >= 10 {
                     self.txt_records.pop_front();
                 }
 

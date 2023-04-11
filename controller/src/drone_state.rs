@@ -35,7 +35,7 @@ fn convert_to_state_message(
                     version: msg
                         .version
                         .clone()
-                        .unwrap_or("missing_drone_id".to_string()), // Existing drones do not report a version in their connect message.
+                        .unwrap_or("missing_drone_version".to_string()), // Existing drones do not report a version in their connect message.
                 }),
             }),
         }],
@@ -125,7 +125,7 @@ pub async fn monitor_drone_state(nats: TypedNats) -> NeverResult {
         };
 
         if let Some(message) = message {
-            tracing::info!(message=?message.value, "Got state message from drone.");
+            tracing::debug!(message=?message.value, "Got state message from drone.");
 
             let state_messages = convert_to_state_message(Utc::now(), &message.value);
             for state_message in state_messages {

@@ -59,7 +59,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                         }
                     }
                     Ok(false) => {
-                        tracing::warn!("No drone available.");
+                        tracing::warn!("Drone rejected backend.");
                         ScheduleResponse::NoDroneAvailable
                     }
                     Err(error) => {
