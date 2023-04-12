@@ -23,7 +23,7 @@ struct Opts {
 #[derive(Subcommand)]
 enum Command {
     ListDrones,
-    ListDns,
+    ListBackends,
     Spawn {
         cluster: String,
         image: String,
@@ -164,8 +164,22 @@ async fn main() -> Result<()> {
                 ),
             }
         }
-        Command::ListDns => {
-            todo!("Implement list dns");
+        Command::ListBackends => {
+            for (cluster_name, cluster) in &state.state().clusters {
+                println!("{}", cluster_name.to_string().bright_green());
+                for (backend_id, backend) in &cluster.backends {
+                    println!(
+                        "\t{}.{}\t{}",
+                        backend_id.to_string().bright_blue(),
+                        cluster_name.to_string().bright_green(),
+                        backend
+                            .state()
+                            .map(|d| d.to_string())
+                            .unwrap_or_else(|| "unknown".to_string())
+                            .bright_magenta(),
+                    );
+                }
+            }
         }
         Command::Terminate {
             cluster, backend, ..
