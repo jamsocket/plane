@@ -1,6 +1,9 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use plane_core::{types::{ClusterName, DroneId}, state::StateHandle};
+use plane_core::{
+    state::StateHandle,
+    types::{ClusterName, DroneId},
+};
 use rand::{seq::SliceRandom, thread_rng};
 use std::{error::Error, fmt::Display};
 

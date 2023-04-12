@@ -7,7 +7,7 @@ use plane_core::{
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
     },
     nats_connection::NatsConnectionSpec,
-    state::start_state_loop,
+    state::get_world_state,
     types::{BackendId, ClusterName, DroneId},
 };
 use std::{collections::HashMap, time::Duration};
@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
         .connect("cli.inbox")
         .await?;
 
-    let state = start_state_loop(nats.clone()).await?;
+    let state = get_world_state(nats.clone()).await?;
 
     match opts.command {
         Command::Status { backend } => {
@@ -85,7 +85,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListDrones => {
-            for (cluster_name, cluster) in &state.state().clusters {
+            for (cluster_name, cluster) in &state.clusters {
                 println!("{}", cluster_name.to_string().bright_green());
                 for (drone_id, drone) in &cluster.drones {
                     println!(
@@ -166,7 +166,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListBackends => {
-            for (cluster_name, cluster) in &state.state().clusters {
+            for (cluster_name, cluster) in &state.clusters {
                 println!("{}", cluster_name.to_string().bright_green());
                 for (backend_id, backend) in &cluster.backends {
                     println!(

@@ -7,8 +7,9 @@ use plane_core::{
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
     nats::TypedNats,
+    state::StateHandle,
     timing::Timer,
-    NeverResult, state::StateHandle,
+    NeverResult,
 };
 use scheduler::Scheduler;
 

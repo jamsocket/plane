@@ -2,9 +2,7 @@ use anyhow::Result;
 use chrono::Utc;
 use integration_test::integration_test;
 use plane_controller::{
-    drone_state::monitor_drone_state,
-    run::update_backend_state_loop,
-    run_scheduler,
+    drone_state::monitor_drone_state, run::update_backend_state_loop, run_scheduler,
 };
 use plane_core::{
     messages::{
@@ -13,8 +11,9 @@ use plane_core::{
         scheduler::ScheduleResponse,
     },
     nats::TypedNats,
+    state::{start_state_loop, StateHandle},
     types::{BackendId, ClusterName, DroneId},
-    NeverResult, state::{StateHandle, start_state_loop},
+    NeverResult,
 };
 use plane_dev::{
     resources::nats::Nats,
