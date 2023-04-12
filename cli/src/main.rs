@@ -7,7 +7,8 @@ use plane_core::{
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
     },
     nats_connection::NatsConnectionSpec,
-    types::{BackendId, ClusterName, DroneId}, state::get_world_state,
+    state::get_world_state,
+    types::{BackendId, ClusterName, DroneId},
 };
 use std::{collections::HashMap, time::Duration};
 

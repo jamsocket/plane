@@ -1,8 +1,6 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use integration_test::integration_test;
-use plane_controller::{
-    drone_state::{apply_state_message, monitor_drone_state},
-};
+use plane_controller::drone_state::{apply_state_message, monitor_drone_state};
 use plane_core::{
     messages::{
         agent::BackendState,
@@ -13,8 +11,9 @@ use plane_core::{
         },
     },
     nats::TypedNats,
+    state::{start_state_loop, StateHandle},
     types::{BackendId, ClusterName, DroneId},
-    NeverResult, state::{StateHandle, start_state_loop},
+    NeverResult,
 };
 use plane_dev::{
     resources::nats::Nats,

@@ -1,9 +1,9 @@
-use crate::{
-    config::ControllerConfig,
-    dns::rname_format::format_rname,
-};
+use crate::{config::ControllerConfig, dns::rname_format::format_rname};
 use anyhow::{Context, Result};
-use plane_core::{nats::TypedNats, state::{StateHandle, start_state_loop}};
+use plane_core::{
+    nats::TypedNats,
+    state::{start_state_loop, StateHandle},
+};
 use std::net::IpAddr;
 use trust_dns_server::client::rr::Name;
 
