@@ -2,6 +2,7 @@ use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
+#[allow(unused)] // Context is unused if bollard is not enabled.
 use anyhow::{anyhow, Context, Error};
 #[cfg(feature = "bollard")]
 use bollard::container::{LogOutput, MemoryStatsStats, Stats};
@@ -314,17 +315,12 @@ impl DroneConnectRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug, Default)]
 pub enum DockerPullPolicy {
+    #[default]
     IfNotPresent,
     Always,
     Never,
-}
-
-impl Default for DockerPullPolicy {
-    fn default() -> Self {
-        DockerPullPolicy::IfNotPresent
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

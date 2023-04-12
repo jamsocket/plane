@@ -8,10 +8,9 @@ use plane_core::{
     },
     nats::TypedNats,
     timing::Timer,
-    NeverResult,
+    NeverResult, state::StateHandle,
 };
 use scheduler::Scheduler;
-use state::StateHandle;
 
 mod config;
 pub mod dns;
@@ -19,7 +18,6 @@ pub mod drone_state;
 pub mod plan;
 pub mod run;
 mod scheduler;
-pub mod state;
 
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     let scheduler = Scheduler::new(state);

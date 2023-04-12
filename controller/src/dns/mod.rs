@@ -3,10 +3,10 @@ pub mod rname_format;
 
 use self::error::OrDnsError;
 use crate::plan::DnsPlan;
-use crate::state::StateHandle;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use error::Result;
+use plane_core::state::StateHandle;
 use plane_core::types::{BackendId, ClusterName};
 use plane_core::Never;
 use std::net::IpAddr;

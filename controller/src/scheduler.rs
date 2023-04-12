@@ -1,7 +1,6 @@
-use crate::state::StateHandle;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use plane_core::types::{ClusterName, DroneId};
+use plane_core::{types::{ClusterName, DroneId}, state::StateHandle};
 use rand::{seq::SliceRandom, thread_rng};
 use std::{error::Error, fmt::Display};
 
