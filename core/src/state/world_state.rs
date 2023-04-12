@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use std::{
-    collections::{BTreeSet, HashMap, VecDeque},
+    collections::{BTreeSet, HashMap, VecDeque, BTreeMap},
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
@@ -49,7 +49,7 @@ impl StateHandle {
 
 #[derive(Default, Debug)]
 pub struct WorldState {
-    clusters: HashMap<ClusterName, ClusterState>,
+    pub clusters: HashMap<ClusterName, ClusterState>,
 }
 
 impl WorldState {
@@ -65,8 +65,8 @@ impl WorldState {
 
 #[derive(Default, Debug)]
 pub struct ClusterState {
-    pub drones: HashMap<DroneId, DroneState>,
-    pub backends: HashMap<BackendId, BackendState>,
+    pub drones: BTreeMap<DroneId, DroneState>,
+    pub backends: BTreeMap<BackendId, BackendState>,
     pub txt_records: VecDeque<String>,
 }
 
@@ -128,7 +128,7 @@ impl DroneState {
     }
 
     /// Return the most recent state, or None.
-    fn state(&self) -> Option<agent::DroneState> {
+    pub fn state(&self) -> Option<agent::DroneState> {
         self.states.last().map(|(_, state)| *state)
     }
 }
