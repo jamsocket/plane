@@ -315,17 +315,12 @@ impl DroneConnectRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug, Default)]
 pub enum DockerPullPolicy {
+    #[default]
     IfNotPresent,
     Always,
     Never,
-}
-
-impl Default for DockerPullPolicy {
-    fn default() -> Self {
-        DockerPullPolicy::IfNotPresent
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

@@ -95,7 +95,7 @@ impl ClusterState {
         let backend = self.backends.get(backend)?;
 
         let drone = backend.drone.as_ref()?;
-        let drone = self.drones.get(&drone)?;
+        let drone = self.drones.get(drone)?;
 
         drone.meta.as_ref().map(|d| d.ip)
     }
