@@ -165,7 +165,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListBackends => {
-            for (cluster_name, cluster) in &state.state().clusters {
+            for (cluster_name, cluster) in &state.clusters {
                 println!("{}", cluster_name.to_string().bright_green());
                 for (backend_id, backend) in &cluster.backends {
                     println!(
