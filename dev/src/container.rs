@@ -210,8 +210,9 @@ pub async fn pull_image(docker: &Docker, name: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn build_image(path: &Path) -> Result<String> {
+pub async fn build_image<P: AsRef<Path>>(path: P) -> Result<String> {
 	// the docker api requires tarballs, which is just an unnecessary headache, so just using the binary here.
+	let path = path.as_ref();
 	let mut docker_cmd = Command::new("docker");
 	let image_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 10);
 	docker_cmd.args(["build","-t", &image_name]);
