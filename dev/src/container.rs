@@ -1,13 +1,16 @@
 use crate::{scratch_dir, TEST_CONTEXT};
-use anyhow::{Context, Result};
+use std::path::Path;
+use anyhow::{Context, Result, anyhow};
 use bollard::{
     container::{Config, LogsOptions, StartContainerOptions},
     image::CreateImageOptions,
     models::HostConfig,
     Docker,
 };
+use rand::distributions::{Alphanumeric, DistString};
 use std::{collections::HashMap, fmt::Display, fs::File, io::Write, net::Ipv4Addr, ops::Deref};
 use tokio::task::JoinHandle;
+use tokio::process::Command;
 use tokio_stream::StreamExt;
 
 #[derive(Clone)]
@@ -86,6 +89,18 @@ pub struct ContainerResource {
 }
 
 impl ContainerResource {
+	pub async fn build(build_dir: Box<Path>) -> Result<ContainerResource> {
+		let docker: Docker =
+			Docker::connect_with_unix_defaults().context("Couldn't connect to Docker socket.")?;
+
+		tracing::info!("Building image in {}", build_dir.display());
+
+		//docker.build_image(
+
+
+		Err(anyhow!("go away rust analyzer"))
+	}
+
     pub async fn new(spec: &ContainerSpec) -> Result<ContainerResource> {
         let docker =
             Docker::connect_with_unix_defaults().context("Couldn't connect to Docker socket.")?;
@@ -205,4 +220,20 @@ pub async fn pull_image(docker: &Docker, name: &str) -> Result<()> {
     println!();
 
     Ok(())
+}
+
+pub async fn build_image(path: &Path) -> Result<String> {
+	// the docker api requires tarballs, which is just an unnecessary headache, so just using the binary here.
+	let mut docker_cmd = Command::new("docker");
+	let image_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 10);
+	docker_cmd.args(["build","-t", &image_name]);
+	docker_cmd.current_dir(path);
+
+	let output = docker_cmd.output().await?;
+	if !output.status.success() {
+		eprintln!("stderr of docker build: {:?}", output.stderr);
+		return Err(anyhow!("docker build failed in dir {}", path.display()));
+	}
+
+	Ok(image_name)
 }
