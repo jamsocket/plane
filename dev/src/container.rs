@@ -89,18 +89,6 @@ pub struct ContainerResource {
 }
 
 impl ContainerResource {
-	pub async fn build(build_dir: Box<Path>) -> Result<ContainerResource> {
-		let docker: Docker =
-			Docker::connect_with_unix_defaults().context("Couldn't connect to Docker socket.")?;
-
-		tracing::info!("Building image in {}", build_dir.display());
-
-		//docker.build_image(
-
-
-		Err(anyhow!("go away rust analyzer"))
-	}
-
     pub async fn new(spec: &ContainerSpec) -> Result<ContainerResource> {
         let docker =
             Docker::connect_with_unix_defaults().context("Couldn't connect to Docker socket.")?;
@@ -228,7 +216,10 @@ pub async fn build_image(path: &Path) -> Result<String> {
 	let image_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 10);
 	docker_cmd.args(["build","-t", &image_name]);
 	docker_cmd.current_dir(path);
-
+	if !path.is_dir() {
+		return Err(anyhow!("must pass in directory to build!"));
+	}
+	tracing::info!("Building image in {}", path.display());
 	let output = docker_cmd.output().await?;
 	if !output.status.success() {
 		eprintln!("stderr of docker build: {:?}", output.stderr);
