@@ -126,7 +126,7 @@ pub fn base_spawn_request() -> SpawnRequest {
 }
 
 async fn make_invalid_image() -> String {
-	build_image("/test-images/invalid-image").await.expect("invalid image should build")
+	build_image("test-images/invalid-image").await.expect("invalid image should build")
 }
 
 pub async fn invalid_image_spawn_request() -> SpawnRequest {

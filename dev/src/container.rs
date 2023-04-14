@@ -7,7 +7,8 @@ use bollard::{
     models::HostConfig,
     Docker,
 };
-use rand::distributions::{Alphanumeric, DistString};
+use rand::{Rng, thread_rng};
+use rand::distributions::{Alphanumeric, DistString, Uniform};
 use std::{collections::HashMap, fmt::Display, fs::File, io::Write, net::Ipv4Addr, ops::Deref};
 use tokio::task::JoinHandle;
 use tokio::process::Command;
@@ -210,22 +211,30 @@ pub async fn pull_image(docker: &Docker, name: &str) -> Result<()> {
     Ok(())
 }
 
+fn random_lowercase_string(len: i32) -> String{
+	let mut rng = rand::thread_rng();
+	let alphabet = Uniform::from('a'..='z');
+	(0..len).map(|_| rng.sample(alphabet) as char).collect()
+}
+
 pub async fn build_image<P: AsRef<Path>>(path: P) -> Result<String> {
 	// the docker api requires tarballs, which is just an unnecessary headache, so just using the binary here.
 	let path = path.as_ref();
 	let mut docker_cmd = Command::new("docker");
-	let image_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 10);
-	docker_cmd.args(["build","-t", &image_name]);
+	let image_name = random_lowercase_string(10);
+	docker_cmd.args(["build","-t", &image_name, "."]);
 	docker_cmd.current_dir(path);
 	if !path.is_dir() {
 		return Err(anyhow!("must pass in directory to build!"));
 	}
 	tracing::info!("Building image in {}", path.display());
+	//println!("{}", path.display());
 	let output = docker_cmd.output().await?;
 	if !output.status.success() {
-		eprintln!("stderr of docker build: {:?}", output.stderr);
+		//eprintln!("stderr of docker build: {}", String::from_utf8(output.stderr).unwrap());
 		return Err(anyhow!("docker build failed in dir {}", path.display()));
 	}
-
+	//println!("{}", String::from_utf8(output.stdout).unwrap());
+	
 	Ok(image_name)
 }

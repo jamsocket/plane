@@ -16,7 +16,7 @@ use plane_dev::{
     resources::server::Server,
     scratch_dir,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{base_spawn_request, random_loopback_ip},
+    util::{base_spawn_request, random_loopback_ip, invalid_image_spawn_request},
 };
 use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
@@ -252,6 +252,54 @@ async fn drone_sends_draining_status() {
         .await
         .unwrap();
 }
+
+async fn do_spawn_request(mut request: SpawnRequest) -> BackendStateSubscription {
+    let nats = Nats::new().await.unwrap();
+    let connection = nats.connection().await.unwrap();
+    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let drone_id = DroneId::new_random();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
+    controller_mock
+        .expect_handshake(&drone_id, agent.ip)
+        .await
+        .unwrap();
+
+    controller_mock
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
+        .await
+        .unwrap();
+
+	let state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+			.await
+			.unwrap();
+
+
+    request.drone_id = drone_id.clone();
+    controller_mock.spawn_backend(&request).await.unwrap();
+	state_subscription
+
+}
+
+#[integration_test]
+async fn invalid_container_fails() {
+	let mut sub = do_spawn_request(invalid_image_spawn_request().await).await;
+	sub
+        .expect_backend_status_message(BackendState::Loading, 30_000)
+        .await
+        .unwrap();
+	sub
+        .expect_backend_status_message(BackendState::ErrorLoading, 30_000)
+        .await
+        .unwrap();
+	sub
+		.expect_backend_status_message(BackendState::Failed, 60_000)
+		.await
+		.unwrap();
+}
+	
+	
 
 #[integration_test]
 async fn spawn_with_agent() {
