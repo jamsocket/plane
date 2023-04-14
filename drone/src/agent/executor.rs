@@ -331,7 +331,10 @@ impl<E: Engine> Executor<E> {
     ) -> Result<Option<BackendState>> {
         match state {
             BackendState::Loading => {
-                self.engine.load(spawn_request).await?;
+				if let Err(loading_error) = self.engine.load(spawn_request).await {
+					tracing::error!("{}", loading_error);
+					return Ok(Some(BackendState::ErrorLoading));
+				};
 
                 Ok(Some(BackendState::Starting))
             }
