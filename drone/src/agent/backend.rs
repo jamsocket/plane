@@ -8,7 +8,7 @@ use plane_core::{
 };
 use std::{net::IpAddr, time::Duration};
 use tokio::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::mpsc::{self, Receiver},
     task::JoinHandle,
     time::sleep,
 };
@@ -27,7 +27,7 @@ pub struct BackendMonitor {
     _log_loop: AbortOnDrop<()>,
     _stats_loop: AbortOnDrop<()>,
     _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
-    inject_log: Sender<DroneLogMessage>,
+    pub inject_log: Box<dyn FnMut(String) + Send + Sync>,
 }
 
 impl BackendMonitor {
@@ -47,7 +47,11 @@ impl BackendMonitor {
             _log_loop: AbortOnDrop(log_loop),
             _stats_loop: AbortOnDrop(stats_loop),
             _dns_loop: AbortOnDrop(dns_loop),
-            inject_log: meta_log_tx,
+            inject_log: Box::new(|text: String| { meta_log_tx.clone().send(DroneLogMessage {
+				backend_id: backend_id.to_owned(),
+				kind: plane_core::messages::agent::DroneLogMessageKind::Stderr,
+				text
+			}); }),
         }
     }
 
