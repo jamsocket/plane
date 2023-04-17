@@ -26,7 +26,7 @@ use trust_dns_resolver::{
 };
 use trust_dns_server::client::rr::Name;
 
-const DNS_PORT: u16 = 5353;
+const DNS_PORT: u16 = 5354;
 
 struct DnsServer {
     _guard: LivenessGuard<Result<Never, anyhow::Error>>,
