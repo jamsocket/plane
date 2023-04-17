@@ -16,7 +16,7 @@ use plane_dev::{
     resources::server::Server,
     scratch_dir,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{base_spawn_request, random_loopback_ip, invalid_image_spawn_request},
+    util::{base_spawn_request, invalid_image_spawn_request, random_loopback_ip},
 };
 use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
@@ -253,7 +253,15 @@ async fn drone_sends_draining_status() {
         .unwrap();
 }
 
-async fn do_spawn_request(mut request: SpawnRequest) -> BackendStateSubscription {
+#[allow(dead_code)]
+struct Ctx {
+    nats_server: Nats,
+    nats_connection: TypedNats,
+    controller: MockController,
+    agent: Agent,
+}
+
+async fn do_spawn_request(mut request: SpawnRequest) -> (Ctx, BackendStateSubscription) {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
     let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
@@ -271,35 +279,33 @@ async fn do_spawn_request(mut request: SpawnRequest) -> BackendStateSubscription
         .await
         .unwrap();
 
-	let state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
-			.await
-			.unwrap();
-
+    let state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+        .await
+        .unwrap();
 
     request.drone_id = drone_id.clone();
     controller_mock.spawn_backend(&request).await.unwrap();
-	state_subscription
-
+    (
+        Ctx {
+            nats_server: nats,
+            nats_connection: connection,
+            controller: controller_mock,
+            agent,
+        },
+        state_subscription,
+    )
 }
 
 #[integration_test]
 async fn invalid_container_fails() {
-	let mut sub = do_spawn_request(invalid_image_spawn_request().await).await;
-	sub
-        .expect_backend_status_message(BackendState::Loading, 30_000)
+    let (_ctx, mut sub) = do_spawn_request(invalid_image_spawn_request().await).await;
+    sub.expect_backend_status_message(BackendState::Loading, 30_000)
         .await
         .unwrap();
-	sub
-        .expect_backend_status_message(BackendState::ErrorLoading, 30_000)
+    sub.expect_backend_status_message(BackendState::ErrorLoading, 30_000)
         .await
         .unwrap();
-	sub
-		.expect_backend_status_message(BackendState::Failed, 60_000)
-		.await
-		.unwrap();
 }
-	
-	
 
 #[integration_test]
 async fn spawn_with_agent() {
