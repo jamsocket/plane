@@ -1,12 +1,17 @@
 use crate::agent::engine::Engine;
 use plane_core::{
     logging::LogError,
+    messages::agent::DroneLogMessage,
     messages::dns::{DnsRecordType, SetDnsRecord},
     nats::TypedNats,
     types::{BackendId, ClusterName},
 };
 use std::{net::IpAddr, time::Duration};
-use tokio::{task::JoinHandle, time::sleep};
+use tokio::{
+    sync::mpsc::{self, Receiver, Sender},
+    task::JoinHandle,
+    time::sleep,
+};
 use tokio_stream::StreamExt;
 
 /// JoinHandle does not abort when it is dropped; this wrapper does.
@@ -22,6 +27,7 @@ pub struct BackendMonitor {
     _log_loop: AbortOnDrop<()>,
     _stats_loop: AbortOnDrop<()>,
     _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
+    inject_log: Sender<DroneLogMessage>,
 }
 
 impl BackendMonitor {
@@ -32,7 +38,8 @@ impl BackendMonitor {
         engine: &E,
         nc: &TypedNats,
     ) -> Self {
-        let log_loop = Self::log_loop(backend_id, engine, nc);
+        let (meta_log_tx, mut meta_log_rx) = mpsc::channel(16);
+        let log_loop = Self::log_loop(backend_id, engine, nc, meta_log_rx);
         let stats_loop = Self::stats_loop(backend_id, cluster, engine, nc);
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
@@ -40,6 +47,7 @@ impl BackendMonitor {
             _log_loop: AbortOnDrop(log_loop),
             _stats_loop: AbortOnDrop(stats_loop),
             _dns_loop: AbortOnDrop(dns_loop),
+            inject_log: meta_log_tx,
         }
     }
 
@@ -69,7 +77,12 @@ impl BackendMonitor {
         })
     }
 
-    fn log_loop<E: Engine>(backend_id: &BackendId, engine: &E, nc: &TypedNats) -> JoinHandle<()> {
+    fn log_loop<E: Engine>(
+        backend_id: &BackendId,
+        engine: &E,
+        nc: &TypedNats,
+        mut meta_log_rx: Receiver<DroneLogMessage>,
+    ) -> JoinHandle<()> {
         let mut stream = engine.log_stream(backend_id);
         let nc = nc.clone();
         let backend_id = backend_id.clone();
@@ -77,11 +90,14 @@ impl BackendMonitor {
         tokio::spawn(async move {
             tracing::info!(%backend_id, "Log recording loop started.");
 
-            while let Some(v) = stream.next().await {
-                nc.publish(&v)
-                    .await
-                    .log_error("Error publishing log message.");
-            }
+            let v = tokio::select! {
+                Some(v) = stream.next() => { v }
+                Some(v) = meta_log_rx.recv() => { v }
+            };
+
+            nc.publish(&v)
+                .await
+                .log_error("Error publishing log message.");
 
             tracing::info!(%backend_id, "Log loop terminated.");
         })
