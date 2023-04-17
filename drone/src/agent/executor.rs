@@ -267,17 +267,6 @@ impl<E: Engine> Executor<E> {
             match next_state {
                 Ok(Some(new_state)) => {
                     state = new_state;
-
-                    /*
-                    if state.running_or_loading()
-                        && !self
-                            .backend_to_monitor
-                            .contains_key(&spawn_request.backend_id)
-                    {
-
-                    }
-                    */
-
                     self.update_backend_state(spawn_request, state).await;
                 }
                 Ok(None) => {
