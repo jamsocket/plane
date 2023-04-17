@@ -3,7 +3,10 @@ use integration_test::integration_test;
 use plane_controller::{drone_state::monitor_drone_state, run::update_backend_state_loop};
 use plane_core::{
     messages::{
-        agent::{BackendState, BackendStatsMessage, DroneLogMessage, SpawnRequest, TerminationRequest, DroneLogMessageKind},
+        agent::{
+            BackendState, BackendStatsMessage, DroneLogMessage, DroneLogMessageKind, SpawnRequest,
+            TerminationRequest,
+        },
         drone_state::{DroneStatusMessage, UpdateBackendStateMessage},
         scheduler::DrainDrone,
     },
@@ -294,18 +297,23 @@ async fn do_spawn_request(mut request: SpawnRequest) -> (Ctx, BackendStateSubscr
 
 #[integration_test]
 async fn invalid_container_fails() {
-	let req = invalid_image_spawn_request().await;
+    let req = invalid_image_spawn_request().await;
     let (ctx, mut sub) = do_spawn_request(req.clone()).await;
-	let mut log_subscription = ctx.nats_connection
-			.subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
-			.await.unwrap();
+    let mut log_subscription = ctx
+        .nats_connection
+        .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
+        .await
+        .unwrap();
     sub.expect_backend_status_message(BackendState::Loading, 30_000)
         .await
         .unwrap();
     sub.expect_backend_status_message(BackendState::ErrorLoading, 30_000)
         .await
         .unwrap();
-	assert_eq!(log_subscription.next().await.unwrap().value.kind, DroneLogMessageKind::Docker);
+    assert_eq!(
+        log_subscription.next().await.unwrap().value.kind,
+        DroneLogMessageKind::Docker
+    );
 }
 
 #[integration_test]

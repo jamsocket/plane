@@ -50,7 +50,7 @@ impl From<&DockerCredentials> for bollard::auth::DockerCredentials {
 pub enum DroneLogMessageKind {
     Stdout,
     Stderr,
-	Docker
+    Docker,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

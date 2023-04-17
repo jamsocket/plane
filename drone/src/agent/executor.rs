@@ -11,7 +11,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use plane_core::{
     messages::{
-        agent::{BackendState, SpawnRequest, TerminationRequest, DroneLogMessageKind},
+        agent::{BackendState, DroneLogMessageKind, SpawnRequest, TerminationRequest},
         drone_state::UpdateBackendStateMessage,
     },
     nats::TypedNats,
@@ -220,21 +220,21 @@ impl<E: Engine> Executor<E> {
         let (send, mut recv) = channel(1);
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
-		self.backend_to_monitor.insert(
-			spawn_request.backend_id.clone(),
-			BackendMonitor::new(
-				&spawn_request.backend_id,
-				&self.cluster,
-				self.ip,
-				self.engine.as_ref(),
-				&self.nc,
-			),
-		);
-		loop {
-			tracing::info!(
-				?state,
-				backend_id = spawn_request.backend_id.id(),
-				metadata = %json!(spawn_request.metadata),
+        self.backend_to_monitor.insert(
+            spawn_request.backend_id.clone(),
+            BackendMonitor::new(
+                &spawn_request.backend_id,
+                &self.cluster,
+                self.ip,
+                self.engine.as_ref(),
+                &self.nc,
+            ),
+        );
+        loop {
+            tracing::info!(
+                ?state,
+                backend_id = spawn_request.backend_id.id(),
+                metadata = %json!(spawn_request.metadata),
                 "Executing state."
             );
 
@@ -268,15 +268,15 @@ impl<E: Engine> Executor<E> {
                 Ok(Some(new_state)) => {
                     state = new_state;
 
-					/*
+                    /*
                     if state.running_or_loading()
                         && !self
                             .backend_to_monitor
                             .contains_key(&spawn_request.backend_id)
                     {
-                        
+
                     }
-					*/
+                    */
 
                     self.update_backend_state(spawn_request, state).await;
                 }
@@ -290,13 +290,16 @@ impl<E: Engine> Executor<E> {
                     match state {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
-							if let Err(_inject_err) =
-								self.backend_to_monitor.get_mut(&spawn_request.backend_id)
-								.expect("backend should be in backend_to_monitor")
-								.value_mut().inject_log(
-									error.to_string(), DroneLogMessageKind::Docker).await {
-									tracing::error!("failed to inject error into logs");
-								}
+                            if let Err(_inject_err) = self
+                                .backend_to_monitor
+                                .get_mut(&spawn_request.backend_id)
+                                .expect("backend should be in backend_to_monitor")
+                                .value_mut()
+                                .inject_log(error.to_string(), DroneLogMessageKind::Docker)
+                                .await
+                            {
+                                tracing::error!("failed to inject error into logs");
+                            }
                             self.update_backend_state(spawn_request, state).await;
                         }
                         _ => tracing::error!(

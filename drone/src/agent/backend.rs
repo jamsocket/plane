@@ -3,13 +3,16 @@ use futures::Future;
 use plane_core::{
     logging::LogError,
     messages::agent::DroneLogMessage,
-    messages::{dns::{DnsRecordType, SetDnsRecord}, agent::DroneLogMessageKind},
+    messages::{
+        agent::DroneLogMessageKind,
+        dns::{DnsRecordType, SetDnsRecord},
+    },
     nats::TypedNats,
     types::{BackendId, ClusterName},
 };
 use std::{net::IpAddr, time::Duration};
 use tokio::{
-    sync::mpsc::{self, Receiver, Sender, error::SendError},
+    sync::mpsc::{self, error::SendError, Receiver, Sender},
     task::JoinHandle,
     time::sleep,
 };
@@ -29,7 +32,7 @@ pub struct BackendMonitor {
     _stats_loop: AbortOnDrop<()>,
     _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
     _log_injection_channel: Sender<DroneLogMessage>,
-	_backend_id: BackendId,
+    _backend_id: BackendId,
 }
 
 impl BackendMonitor {
@@ -50,17 +53,21 @@ impl BackendMonitor {
             _stats_loop: AbortOnDrop(stats_loop),
             _dns_loop: AbortOnDrop(dns_loop),
             _log_injection_channel: meta_log_tx,
-			_backend_id: backend_id.to_owned()
+            _backend_id: backend_id.to_owned(),
         }
     }
 
-	pub fn inject_log(&mut self, text: String, kind: DroneLogMessageKind) -> impl Future<Output = Result<(), SendError<DroneLogMessage>>> + '_ {
-		self._log_injection_channel.send(DroneLogMessage {
-			backend_id: self._backend_id.clone(),
-			kind,
-			text
-		})
-	}
+    pub fn inject_log(
+        &mut self,
+        text: String,
+        kind: DroneLogMessageKind,
+    ) -> impl Future<Output = Result<(), SendError<DroneLogMessage>>> + '_ {
+        self._log_injection_channel.send(DroneLogMessage {
+            backend_id: self._backend_id.clone(),
+            kind,
+            text,
+        })
+    }
 
     fn dns_loop(
         backend_id: &BackendId,
