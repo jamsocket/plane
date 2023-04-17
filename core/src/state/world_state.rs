@@ -10,7 +10,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
@@ -57,7 +57,7 @@ impl StateHandle {
 
 #[derive(Default, Debug)]
 pub struct WorldState {
-    pub clusters: HashMap<ClusterName, ClusterState>,
+    pub clusters: BTreeMap<ClusterName, ClusterState>,
 }
 
 impl WorldState {
