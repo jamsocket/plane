@@ -11,7 +11,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use plane_core::{
     messages::{
-        agent::{BackendState, SpawnRequest, TerminationRequest},
+        agent::{BackendState, SpawnRequest, TerminationRequest, DroneLogMessageKind},
         drone_state::UpdateBackendStateMessage,
     },
     nats::TypedNats,
@@ -293,7 +293,8 @@ impl<E: Engine> Executor<E> {
 							if let Err(_inject_err) =
 								self.backend_to_monitor.get_mut(&spawn_request.backend_id)
 								.expect("backend should be in backend_to_monitor")
-								.value_mut().inject_log(error.to_string()).await {
+								.value_mut().inject_log(
+									error.to_string(), DroneLogMessageKind::Docker).await {
 									tracing::error!("failed to inject error into logs");
 								}
                             self.update_backend_state(spawn_request, state).await;

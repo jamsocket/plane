@@ -3,7 +3,7 @@ use futures::Future;
 use plane_core::{
     logging::LogError,
     messages::agent::DroneLogMessage,
-    messages::dns::{DnsRecordType, SetDnsRecord},
+    messages::{dns::{DnsRecordType, SetDnsRecord}, agent::DroneLogMessageKind},
     nats::TypedNats,
     types::{BackendId, ClusterName},
 };
@@ -54,10 +54,10 @@ impl BackendMonitor {
         }
     }
 
-	pub fn inject_log(&mut self, text: String) -> impl Future<Output = Result<(), SendError<DroneLogMessage>>> + '_ {
+	pub fn inject_log(&mut self, text: String, kind: DroneLogMessageKind) -> impl Future<Output = Result<(), SendError<DroneLogMessage>>> + '_ {
 		self._log_injection_channel.send(DroneLogMessage {
 			backend_id: self._backend_id.clone(),
-			kind: plane_core::messages::agent::DroneLogMessageKind::Stderr,
+			kind,
 			text
 		})
 	}
