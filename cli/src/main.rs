@@ -23,6 +23,7 @@ struct Opts {
 
 #[derive(Subcommand)]
 enum Command {
+    DumpState,
     ListDrones,
     ListBackends,
     Spawn {
@@ -65,6 +66,9 @@ async fn main() -> Result<()> {
     let state = get_world_state(nats.clone()).await?;
 
     match opts.command {
+        Command::DumpState => {
+            println!("{:#?}", state);
+        }
         Command::Status { backend } => {
             let mut sub = if let Some(backend) = backend {
                 nats.subscribe_jetstream_subject(BackendStateMessage::subscribe_subject(
