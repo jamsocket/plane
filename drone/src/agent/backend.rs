@@ -1,4 +1,5 @@
 use crate::agent::engine::Engine;
+use futures::Future;
 use plane_core::{
     logging::LogError,
     messages::agent::DroneLogMessage,
@@ -8,7 +9,7 @@ use plane_core::{
 };
 use std::{net::IpAddr, time::Duration};
 use tokio::{
-    sync::mpsc::{self, Receiver},
+    sync::mpsc::{self, Receiver, Sender, error::SendError},
     task::JoinHandle,
     time::sleep,
 };
@@ -27,7 +28,8 @@ pub struct BackendMonitor {
     _log_loop: AbortOnDrop<()>,
     _stats_loop: AbortOnDrop<()>,
     _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
-    pub inject_log: Box<dyn FnMut(String) + Send + Sync>,
+    _log_injection_channel: Sender<DroneLogMessage>,
+	_backend_id: BackendId,
 }
 
 impl BackendMonitor {
@@ -38,7 +40,7 @@ impl BackendMonitor {
         engine: &E,
         nc: &TypedNats,
     ) -> Self {
-        let (meta_log_tx, mut meta_log_rx) = mpsc::channel(16);
+        let (meta_log_tx, meta_log_rx) = mpsc::channel(16);
         let log_loop = Self::log_loop(backend_id, engine, nc, meta_log_rx);
         let stats_loop = Self::stats_loop(backend_id, cluster, engine, nc);
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
@@ -47,13 +49,18 @@ impl BackendMonitor {
             _log_loop: AbortOnDrop(log_loop),
             _stats_loop: AbortOnDrop(stats_loop),
             _dns_loop: AbortOnDrop(dns_loop),
-            inject_log: Box::new(|text: String| { meta_log_tx.clone().send(DroneLogMessage {
-				backend_id: backend_id.to_owned(),
-				kind: plane_core::messages::agent::DroneLogMessageKind::Stderr,
-				text
-			}); }),
+            _log_injection_channel: meta_log_tx,
+			_backend_id: backend_id.to_owned()
         }
     }
+
+	pub fn inject_log(&mut self, text: String) -> impl Future<Output = Result<(), SendError<DroneLogMessage>>> + '_ {
+		self._log_injection_channel.send(DroneLogMessage {
+			backend_id: self._backend_id.clone(),
+			kind: plane_core::messages::agent::DroneLogMessageKind::Stderr,
+			text
+		})
+	}
 
     fn dns_loop(
         backend_id: &BackendId,
