@@ -39,7 +39,7 @@ impl StateHandle {
             .iter()
             .filter(|(_, drone)| {
                 drone.state() == Some(agent::DroneState::Ready)
-                    && drone.meta.is_some()
+                    // && drone.meta.is_some()
                     && drone.last_seen > Some(min_keepalive)
             })
             .map(|(drone_id, _)| drone_id.clone())
