@@ -264,13 +264,9 @@ struct Ctx {
 async fn do_spawn_request(mut request: SpawnRequest) -> (Ctx, BackendStateSubscription) {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
-    let mut controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
     let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
-        .await
-        .unwrap();
-    controller_mock
-        .expect_handshake(&drone_id, agent.ip)
         .await
         .unwrap();
 
