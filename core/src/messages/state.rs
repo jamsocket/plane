@@ -53,6 +53,12 @@ pub struct DroneMeta {
     pub git_hash: Option<String>,
 }
 
+impl DroneMeta {
+    pub fn git_hash_short(&self) -> Option<String> {
+        self.git_hash.as_ref().map(|hash| hash[..7].to_string())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DroneMessageType {
     Metadata(DroneMeta),

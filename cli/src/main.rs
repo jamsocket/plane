@@ -120,7 +120,7 @@ async fn main() -> Result<()> {
                         drone
                             .meta
                             .as_ref()
-                            .map(|d| d.git_hash.clone())
+                            .map(|d| d.git_hash_short())
                             .flatten()
                             .unwrap_or_else(|| "unknown".to_string())
                             .bright_purple(),
