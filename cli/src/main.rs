@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
                 println!("{}", cluster_name.to_string().bright_green());
                 for (drone_id, drone) in &cluster.drones {
                     println!(
-                        "\t{}\t{}\t{}\t{}",
+                        "\t{}\t{}\t{}\t{}\t{}\t{}",
                         drone_id.to_string().bright_blue(),
                         drone
                             .state()
@@ -111,6 +111,19 @@ async fn main() -> Result<()> {
                             .map(|d| d.ip.to_string())
                             .unwrap_or_else(|| "unknown".to_string())
                             .bright_yellow(),
+                        drone
+                            .meta
+                            .as_ref()
+                            .map(|d| d.version.to_string())
+                            .unwrap_or_else(|| "unknown".to_string())
+                            .bright_cyan(),
+                        drone
+                            .meta
+                            .as_ref()
+                            .map(|d| d.git_hash.clone())
+                            .flatten()
+                            .unwrap_or_else(|| "unknown".to_string())
+                            .bright_purple(),
                     );
                 }
             }
