@@ -108,14 +108,14 @@ impl BackendMonitor {
         tokio::spawn(async move {
             tracing::info!(%backend_id, "Log recording loop started.");
 
-            let v = tokio::select! {
-                Some(v) = stream.next() => { v }
-                Some(v) = meta_log_rx.recv() => { v }
-            };
-
-            nc.publish(&v)
-                .await
-                .log_error("Error publishing log message.");
+            while let Some(v) = tokio::select! {
+                v = stream.next() => { v }
+                v = meta_log_rx.recv() => { v }
+            } {
+                nc.publish(&v)
+                    .await
+                    .log_error("Error publishing log message.");
+            }
 
             tracing::info!(%backend_id, "Log loop terminated.");
         })
