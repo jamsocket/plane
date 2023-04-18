@@ -284,7 +284,7 @@ impl<E: Engine> Executor<E> {
                                 .get_mut(&spawn_request.backend_id)
                                 .expect("backend should be in backend_to_monitor")
                                 .value_mut()
-                                .inject_log(error.to_string(), DroneLogMessageKind::Docker)
+                                .inject_log(error.to_string(), DroneLogMessageKind::Executor)
                                 .await
                             {
                                 tracing::error!("failed to inject error into logs");

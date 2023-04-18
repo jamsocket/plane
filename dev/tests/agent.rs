@@ -312,7 +312,7 @@ async fn invalid_container_fails() {
         .unwrap();
     assert_eq!(
         log_subscription.next().await.unwrap().value.kind,
-        DroneLogMessageKind::Docker
+        DroneLogMessageKind::Executor
     );
 }
 
