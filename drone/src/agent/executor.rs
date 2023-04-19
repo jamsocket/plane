@@ -279,7 +279,7 @@ impl<E: Engine> Executor<E> {
                     match state {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
-                            if let Err(_inject_err) = self
+                            if let Err(inject_err) = self
                                 .backend_to_monitor
                                 .get_mut(&spawn_request.backend_id)
                                 .expect("backend should be in backend_to_monitor")
@@ -287,7 +287,7 @@ impl<E: Engine> Executor<E> {
                                 .inject_log(error.to_string(), DroneLogMessageKind::Executor)
                                 .await
                             {
-                                tracing::error!("failed to inject error into logs");
+                                tracing::error!(?inject_err, "failed to inject error into logs");
                             }
                             self.update_backend_state(spawn_request, state).await;
                         }

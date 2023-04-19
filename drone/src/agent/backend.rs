@@ -12,11 +12,11 @@ use plane_core::{
 };
 use std::{net::IpAddr, time::Duration};
 use tokio::{
-    sync::mpsc::{self, error::SendError, Receiver, Sender},
+    sync::mpsc::{self, error::SendError, Sender},
     task::JoinHandle,
     time::sleep,
 };
-use tokio_stream::StreamExt;
+use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 
 /// JoinHandle does not abort when it is dropped; this wrapper does.
 struct AbortOnDrop<T>(JoinHandle<T>);
@@ -44,7 +44,7 @@ impl BackendMonitor {
         nc: &TypedNats,
     ) -> Self {
         let (meta_log_tx, meta_log_rx) = mpsc::channel(16);
-        let log_loop = Self::log_loop(backend_id, engine, nc, meta_log_rx);
+        let log_loop = Self::log_loop(backend_id, engine, nc, ReceiverStream::new(meta_log_rx));
         let stats_loop = Self::stats_loop(backend_id, cluster, engine, nc);
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
@@ -99,19 +99,16 @@ impl BackendMonitor {
         backend_id: &BackendId,
         engine: &E,
         nc: &TypedNats,
-        mut meta_log_rx: Receiver<DroneLogMessage>,
+        meta_log_rx: ReceiverStream<DroneLogMessage>,
     ) -> JoinHandle<()> {
-        let mut stream = engine.log_stream(backend_id);
+        let mut stream = engine.log_stream(backend_id).merge(meta_log_rx);
         let nc = nc.clone();
         let backend_id = backend_id.clone();
 
         tokio::spawn(async move {
             tracing::info!(%backend_id, "Log recording loop started.");
 
-            while let Some(v) = tokio::select! {
-                v = stream.next() => { v }
-                v = meta_log_rx.recv() => { v }
-            } {
+            while let Some(v) = stream.next().await {
                 nc.publish(&v)
                     .await
                     .log_error("Error publishing log message.");
