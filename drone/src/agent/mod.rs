@@ -29,6 +29,7 @@ mod engine;
 mod engines;
 mod executor;
 
+#[derive(Clone)]
 pub struct AgentOptions {
     pub drone_id: DroneId,
     pub db: DroneDatabase,

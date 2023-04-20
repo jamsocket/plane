@@ -19,8 +19,7 @@ plane-core = {path = "../core", version="0.3.5"}
 futures = "0.3.24"
 rand = "0.8.5"
 serde = { version = "1.0.144", features = ["derive"] }
-signal-hook = "0.3.14"
-tokio = { version = "1.21.0", features = ["macros", "rt"] }
+tokio = { version = "1.21.0", features = ["macros", "rt", "signal"] }
 tokio-stream = "0.1.9"
 tracing = "0.1.36"
 trust-dns-server = "0.22.0"
