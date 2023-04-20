@@ -72,7 +72,7 @@ async fn drone_main() -> Result<()> {
                 let proxy_options = proxy_options.clone();
                 let result = serve(proxy_options).await;
                 tracing::warn!(?result, "Proxy server exited.");
-            }            
+            }
         });
     }
 
