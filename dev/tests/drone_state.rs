@@ -11,7 +11,7 @@ use plane_core::{
         },
     },
     nats::TypedNats,
-    state::{start_state_loop, StateHandle, get_world_state},
+    state::{get_world_state, start_state_loop, StateHandle},
     types::{BackendId, ClusterName, DroneId},
     NeverResult,
 };

@@ -11,7 +11,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use plane_core::{
     messages::{
-        agent::{BackendState, SpawnRequest, TerminationRequest},
+        agent::{BackendState, DroneLogMessageKind, SpawnRequest, TerminationRequest},
         drone_state::UpdateBackendStateMessage,
     },
     nats::TypedNats,
@@ -197,19 +197,6 @@ impl<E: Engine> Executor<E> {
                 spec,
             } = backend;
             tracing::info!(%backend_id, ?state, "Resuming backend");
-
-            if state.running() {
-                self.backend_to_monitor.insert(
-                    backend_id.clone(),
-                    BackendMonitor::new(
-                        &backend_id,
-                        &self.cluster,
-                        self.ip,
-                        self.engine.as_ref(),
-                        &self.nc,
-                    ),
-                );
-            }
             tokio::spawn(async move { executor.run_backend(&spec, state).await });
         }
 
@@ -220,7 +207,16 @@ impl<E: Engine> Executor<E> {
         let (send, mut recv) = channel(1);
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
-
+        self.backend_to_monitor.insert(
+            spawn_request.backend_id.clone(),
+            BackendMonitor::new(
+                &spawn_request.backend_id,
+                &self.cluster,
+                self.ip,
+                self.engine.as_ref(),
+                &self.nc,
+            ),
+        );
         loop {
             tracing::info!(
                 ?state,
@@ -258,24 +254,6 @@ impl<E: Engine> Executor<E> {
             match next_state {
                 Ok(Some(new_state)) => {
                     state = new_state;
-
-                    if state.running()
-                        && !self
-                            .backend_to_monitor
-                            .contains_key(&spawn_request.backend_id)
-                    {
-                        self.backend_to_monitor.insert(
-                            spawn_request.backend_id.clone(),
-                            BackendMonitor::new(
-                                &spawn_request.backend_id,
-                                &self.cluster,
-                                self.ip,
-                                self.engine.as_ref(),
-                                &self.nc,
-                            ),
-                        );
-                    }
-
                     self.update_backend_state(spawn_request, state).await;
                 }
                 Ok(None) => {
@@ -288,6 +266,16 @@ impl<E: Engine> Executor<E> {
                     match state {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
+                            if let Err(inject_err) = self
+                                .backend_to_monitor
+                                .get_mut(&spawn_request.backend_id)
+                                .expect("backend should be in backend_to_monitor")
+                                .value_mut()
+                                .inject_log(error.to_string(), DroneLogMessageKind::Meta)
+                                .await
+                            {
+                                tracing::error!(?inject_err, "failed to inject error into logs");
+                            }
                             self.update_backend_state(spawn_request, state).await;
                         }
                         _ => tracing::error!(

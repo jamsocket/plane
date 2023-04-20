@@ -3,7 +3,10 @@ use integration_test::integration_test;
 use plane_controller::{drone_state::monitor_drone_state, run::update_backend_state_loop};
 use plane_core::{
     messages::{
-        agent::{BackendState, BackendStatsMessage, SpawnRequest, TerminationRequest},
+        agent::{
+            BackendState, BackendStatsMessage, DroneLogMessage, DroneLogMessageKind, SpawnRequest,
+            TerminationRequest,
+        },
         drone_state::{DroneStatusMessage, UpdateBackendStateMessage},
         scheduler::DrainDrone,
     },
@@ -16,14 +19,16 @@ use plane_dev::{
     resources::server::Server,
     scratch_dir,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{base_spawn_request, random_loopback_ip},
+    util::{base_spawn_request, invalid_image_spawn_request, random_loopback_ip},
 };
 use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
 use serde_json::json;
 use std::net::IpAddr;
+use std::pin::Pin;
 use std::time::Duration;
-use tokio::time::Instant;
+use tokio::{task::JoinError, time::Instant};
+use tokio_stream::{Stream, StreamExt};
 
 pub const CLUSTER_DOMAIN: &str = "plane.test";
 
@@ -194,6 +199,34 @@ impl BackendStateSubscription {
     }
 }
 
+pub trait StreamTimeoutExt<E: std::error::Error>: Stream {
+    fn into_stream_with_timeout(
+        self,
+        timeout_in_seconds: u64,
+    ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, E>> + Send>>;
+}
+
+impl<S: Stream + Send + 'static> StreamTimeoutExt<JoinError> for S
+where
+    S::Item: Send,
+{
+    fn into_stream_with_timeout(
+        self,
+        timeout_in_seconds: u64,
+    ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, JoinError>> + Send>> {
+        let stream = self.then(move |item| {
+            let handle = tokio::spawn(async move { item });
+            async move {
+                tokio::time::timeout(Duration::from_secs(timeout_in_seconds), handle)
+                    .await
+                    .unwrap()
+            }
+        });
+
+        Box::pin(stream)
+    }
+}
+
 #[integration_test]
 async fn drone_sends_status_messages() {
     let nats = Nats::new().await.unwrap();
@@ -251,6 +284,67 @@ async fn drone_sends_draining_status() {
         .expect_status_message(&drone_id, &ClusterName::new("plane.test"), false, 0)
         .await
         .unwrap();
+}
+
+#[allow(dead_code)]
+struct TestFixture {
+    nats_server: Nats,
+    nats_connection: TypedNats,
+    controller: MockController,
+    agent: Agent,
+}
+
+async fn do_spawn_request(mut request: SpawnRequest) -> (TestFixture, BackendStateSubscription) {
+    let nats = Nats::new().await.unwrap();
+    let connection = nats.connection().await.unwrap();
+    let controller_mock = MockController::new(connection.clone()).await.unwrap();
+    let drone_id = DroneId::new_random();
+    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+        .await
+        .unwrap();
+
+    controller_mock
+        .expect_status_message(&drone_id, &ClusterName::new("plane.test"), true, 0)
+        .await
+        .unwrap();
+
+    let state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
+        .await
+        .unwrap();
+
+    request.drone_id = drone_id.clone();
+    controller_mock.spawn_backend(&request).await.unwrap();
+    (
+        TestFixture {
+            nats_server: nats,
+            nats_connection: connection,
+            controller: controller_mock,
+            agent,
+        },
+        state_subscription,
+    )
+}
+
+#[integration_test]
+async fn invalid_container_fails() {
+    let req = invalid_image_spawn_request().await;
+    let (ctx, mut sub) = do_spawn_request(req.clone()).await;
+    let mut log_subscription = ctx
+        .nats_connection
+        .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
+        .await
+        .unwrap()
+        .into_stream_with_timeout(10);
+    sub.expect_backend_status_message(BackendState::Loading, 30_000)
+        .await
+        .unwrap();
+    sub.expect_backend_status_message(BackendState::ErrorLoading, 30_000)
+        .await
+        .unwrap();
+    assert_eq!(
+        log_subscription.next().await.unwrap().unwrap().value.kind,
+        DroneLogMessageKind::Meta
+    );
 }
 
 #[integration_test]

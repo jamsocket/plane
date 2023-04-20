@@ -13,11 +13,14 @@ use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
 use dashmap::DashSet;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
 use std::fmt::Debug;
+use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::task::Poll;
 use time::OffsetDateTime;
-use tokio_stream::StreamExt;
+use tokio_stream::{Stream, StreamExt};
 
 /// This code is returned by NATS when an expected last sequence number is violated.
 const NATS_WRONG_LAST_SEQUENCE_CODE: &str = "10071";
@@ -200,6 +203,20 @@ where
     }
 }
 
+impl<T> Stream for TypedSubscription<T>
+where
+    T: TypedMessage + std::marker::Unpin,
+{
+    type Item = MessageWithResponseHandle<T>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<MessageWithResponseHandle<T>>> {
+        let mut fut1 = Box::pin(Self::next(&mut self));
+        fut1.as_mut().poll(cx)
+    }
+}
 /// NATS errors are not castable to anyhow::Error, because they don't
 /// implement [Sized] for some reason.
 ///

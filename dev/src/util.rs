@@ -1,10 +1,11 @@
+use crate::container::build_image;
 use anyhow::{anyhow, Result};
 use plane_core::messages::agent::{DockerExecutableConfig, SpawnRequest};
 use plane_core::messages::scheduler::ScheduleRequest;
 use plane_core::types::BackendId;
 use plane_core::types::ClusterName;
 use plane_core::types::DroneId;
-use rand::distributions::Alphanumeric;
+use rand::distributions::Uniform;
 use rand::thread_rng;
 use rand::Rng;
 use std::net::Ipv4Addr;
@@ -19,7 +20,7 @@ const POLL_LOOP_SLEEP: u64 = 10;
 
 pub fn random_string(len: usize) -> String {
     rand::thread_rng()
-        .sample_iter(&Alphanumeric)
+        .sample_iter(&Uniform::from('a'..='z'))
         .take(len)
         .map(char::from)
         .collect()
@@ -112,6 +113,32 @@ pub fn base_spawn_request() -> SpawnRequest {
         max_idle_secs: Duration::from_secs(10),
         executable: DockerExecutableConfig {
             image: TEST_IMAGE.into(),
+            env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
+            credentials: None,
+            resource_limits: Default::default(),
+            pull_policy: Default::default(),
+            port: None,
+            volume_mounts: vec![],
+        },
+        bearer_token: None,
+    }
+}
+
+async fn make_invalid_image() -> String {
+    build_image("test-images/invalid-image")
+        .await
+        .expect("invalid image should build")
+}
+
+pub async fn invalid_image_spawn_request() -> SpawnRequest {
+    SpawnRequest {
+        cluster: ClusterName::new("plane.test"),
+        backend_id: BackendId::new_random(),
+        drone_id: DroneId::new_random(),
+        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
+        max_idle_secs: Duration::from_secs(10),
+        executable: DockerExecutableConfig {
+            image: make_invalid_image().await.into(),
             env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
             credentials: None,
             resource_limits: Default::default(),

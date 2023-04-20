@@ -5,6 +5,6 @@ members = [
     "core",
     "dev",
     "dev/integration-test",
-    "dev/test-server",
+    "dev/test-images/test-server",
     "drone",
 ]

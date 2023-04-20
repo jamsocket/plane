@@ -1,13 +1,22 @@
 use crate::agent::engine::Engine;
+use futures::Future;
 use plane_core::{
     logging::LogError,
-    messages::dns::{DnsRecordType, SetDnsRecord},
+    messages::agent::DroneLogMessage,
+    messages::{
+        agent::DroneLogMessageKind,
+        dns::{DnsRecordType, SetDnsRecord},
+    },
     nats::TypedNats,
     types::{BackendId, ClusterName},
 };
 use std::{net::IpAddr, time::Duration};
-use tokio::{task::JoinHandle, time::sleep};
-use tokio_stream::StreamExt;
+use tokio::{
+    sync::mpsc::{self, error::SendError, Sender},
+    task::JoinHandle,
+    time::sleep,
+};
+use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 
 /// JoinHandle does not abort when it is dropped; this wrapper does.
 struct AbortOnDrop<T>(JoinHandle<T>);
@@ -22,6 +31,8 @@ pub struct BackendMonitor {
     _log_loop: AbortOnDrop<()>,
     _stats_loop: AbortOnDrop<()>,
     _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
+    _log_injection_channel: Sender<DroneLogMessage>,
+    _backend_id: BackendId,
 }
 
 impl BackendMonitor {
@@ -32,7 +43,8 @@ impl BackendMonitor {
         engine: &E,
         nc: &TypedNats,
     ) -> Self {
-        let log_loop = Self::log_loop(backend_id, engine, nc);
+        let (meta_log_tx, meta_log_rx) = mpsc::channel(16);
+        let log_loop = Self::log_loop(backend_id, engine, nc, ReceiverStream::new(meta_log_rx));
         let stats_loop = Self::stats_loop(backend_id, cluster, engine, nc);
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
@@ -40,7 +52,21 @@ impl BackendMonitor {
             _log_loop: AbortOnDrop(log_loop),
             _stats_loop: AbortOnDrop(stats_loop),
             _dns_loop: AbortOnDrop(dns_loop),
+            _log_injection_channel: meta_log_tx,
+            _backend_id: backend_id.to_owned(),
         }
+    }
+
+    pub fn inject_log(
+        &mut self,
+        text: String,
+        kind: DroneLogMessageKind,
+    ) -> impl Future<Output = Result<(), SendError<DroneLogMessage>>> + '_ {
+        self._log_injection_channel.send(DroneLogMessage {
+            backend_id: self._backend_id.clone(),
+            kind,
+            text,
+        })
     }
 
     fn dns_loop(
@@ -69,8 +95,13 @@ impl BackendMonitor {
         })
     }
 
-    fn log_loop<E: Engine>(backend_id: &BackendId, engine: &E, nc: &TypedNats) -> JoinHandle<()> {
-        let mut stream = engine.log_stream(backend_id);
+    fn log_loop<E: Engine>(
+        backend_id: &BackendId,
+        engine: &E,
+        nc: &TypedNats,
+        meta_log_rx: ReceiverStream<DroneLogMessage>,
+    ) -> JoinHandle<()> {
+        let mut stream = engine.log_stream(backend_id).merge(meta_log_rx);
         let nc = nc.clone();
         let backend_id = backend_id.clone();
 

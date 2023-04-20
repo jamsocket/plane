@@ -46,10 +46,11 @@ impl From<&DockerCredentials> for bollard::auth::DockerCredentials {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum DroneLogMessageKind {
     Stdout,
     Stderr,
+    Meta,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
