@@ -202,7 +202,7 @@ impl BackendStateSubscription {
 pub trait StreamTimeoutExt<E: std::error::Error>: Stream {
     fn into_stream_with_timeout(
         self,
-        timeout_duration: Duration,
+        timeout_in_seconds: u64,
     ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, E>> + Send>>;
 }
 
@@ -212,12 +212,12 @@ where
 {
     fn into_stream_with_timeout(
         self,
-        timeout_duration: Duration,
+        timeout_in_seconds: u64,
     ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, JoinError>> + Send>> {
         let stream = self.then(move |item| {
             let handle = tokio::spawn(async move { item });
             async move {
-                tokio::time::timeout(timeout_duration, handle)
+                tokio::time::timeout(Duration::from_secs(timeout_in_seconds), handle)
                     .await
                     .unwrap()
             }
@@ -334,7 +334,7 @@ async fn invalid_container_fails() {
         .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
         .await
         .unwrap()
-        .into_stream_with_timeout(Duration::from_secs(10));
+        .into_stream_with_timeout(10);
     sub.expect_backend_status_message(BackendState::Loading, 30_000)
         .await
         .unwrap();
