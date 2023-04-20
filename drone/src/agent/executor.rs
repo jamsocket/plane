@@ -197,19 +197,6 @@ impl<E: Engine> Executor<E> {
                 spec,
             } = backend;
             tracing::info!(%backend_id, ?state, "Resuming backend");
-
-            if state.running() {
-                self.backend_to_monitor.insert(
-                    backend_id.clone(),
-                    BackendMonitor::new(
-                        &backend_id,
-                        &self.cluster,
-                        self.ip,
-                        self.engine.as_ref(),
-                        &self.nc,
-                    ),
-                );
-            }
             tokio::spawn(async move { executor.run_backend(&spec, state).await });
         }
 
