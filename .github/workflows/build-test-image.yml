@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths:
-    - 'dev/test-server/**'
+    - 'dev/test-images/test-server/**'
     - '.github/workflows/build-test-image.yml'
 
 env:
@@ -48,7 +48,7 @@ jobs:
         id: build-and-push
         uses: depot/build-push-action@v1
         with:
-          context: dev/test-server
+          context: dev/test-images/test-server
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
