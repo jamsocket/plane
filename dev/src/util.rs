@@ -1,3 +1,4 @@
+use crate::container::build_image;
 use anyhow::{anyhow, Result};
 use plane_core::messages::agent::{DockerExecutableConfig, SpawnRequest};
 use plane_core::messages::scheduler::ScheduleRequest;
@@ -14,8 +15,6 @@ use std::{
     time::Duration,
 };
 use tokio::net::TcpSocket;
-
-use crate::container::build_image;
 
 const POLL_LOOP_SLEEP: u64 = 10;
 
