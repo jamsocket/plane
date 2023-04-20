@@ -77,7 +77,7 @@ impl NatsConnectionSpec {
         )
         .await?;
 
-        Ok(TypedNats::new(nats))
+        TypedNats::new(nats).await
     }
 
     pub async fn connect(&self, inbox_prefix: &str) -> Result<TypedNats> {
@@ -91,6 +91,6 @@ impl NatsConnectionSpec {
         )
         .await?;
 
-        Ok(TypedNats::new(nats))
+        TypedNats::new(nats).await
     }
 }
