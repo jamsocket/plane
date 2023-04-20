@@ -262,12 +262,21 @@ impl<T: DeserializeOwned> DelayedReply<T> {
 pub struct JetstreamSubscription<T: TypedMessage> {
     stream: Messages,
 
-    /// True if this consumer has pending messages to be consumed.
-    pub has_pending: bool,
+    /// The sequence number of the last message as of the construction of this subscription.
+    init_sequence: u64,
+
+    /// The sequence number of the last message received by this subscription.
+    last_received_sequence: u64,
+
     _ph: PhantomData<T>,
 }
 
 impl<T: TypedMessage> JetstreamSubscription<T> {
+    /// True if we have received every message that occured before the subscription was created.
+    pub fn has_pending(&self) -> bool {
+        self.last_received_sequence < self.init_sequence
+    }
+
     pub async fn next(&mut self) -> Option<(T, MessageMeta)> {
         loop {
             if let Some(message) = self.stream.next().await {
@@ -290,7 +299,9 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
                         continue;
                     }
                 };
-                self.has_pending = meta.pending > 0;
+                
+                self.last_received_sequence = meta.sequence;
+
                 match value {
                     Ok(value) => return Some((value, meta)),
                     Err(error) => {
@@ -369,7 +380,9 @@ impl TypedNats {
         let stream_name = T::stream_name();
 
         let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
-        let has_pending = stream.cached_info().state.messages > 0;
+        
+        let init_sequence = stream.cached_info().state.last_sequence;
+
         let deliver_subject = self.nc.new_inbox();
 
         let consumer = stream
@@ -389,7 +402,8 @@ impl TypedNats {
 
         Ok(JetstreamSubscription {
             stream,
-            has_pending,
+            init_sequence,
+            last_received_sequence: 0,
             _ph: PhantomData::default(),
         })
     }

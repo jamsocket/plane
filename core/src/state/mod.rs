@@ -13,7 +13,7 @@ async fn get_world_state_from_sub(
 ) -> Result<WorldState> {
     let mut world_state = WorldState::default();
 
-    while sub.has_pending {
+    while sub.has_pending() {
         let (message, _) = sub
             .next()
             .await
