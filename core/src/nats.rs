@@ -272,7 +272,7 @@ pub struct JetstreamSubscription<T: TypedMessage> {
 }
 
 impl<T: TypedMessage> JetstreamSubscription<T> {
-    /// True if we have received every message that occured before the subscription was created.
+    /// True if we have not received every message that occured before the subscription was created.
     pub fn has_pending(&self) -> bool {
         self.last_received_sequence < self.init_sequence
     }
