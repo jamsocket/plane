@@ -13,15 +13,11 @@ async fn get_world_state_from_sub(
 ) -> Result<WorldState> {
     let mut world_state = WorldState::default();
 
-    loop {
-        let (message, meta) = sub
+    while sub.has_pending {
+        let (message, _) = sub
             .next()
             .await
             .ok_or_else(|| anyhow!("State stream closed before pending messages read."))?;
-
-        if meta.pending == 0 {
-            break;
-        }
 
         world_state.apply(message);
     }

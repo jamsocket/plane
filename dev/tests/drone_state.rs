@@ -11,7 +11,7 @@ use plane_core::{
         },
     },
     nats::TypedNats,
-    state::{start_state_loop, StateHandle},
+    state::{start_state_loop, StateHandle, get_world_state},
     types::{BackendId, ClusterName, DroneId},
     NeverResult,
 };
@@ -145,12 +145,14 @@ fn timestamp(t: u64) -> DateTime<Utc> {
 
 #[integration_test]
 async fn status_lifecycle() {
+    tracing::info!("Initializing test fixture.");
     let fixture = StateTestFixture::new().await;
     let ip: IpAddr = Ipv4Addr::new(12, 12, 12, 12).into();
     let cluster = ClusterName::new("plane.test".into());
     let drone = DroneId::new_random();
     let backend = BackendId::new_random();
 
+    tracing::info!("Initializing drone metadata.");
     apply_state_message(
         &fixture.nats,
         &WorldStateMessage {
@@ -169,7 +171,7 @@ async fn status_lifecycle() {
     .unwrap();
 
     {
-        // Ensure that the drone exists.
+        tracing::info!("Ensuring that the drone exists.");
         sleep(Duration::from_millis(100)).await;
         let state = fixture.state.state();
         let cluster = state.cluster(&cluster).unwrap();
@@ -177,7 +179,7 @@ async fn status_lifecycle() {
         assert_eq!(drone.meta.as_ref().unwrap().ip, ip);
     }
 
-    // Assign a backend to the drone.
+    tracing::info!("Assigning backend to drone.");
     apply_state_message(
         &fixture.nats,
         &WorldStateMessage {
@@ -194,7 +196,7 @@ async fn status_lifecycle() {
     .unwrap();
 
     {
-        // Ensure that the backend has been assigned to the drone.
+        tracing::info!("Ensuring that the backend has been assigned to the drone.");
         sleep(Duration::from_millis(100)).await;
         let state = fixture.state.state();
         let cluster = state.cluster(&cluster).unwrap();
@@ -202,7 +204,7 @@ async fn status_lifecycle() {
         assert_eq!(backend.drone.as_ref().unwrap(), &drone);
     }
 
-    // Update the state of the backend to "starting".
+    tracing::info!("Updating backend state to 'starting'.");
     apply_state_message(
         &fixture.nats,
         &WorldStateMessage {
@@ -220,7 +222,7 @@ async fn status_lifecycle() {
     .unwrap();
 
     {
-        // Ensure that the the backend is in "starting" state.
+        tracing::info!("Ensuring that the backend is in 'starting' state.");
         sleep(Duration::from_millis(100)).await;
         let state = fixture.state.state();
         let cluster = state.cluster(&cluster).unwrap();
@@ -228,7 +230,7 @@ async fn status_lifecycle() {
         assert_eq!(backend.state().unwrap(), BackendState::Starting);
     }
 
-    // Update the state of the backend to "loading".
+    tracing::info!("Updating backend state to 'loading'.");
     apply_state_message(
         &fixture.nats,
         &WorldStateMessage {
@@ -246,7 +248,7 @@ async fn status_lifecycle() {
     .unwrap();
 
     {
-        // Ensure that the the backend is in "loading" state.
+        tracing::info!("Ensuring that the backend is in 'loading' state.");
         sleep(Duration::from_millis(100)).await;
         let state = fixture.state.state();
         let cluster = state.cluster(&cluster).unwrap();
@@ -254,7 +256,7 @@ async fn status_lifecycle() {
         assert_eq!(backend.state().unwrap(), BackendState::Loading);
     }
 
-    // Update the state of the backend to "ready".
+    tracing::info!("Updating backend state to 'ready'.");
     apply_state_message(
         &fixture.nats,
         &WorldStateMessage {
@@ -272,7 +274,7 @@ async fn status_lifecycle() {
     .unwrap();
 
     {
-        // Ensure that the the backend is in "ready" state.
+        tracing::info!("Ensuring that the backend is in 'ready' state.");
         sleep(Duration::from_millis(100)).await;
         let state = fixture.state.state();
         let cluster = state.cluster(&cluster).unwrap();
@@ -280,7 +282,7 @@ async fn status_lifecycle() {
         assert_eq!(backend.state().unwrap(), BackendState::Ready);
     }
 
-    // Update the state of the backend to "swept".
+    tracing::info!("Updating backend state to 'swept'.");
     apply_state_message(
         &fixture.nats,
         &WorldStateMessage {
@@ -298,7 +300,7 @@ async fn status_lifecycle() {
     .unwrap();
 
     {
-        // Ensure that the the backend is in "swept" state.
+        tracing::info!("Ensuring that the backend is in 'swept' state.");
         sleep(Duration::from_millis(100)).await;
         let state = fixture.state.state();
         let cluster = state.cluster(&cluster).unwrap();
@@ -306,11 +308,10 @@ async fn status_lifecycle() {
         assert_eq!(backend.state().unwrap(), BackendState::Swept);
     }
 
-    // Ensure that if we reconstruct the state from NATS, we have the same state history.
-    let state1 = start_state_loop(fixture.nats.clone()).await.unwrap();
+    tracing::info!("Reconstructing state from NATS.");
+    let state1 = get_world_state(fixture.nats.clone()).await.unwrap();
     {
-        let state = state1.state();
-        let cluster = state.cluster(&cluster).unwrap();
+        let cluster = state1.cluster(&cluster).unwrap();
         let backend = cluster.backend(&backend).unwrap();
         let state_vec: Vec<(DateTime<Utc>, BackendState)> =
             backend.states.iter().cloned().collect();
