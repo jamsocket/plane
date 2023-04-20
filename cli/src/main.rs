@@ -5,6 +5,10 @@ use plane_core::{
     messages::{
         agent::{BackendStateMessage, DockerExecutableConfig, ResourceLimits, TerminationRequest},
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
+        state::{
+            BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
+            DroneMessageType, WorldStateMessage,
+        },
     },
     nats_connection::NatsConnectionSpec,
     state::get_world_state,
@@ -23,7 +27,6 @@ struct Opts {
 
 #[derive(Subcommand)]
 enum Command {
-    DumpState,
     ListDrones,
     ListBackends,
     Spawn {
@@ -52,6 +55,12 @@ enum Command {
         cluster: String,
         backend: String,
     },
+    DumpState,
+    StreamState {
+        /// Whether to include heartbeat messages.
+        #[clap(long, default_value = "false")]
+        include_heartbeat: bool,
+    },
 }
 
 #[tokio::main]
@@ -63,11 +72,80 @@ async fn main() -> Result<()> {
         .connect("cli.inbox")
         .await?;
 
-    let state = get_world_state(nats.clone()).await?;
-
     match opts.command {
         Command::DumpState => {
+            let state = get_world_state(nats.clone()).await?;
             println!("{:#?}", state);
+        }
+        Command::StreamState { include_heartbeat } => {
+            let mut sub = nats
+                .subscribe_jetstream_subject(WorldStateMessage::subscribe_subject())
+                .await?;
+
+            while let Some((message, _)) = sub.next().await {
+                let WorldStateMessage { cluster, message } = message;
+
+                let text = match message {
+                    ClusterStateMessage::AcmeMessage(acme) => {
+                        format!("ACME TXT entry: {}", acme.value.to_string().bright_blue())
+                    }
+                    ClusterStateMessage::DroneMessage(drone) => {
+                        let DroneMessage { drone, message } = drone;
+
+                        let text = match message {
+                            DroneMessageType::KeepAlive { timestamp } => {
+                                if !include_heartbeat {
+                                    continue;
+                                }
+                                format!("is alive at {}", timestamp.to_string().bright_blue())
+                            }
+                            DroneMessageType::Metadata(metadata) => {
+                                format!(
+                                    "has IP: {}, version: {}, git hash: {}",
+                                    metadata.ip.to_string().bright_blue(),
+                                    metadata.version.to_string().bright_blue(),
+                                    metadata
+                                        .git_hash_short()
+                                        .unwrap_or("unknown".to_string())
+                                        .bright_blue()
+                                )
+                            }
+                            DroneMessageType::State { state, timestamp } => {
+                                format!(
+                                    "is {} at {}",
+                                    state.to_string().bright_magenta(),
+                                    timestamp.to_string().bright_yellow()
+                                )
+                            }
+                        };
+
+                        format!("Drone: {} {}", drone.to_string().bright_yellow(), text)
+                    }
+                    ClusterStateMessage::BackendMessage(backend) => {
+                        let BackendMessage { backend, message } = backend;
+
+                        let text = match message {
+                            BackendMessageType::State { state, timestamp } => {
+                                format!(
+                                    "is {} at {}",
+                                    state.to_string().bright_magenta(),
+                                    timestamp.to_string().bright_yellow()
+                                )
+                            }
+                            BackendMessageType::Assignment { drone } => {
+                                format!(
+                                    "is assigned to drone {}",
+                                    drone.to_string().bright_yellow()
+                                )
+                            }
+                        };
+
+                        format!("Backend: {} {}", backend.to_string().bright_cyan(), text)
+                    }
+                };
+
+                println!("Cluster: {} {}", cluster.to_string().bright_green(), text);
+            }
         }
         Command::Status { backend } => {
             let mut sub = if let Some(backend) = backend {
@@ -89,6 +167,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListDrones => {
+            let state = get_world_state(nats.clone()).await?;
             for (cluster_name, cluster) in &state.clusters {
                 println!("{}", cluster_name.to_string().bright_green());
                 for (drone_id, drone) in &cluster.drones {
@@ -188,6 +267,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::ListBackends => {
+            let state = get_world_state(nats.clone()).await?;
             for (cluster_name, cluster) in &state.clusters {
                 println!("{}", cluster_name.to_string().bright_green());
                 for (backend_id, backend) in &cluster.backends {
