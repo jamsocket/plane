@@ -4,7 +4,7 @@ use plane_core::messages::scheduler::ScheduleRequest;
 use plane_core::types::BackendId;
 use plane_core::types::ClusterName;
 use plane_core::types::DroneId;
-use rand::distributions::Alphanumeric;
+use rand::distributions::Uniform;
 use rand::thread_rng;
 use rand::Rng;
 use std::net::Ipv4Addr;
@@ -21,7 +21,7 @@ const POLL_LOOP_SLEEP: u64 = 10;
 
 pub fn random_string(len: usize) -> String {
     rand::thread_rng()
-        .sample_iter(&Alphanumeric)
+        .sample_iter(&Uniform::from('a'..='z'))
         .take(len)
         .map(char::from)
         .collect()
