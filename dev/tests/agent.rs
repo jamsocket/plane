@@ -287,14 +287,14 @@ async fn drone_sends_draining_status() {
 }
 
 #[allow(dead_code)]
-struct Ctx {
+struct TestFixture {
     nats_server: Nats,
     nats_connection: TypedNats,
     controller: MockController,
     agent: Agent,
 }
 
-async fn do_spawn_request(mut request: SpawnRequest) -> (Ctx, BackendStateSubscription) {
+async fn do_spawn_request(mut request: SpawnRequest) -> (TestFixture, BackendStateSubscription) {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
     let controller_mock = MockController::new(connection.clone()).await.unwrap();
@@ -315,7 +315,7 @@ async fn do_spawn_request(mut request: SpawnRequest) -> (Ctx, BackendStateSubscr
     request.drone_id = drone_id.clone();
     controller_mock.spawn_backend(&request).await.unwrap();
     (
-        Ctx {
+        TestFixture {
             nats_server: nats,
             nats_connection: connection,
             controller: controller_mock,
@@ -343,7 +343,7 @@ async fn invalid_container_fails() {
         .unwrap();
     assert_eq!(
         log_subscription.next().await.unwrap().unwrap().value.kind,
-        DroneLogMessageKind::Executor
+        DroneLogMessageKind::Meta
     );
 }
 
