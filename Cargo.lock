@@ -1875,7 +1875,6 @@ dependencies = [
  "serde",
  "serde_html_form",
  "serde_json",
- "signal-hook",
  "sqlx",
  "tokio",
  "tokio-rustls 0.24.0",

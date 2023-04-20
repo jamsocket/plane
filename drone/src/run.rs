@@ -5,22 +5,15 @@ use crate::{
     plan::DronePlan,
     proxy::serve,
 };
-use anyhow::{anyhow, Context, Result};
-use futures::future::try_join_all;
-use futures::Future;
+use anyhow::{Context, Result};
 use plane_core::cli::init_cli;
 use plane_core::logging::TracingHandle;
 use plane_core::messages::logging::Component;
 use plane_core::retry::do_with_retry;
 use plane_core::types::DroneId;
-use plane_core::NeverResult;
-use signal_hook::{
-    consts::{SIGINT, SIGTERM},
-    iterator::Signals,
-};
-use std::{pin::Pin, thread};
+use tokio::signal::unix::SignalKind;
 
-async fn drone_main() -> NeverResult {
+async fn drone_main() -> Result<()> {
     tracing::info!("Starting drone");
     let mut config: DroneConfig = init_cli().context("Initializing CLI")?;
 
@@ -55,8 +48,6 @@ async fn drone_main() -> NeverResult {
             .context("Attaching NATS to tracing handle")?;
     }
 
-    let mut futs: Vec<Pin<Box<dyn Future<Output = NeverResult>>>> = vec![];
-
     if let Some(cert_options) = cert_options {
         do_with_retry(
             || refresh_if_not_valid(&cert_options),
@@ -66,35 +57,51 @@ async fn drone_main() -> NeverResult {
         .await
         .context("Refreshing certificate.")?;
 
-        futs.push(Box::pin(refresh_loop(cert_options)))
+        tokio::spawn(async move {
+            loop {
+                let cert_options = cert_options.clone();
+                let result = refresh_loop(cert_options).await;
+                tracing::warn!(?result, "Certificate refresh loop exited.");
+            }
+        });
     }
 
     if let Some(proxy_options) = proxy_options {
-        futs.push(Box::pin(serve(proxy_options)));
+        tokio::spawn(async move {
+            loop {
+                let proxy_options = proxy_options.clone();
+                let result = serve(proxy_options).await;
+                tracing::warn!(?result, "Proxy server exited.");
+            }            
+        });
     }
 
     if let Some(agent_options) = agent_options {
-        futs.push(Box::pin(run_agent(agent_options)))
+        tokio::spawn(async move {
+            loop {
+                let agent_options = agent_options.clone();
+                let result = run_agent(agent_options).await;
+                tracing::warn!(?result, "Agent exited.");
+            }
+        });
+        tracing::warn!("Agent exited.");
     }
 
-    try_join_all(futs.into_iter()).await?;
-    // try_join_all either returns an Err, or Ok() with a list of Never values.
-    // Since Never values are not constructable, if we get here, we can assume that
-    // try_join_all returned an empty list. This means that no event loops ever
-    // actually ran, i.e. futs was empty.
-    Err(anyhow!("No event loops selected."))
+    let mut int_stream = tokio::signal::unix::signal(SignalKind::interrupt())?;
+    let mut term_stream = tokio::signal::unix::signal(SignalKind::terminate())?;
+    tokio::select!(
+        _ = int_stream.recv() => {
+            tracing::info!("Received SIGINT, exiting.");
+        },
+        _ = term_stream.recv() => {
+            tracing::info!("Received SIGTERM, exiting.");
+        },
+    );
+
+    Ok(())
 }
 
 pub fn run() -> Result<()> {
-    let mut signals = Signals::new([SIGINT, SIGTERM])?;
-
-    thread::spawn(move || {
-        for _ in signals.forever() {
-            // TODO: we could shut down containers here.
-            std::process::exit(0)
-        }
-    });
-
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?
