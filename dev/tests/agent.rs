@@ -1,6 +1,6 @@
 use anyhow::Result;
-use futures::FutureExt;
-use futures::TryFutureExt;
+
+
 use integration_test::integration_test;
 use plane_controller::{drone_state::monitor_drone_state, run::update_backend_state_loop};
 use plane_core::{
@@ -30,10 +30,10 @@ use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
 use serde_json::json;
 use std::net::IpAddr;
-use std::pin::Pin;
+
 use std::time::Duration;
-use tokio::{task::JoinError, time::Instant};
-use tokio_stream::{Stream, StreamExt};
+use tokio::{time::Instant};
+use tokio_stream::{StreamExt};
 
 pub const CLUSTER_DOMAIN: &str = "plane.test";
 

@@ -9,11 +9,11 @@ use crate::{
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use dashmap::DashMap;
-use futures::{Future, FutureExt};
+
 use plane_core::{
     messages::{
         agent::{
-            BackendState, DroneLogMessage, DroneLogMessageKind, SpawnRequest, TerminationRequest,
+            BackendState, DroneLogMessageKind, SpawnRequest, TerminationRequest,
         },
         drone_state::UpdateBackendStateMessage,
     },
@@ -24,12 +24,11 @@ use serde_json::json;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
     sync::{
-        mpsc::{channel, error::SendError, Sender},
-        Barrier,
+        mpsc::{channel, Sender},
     },
     task::JoinHandle,
 };
-use tokio_stream::{wrappers::ReceiverStream, StreamExt};
+use tokio_stream::{StreamExt};
 
 trait LogError {
     fn log_error(&self) -> &Self;
