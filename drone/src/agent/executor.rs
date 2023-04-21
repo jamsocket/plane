@@ -232,17 +232,16 @@ impl<E: Engine> Executor<E> {
 		let self2 = self.clone();
 		let sr = spawn_request.clone();
 		let jh = tokio::spawn(async move {
-			self2.backend_to_monitor.insert(
-				sr.backend_id.clone(),
-				BackendMonitor::new(
+			let bm = BackendMonitor::new(
 					&sr.backend_id.clone(),
 					&self2.cluster.clone(),
 					self2.ip,
 					self2.engine.as_ref(),
 					&self2.nc,
 					&notify2
-				).await
-			);
+				).await;
+			self2.backend_to_monitor.insert(
+				sr.backend_id.clone(), bm);
 		});
 
 		loop {
@@ -299,7 +298,7 @@ impl<E: Engine> Executor<E> {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
 							notify.notify_one();
-							jh.await;
+							if jh.await.is_ok() {
 							if let Err(inject_err) = self.backend_to_monitor
 								.try_get_mut(&spawn_request.backend_id)
 								.unwrap().inject_log(error.to_string(), DroneLogMessageKind::Meta)
@@ -307,7 +306,9 @@ impl<E: Engine> Executor<E> {
                             {
                                 tracing::error!(?inject_err, "failed to inject error into logs");
                             }
-							tracing::info!("gotcha");
+							} else {
+								tracing::error!("inserting into backend_to_monitor failed");
+							}
                             self.update_backend_state(spawn_request, state).await;
                         }
                         _ => tracing::error!(
