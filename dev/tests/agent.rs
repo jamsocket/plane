@@ -1,6 +1,6 @@
 use anyhow::Result;
-use futures::TryFutureExt;
 use futures::FutureExt;
+use futures::TryFutureExt;
 use integration_test::integration_test;
 use plane_controller::{drone_state::monitor_drone_state, run::update_backend_state_loop};
 use plane_core::{
@@ -21,7 +21,10 @@ use plane_dev::{
     resources::server::Server,
     scratch_dir,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{base_spawn_request, invalid_image_spawn_request, random_loopback_ip, three_logs_image_spawn_request},
+    util::{
+        base_spawn_request, invalid_image_spawn_request, random_loopback_ip,
+        three_logs_image_spawn_request,
+    },
 };
 use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
@@ -221,8 +224,8 @@ where
             let duration = Duration::from_secs(timeout_in_seconds);
             async move {
                 tokio::time::timeout(duration, async { item }).await.map_err(|e| {
-					self.timeout()
-					e
+                    self.timeout()
+                    e
                 })
             }
         });
@@ -346,28 +349,35 @@ async fn invalid_container_fails() {
         .await
         .unwrap();
     assert_eq!(
-        Box::pin(log_subscription).try_next().await.unwrap().unwrap().value.kind,
+        Box::pin(log_subscription)
+            .try_next()
+            .await
+            .unwrap()
+            .unwrap()
+            .value
+            .kind,
         DroneLogMessageKind::Meta
     );
 }
 
 #[integration_test]
 async fn check_that_logs_work() {
-	let req = three_logs_image_spawn_request().await;
+    let req = three_logs_image_spawn_request().await;
     let (ctx, _) = do_spawn_request(req.clone()).await;
-	let mut log_subscription = Box::pin(ctx
-		.nats_connection
-		.subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
-		.await
-		.unwrap()
-		.timeout(Duration::from_secs(1)));
+    let mut log_subscription = Box::pin(
+        ctx.nats_connection
+            .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
+            .await
+            .unwrap()
+            .timeout(Duration::from_secs(1)),
+    );
 
-	for _ in 0..3 {
-		assert_eq!(
-			log_subscription.next().await.unwrap().unwrap().value.kind,
-			DroneLogMessageKind::Stdout
-		);
-	}
+    for _ in 0..3 {
+        assert_eq!(
+            log_subscription.next().await.unwrap().unwrap().value.kind,
+            DroneLogMessageKind::Stdout
+        );
+    }
 }
 
 #[integration_test]

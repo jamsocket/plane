@@ -2,7 +2,6 @@ use super::{
     backend::BackendMonitor,
     engine::{Engine, EngineBackendStatus},
 };
-use futures::{Future, FutureExt};
 use crate::{
     agent::wait_port_ready,
     database::{Backend, DroneDatabase},
@@ -10,9 +9,12 @@ use crate::{
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use dashmap::DashMap;
+use futures::{Future, FutureExt};
 use plane_core::{
     messages::{
-        agent::{BackendState, DroneLogMessage, DroneLogMessageKind, SpawnRequest, TerminationRequest},
+        agent::{
+            BackendState, DroneLogMessage, DroneLogMessageKind, SpawnRequest, TerminationRequest,
+        },
         drone_state::UpdateBackendStateMessage,
     },
     nats::TypedNats,
@@ -21,10 +23,13 @@ use plane_core::{
 use serde_json::json;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
-    sync::{mpsc::{channel, Sender, error::SendError}, Barrier},
+    sync::{
+        mpsc::{channel, error::SendError, Sender},
+        Barrier,
+    },
     task::JoinHandle,
 };
-use tokio_stream::{StreamExt, wrappers::ReceiverStream};
+use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 
 trait LogError {
     fn log_error(&self) -> &Self;
@@ -40,25 +45,6 @@ impl<T, E: Debug> LogError for Result<T, E> {
         self
     }
 }
-
-/*
-async fn inject_log(
-	sender: &Option<Sender<DroneLogMessage>>,
-	backend_id: BackendId,
-	text: String,
-	kind: DroneLogMessageKind,
-//) -> impl Future<Output = Result<(), SendError<DroneLogMessage>>> + '_ {
-) ->Result<(), anyhow::Error> {
-	if let Some(sender) = sender {
-		sender.send(DroneLogMessage {
-					backend_id,
-					kind,
-					text,
-				}).await.map_err(|e| { anyhow!(e) })
-	} else { Err(anyhow!("no sender present!")) }
-}
-*/
-
 
 #[derive(Debug, PartialEq, Eq)]
 enum Signal {
@@ -227,36 +213,35 @@ impl<E: Engine> Executor<E> {
         let (send, mut recv) = channel(1);
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
-		let notify = Arc::new(tokio::sync::Notify::new());
-		let jh = tokio::spawn({
-			let notify2 = notify.clone();
-			let self2 = self.clone();
-			let sr = spawn_request.clone();
-			async move {
-				notify2.notified().await;
-				let bm = BackendMonitor::new(
-					&sr.backend_id.clone(),
-					&self2.cluster.clone(),
-					self2.ip,
-					self2.engine.as_ref(),
-					&self2.nc,
-				);
-				self2.backend_to_monitor.insert(
-					sr.backend_id.clone(), bm);
-			}
-		});
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let jh = tokio::spawn({
+            let notify2 = notify.clone();
+            let self2 = self.clone();
+            let sr = spawn_request.clone();
+            async move {
+                notify2.notified().await;
+                let bm = BackendMonitor::new(
+                    &sr.backend_id.clone(),
+                    &self2.cluster.clone(),
+                    self2.ip,
+                    self2.engine.as_ref(),
+                    &self2.nc,
+                );
+                self2.backend_to_monitor.insert(sr.backend_id.clone(), bm);
+            }
+        });
 
-		loop {
-			tracing::info!(
-				?state,
-				backend_id = spawn_request.backend_id.id(),
+        loop {
+            tracing::info!(
+                ?state,
+                backend_id = spawn_request.backend_id.id(),
                 metadata = %json!(spawn_request.metadata),
                 "Executing state."
             );
 
-			if state.running() {
-				notify.notify_one();
-			}
+            if state.running() {
+                notify.notify_one();
+            }
 
             let next_state = loop {
                 if state == BackendState::Swept {
@@ -299,18 +284,23 @@ impl<E: Engine> Executor<E> {
                     match state {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
-							notify.notify_one();
-							if jh.await.is_ok() {
-							if let Err(inject_err) = self.backend_to_monitor
-								.try_get_mut(&spawn_request.backend_id)
-								.unwrap().inject_log(error.to_string(), DroneLogMessageKind::Meta)
-                                .await
-                            {
-                                tracing::error!(?inject_err, "failed to inject error into logs");
+                            notify.notify_one();
+                            if jh.await.is_ok() {
+                                if let Err(inject_err) = self
+                                    .backend_to_monitor
+                                    .try_get_mut(&spawn_request.backend_id)
+                                    .unwrap()
+                                    .inject_log(error.to_string(), DroneLogMessageKind::Meta)
+                                    .await
+                                {
+                                    tracing::error!(
+                                        ?inject_err,
+                                        "failed to inject error into logs"
+                                    );
+                                }
+                            } else {
+                                tracing::error!("inserting into backend_to_monitor failed");
                             }
-							} else {
-								tracing::error!("inserting into backend_to_monitor failed");
-							}
                             self.update_backend_state(spawn_request, state).await;
                         }
                         _ => tracing::error!(

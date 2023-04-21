@@ -77,19 +77,17 @@ impl DockerInterface {
         &self,
         container_name: &str,
     ) -> impl Stream<Item = Result<LogOutput, bollard::errors::Error>> {
-		let opts = LogsOptions {
-                follow: true,
-                stdout: true,
-                stderr: true,
-                since: 0,
-                until: 0,
-                timestamps: true,
-                tail: "all",
-            };
+        let opts = LogsOptions {
+            follow: true,
+            stdout: true,
+            stderr: true,
+            since: 0,
+            until: 0,
+            timestamps: true,
+            tail: "all",
+        };
 
-			self.docker.logs(
-            container_name,
-			Some(opts.clone()))
+        self.docker.logs(container_name, Some(opts.clone()))
     }
 
     /// The docker api (as of docker version 20.10.18) blocks for ~1s before returning
@@ -405,7 +403,7 @@ impl Engine for DockerInterface {
         let stream = self.get_logs(&backend.to_resource_name());
         let backend = backend.clone();
         let stream = stream.filter_map(move |v| {
-			tracing::info!(?v, "docker log collected");
+            tracing::info!(?v, "docker log collected");
             v.ok()
                 .as_ref()
                 .and_then(|d| DroneLogMessage::from_log_message(&backend, d))

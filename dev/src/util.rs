@@ -130,7 +130,6 @@ async fn make_invalid_image() -> String {
         .expect("invalid image should build")
 }
 
-
 pub async fn three_logs_image_spawn_request() -> SpawnRequest {
     SpawnRequest {
         cluster: ClusterName::new("plane.test"),

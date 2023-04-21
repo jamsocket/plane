@@ -10,10 +10,13 @@ use plane_core::{
     nats::TypedNats,
     types::{BackendId, ClusterName},
 };
-use std::{net::IpAddr, time::Duration, ops::DerefMut};
 use std::sync::{Arc, Mutex};
+use std::{net::IpAddr, ops::DerefMut, time::Duration};
 use tokio::{
-    sync::{mpsc::{self, error::SendError, Sender, Receiver}, Barrier},
+    sync::{
+        mpsc::{self, error::SendError, Receiver, Sender},
+        Barrier,
+    },
     task::JoinHandle,
     time::sleep,
 };
@@ -33,7 +36,7 @@ pub struct BackendMonitor {
     _stats_loop: AbortOnDrop<()>,
     _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
     _backend_id: BackendId,
-	meta_log_tx: Sender<DroneLogMessage>,
+    meta_log_tx: Sender<DroneLogMessage>,
 }
 
 impl BackendMonitor {
@@ -44,8 +47,8 @@ impl BackendMonitor {
         engine: &E,
         nc: &TypedNats,
     ) -> Self {
-		let (meta_tx, meta_rx) = tokio::sync::mpsc::channel(16);
-        let log_loop = Self::log_loop(backend_id, engine, nc,ReceiverStream::new(meta_rx));
+        let (meta_tx, meta_rx) = tokio::sync::mpsc::channel(16);
+        let log_loop = Self::log_loop(backend_id, engine, nc, ReceiverStream::new(meta_rx));
         let stats_loop = Self::stats_loop(backend_id, cluster, engine, nc);
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
@@ -54,7 +57,7 @@ impl BackendMonitor {
             _stats_loop: AbortOnDrop(stats_loop),
             _dns_loop: AbortOnDrop(dns_loop),
             _backend_id: backend_id.to_owned(),
-			meta_log_tx: meta_tx,
+            meta_log_tx: meta_tx,
         }
     }
 
