@@ -1,6 +1,6 @@
 [package]
 name = "plane-core"
-version = "0.3.17"
+version = "0.3.18"
 edition = "2021"
 authors = ["Paul Butler <paul@driftingin.space>"]
 homepage = "https://plane.dev"
