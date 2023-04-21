@@ -13,7 +13,6 @@ pub struct Supervisor {
 impl Supervisor {
     pub fn new<F, Fut>(name: &'static str, factory: F) -> Self
     where
-        //F: Fn() -> Pin<Box<dyn Future<Output = NeverResult> + Send>> + Send + 'static,
         F: Fn() -> Fut + Send + 'static,
         Fut: Future<Output = NeverResult> + Send + 'static,
     {
