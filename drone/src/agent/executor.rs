@@ -207,16 +207,29 @@ impl<E: Engine> Executor<E> {
         let (send, mut recv) = channel(1);
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
-        self.backend_to_monitor.insert(
-            spawn_request.backend_id.clone(),
-            BackendMonitor::new(
-                &spawn_request.backend_id,
-                &self.cluster,
-                self.ip,
-                self.engine.as_ref(),
-                &self.nc,
-            ),
-        );
+		
+		// the BackendMonitor must be created after the backend is ready
+		// unless there's an error before the backend starts
+		// this notifier is used to indicate that the BackendMonitor
+		// should be created.
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let jh = tokio::spawn({
+            let notify = notify.clone();
+            let spawn_request = spawn_request.clone();
+            let s = self.clone();
+            async move {
+                notify.notified().await;
+                let bm = BackendMonitor::new(
+                    &spawn_request.backend_id,
+                    &s.cluster,
+                    s.ip,
+                    s.engine.as_ref(),
+                    &s.nc,
+                );
+                s.backend_to_monitor.insert(spawn_request.backend_id, bm);
+            }
+        });
+
         loop {
             tracing::info!(
                 ?state,
@@ -224,6 +237,11 @@ impl<E: Engine> Executor<E> {
                 metadata = %json!(spawn_request.metadata),
                 "Executing state."
             );
+
+            if state.running() {
+				//this creates the BackendMonitor
+                notify.notify_one();
+            }
 
             let next_state = loop {
                 if state == BackendState::Swept {
@@ -266,15 +284,26 @@ impl<E: Engine> Executor<E> {
                     match state {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
-                            if let Err(inject_err) = self
-                                .backend_to_monitor
-                                .get_mut(&spawn_request.backend_id)
-                                .expect("backend should be in backend_to_monitor")
-                                .value_mut()
-                                .inject_log(error.to_string(), DroneLogMessageKind::Meta)
-                                .await
-                            {
-                                tracing::error!(?inject_err, "failed to inject error into logs");
+
+							//create the BackendMonitor to take errorloading logs
+                            notify.notify_one();
+
+							//must wait on BackendMonitor's insertion into hashtable. 
+                            if jh.await.is_ok() {
+                                if let Err(inject_err) = self
+                                    .backend_to_monitor
+                                    .try_get_mut(&spawn_request.backend_id)
+                                    .unwrap() //this cannot fail since we insert into the table in jh
+                                    .inject_log(error.to_string(), DroneLogMessageKind::Meta)
+                                    .await
+                                {
+                                    tracing::error!(
+                                        ?inject_err,
+                                        "failed to inject error into logs"
+                                    );
+                                }
+                            } else {
+                                tracing::error!("inserting into backend_to_monitor failed");
                             }
                             self.update_backend_state(spawn_request, state).await;
                         }

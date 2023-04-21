@@ -77,18 +77,17 @@ impl DockerInterface {
         &self,
         container_name: &str,
     ) -> impl Stream<Item = Result<LogOutput, bollard::errors::Error>> {
-        self.docker.logs(
-            container_name,
-            Some(LogsOptions {
-                follow: true,
-                stdout: true,
-                stderr: true,
-                since: 0,
-                until: 0,
-                timestamps: true,
-                tail: "all",
-            }),
-        )
+        let opts = LogsOptions {
+            follow: true,
+            stdout: true,
+            stderr: true,
+            since: 0,
+            until: 0,
+            timestamps: true,
+            tail: "all",
+        };
+
+        self.docker.logs(container_name, Some(opts.clone()))
     }
 
     /// The docker api (as of docker version 20.10.18) blocks for ~1s before returning

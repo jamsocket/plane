@@ -316,7 +316,7 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
                         continue;
                     }
                 };
-                
+
                 self.last_received_sequence = meta.sequence;
 
                 match value {
@@ -397,7 +397,7 @@ impl TypedNats {
         let stream_name = T::stream_name();
 
         let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
-        
+
         let init_sequence = stream.cached_info().state.last_sequence;
 
         let deliver_subject = self.nc.new_inbox();
