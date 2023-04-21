@@ -207,8 +207,12 @@ impl<E: Engine> Executor<E> {
         let (send, mut recv) = channel(1);
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
+		
+		// the BackendMonitor must be created after the backend is ready
+		// unless there's an error before the backend starts
+		// this notifier is used to indicate that the BackendMonitor
+		// should be created.
         let notify = Arc::new(tokio::sync::Notify::new());
-
         let jh = tokio::spawn({
             let notify = notify.clone();
             let spawn_request = spawn_request.clone();
@@ -235,6 +239,7 @@ impl<E: Engine> Executor<E> {
             );
 
             if state.running() {
+				//this creates the BackendMonitor
                 notify.notify_one();
             }
 
@@ -279,12 +284,16 @@ impl<E: Engine> Executor<E> {
                     match state {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
+
+							//create the BackendMonitor to take errorloading logs
                             notify.notify_one();
+
+							//must wait on BackendMonitor's insertion into hashtable. 
                             if jh.await.is_ok() {
                                 if let Err(inject_err) = self
                                     .backend_to_monitor
                                     .try_get_mut(&spawn_request.backend_id)
-                                    .unwrap()
+                                    .unwrap() //this cannot fail since we insert into the table in jh
                                     .inject_log(error.to_string(), DroneLogMessageKind::Meta)
                                     .await
                                 {
