@@ -10,12 +10,9 @@ use plane_core::{
     nats::TypedNats,
     types::{BackendId, ClusterName},
 };
-
 use std::{net::IpAddr, time::Duration};
 use tokio::{
-    sync::{
-        mpsc::{error::SendError, Sender},
-    },
+    sync::mpsc::{error::SendError, Sender},
     task::JoinHandle,
     time::sleep,
 };

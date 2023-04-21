@@ -9,12 +9,9 @@ use crate::{
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use dashmap::DashMap;
-
 use plane_core::{
     messages::{
-        agent::{
-            BackendState, DroneLogMessageKind, SpawnRequest, TerminationRequest,
-        },
+        agent::{BackendState, DroneLogMessageKind, SpawnRequest, TerminationRequest},
         drone_state::UpdateBackendStateMessage,
     },
     nats::TypedNats,
@@ -23,12 +20,10 @@ use plane_core::{
 use serde_json::json;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
-    sync::{
-        mpsc::{channel, Sender},
-    },
+    sync::mpsc::{channel, Sender},
     task::JoinHandle,
 };
-use tokio_stream::{StreamExt};
+use tokio_stream::StreamExt;
 
 trait LogError {
     fn log_error(&self) -> &Self;
@@ -213,20 +208,21 @@ impl<E: Engine> Executor<E> {
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
         let notify = Arc::new(tokio::sync::Notify::new());
+
         let jh = tokio::spawn({
-            let notify2 = notify.clone();
-            let self2 = self.clone();
-            let sr = spawn_request.clone();
+            let notify = notify.clone();
+            let spawn_request = spawn_request.clone();
+            let s = self.clone();
             async move {
-                notify2.notified().await;
+                notify.notified().await;
                 let bm = BackendMonitor::new(
-                    &sr.backend_id.clone(),
-                    &self2.cluster.clone(),
-                    self2.ip,
-                    self2.engine.as_ref(),
-                    &self2.nc,
+                    &spawn_request.backend_id,
+                    &s.cluster,
+                    s.ip,
+                    s.engine.as_ref(),
+                    &s.nc,
                 );
-                self2.backend_to_monitor.insert(sr.backend_id.clone(), bm);
+                s.backend_to_monitor.insert(spawn_request.backend_id, bm);
             }
         });
 
