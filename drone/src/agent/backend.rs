@@ -37,21 +37,16 @@ pub struct BackendMonitor {
 }
 
 impl BackendMonitor {
-    pub async fn new<E: Engine>(
+    pub fn new<E: Engine>(
         backend_id: &BackendId,
         cluster: &ClusterName,
         ip: IpAddr,
         engine: &E,
         nc: &TypedNats,
-		notify: &tokio::sync::Notify
     ) -> Self {
-		notify.notified().await;
 		let (meta_tx, meta_rx) = tokio::sync::mpsc::channel(16);
-		tracing::info!("who are you blocking??");
         let log_loop = Self::log_loop(backend_id, engine, nc,ReceiverStream::new(meta_rx));
-		tracing::info!("2 who are you blocking??");
         let stats_loop = Self::stats_loop(backend_id, cluster, engine, nc);
-		tracing::info!("3 who are you blocking??");
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
         BackendMonitor {
@@ -115,7 +110,6 @@ impl BackendMonitor {
             tracing::info!(%backend_id, "Log recording loop started.");
 
             while let Some(v) = stream.next().await {
-				tracing::info!(%backend_id, ?v, "log message");
                 nc.publish(&v)
                     .await
                     .log_error("Error publishing log message.");

@@ -228,20 +228,22 @@ impl<E: Engine> Executor<E> {
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
 		let notify = Arc::new(tokio::sync::Notify::new());
-		let notify2 = notify.clone();
-		let self2 = self.clone();
-		let sr = spawn_request.clone();
-		let jh = tokio::spawn(async move {
-			let bm = BackendMonitor::new(
+		let jh = tokio::spawn({
+			let notify2 = notify.clone();
+			let self2 = self.clone();
+			let sr = spawn_request.clone();
+			async move {
+				notify2.notified().await;
+				let bm = BackendMonitor::new(
 					&sr.backend_id.clone(),
 					&self2.cluster.clone(),
 					self2.ip,
 					self2.engine.as_ref(),
 					&self2.nc,
-					&notify2
-				).await;
-			self2.backend_to_monitor.insert(
-				sr.backend_id.clone(), bm);
+				);
+				self2.backend_to_monitor.insert(
+					sr.backend_id.clone(), bm);
+			}
 		});
 
 		loop {
