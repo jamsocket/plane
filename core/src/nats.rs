@@ -248,7 +248,7 @@ impl<T> NatsResultExt<T> for std::result::Result<T, async_nats::Error> {
 #[derive(Clone)]
 pub struct TypedNats {
     nc: Client,
-    jetstream: jetstream::Context,
+    pub jetstream: jetstream::Context,
     /// A set of JetStream names which have been created by this client.
     /// JetStreams are lazily created by TypedNats the first time they
     /// are used, and then stored here to avoid a round-trip after that.

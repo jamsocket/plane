@@ -3,7 +3,10 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
     messages::{
-        agent::{BackendStateMessage, DockerExecutableConfig, ResourceLimits, TerminationRequest},
+        agent::{
+            BackendState, BackendStateMessage, DockerExecutableConfig, ResourceLimits,
+            TerminationRequest,
+        },
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
         state::{
             BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
@@ -61,6 +64,8 @@ enum Command {
         #[clap(long, default_value = "false")]
         include_heartbeat: bool,
     },
+    /// Remove swept backends.
+    Cleanup,
 }
 
 #[tokio::main]
@@ -73,6 +78,33 @@ async fn main() -> Result<()> {
         .await?;
 
     match opts.command {
+        Command::Cleanup => {
+            let state = get_world_state(nats.clone()).await?;
+            let stream = nats.jetstream.get_stream("plane_state").await.unwrap();
+
+            for (cluster_name, cluster) in &state.clusters {
+                for (backend_id, backend) in &cluster.backends {
+                    let Some((timestamp, state)) = backend.state_timestamp() else { continue };
+
+                    if state == BackendState::Swept {
+                        println!(
+                            "Removing backend {} from cluster {}, swept at {}",
+                            backend_id, cluster_name, timestamp
+                        );
+
+                        stream
+                            .purge()
+                            .filter(format!(
+                                "state.cluster.{}.backend.{}.>",
+                                cluster_name.subject_name(),
+                                backend_id.id()
+                            ))
+                            .await
+                            .unwrap();
+                    }
+                }
+            }
+        }
         Command::DumpState => {
             let state = get_world_state(nats.clone()).await?;
             println!("{:#?}", state);
