@@ -404,6 +404,7 @@ impl Engine for DockerInterface {
         let stream = self.get_logs(&backend.to_resource_name());
         let backend = backend.clone();
         let stream = stream.filter_map(move |v| {
+			tracing::info!(?v, "docker log collected");
             v.ok()
                 .as_ref()
                 .and_then(|d| DroneLogMessage::from_log_message(&backend, d))

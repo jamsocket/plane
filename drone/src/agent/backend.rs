@@ -12,7 +12,7 @@ use plane_core::{
 };
 use std::{net::IpAddr, time::Duration};
 use tokio::{
-    sync::mpsc::{self, error::SendError, Sender},
+    sync::mpsc::{self, error::SendError, Sender, Receiver},
     task::JoinHandle,
     time::sleep,
 };
@@ -31,7 +31,6 @@ pub struct BackendMonitor {
     _log_loop: AbortOnDrop<()>,
     _stats_loop: AbortOnDrop<()>,
     _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
-    _log_injection_channel: Sender<DroneLogMessage>,
     _backend_id: BackendId,
 }
 
@@ -42,21 +41,24 @@ impl BackendMonitor {
         ip: IpAddr,
         engine: &E,
         nc: &TypedNats,
+		log_injection_receiver: Receiver<DroneLogMessage>
     ) -> Self {
-        let (meta_log_tx, meta_log_rx) = mpsc::channel(16);
-        let log_loop = Self::log_loop(backend_id, engine, nc, ReceiverStream::new(meta_log_rx));
+		tracing::info!("who are you blocking??");
+        let log_loop = Self::log_loop(backend_id, engine, nc, ReceiverStream::new(log_injection_receiver));
+		tracing::info!("2 who are you blocking??");
         let stats_loop = Self::stats_loop(backend_id, cluster, engine, nc);
+		tracing::info!("3 who are you blocking??");
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
         BackendMonitor {
             _log_loop: AbortOnDrop(log_loop),
             _stats_loop: AbortOnDrop(stats_loop),
             _dns_loop: AbortOnDrop(dns_loop),
-            _log_injection_channel: meta_log_tx,
             _backend_id: backend_id.to_owned(),
         }
     }
 
+	/*
     pub fn inject_log(
         &mut self,
         text: String,
@@ -68,6 +70,7 @@ impl BackendMonitor {
             text,
         })
     }
+	*/
 
     fn dns_loop(
         backend_id: &BackendId,
@@ -109,6 +112,7 @@ impl BackendMonitor {
             tracing::info!(%backend_id, "Log recording loop started.");
 
             while let Some(v) = stream.next().await {
+				tracing::info!(%backend_id, ?v, "log message");
                 nc.publish(&v)
                     .await
                     .log_error("Error publishing log message.");

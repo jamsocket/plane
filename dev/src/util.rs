@@ -130,6 +130,27 @@ async fn make_invalid_image() -> String {
         .expect("invalid image should build")
 }
 
+
+pub async fn three_logs_image_spawn_request() -> SpawnRequest {
+    SpawnRequest {
+        cluster: ClusterName::new("plane.test"),
+        backend_id: BackendId::new_random(),
+        drone_id: DroneId::new_random(),
+        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
+        max_idle_secs: Duration::from_secs(10),
+        executable: DockerExecutableConfig {
+            image: build_image("test-images/three-logs").await.unwrap(),
+            env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
+            credentials: None,
+            resource_limits: Default::default(),
+            pull_policy: Default::default(),
+            port: None,
+            volume_mounts: vec![],
+        },
+        bearer_token: None,
+    }
+}
+
 pub async fn invalid_image_spawn_request() -> SpawnRequest {
     SpawnRequest {
         cluster: ClusterName::new("plane.test"),

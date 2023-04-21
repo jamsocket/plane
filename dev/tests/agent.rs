@@ -1,4 +1,6 @@
 use anyhow::Result;
+use futures::TryFutureExt;
+use futures::FutureExt;
 use integration_test::integration_test;
 use plane_controller::{drone_state::monitor_drone_state, run::update_backend_state_loop};
 use plane_core::{
@@ -19,7 +21,7 @@ use plane_dev::{
     resources::server::Server,
     scratch_dir,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{base_spawn_request, invalid_image_spawn_request, random_loopback_ip},
+    util::{base_spawn_request, invalid_image_spawn_request, random_loopback_ip, three_logs_image_spawn_request},
 };
 use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
@@ -199,6 +201,7 @@ impl BackendStateSubscription {
     }
 }
 
+/*
 pub trait StreamTimeoutExt<E: std::error::Error>: Stream {
     fn into_stream_with_timeout(
         self,
@@ -206,26 +209,27 @@ pub trait StreamTimeoutExt<E: std::error::Error>: Stream {
     ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, E>> + Send>>;
 }
 
-impl<S: Stream + Send + 'static> StreamTimeoutExt<JoinError> for S
+impl<S: Stream + Send + Unpin + 'static > StreamTimeoutExt<tokio::time::error::Elapsed> for S
 where
-    S::Item: Send,
+    S::Item: Send + std::fmt::Debug,
 {
     fn into_stream_with_timeout(
         self,
         timeout_in_seconds: u64,
-    ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, JoinError>> + Send>> {
+    ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, tokio::time::error::Elapsed>> + Send>> {
         let stream = self.then(move |item| {
-            let handle = tokio::spawn(async move { item });
+            let duration = Duration::from_secs(timeout_in_seconds);
             async move {
-                tokio::time::timeout(Duration::from_secs(timeout_in_seconds), handle)
-                    .await
-                    .unwrap()
+                tokio::time::timeout(duration, async { item }).await.map_err(|e| {
+					self.timeout()
+					e
+                })
             }
         });
-
         Box::pin(stream)
     }
 }
+*/
 
 #[integration_test]
 async fn drone_sends_status_messages() {
@@ -329,12 +333,12 @@ async fn do_spawn_request(mut request: SpawnRequest) -> (TestFixture, BackendSta
 async fn invalid_container_fails() {
     let req = invalid_image_spawn_request().await;
     let (ctx, mut sub) = do_spawn_request(req.clone()).await;
-    let mut log_subscription = ctx
+    let log_subscription = ctx
         .nats_connection
         .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
         .await
         .unwrap()
-        .into_stream_with_timeout(10);
+        .timeout(Duration::from_secs(10));
     sub.expect_backend_status_message(BackendState::Loading, 30_000)
         .await
         .unwrap();
@@ -342,9 +346,28 @@ async fn invalid_container_fails() {
         .await
         .unwrap();
     assert_eq!(
-        log_subscription.next().await.unwrap().unwrap().value.kind,
+        Box::pin(log_subscription).try_next().await.unwrap().unwrap().value.kind,
         DroneLogMessageKind::Meta
     );
+}
+
+#[integration_test]
+async fn check_that_logs_work() {
+	let req = three_logs_image_spawn_request().await;
+    let (ctx, _) = do_spawn_request(req.clone()).await;
+	let mut log_subscription = Box::pin(ctx
+		.nats_connection
+		.subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
+		.await
+		.unwrap()
+		.timeout(Duration::from_secs(1)));
+
+	for _ in 0..3 {
+		assert_eq!(
+			log_subscription.next().await.unwrap().unwrap().value.kind,
+			DroneLogMessageKind::Stdout
+		);
+	}
 }
 
 #[integration_test]

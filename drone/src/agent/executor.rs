@@ -2,6 +2,7 @@ use super::{
     backend::BackendMonitor,
     engine::{Engine, EngineBackendStatus},
 };
+use futures::{Future, FutureExt};
 use crate::{
     agent::wait_port_ready,
     database::{Backend, DroneDatabase},
@@ -11,7 +12,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use plane_core::{
     messages::{
-        agent::{BackendState, DroneLogMessageKind, SpawnRequest, TerminationRequest},
+        agent::{BackendState, DroneLogMessage, DroneLogMessageKind, SpawnRequest, TerminationRequest},
         drone_state::UpdateBackendStateMessage,
     },
     nats::TypedNats,
@@ -20,7 +21,7 @@ use plane_core::{
 use serde_json::json;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
-    sync::mpsc::{channel, Sender},
+    sync::mpsc::{channel, Sender, error::SendError},
     task::JoinHandle,
 };
 use tokio_stream::StreamExt;
@@ -39,6 +40,23 @@ impl<T, E: Debug> LogError for Result<T, E> {
         self
     }
 }
+
+async fn inject_log(
+	sender: &Option<Sender<DroneLogMessage>>,
+	backend_id: BackendId,
+	text: String,
+	kind: DroneLogMessageKind,
+//) -> impl Future<Output = Result<(), SendError<DroneLogMessage>>> + '_ {
+) ->Result<(), anyhow::Error> {
+	if let Some(sender) = sender {
+		sender.send(DroneLogMessage {
+					backend_id,
+					kind,
+					text,
+				}).await.map_err(|e| { anyhow!(e) })
+	} else { Err(anyhow!("no sender present!")) }
+}
+
 
 #[derive(Debug, PartialEq, Eq)]
 enum Signal {
@@ -207,20 +225,26 @@ impl<E: Engine> Executor<E> {
         let (send, mut recv) = channel(1);
         self.backend_to_listener
             .insert(spawn_request.backend_id.clone(), send);
-        self.backend_to_monitor.insert(
-            spawn_request.backend_id.clone(),
-            BackendMonitor::new(
-                &spawn_request.backend_id,
-                &self.cluster,
-                self.ip,
-                self.engine.as_ref(),
-                &self.nc,
-            ),
-        );
-        loop {
-            tracing::info!(
-                ?state,
-                backend_id = spawn_request.backend_id.id(),
+		let mut log_tx: Option<Sender<DroneLogMessage>> = None;
+		loop {
+			if state.running() && !self.backend_to_monitor.contains_key(&spawn_request.backend_id){
+				let (meta_log_tx, meta_log_rx) = tokio::sync::mpsc::channel(16);
+				log_tx = Some(meta_log_tx.clone());
+				self.backend_to_monitor.insert(
+					spawn_request.backend_id.clone(),
+					BackendMonitor::new(
+						&spawn_request.backend_id,
+						&self.cluster,
+						self.ip,
+						self.engine.as_ref(),
+						&self.nc,
+						meta_log_rx
+					)
+				);
+			}
+			tracing::info!(
+				?state,
+				backend_id = spawn_request.backend_id.id(),
                 metadata = %json!(spawn_request.metadata),
                 "Executing state."
             );
@@ -266,12 +290,11 @@ impl<E: Engine> Executor<E> {
                     match state {
                         BackendState::Loading => {
                             state = BackendState::ErrorLoading;
-                            if let Err(inject_err) = self
-                                .backend_to_monitor
-                                .get_mut(&spawn_request.backend_id)
-                                .expect("backend should be in backend_to_monitor")
-                                .value_mut()
-                                .inject_log(error.to_string(), DroneLogMessageKind::Meta)
+                            if let Err(inject_err) = inject_log(
+								&log_tx, 
+								spawn_request.backend_id.clone(),
+								error.to_string(),
+								DroneLogMessageKind::Meta)
                                 .await
                             {
                                 tracing::error!(?inject_err, "failed to inject error into logs");
