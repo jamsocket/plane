@@ -32,8 +32,8 @@ use serde_json::json;
 use std::net::IpAddr;
 
 use std::time::Duration;
-use tokio::{time::Instant};
-use tokio_stream::{StreamExt};
+use tokio::time::Instant;
+use tokio_stream::StreamExt;
 
 pub const CLUSTER_DOMAIN: &str = "plane.test";
 
@@ -203,36 +203,6 @@ impl BackendStateSubscription {
         }
     }
 }
-
-/*
-pub trait StreamTimeoutExt<E: std::error::Error>: Stream {
-    fn into_stream_with_timeout(
-        self,
-        timeout_in_seconds: u64,
-    ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, E>> + Send>>;
-}
-
-impl<S: Stream + Send + Unpin + 'static > StreamTimeoutExt<tokio::time::error::Elapsed> for S
-where
-    S::Item: Send + std::fmt::Debug,
-{
-    fn into_stream_with_timeout(
-        self,
-        timeout_in_seconds: u64,
-    ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, tokio::time::error::Elapsed>> + Send>> {
-        let stream = self.then(move |item| {
-            let duration = Duration::from_secs(timeout_in_seconds);
-            async move {
-                tokio::time::timeout(duration, async { item }).await.map_err(|e| {
-                    self.timeout()
-                    e
-                })
-            }
-        });
-        Box::pin(stream)
-    }
-}
-*/
 
 #[integration_test]
 async fn drone_sends_status_messages() {
