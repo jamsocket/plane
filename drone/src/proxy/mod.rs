@@ -17,6 +17,7 @@ mod tls;
 
 pub const PLANE_AUTH_COOKIE: &str = "_plane_auth";
 
+#[derive(Clone)]
 pub struct ProxyOptions {
     pub db: DroneDatabase,
     pub bind_ip: IpAddr,

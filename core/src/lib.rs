@@ -5,6 +5,7 @@ pub mod nats;
 pub mod nats_connection;
 pub mod retry;
 pub mod state;
+pub mod supervisor;
 pub mod timing;
 pub mod types;
 

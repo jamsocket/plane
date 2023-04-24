@@ -9,6 +9,7 @@ use trust_dns_server::client::rr::Name;
 
 pub struct SchedulerPlan;
 
+#[derive(Clone)]
 pub struct DnsPlan {
     pub port: u16,
     pub bind_ip: IpAddr,

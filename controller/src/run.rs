@@ -3,20 +3,14 @@ use crate::dns::serve_dns;
 use crate::drone_state::monitor_drone_state;
 use crate::plan::ControllerPlan;
 use crate::run_scheduler;
-use anyhow::{anyhow, Context, Result};
-use futures::future::try_join_all;
+use anyhow::{Context, Result};
+use plane_core::cli::wait_for_interrupt;
 use plane_core::messages::agent::BackendStateMessage;
 use plane_core::messages::drone_state::UpdateBackendStateMessage;
 use plane_core::messages::logging::Component;
 use plane_core::nats::TypedNats;
+use plane_core::supervisor::Supervisor;
 use plane_core::{cli::init_cli, logging::TracingHandle, NeverResult};
-use signal_hook::{
-    consts::{SIGINT, SIGTERM},
-    iterator::Signals,
-};
-use std::future::Future;
-use std::pin::Pin;
-use std::thread;
 
 /// Receive UpdateBackendStateMessages over core NATS, and turn them into
 /// BackendStateMessages over JetStream.
@@ -48,7 +42,7 @@ pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
     }
 }
 
-async fn controller_main() -> NeverResult {
+async fn controller_main() -> Result<()> {
     let mut tracing_handle = TracingHandle::init(Component::Controller)?;
     let config: ControllerConfig = init_cli()?;
     let plan = ControllerPlan::from_controller_config(config).await?;
@@ -62,38 +56,45 @@ async fn controller_main() -> NeverResult {
 
     tracing_handle.attach_nats(nats.clone())?;
 
-    let mut futs: Vec<Pin<Box<dyn Future<Output = NeverResult>>>> = vec![];
+    let _scheduler_supervisors = if scheduler_plan.is_some() {
+        let scheduler = {
+            let nats = nats.clone();
+            let state = state.clone();
+            Supervisor::new("scheduler", move || {
+                run_scheduler(nats.clone(), state.clone())
+            })
+        };
 
-    if scheduler_plan.is_some() {
-        futs.push(Box::pin(run_scheduler(nats.clone(), state.clone())));
+        let backend_state = {
+            let nats = nats.clone();
+            Supervisor::new("backend_state", move || {
+                update_backend_state_loop(nats.clone())
+            })
+        };
 
-        futs.push(Box::pin(update_backend_state_loop(nats.clone())));
+        let monitor_drone_state = {
+            let nats = nats.clone();
+            Supervisor::new("monitor_drone_state", move || {
+                monitor_drone_state(nats.clone())
+            })
+        };
 
-        futs.push(Box::pin(monitor_drone_state(nats.clone())));
-    }
+        Some((scheduler, backend_state, monitor_drone_state))
+    } else {
+        None
+    };
 
-    if let Some(dns_plan) = dns_plan {
-        futs.push(Box::pin(serve_dns(dns_plan)));
-    }
+    #[allow(clippy::manual_map)]
+    let _dns_supervisor = if let Some(dns_plan) = dns_plan {
+        Some(Supervisor::new("dns", move || serve_dns(dns_plan.clone())))
+    } else {
+        None
+    };
 
-    try_join_all(futs.into_iter()).await?;
-    // try_join_all either returns an Err, or Ok() with a list of Never values.
-    // Since Never values are not constructable, if we get here, we can assume that
-    // try_join_all returned an empty list. This means that no event loops ever
-    // actually ran, i.e. futs was empty.
-    Err(anyhow!("No event loops selected."))
+    wait_for_interrupt().await
 }
 
 pub fn run() -> Result<()> {
-    let mut signals = Signals::new([SIGINT, SIGTERM])?;
-
-    thread::spawn(move || {
-        for _ in signals.forever() {
-            // TODO: we could shut down containers here.
-            std::process::exit(0)
-        }
-    });
-
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?

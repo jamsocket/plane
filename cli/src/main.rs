@@ -18,6 +18,7 @@ use plane_core::{
     types::{BackendId, ClusterName, DroneId},
 };
 use std::{collections::HashMap, time::Duration};
+use time::macros::format_description;
 
 #[derive(Parser)]
 struct Opts {
@@ -114,7 +115,7 @@ async fn main() -> Result<()> {
                 .subscribe_jetstream_subject(WorldStateMessage::subscribe_subject())
                 .await?;
 
-            while let Some((message, _)) = sub.next().await {
+            while let Some((message, meta)) = sub.next().await {
                 let WorldStateMessage { cluster, message } = message;
 
                 let text = match message {
@@ -176,7 +177,14 @@ async fn main() -> Result<()> {
                     }
                 };
 
-                println!("Cluster: {} {}", cluster.to_string().bright_green(), text);
+                let format = format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
+                let timestamp = meta.timestamp.format(format)?.to_string();
+                println!(
+                    "{} cluster: {} {}",
+                    timestamp.bright_purple(),
+                    cluster.to_string().bright_green(),
+                    text
+                );
             }
         }
         Command::Status { backend } => {
