@@ -3,6 +3,7 @@
 //! These use serde to serialize data to/from JSON over nats into Rust types.
 
 use crate::logging::LogError;
+use crate::messages::initialize_jetstreams;
 use anyhow::{anyhow, Context, Result};
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::push::Messages;
@@ -11,13 +12,10 @@ use async_nats::jetstream::context::Publish;
 use async_nats::jetstream::stream::Config;
 use async_nats::{Client, Message, Subscriber};
 use bytes::Bytes;
-use dashmap::DashSet;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
 use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::sync::Arc;
 use std::task::Poll;
 use time::OffsetDateTime;
 use tokio_stream::{Stream, StreamExt};
@@ -249,14 +247,6 @@ impl<T> NatsResultExt<T> for std::result::Result<T, async_nats::Error> {
 pub struct TypedNats {
     nc: Client,
     jetstream: jetstream::Context,
-    /// A set of JetStream names which have been created by this client.
-    /// JetStreams are lazily created by TypedNats the first time they
-    /// are used, and then stored here to avoid a round-trip after that.
-    /// Stream creation (with the same config) is idempotent, so it doesn't
-    /// matter if this is called multiple times, but we want to avoid
-    /// creating the same stream repeatedly because it costs a round-trip
-    /// to NATS.
-    jetstream_created_streams: Arc<DashSet<String>>,
 }
 
 pub struct DelayedReply<T: DeserializeOwned> {
@@ -341,24 +331,12 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
 
 impl TypedNats {
     #[must_use]
-    pub fn new(nc: Client) -> Self {
+    pub async fn new(nc: Client) -> Result<Self> {
         let jetstream = async_nats::jetstream::new(nc.clone());
-        TypedNats {
-            nc,
-            jetstream,
-            jetstream_created_streams: Arc::default(),
-        }
-    }
 
-    pub async fn ensure_jetstream_exists<T: JetStreamable>(&self) -> Result<()> {
-        if !self.jetstream_created_streams.contains(T::stream_name()) {
-            self.add_jetstream_stream::<T>().await?;
+        initialize_jetstreams(&jetstream).await?;
 
-            self.jetstream_created_streams
-                .insert(T::stream_name().to_string());
-        }
-
-        Ok(())
+        Ok(TypedNats { nc, jetstream })
     }
 
     /// Send a request that expects a reply, but return as soon as the request
@@ -383,24 +361,12 @@ impl TypedNats {
         })
     }
 
-    async fn add_jetstream_stream<T: JetStreamable>(&self) -> Result<()> {
-        let config = T::config();
-        tracing::debug!(name = config.name, "Creating jetstream stream.");
-        self.jetstream
-            .get_or_create_stream(config)
-            .await
-            .to_anyhow()?;
-
-        Ok(())
-    }
-
     async fn subscribe_jetstream_impl<T: JetStreamable>(
         &self,
         subject: Option<SubscribeSubject<T>>,
     ) -> Result<JetstreamSubscription<T>> {
         // An empty string is equivalent to no subject filter.
         let subject = subject.map(|d| d.subject).unwrap_or_default();
-        let _ = self.ensure_jetstream_exists::<T>().await;
         let stream_name = T::stream_name();
 
         let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
@@ -464,8 +430,6 @@ impl TypedNats {
     where
         T: TypedMessage<Response = NoReply> + JetStreamable,
     {
-        self.ensure_jetstream_exists::<T>().await?;
-
         let sequence = self
             .jetstream
             .publish(
@@ -486,8 +450,6 @@ impl TypedNats {
     where
         T: TypedMessage<Response = NoReply> + JetStreamable,
     {
-        self.ensure_jetstream_exists::<T>().await?;
-
         let publish = Publish::build()
             .payload(Bytes::from(serde_json::to_vec(value)?))
             .expected_last_subject_sequence(0);
