@@ -14,7 +14,7 @@ enum NatsAuthentication {
     // JWT
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum DockerConnection {
     Socket { socket: String },
@@ -29,7 +29,7 @@ impl Default for DockerConnection {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct DockerConfig {
     pub runtime: Option<String>,
 
