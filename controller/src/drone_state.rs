@@ -124,8 +124,6 @@ pub async fn monitor_drone_state(nats: TypedNats) -> NeverResult {
         };
 
         if let Some(message) = message {
-            tracing::debug!(message=?message.value, "Got state message from drone.");
-
             let state_messages = convert_to_state_message(Utc::now(), &message.value);
             for state_message in state_messages {
                 apply_state_message(&nats, &state_message).await?;
