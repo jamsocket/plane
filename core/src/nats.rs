@@ -309,6 +309,14 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
                     .await
                     .log_error("Error acking jetstream message.");
                 let value: Result<T, _> = parse_and_verify_message(&message);
+                let value = match value {
+                    Ok(value) => value,
+                    Err(error) => {
+                        tracing::error!(?error, ?message, "Error parsing jetstream message; message ignored.");
+                        continue;
+                    }
+                };
+
                 let meta = match MessageMeta::try_from(message) {
                     Ok(meta) => meta,
                     Err(error) => {
@@ -319,12 +327,7 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
 
                 self.last_received_sequence = meta.sequence;
 
-                match value {
-                    Ok(value) => return Some((value, meta)),
-                    Err(error) => {
-                        tracing::error!(?error, "Error parsing jetstream message; message ignored.")
-                    }
-                }
+                return Some((value, meta));
             } else {
                 return None;
             }
