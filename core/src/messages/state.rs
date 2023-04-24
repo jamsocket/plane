@@ -1,6 +1,6 @@
 use super::agent::{BackendState, DroneState};
 use crate::{
-    nats::{JetStreamable, NoReply, TypedMessage},
+    nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
 use chrono::{DateTime, Utc};
@@ -96,6 +96,12 @@ pub enum BackendMessageType {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcmeDnsRecord {
     pub value: String,
+}
+
+impl WorldStateMessage {
+    pub fn subscribe_subject() -> SubscribeSubject<WorldStateMessage> {
+        SubscribeSubject::new("state.>".into())
+    }
 }
 
 impl TypedMessage for WorldStateMessage {

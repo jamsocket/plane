@@ -1,6 +1,6 @@
 [package]
 name = "plane-drone"
-version = "0.3.17"
+version = "0.3.18"
 edition = "2021"
 authors = ["Paul Butler <paul@driftingin.space>"]
 homepage = "https://plane.dev"
@@ -29,7 +29,6 @@ rustls = "0.21.0"
 rustls-pemfile = "1.0.0"
 serde = { version = "1.0.144", features = ["derive"] }
 serde_json = "1.0.81"
-signal-hook = "0.3.14"
 sqlx = { version = "0.6.1", features = [
     "runtime-tokio-rustls",
     "sqlite",
@@ -37,7 +36,7 @@ sqlx = { version = "0.6.1", features = [
     "macros",
     "offline",
 ] }
-tokio = { version = "1.18.2", features = ["rt"] }
+tokio = { version = "1.18.2", features = ["rt", "signal"] }
 tokio-rustls = "0.24.0"
 tokio-stream = "0.1.8"
 tracing = "0.1.36"
