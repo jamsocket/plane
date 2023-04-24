@@ -147,7 +147,12 @@ async fn main() -> Result<()> {
 
                 let format = format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
                 let timestamp = meta.timestamp.format(format)?.to_string();
-                println!("{} cluster: {} {}", timestamp.bright_purple(), cluster.to_string().bright_green(), text);
+                println!(
+                    "{} cluster: {} {}",
+                    timestamp.bright_purple(),
+                    cluster.to_string().bright_green(),
+                    text
+                );
             }
         }
         Command::Status { backend } => {

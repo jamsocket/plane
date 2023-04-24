@@ -312,7 +312,11 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
                 let value = match value {
                     Ok(value) => value,
                     Err(error) => {
-                        tracing::error!(?error, ?message, "Error parsing jetstream message; message ignored.");
+                        tracing::error!(
+                            ?error,
+                            ?message,
+                            "Error parsing jetstream message; message ignored."
+                        );
                         continue;
                     }
                 };
