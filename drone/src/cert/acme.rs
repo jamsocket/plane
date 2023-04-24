@@ -3,7 +3,7 @@ use base64::Engine;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct AcmeEabConfiguration {
     pub key_id: String,
 

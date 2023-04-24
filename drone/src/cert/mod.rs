@@ -24,6 +24,7 @@ const DNS_01: &str = "dns-01";
 const REFRESH_MARGIN: Duration = Duration::from_secs(3600 * 24 * 15);
 const MAX_SLEEP: Duration = Duration::from_secs(3600);
 
+#[derive(Clone)]
 pub struct CertOptions {
     pub cluster_domain: String,
     pub nats: TypedNats,

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use serde::{de::DeserializeOwned, Serialize};
+use tokio::signal::unix::SignalKind;
 
 #[derive(Parser)]
 struct CliArgs {
@@ -8,6 +9,21 @@ struct CliArgs {
     dump_config: bool,
 
     config_file: Option<String>,
+}
+
+pub async fn wait_for_interrupt() -> Result<()> {
+    let mut int_stream = tokio::signal::unix::signal(SignalKind::interrupt())?;
+    let mut term_stream = tokio::signal::unix::signal(SignalKind::terminate())?;
+    tokio::select!(
+        _ = int_stream.recv() => {
+            tracing::info!("Received SIGINT, exiting.");
+        },
+        _ = term_stream.recv() => {
+            tracing::info!("Received SIGTERM, exiting.");
+        },
+    );
+
+    Ok(())
 }
 
 pub fn init_cli<C: Serialize + DeserializeOwned>() -> Result<C> {

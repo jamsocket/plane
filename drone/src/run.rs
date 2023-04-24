@@ -5,22 +5,15 @@ use crate::{
     plan::DronePlan,
     proxy::serve,
 };
-use anyhow::{anyhow, Context, Result};
-use futures::future::try_join_all;
-use futures::Future;
-use plane_core::cli::init_cli;
+use anyhow::{Context, Result};
+use plane_core::cli::{init_cli, wait_for_interrupt};
 use plane_core::logging::TracingHandle;
 use plane_core::messages::logging::Component;
 use plane_core::retry::do_with_retry;
+use plane_core::supervisor::Supervisor;
 use plane_core::types::DroneId;
-use plane_core::NeverResult;
-use signal_hook::{
-    consts::{SIGINT, SIGTERM},
-    iterator::Signals,
-};
-use std::{pin::Pin, thread};
 
-async fn drone_main() -> NeverResult {
+async fn drone_main() -> Result<()> {
     tracing::info!("Starting drone");
     let mut config: DroneConfig = init_cli().context("Initializing CLI")?;
 
@@ -55,9 +48,7 @@ async fn drone_main() -> NeverResult {
             .context("Attaching NATS to tracing handle")?;
     }
 
-    let mut futs: Vec<Pin<Box<dyn Future<Output = NeverResult>>>> = vec![];
-
-    if let Some(cert_options) = cert_options {
+    let _cert_supervisor = if let Some(cert_options) = cert_options {
         do_with_retry(
             || refresh_if_not_valid(&cert_options),
             5,
@@ -66,35 +57,35 @@ async fn drone_main() -> NeverResult {
         .await
         .context("Refreshing certificate.")?;
 
-        futs.push(Box::pin(refresh_loop(cert_options)))
-    }
+        Some(Supervisor::new("cert_refresh", move || {
+            refresh_loop(cert_options.clone())
+        }))
+    } else {
+        None
+    };
 
-    if let Some(proxy_options) = proxy_options {
-        futs.push(Box::pin(serve(proxy_options)));
-    }
+    #[allow(clippy::manual_map)]
+    let _proxy_supervisor = if let Some(proxy_options) = proxy_options {
+        Some(Supervisor::new("proxy", move || {
+            serve(proxy_options.clone())
+        }))
+    } else {
+        None
+    };
 
-    if let Some(agent_options) = agent_options {
-        futs.push(Box::pin(run_agent(agent_options)))
-    }
+    #[allow(clippy::manual_map)]
+    let _agent_supervisor = if let Some(agent_options) = agent_options {
+        Some(Supervisor::new("agent", move || {
+            run_agent(agent_options.clone())
+        }))
+    } else {
+        None
+    };
 
-    try_join_all(futs.into_iter()).await?;
-    // try_join_all either returns an Err, or Ok() with a list of Never values.
-    // Since Never values are not constructable, if we get here, we can assume that
-    // try_join_all returned an empty list. This means that no event loops ever
-    // actually ran, i.e. futs was empty.
-    Err(anyhow!("No event loops selected."))
+    wait_for_interrupt().await
 }
 
 pub fn run() -> Result<()> {
-    let mut signals = Signals::new([SIGINT, SIGTERM])?;
-
-    thread::spawn(move || {
-        for _ in signals.forever() {
-            // TODO: we could shut down containers here.
-            std::process::exit(0)
-        }
-    });
-
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?
