@@ -64,6 +64,10 @@ enum Command {
         /// Whether to include heartbeat messages.
         #[clap(long, default_value = "false")]
         include_heartbeat: bool,
+
+        /// Stream until we receive a snapshot, then exit.
+        #[clap(long, default_value = "false")]
+        snapshot: bool,
     },
     /// Remove swept backends.
     Cleanup,
@@ -110,12 +114,16 @@ async fn main() -> Result<()> {
             let state = get_world_state(nats.clone()).await?;
             println!("{:#?}", state);
         }
-        Command::StreamState { include_heartbeat } => {
+        Command::StreamState { include_heartbeat, snapshot } => {
             let mut sub = nats
                 .subscribe_jetstream_subject(WorldStateMessage::subscribe_subject())
                 .await?;
 
             while let Some((message, meta)) = sub.next().await {
+                if snapshot && !sub.has_pending() {
+                    break;
+                }
+
                 let WorldStateMessage { cluster, message } = message;
 
                 let text = match message {
