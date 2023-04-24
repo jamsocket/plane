@@ -79,7 +79,11 @@ async fn controller_main() -> Result<()> {
             })
         };
 
-        Some((scheduler, backend_state, monitor_drone_state))
+        Some([
+            scheduler,
+            backend_state,
+            monitor_drone_state
+        ])
     } else {
         None
     };
