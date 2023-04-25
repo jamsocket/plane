@@ -3,7 +3,10 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
     messages::{
-        agent::{BackendStateMessage, DockerExecutableConfig, ResourceLimits, TerminationRequest},
+        agent::{
+            BackendState, BackendStateMessage, DockerExecutableConfig, ResourceLimits,
+            TerminationRequest,
+        },
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
         state::{
             BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
@@ -66,6 +69,18 @@ enum Command {
         #[clap(long, default_value = "false")]
         snapshot: bool,
     },
+    /// Remove swept backends.
+    Cleanup {
+        /// Whether to include backends with no state information.
+        /// Note that this will remove backends that have just been created
+        /// and don't have any state information yet.
+        #[clap(long, default_value = "false")]
+        include_missing_state: bool,
+
+        /// Whether to do a dry run.
+        #[clap(long, default_value = "false")]
+        dry_run: bool,
+    },
 }
 
 #[tokio::main]
@@ -78,11 +93,67 @@ async fn main() -> Result<()> {
         .await?;
 
     match opts.command {
+        Command::Cleanup {dry_run, include_missing_state} => {
+            let state = get_world_state(nats.clone()).await?;
+            let stream = nats.jetstream.get_stream("plane_state").await.unwrap();
+
+            for (cluster_name, cluster) in &state.clusters {
+                for (backend_id, backend) in &cluster.backends {
+                    if let Some((timestamp, state)) = backend.state_timestamp() {
+                        if state != BackendState::Swept {
+                            continue;
+                        }
+                        println!(
+                            "Removing backend {} from cluster {}, swept at {}",
+                            backend_id, cluster_name, timestamp
+                        );
+                    } else if include_missing_state {
+                        println!(
+                            "Removing backend {} from cluster {}, no state information",
+                            backend_id, cluster_name
+                        );
+                    } else {
+                        continue;
+                    };
+
+                    let subject = format!(
+                        "state.cluster.{}.backend.{}",
+                        cluster_name.subject_name(),
+                        backend_id.id()
+                    );
+                    // NB: this is only needed because assignments are stored directly
+                    // at state.cluster.{}.backend.{}.
+                    let subjects = [subject.clone(), format!("{}.>", subject)];
+
+                    if dry_run {
+                        println!("Would purge {:?}", subjects);
+                    } else {
+                        println!("Purging {:?}", subjects);
+
+                        for subject in subjects.iter() {
+                            stream
+                                .purge()
+                                .filter(subject)
+                                .await
+                                .unwrap();
+                        }
+
+                        // TEMP: sleep a bit to avoid stressing NATS until
+                        // we have a better grasp of performance implications.
+                        // We probably don't need this, but it's cheap.
+                        tokio::time::sleep(Duration::from_millis(1_000)).await;
+                    }
+                }
+            }
+        }
         Command::DumpState => {
             let state = get_world_state(nats.clone()).await?;
             println!("{:#?}", state);
         }
-        Command::StreamState { include_heartbeat, snapshot } => {
+        Command::StreamState {
+            include_heartbeat,
+            snapshot,
+        } => {
             let mut sub = nats
                 .subscribe_jetstream_subject(WorldStateMessage::subscribe_subject())
                 .await?;
