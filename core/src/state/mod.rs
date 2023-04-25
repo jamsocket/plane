@@ -26,8 +26,11 @@ async fn get_world_state_from_sub(
 }
 
 pub async fn get_world_state(nc: TypedNats) -> Result<WorldState> {
+    tracing::info!("Getting initial world state.");
     let mut sub: JetstreamSubscription<WorldStateMessage> = nc.subscribe_jetstream().await?;
-    get_world_state_from_sub(&mut sub).await
+    let result = get_world_state_from_sub(&mut sub).await;
+    tracing::info!("Done getting initial world state.");
+    result
 }
 
 /// Start a loop which reads the state stream and applies the messages to the world state.

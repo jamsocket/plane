@@ -246,7 +246,7 @@ impl<T> NatsResultExt<T> for std::result::Result<T, async_nats::Error> {
 #[derive(Clone)]
 pub struct TypedNats {
     nc: Client,
-    jetstream: jetstream::Context,
+    pub jetstream: jetstream::Context,
 }
 
 pub struct DelayedReply<T: DeserializeOwned> {
