@@ -1,4 +1,13 @@
 #!/bin/sh
+# shellcheck enable=all
+
+set -x
+
+export EXIT_TIMEOUT
+export EXIT_CODE
+
+trap 'exit ${EXIT_CODE}' TERM
+[ -n "${EXIT_TIMEOUT}" ] && { sleep "${EXIT_TIMEOUT}" && kill -TERM "${PID}" & }
 
 while true; do
 	cat <<-EOF  | busybox nc -l -p 8080
