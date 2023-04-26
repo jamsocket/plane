@@ -7,7 +7,7 @@ use plane_core::{
             BackendState, BackendStateMessage, DockerExecutableConfig, ResourceLimits,
             TerminationRequest,
         },
-        scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
+        scheduler::{BackendResource, DrainDrone, Resource, ScheduleRequest, ScheduleResponse},
         state::{
             BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
             DroneMessageType, WorldStateMessage,
@@ -313,20 +313,22 @@ async fn main() -> Result<()> {
 
             let result = nats
                 .request(&ScheduleRequest {
-                    backend_id: None,
                     cluster: ClusterName::new(&cluster),
-                    max_idle_secs: Duration::from_secs(timeout),
-                    metadata: HashMap::new(),
-                    executable: DockerExecutableConfig {
-                        image,
-                        env,
-                        credentials: None,
-                        resource_limits: ResourceLimits::default(),
-                        pull_policy: Default::default(),
-                        port,
-                        volume_mounts: Vec::new(),
-                    },
-                    require_bearer_token: false,
+                    resource: Resource::Backend(BackendResource {
+                        backend_id: None,
+                        max_idle_secs: Duration::from_secs(timeout),
+                        metadata: HashMap::new(),
+                        executable: DockerExecutableConfig {
+                            image,
+                            env,
+                            credentials: None,
+                            resource_limits: ResourceLimits::default(),
+                            pull_policy: Default::default(),
+                            port,
+                            volume_mounts: Vec::new(),
+                        },
+                        require_bearer_token: false,
+                    }),
                 })
                 .await?;
 

@@ -3,10 +3,11 @@ use anyhow::anyhow;
 use chrono::Utc;
 use plane_core::{
     messages::{
-        scheduler::{ScheduleRequest, ScheduleResponse},
+        agent::{ResourceRequest, SpawnRequest},
+        scheduler::{BackendResource, Resource, ScheduleRequest, ScheduleResponse},
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
-    nats::TypedNats,
+    nats::{MessageWithResponseHandle, TypedNats},
     state::StateHandle,
     timing::Timer,
     NeverResult,
@@ -25,12 +26,24 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
 
-    while let Some(schedule_request) = schedule_request_sub.next().await {
-        tracing::info!(spawn_request=?schedule_request.value, "Got spawn request");
-        let result = match scheduler.schedule(&schedule_request.value.cluster, Utc::now()) {
+    while let Some(
+        msg @ MessageWithResponseHandle {
+            value:
+                ScheduleRequest {
+                    resource: Resource::Backend(_),
+                    ..
+                },
+            ..
+        },
+    ) = schedule_request_sub.next().await
+    {
+        let Resource::Backend(backend) = msg.value.resource.clone() else { panic!() };
+        let cluster = msg.value.cluster.clone();
+        tracing::info!(spawn_request=?backend, "Got spawn request");
+        let result = match scheduler.schedule(&cluster, Utc::now()) {
             Ok(drone_id) => {
                 let timer = Timer::new();
-                let spawn_request = schedule_request.value.schedule(&drone_id);
+                let spawn_request = backend.schedule(&cluster, &drone_id);
                 match nats.request(&spawn_request).await {
                     Ok(true) => {
                         tracing::info!(
@@ -41,7 +54,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                         );
 
                         nats.publish(&WorldStateMessage {
-                            cluster: schedule_request.value.cluster.clone(),
+                            cluster: cluster.clone(),
                             message: ClusterStateMessage::BackendMessage(BackendMessage {
                                 backend: spawn_request.backend_id.clone(),
                                 message: BackendMessageType::Assignment {
@@ -75,7 +88,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
             },
         };
 
-        schedule_request.respond(&result).await?;
+        msg.respond(&result).await?;
     }
 
     Err(anyhow!(

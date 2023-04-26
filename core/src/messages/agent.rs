@@ -380,6 +380,21 @@ pub struct SpawnRequest {
     pub bearer_token: Option<String>,
 }
 
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ImageDownloadRequest {
+    pub cluster: ClusterName,
+
+    pub drone_id: DroneId,
+
+    pub image_url: String,
+}
+
+pub enum ResourceRequest {
+    Spawn(SpawnRequest),
+    ImageDownload(ImageDownloadRequest),
+}
+
 // eventually, this will be generic over executors
 // currently only applies to docker
 #[serde_as]
