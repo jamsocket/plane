@@ -219,12 +219,14 @@ pub async fn build_image<P: AsRef<Path>>(path: P) -> Result<String> {
     tracing::info!("Building image in {}", path.display());
     let output = docker_cmd.output().await?;
     if !output.status.success() {
-        eprintln!(
+        println!(
             "stderr of docker build: {}",
             String::from_utf8(output.stderr).unwrap()
         );
         return Err(anyhow!("docker build failed in dir {}", path.display()));
     }
-	let docker_quiet_out: String = output.stdout.into();
-	Ok(docker_quiet_out.trim_start_matches("sha:").into())
+	let docker_quiet_out: String = String::from_utf8(output.stdout).unwrap();
+	println!("testing!");
+	println!("{}", docker_quiet_out.trim_start_matches("sha256:"));
+	Ok(docker_quiet_out.trim_start_matches("sha256:")[0..13].into())
 }
