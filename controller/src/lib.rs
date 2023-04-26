@@ -27,18 +27,16 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     tracing::info!("Subscribed to spawn requests.");
 
     while let Some(
-        msg @ MessageWithResponseHandle {
+        ref msg @ MessageWithResponseHandle {
             value:
                 ScheduleRequest {
-                    resource: Resource::Backend(_),
-                    ..
+                    resource: Resource::Backend(ref backend),
+					ref cluster
                 },
             ..
         },
     ) = schedule_request_sub.next().await
     {
-        let Resource::Backend(backend) = msg.value.resource.clone() else { panic!() };
-        let cluster = msg.value.cluster.clone();
         tracing::info!(spawn_request=?backend, "Got spawn request");
         let result = match scheduler.schedule(&cluster, Utc::now()) {
             Ok(drone_id) => {
