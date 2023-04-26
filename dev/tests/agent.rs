@@ -395,8 +395,7 @@ async fn spawn_with_agent() {
         .unwrap()
         .expect("Expected proxy route.");
 
-
-	println!("{:?}", proxy_route.address);
+    println!("{:?}", proxy_route.address);
     let result = reqwest::get(format!("http://{}/", proxy_route.address))
         .await
         .unwrap();

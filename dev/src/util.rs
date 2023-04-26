@@ -1,7 +1,7 @@
 use crate::container::build_image;
 use anyhow::{anyhow, Result};
 use plane_core::messages::agent::{DockerExecutableConfig, SpawnRequest};
-use plane_core::messages::scheduler::ScheduleRequest;
+use plane_core::messages::scheduler::{BackendResource, Resource, ScheduleRequest};
 use plane_core::types::BackendId;
 use plane_core::types::ClusterName;
 use plane_core::types::DroneId;
@@ -112,7 +112,9 @@ pub async fn base_spawn_request() -> SpawnRequest {
         metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
         max_idle_secs: Duration::from_secs(10),
         executable: DockerExecutableConfig {
-            image: build_image("test-images/buildable-test-server").await.unwrap(),
+            image: build_image("test-images/buildable-test-server")
+                .await
+                .unwrap(),
             env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
             credentials: None,
             resource_limits: Default::default(),
@@ -173,18 +175,20 @@ pub async fn invalid_image_spawn_request() -> SpawnRequest {
 pub fn base_scheduler_request() -> ScheduleRequest {
     ScheduleRequest {
         cluster: ClusterName::new("plane.test"),
-        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
-        backend_id: None,
-        max_idle_secs: Duration::from_secs(10),
-        executable: DockerExecutableConfig {
-            env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
-            image: TEST_IMAGE.into(),
-            credentials: None,
-            resource_limits: Default::default(),
-            pull_policy: Default::default(),
-            port: None,
-            volume_mounts: vec![],
-        },
-        require_bearer_token: false,
+        resource: Resource::Backend(BackendResource {
+            metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
+            backend_id: None,
+            max_idle_secs: Duration::from_secs(10),
+            executable: DockerExecutableConfig {
+                env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
+                image: TEST_IMAGE.into(),
+                credentials: None,
+                resource_limits: Default::default(),
+                pull_policy: Default::default(),
+                port: None,
+                volume_mounts: vec![],
+            },
+            require_bearer_token: false,
+        }),
     }
 }
