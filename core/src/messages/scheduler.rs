@@ -64,7 +64,7 @@ pub struct ImageResource {
 }
 
 impl ImageResource {
-    pub fn schedule(&self, cluster: &ClusterName, drone_id: &DroneId) -> ImageDownloadRequest {
+    pub fn schedule(&self, _cluster: &ClusterName, _drone_id: &DroneId) -> ImageDownloadRequest {
         todo!();
     }
 }

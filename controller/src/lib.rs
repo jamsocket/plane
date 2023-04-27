@@ -3,8 +3,7 @@ use anyhow::anyhow;
 use chrono::Utc;
 use plane_core::{
     messages::{
-        agent::{ResourceRequest, SpawnRequest},
-        scheduler::{BackendResource, Resource, ScheduleRequest, ScheduleResponse},
+        scheduler::{Resource, ScheduleRequest, ScheduleResponse},
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
     nats::{MessageWithResponseHandle, TypedNats},
