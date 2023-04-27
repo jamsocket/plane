@@ -577,17 +577,11 @@ async fn handle_failure_after_ready() {
     // We don't check the status, because the request itself is expected to fail
     // (the process exits immediately, so the response is not sent).
     let _ = reqwest::get(format!("http://{}/exit/1", proxy_route.address)).await;
-	state_subscription
-		.wait_for_state(BackendState::Failed, 60_000)
-		.await
-		.unwrap();
 
-	/*
     state_subscription
         .expect_backend_status_message(BackendState::Failed, 5_000)
         .await
         .unwrap();
-	*/
 }
 
 #[integration_test]
@@ -610,7 +604,7 @@ async fn handle_successful_termination() {
 	request
 		.executable
 		.env
-		.insert("EXIT_CODE".into(), "1".into());
+		.insert("EXIT_CODE".into(), "0".into());
 	request
 		.executable
 		.env
