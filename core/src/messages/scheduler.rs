@@ -85,9 +85,7 @@ pub struct ScheduleRequest {
 impl ScheduleRequest {
     pub fn schedule(&self, drone_id: &DroneId) -> ResourceRequest {
         match &self.resource {
-            Resource::Image(s) => {
-                ResourceRequest::ImageDownload(s.schedule(&self.cluster, drone_id))
-            }
+            Resource::Image(s) => ResourceRequest::ImageDownload(s.schedule(&self.cluster, drone_id)),
             Resource::Backend(s) => ResourceRequest::Spawn(s.schedule(&self.cluster, drone_id)),
         }
     }
