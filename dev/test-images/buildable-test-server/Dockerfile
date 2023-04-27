@@ -1,3 +1,3 @@
 FROM busybox:latest
-COPY server.sh .
+COPY resources .
 ENTRYPOINT ["./server.sh"]
