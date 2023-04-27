@@ -1,8 +1,8 @@
 #!/bin/sh
 export EXIT_TIMEOUT
 export EXIT_CODE
-set -x
 
+#kill the server after $EXIT_TIMEOUT if it is set
 [ -n "${EXIT_TIMEOUT}" ] && { sleep "${EXIT_TIMEOUT}" && kill -USR1 "$$" ; } &
 busybox httpd -vf -p 8080 -c ./httpd.conf -h . &
 trap "kill $!" USR1
