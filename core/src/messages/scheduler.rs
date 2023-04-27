@@ -82,31 +82,6 @@ pub struct ScheduleRequest {
     pub resource: Resource,
 }
 
-/*
-#[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ScheduleRequest {
-    pub cluster: ClusterName,
-
-    /// The name of the backend. This forms part of the hostname used to
-    /// connect to the drone.
-    pub backend_id: Option<BackendId>,
-
-    /// The timeout after which the drone is shut down if no connections are made.
-    #[serde_as(as = "DurationSeconds")]
-    pub max_idle_secs: Duration,
-
-    /// Metadata for the spawn. Typically added to log messages for debugging and observability.
-    pub metadata: HashMap<String, String>,
-
-    /// Configuration for docker run (image, creds, env vars etc.)
-    pub executable: DockerExecutableConfig,
-
-    #[serde(default)]
-    pub require_bearer_token: bool,
-}
-*/
-
 impl ScheduleRequest {
     pub fn schedule(&self, drone_id: &DroneId) -> ResourceRequest {
         match &self.resource {
@@ -115,34 +90,6 @@ impl ScheduleRequest {
             }
             Resource::Backend(s) => ResourceRequest::Spawn(s.schedule(&self.cluster, drone_id)),
         }
-        /*
-        let backend_id = self
-            .backend_id
-            .clone()
-            .unwrap_or_else(BackendId::new_random);
-
-        let bearer_token = if self.require_bearer_token {
-            let bearer_token: String = rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(30)
-                .map(char::from)
-                .collect();
-
-            Some(bearer_token)
-        } else {
-            None
-        };
-
-        SpawnRequest {
-            cluster: self.cluster.clone(),
-            drone_id: drone_id.clone(),
-            backend_id,
-            max_idle_secs: self.max_idle_secs,
-            metadata: self.metadata.clone(),
-            executable: self.executable.clone(),
-            bearer_token,
-        }
-        */
     }
 }
 
