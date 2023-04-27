@@ -37,10 +37,10 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     ) = schedule_request_sub.next().await
     {
         tracing::info!(spawn_request=?backend, "Got spawn request");
-        let result = match scheduler.schedule(&cluster, Utc::now()) {
+        let result = match scheduler.schedule(cluster, Utc::now()) {
             Ok(drone_id) => {
                 let timer = Timer::new();
-                let spawn_request = backend.schedule(&cluster, &drone_id);
+                let spawn_request = backend.schedule(cluster, &drone_id);
                 match nats.request(&spawn_request).await {
                     Ok(true) => {
                         tracing::info!(
