@@ -1,4 +1,4 @@
-use crate::{scratch_dir, util::random_string, TEST_CONTEXT};
+use crate::{scratch_dir, TEST_CONTEXT};
 use anyhow::{anyhow, Context, Result};
 use bollard::{
     container::{Config, LogsOptions, StartContainerOptions},
@@ -224,6 +224,6 @@ pub async fn build_image<P: AsRef<Path>>(path: P) -> Result<String> {
         );
         return Err(anyhow!("docker build failed in dir {}", path.display()));
     }
-	let docker_quiet_out: String = String::from_utf8(output.stdout).unwrap();
-	Ok(docker_quiet_out.trim_start_matches("sha256:")[0..13].into())
+    let docker_quiet_out: String = String::from_utf8(output.stdout).unwrap();
+    Ok(docker_quiet_out.trim_start_matches("sha256:")[0..13].into())
 }

@@ -112,7 +112,9 @@ pub async fn base_spawn_request() -> SpawnRequest {
         metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
         max_idle_secs: Duration::from_secs(10),
         executable: DockerExecutableConfig {
-            image: build_image("test-images/buildable-test-server").await.unwrap(),
+            image: build_image("test-images/buildable-test-server")
+                .await
+                .unwrap(),
             env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
             credentials: None,
             resource_limits: Default::default(),
