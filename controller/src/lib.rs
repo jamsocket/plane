@@ -30,7 +30,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
             value:
                 ScheduleRequest {
                     resource: Resource::Backend(ref backend),
-					ref cluster
+                    ref cluster,
                 },
             ..
         },

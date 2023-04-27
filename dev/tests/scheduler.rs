@@ -8,7 +8,7 @@ use plane_core::{
     messages::{
         agent::{BackendState, BackendStateMessage, DroneState, SpawnRequest},
         drone_state::{DroneConnectRequest, DroneStatusMessage, UpdateBackendStateMessage},
-        scheduler::{ScheduleResponse, Resource},
+        scheduler::{Resource, ScheduleResponse},
     },
     nats::TypedNats,
     state::{start_state_loop, StateHandle},
@@ -77,7 +77,7 @@ impl MockAgent {
         // Construct a scheduler request.
         let mut request = base_scheduler_request();
         let Resource::Backend(ref mut resource) = request.resource else { panic!(); };
-		resource.require_bearer_token = request_bearer_token;
+        resource.require_bearer_token = request_bearer_token;
 
         // Publish scheduler request, but defer waiting for response.
         let mut response_handle = self.nats.split_request(&request).await?;
