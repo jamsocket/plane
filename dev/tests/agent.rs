@@ -395,8 +395,6 @@ async fn spawn_with_agent() {
         .unwrap()
         .expect("Expected proxy route.");
 
-
-	println!("{:?}", proxy_route.address);
     let result = reqwest::get(format!("http://{}/", proxy_route.address))
         .await
         .unwrap();
@@ -539,7 +537,7 @@ async fn handle_failure_after_ready() {
     let connection = nats.connection().await.unwrap();
     let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+    let _agent = Agent::new(&nats, &drone_id, DockerConfig::default())
         .await
         .unwrap();
 
@@ -550,14 +548,14 @@ async fn handle_failure_after_ready() {
 
     let mut request = base_spawn_request().await;
     request.drone_id = drone_id;
-	request
-		.executable
-		.env
-		.insert("EXIT_CODE".into(), "1".into());
-	request
-		.executable
-		.env
-		.insert("EXIT_TIMEOUT".into(), "2".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_CODE".into(), "1".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_TIMEOUT".into(), "2".into());
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
         .unwrap();
@@ -567,17 +565,6 @@ async fn handle_failure_after_ready() {
         .wait_for_state(BackendState::Ready, 60_000)
         .await
         .unwrap();
-
-    let proxy_route = agent
-        .db
-        .get_proxy_route(request.backend_id.id())
-        .await
-        .unwrap()
-        .expect("Expected proxy route.");
-    // A get request to this URL will cause the container to exit with status 1.
-    // We don't check the status, because the request itself is expected to fail
-    // (the process exits immediately, so the response is not sent).
-    let _ = reqwest::get(format!("http://{}/exit/1", proxy_route.address)).await;
 
     state_subscription
         .expect_backend_status_message(BackendState::Failed, 5_000)
@@ -591,7 +578,7 @@ async fn handle_successful_termination() {
     let connection = nats.connection().await.unwrap();
     let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+    let _agent = Agent::new(&nats, &drone_id, DockerConfig::default())
         .await
         .unwrap();
 
@@ -602,14 +589,14 @@ async fn handle_successful_termination() {
 
     let mut request = base_spawn_request().await;
     request.drone_id = drone_id;
-	request
-		.executable
-		.env
-		.insert("EXIT_CODE".into(), "0".into());
-	request
-		.executable
-		.env
-		.insert("EXIT_TIMEOUT".into(), "2".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_CODE".into(), "0".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_TIMEOUT".into(), "2".into());
 
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
@@ -620,17 +607,6 @@ async fn handle_successful_termination() {
         .wait_for_state(BackendState::Ready, 60_000)
         .await
         .unwrap();
-
-    let proxy_route = agent
-        .db
-        .get_proxy_route(request.backend_id.id())
-        .await
-        .unwrap()
-        .expect("Expected proxy route.");
-    // A get request to this URL will cause the container to exit with status 1.
-    // We don't check the status, because the request itself is expected to fail
-    // (the process exits immediately, so the response is not sent).
-    let _ = reqwest::get(format!("http://{}/exit/0", proxy_route.address)).await;
 
     state_subscription
         .expect_backend_status_message(BackendState::Exited, 5_000)
