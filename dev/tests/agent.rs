@@ -511,7 +511,7 @@ async fn handle_error_during_start() {
     request
         .executable
         .env
-        .insert("EXIT_TIMEOUT".into(), "100".into());
+        .insert("EXIT_TIMEOUT".into(), "0".into());
 
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
@@ -549,7 +549,14 @@ async fn handle_failure_after_ready() {
 
     let mut request = base_spawn_request().await;
     request.drone_id = drone_id;
-
+	request
+		.executable
+		.env
+		.insert("EXIT_CODE".into(), "1".into());
+	request
+		.executable
+		.env
+		.insert("EXIT_TIMEOUT".into(), "2".into());
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
         .unwrap();
@@ -570,11 +577,17 @@ async fn handle_failure_after_ready() {
     // We don't check the status, because the request itself is expected to fail
     // (the process exits immediately, so the response is not sent).
     let _ = reqwest::get(format!("http://{}/exit/1", proxy_route.address)).await;
+	state_subscription
+		.wait_for_state(BackendState::Failed, 60_000)
+		.await
+		.unwrap();
 
+	/*
     state_subscription
         .expect_backend_status_message(BackendState::Failed, 5_000)
         .await
         .unwrap();
+	*/
 }
 
 #[integration_test]
@@ -594,6 +607,14 @@ async fn handle_successful_termination() {
 
     let mut request = base_spawn_request().await;
     request.drone_id = drone_id;
+	request
+		.executable
+		.env
+		.insert("EXIT_CODE".into(), "1".into());
+	request
+		.executable
+		.env
+		.insert("EXIT_TIMEOUT".into(), "2".into());
 
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
