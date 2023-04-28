@@ -204,7 +204,7 @@ impl DockerInterface {
             None
         };
 
-        // Build the container.
+        // Create the container.
         let container_id = {
             let timer = Timer::new();
             let options: Option<CreateContainerOptions<String>> = Some(CreateContainerOptions {
