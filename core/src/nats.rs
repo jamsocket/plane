@@ -334,9 +334,11 @@ impl TypedNats {
     pub async fn new(nc: Client) -> Result<Self> {
         let jetstream = async_nats::jetstream::new(nc.clone());
 
-        initialize_jetstreams(&jetstream).await?;
-
         Ok(TypedNats { nc, jetstream })
+    }
+
+    pub async fn initialize_jetstreams(&self) -> Result<()> {
+        initialize_jetstreams(&self.jetstream).await
     }
 
     /// Send a request that expects a reply, but return as soon as the request

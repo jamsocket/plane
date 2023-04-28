@@ -18,7 +18,7 @@ impl Supervisor {
     {
         let handle = tokio::spawn(async move {
             loop {
-                tracing::info!(name=name, "Starting event loop");
+                tracing::info!(name = name, "Starting event loop");
                 let fut = factory();
                 let result = fut.await;
                 tracing::error!(error=%result.unwrap_err(), name=name, "Event loop terminated! Restarting...");

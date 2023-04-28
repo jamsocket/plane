@@ -93,7 +93,10 @@ async fn main() -> Result<()> {
         .await?;
 
     match opts.command {
-        Command::Cleanup {dry_run, include_missing_state} => {
+        Command::Cleanup {
+            dry_run,
+            include_missing_state,
+        } => {
             let state = get_world_state(nats.clone()).await?;
             let stream = nats.jetstream.get_stream("plane_state").await.unwrap();
 
@@ -131,11 +134,7 @@ async fn main() -> Result<()> {
                         println!("Purging {:?}", subjects);
 
                         for subject in subjects.iter() {
-                            stream
-                                .purge()
-                                .filter(subject)
-                                .await
-                                .unwrap();
+                            stream.purge().filter(subject).await.unwrap();
                         }
 
                         // TEMP: sleep a bit to avoid stressing NATS until
