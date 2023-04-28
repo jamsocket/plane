@@ -33,7 +33,9 @@ impl Nats {
     }
 
     pub async fn connection(&self) -> Result<TypedNats> {
-        self.connection_spec().connect("test.inbox").await
+        let nc = self.connection_spec().connect("test.inbox").await?;
+        nc.initialize_jetstreams().await?;
+        Ok(nc)
     }
 
     pub async fn new() -> Result<Nats> {
