@@ -398,7 +398,7 @@ async fn spawn_with_agent() {
     let result = reqwest::get(format!("http://{}/", proxy_route.address))
         .await
         .unwrap();
-    assert_eq!("Hello World!", result.text().await.unwrap());
+    assert_eq!("Hello World!", result.text().await.unwrap().trim());
 
     state_subscription
         .expect_backend_status_message(BackendState::Swept, 15_000)
