@@ -384,7 +384,9 @@ impl Engine for DockerInterface {
             let status = match state.exit_code {
                 None => EngineBackendStatus::Terminated,
                 Some(0) => EngineBackendStatus::Exited,
-                Some(_) => EngineBackendStatus::Failed,
+                Some(code) => EngineBackendStatus::Failed {
+                    code: code.try_into().unwrap(),
+                },
             };
 
             let state_json = serde_json::to_string(&state)
