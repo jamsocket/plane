@@ -364,13 +364,12 @@ async fn spawn_with_agent() {
 
     let mut request = base_spawn_request().await;
     request.drone_id = drone_id.clone();
-	const TEST_VAR_NAME: &str = "TEST_VAR";
-	const TEST_VAR_VALUE: &str = "TESTING";
-	request
-		.executable
-		.env
-		.insert(TEST_VAR_NAME.into(), TEST_VAR_VALUE.into());
-
+    const TEST_VAR_NAME: &str = "TEST_VAR";
+    const TEST_VAR_VALUE: &str = "TESTING";
+    request
+        .executable
+        .env
+        .insert(TEST_VAR_NAME.into(), TEST_VAR_VALUE.into());
 
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
@@ -407,11 +406,13 @@ async fn spawn_with_agent() {
         .unwrap();
     assert_eq!("Hello World!", result.text().await.unwrap().trim());
 
-	let env_var = reqwest::get(
-		format!("http://{}/cgi-bin/env.cgi/{}", proxy_route.address, TEST_VAR_NAME))
-		.await
-		.unwrap();
-	assert_eq!(TEST_VAR_VALUE, env_var.text().await.unwrap().trim());
+    let env_var = reqwest::get(format!(
+        "http://{}/cgi-bin/env.cgi/{}",
+        proxy_route.address, TEST_VAR_NAME
+    ))
+    .await
+    .unwrap();
+    assert_eq!(TEST_VAR_VALUE, env_var.text().await.unwrap().trim());
 
     state_subscription
         .expect_backend_status_message(BackendState::Swept, 15_000)
