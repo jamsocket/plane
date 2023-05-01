@@ -1,4 +1,4 @@
-use crate::{scratch_dir, util::random_string, TEST_CONTEXT};
+use crate::{scratch_dir, TEST_CONTEXT};
 use anyhow::{anyhow, Context, Result};
 use bollard::{
     container::{Config, LogsOptions, StartContainerOptions},
@@ -213,8 +213,7 @@ pub async fn build_image<P: AsRef<Path>>(path: P) -> Result<String> {
     // the docker api requires tarballs, which is just an unnecessary headache, so just using the binary here.
     let path = path.as_ref();
     let mut docker_cmd = Command::new("docker");
-    let image_name = random_string(10);
-    docker_cmd.args(["build", "-t", &image_name, "."]);
+    docker_cmd.args(["build", "-q", "."]);
     docker_cmd.current_dir(path);
     tracing::info!("Building image in {}", path.display());
     let output = docker_cmd.output().await?;
@@ -225,6 +224,6 @@ pub async fn build_image<P: AsRef<Path>>(path: P) -> Result<String> {
         );
         return Err(anyhow!("docker build failed in dir {}", path.display()));
     }
-
-    Ok(image_name)
+    let docker_quiet_out: String = String::from_utf8(output.stdout).unwrap();
+    Ok(docker_quiet_out.trim_start_matches("sha256:")[0..13].into())
 }

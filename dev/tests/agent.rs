@@ -362,7 +362,7 @@ async fn spawn_with_agent() {
         .await
         .unwrap();
 
-    let mut request = base_spawn_request();
+    let mut request = base_spawn_request().await;
     request.drone_id = drone_id.clone();
 
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
@@ -394,10 +394,11 @@ async fn spawn_with_agent() {
         .await
         .unwrap()
         .expect("Expected proxy route.");
+
     let result = reqwest::get(format!("http://{}/", proxy_route.address))
         .await
         .unwrap();
-    assert_eq!("Hello World!", result.text().await.unwrap());
+    assert_eq!("Hello World!", result.text().await.unwrap().trim());
 
     state_subscription
         .expect_backend_status_message(BackendState::Swept, 15_000)
@@ -436,7 +437,7 @@ async fn stats_are_acquired() {
         .await
         .unwrap();
 
-    let mut request = base_spawn_request();
+    let mut request = base_spawn_request().await;
     request.drone_id = drone_id;
     // Ensure long enough life to report stats.
     request.max_idle_secs = Duration::from_secs(30);
@@ -499,7 +500,7 @@ async fn handle_error_during_start() {
         .await
         .unwrap();
 
-    let mut request = base_spawn_request();
+    let mut request = base_spawn_request().await;
     request.drone_id = drone_id;
     // Exit with error code 1 after 100ms.
     request
@@ -509,7 +510,7 @@ async fn handle_error_during_start() {
     request
         .executable
         .env
-        .insert("EXIT_TIMEOUT".into(), "100".into());
+        .insert("EXIT_TIMEOUT".into(), "0".into());
 
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
@@ -536,7 +537,7 @@ async fn handle_failure_after_ready() {
     let connection = nats.connection().await.unwrap();
     let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+    let _agent = Agent::new(&nats, &drone_id, DockerConfig::default())
         .await
         .unwrap();
 
@@ -545,9 +546,16 @@ async fn handle_failure_after_ready() {
         .await
         .unwrap();
 
-    let mut request = base_spawn_request();
+    let mut request = base_spawn_request().await;
     request.drone_id = drone_id;
-
+    request
+        .executable
+        .env
+        .insert("EXIT_CODE".into(), "1".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_TIMEOUT".into(), "2".into());
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
         .unwrap();
@@ -557,17 +565,6 @@ async fn handle_failure_after_ready() {
         .wait_for_state(BackendState::Ready, 60_000)
         .await
         .unwrap();
-
-    let proxy_route = agent
-        .db
-        .get_proxy_route(request.backend_id.id())
-        .await
-        .unwrap()
-        .expect("Expected proxy route.");
-    // A get request to this URL will cause the container to exit with status 1.
-    // We don't check the status, because the request itself is expected to fail
-    // (the process exits immediately, so the response is not sent).
-    let _ = reqwest::get(format!("http://{}/exit/1", proxy_route.address)).await;
 
     state_subscription
         .expect_backend_status_message(BackendState::Failed, 5_000)
@@ -581,7 +578,7 @@ async fn handle_successful_termination() {
     let connection = nats.connection().await.unwrap();
     let controller_mock = MockController::new(connection.clone()).await.unwrap();
     let drone_id = DroneId::new_random();
-    let agent = Agent::new(&nats, &drone_id, DockerConfig::default())
+    let _agent = Agent::new(&nats, &drone_id, DockerConfig::default())
         .await
         .unwrap();
 
@@ -590,8 +587,16 @@ async fn handle_successful_termination() {
         .await
         .unwrap();
 
-    let mut request = base_spawn_request();
+    let mut request = base_spawn_request().await;
     request.drone_id = drone_id;
+    request
+        .executable
+        .env
+        .insert("EXIT_CODE".into(), "0".into());
+    request
+        .executable
+        .env
+        .insert("EXIT_TIMEOUT".into(), "2".into());
 
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
@@ -602,17 +607,6 @@ async fn handle_successful_termination() {
         .wait_for_state(BackendState::Ready, 60_000)
         .await
         .unwrap();
-
-    let proxy_route = agent
-        .db
-        .get_proxy_route(request.backend_id.id())
-        .await
-        .unwrap()
-        .expect("Expected proxy route.");
-    // A get request to this URL will cause the container to exit with status 1.
-    // We don't check the status, because the request itself is expected to fail
-    // (the process exits immediately, so the response is not sent).
-    let _ = reqwest::get(format!("http://{}/exit/0", proxy_route.address)).await;
 
     state_subscription
         .expect_backend_status_message(BackendState::Exited, 5_000)
@@ -637,7 +631,7 @@ async fn handle_agent_restart() {
             .await
             .unwrap();
 
-        let mut request = base_spawn_request();
+        let mut request = base_spawn_request().await;
         request.drone_id = drone_id;
 
         let mut state_subscription = BackendStateSubscription::new(&nats, &request.backend_id)
@@ -675,7 +669,7 @@ async fn handle_termination_request() {
         .await
         .unwrap();
 
-    let mut request = base_spawn_request();
+    let mut request = base_spawn_request().await;
     // Ensure spawnee lives long enough to be terminated.
     request.drone_id = drone_id.clone();
     request.max_idle_secs = Duration::from_secs(10_000);
@@ -726,7 +720,7 @@ async fn attempt_to_spawn_with_disallowed_volume_mount() {
         .await
         .unwrap();
 
-    let mut request = base_spawn_request();
+    let mut request = base_spawn_request().await;
     request.drone_id = drone_id.clone();
     request.executable.volume_mounts = vec![json!({
         "source": "/foo",
@@ -766,7 +760,7 @@ async fn attempt_to_spawn_with_allowed_volume_mount() {
         .await
         .unwrap();
 
-    let mut request = base_spawn_request();
+    let mut request = base_spawn_request().await;
     request.drone_id = drone_id.clone();
     request.executable.volume_mounts = vec![json!({
         "Type": "tmpfs",

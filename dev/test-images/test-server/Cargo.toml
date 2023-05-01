@@ -1,9 +1,0 @@
-[package]
-name = "test-server"
-version = "0.1.0"
-edition = "2021"
-publish = false
-
-[dependencies]
-hyper = { version = "0.14.20", features = ["server", "http1", "tcp"] }
-tokio = { version = "1.20.1", features = ["macros", "rt", "rt-multi-thread"] }

@@ -104,7 +104,7 @@ pub async fn wait_for_url(url: &str, timeout_ms: u128) -> Result<()> {
 
 const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 
-pub fn base_spawn_request() -> SpawnRequest {
+pub async fn base_spawn_request() -> SpawnRequest {
     SpawnRequest {
         cluster: ClusterName::new("plane.test"),
         backend_id: BackendId::new_random(),
@@ -112,7 +112,9 @@ pub fn base_spawn_request() -> SpawnRequest {
         metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
         max_idle_secs: Duration::from_secs(10),
         executable: DockerExecutableConfig {
-            image: TEST_IMAGE.into(),
+            image: build_image("test-images/buildable-test-server")
+                .await
+                .unwrap(),
             env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
             credentials: None,
             resource_limits: Default::default(),

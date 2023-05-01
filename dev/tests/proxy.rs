@@ -212,7 +212,7 @@ async fn simple_backend_proxy() {
         .await
         .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -235,7 +235,7 @@ async fn simple_ws_backend_proxy() {
     let proxy = Proxy::new(None).await.unwrap();
     let server = Server::serve_web_sockets().await.unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -293,7 +293,7 @@ async fn connection_status_is_recorded() {
         .await
         .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -372,7 +372,7 @@ async fn host_header_is_set() {
     .await
     .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -397,7 +397,7 @@ async fn update_certificates() {
         .await
         .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -433,7 +433,7 @@ async fn simple_missing_bearer_token() {
         .await
         .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -463,7 +463,7 @@ async fn simple_bearer_token() {
         .await
         .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -496,7 +496,7 @@ async fn simple_wrong_bearer_token() {
         .await
         .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -529,7 +529,7 @@ async fn simple_cookie_bearer_token() {
         .await
         .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -562,7 +562,7 @@ async fn simple_cookie_set() {
         .await
         .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -599,7 +599,7 @@ async fn custom_path_cookie_set() {
         .await
         .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
@@ -641,7 +641,7 @@ async fn custom_path_cookie_set_invalid_redirect() {
         .await
         .unwrap();
 
-    let sr = base_spawn_request();
+    let sr = base_spawn_request().await;
     proxy.db.insert_backend(&sr).await.unwrap();
     proxy
         .db
