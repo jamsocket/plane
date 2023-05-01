@@ -268,7 +268,11 @@ struct TestFixture {
     agent: Agent,
 }
 
-async fn do_spawn_request(mut request: SpawnRequest) -> (TestFixture, BackendStateSubscription) {
+async fn do_spawn_request(
+    mut request: SpawnRequest,
+    exit_code: Option<u16>,
+    exit_timeout: Option<u64>,
+) -> (TestFixture, BackendStateSubscription) {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
     let controller_mock = MockController::new(connection.clone()).await.unwrap();
@@ -287,6 +291,19 @@ async fn do_spawn_request(mut request: SpawnRequest) -> (TestFixture, BackendSta
         .unwrap();
 
     request.drone_id = drone_id.clone();
+    if let Some(exit_code) = exit_code {
+        request
+            .executable
+            .env
+            .insert("EXIT_CODE".into(), format!("{}", exit_code));
+    }
+    if let Some(exit_timeout) = exit_timeout {
+        request
+            .executable
+            .env
+            .insert("EXIT_TIMEOUT".into(), format!("{}", exit_timeout));
+    }
+
     controller_mock.spawn_backend(&request).await.unwrap();
     (
         TestFixture {
@@ -302,7 +319,7 @@ async fn do_spawn_request(mut request: SpawnRequest) -> (TestFixture, BackendSta
 #[integration_test]
 async fn invalid_container_fails() {
     let req = invalid_image_spawn_request().await;
-    let (ctx, mut sub) = do_spawn_request(req.clone()).await;
+    let (ctx, mut sub) = do_spawn_request(req.clone(), None, None).await;
     let log_subscription = ctx
         .nats_connection
         .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
@@ -330,7 +347,7 @@ async fn invalid_container_fails() {
 #[integration_test]
 async fn check_that_logs_work() {
     let req = three_logs_image_spawn_request().await;
-    let (ctx, _) = do_spawn_request(req.clone()).await;
+    let (ctx, _) = do_spawn_request(req.clone(), Some(2), Some(2)).await;
     let mut log_subscription = Box::pin(
         ctx.nats_connection
             .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
