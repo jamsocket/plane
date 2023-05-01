@@ -9,5 +9,4 @@ while true; do
 
 	<html><body><h1>Hello, World!</h1></body></html>'
 	EOF
-	echo -e "test\ntest\ntest\n"
 done 
