@@ -271,6 +271,14 @@ impl<E: Engine> Executor<E> {
 
             match next_state {
                 Ok(Some(new_state)) => {
+                    if new_state.terminal() {
+                        if let Err(inject_err) = self.inject_exit_code(spawn_request).await {
+                            tracing::error!(
+                                ?inject_err,
+                                "failed to inject exit code for failed backend into logs"
+                            );
+                        }
+                    }
                     state = new_state;
                     self.update_backend_state(spawn_request, state).await;
                 }
@@ -317,27 +325,26 @@ impl<E: Engine> Executor<E> {
                 }
             }
         }
+
+        self.backend_to_monitor.remove(&spawn_request.backend_id);
+        self.backend_to_listener.remove(&spawn_request.backend_id);
+    }
+
+    async fn inject_exit_code(&self, spawn_request: &SpawnRequest) -> Result<()> {
         if let Ok(EngineBackendStatus::Failed { code }) =
             self.engine.backend_status(spawn_request).await
         {
-            if let Err(inject_err) = self
-                .backend_to_monitor
+            self.backend_to_monitor
                 .try_get_mut(&spawn_request.backend_id)
-                .unwrap()
+                .try_unwrap()
+                .ok_or(anyhow!("backend not in backend_to_monitor"))?
                 .inject_log(
                     format!("Backend exit code: {}", code),
                     DroneLogMessageKind::Meta,
                 )
-                .await
-            {
-                tracing::error!(
-                    ?inject_err,
-                    "failed to inject exit code for failed backend into logs"
-                );
-            }
+                .await?;
         }
-        self.backend_to_monitor.remove(&spawn_request.backend_id);
-        self.backend_to_listener.remove(&spawn_request.backend_id);
+        Ok(())
     }
 
     /// Update the rest of the system on the state of a backend, by writing it to the local
