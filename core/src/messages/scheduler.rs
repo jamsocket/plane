@@ -64,8 +64,12 @@ pub struct ImageResource {
 }
 
 impl ImageResource {
-    pub fn schedule(&self, _cluster: &ClusterName, _drone_id: &DroneId) -> ImageDownloadRequest {
-        todo!();
+    pub fn schedule(&self, cluster: &ClusterName, drone_id: &DroneId) -> ImageDownloadRequest {
+        ImageDownloadRequest {
+            cluster: cluster.clone(),
+            drone_id: drone_id.clone(),
+            image_url: self.url.clone(),
+        }
     }
 }
 
@@ -85,7 +89,9 @@ pub struct ScheduleRequest {
 impl ScheduleRequest {
     pub fn schedule(&self, drone_id: &DroneId) -> ResourceRequest {
         match &self.resource {
-            Resource::Image(s) => ResourceRequest::ImageDownload(s.schedule(&self.cluster, drone_id)),
+            Resource::Image(s) => {
+                ResourceRequest::ImageDownload(s.schedule(&self.cluster, drone_id))
+            }
             Resource::Backend(s) => ResourceRequest::Spawn(s.schedule(&self.cluster, drone_id)),
         }
     }
