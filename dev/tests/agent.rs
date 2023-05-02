@@ -19,10 +19,7 @@ use plane_dev::{
     resources::server::Server,
     scratch_dir,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{
-        base_spawn_request, invalid_image_spawn_request, random_loopback_ip,
-        three_logs_image_spawn_request,
-    },
+    util::{base_spawn_request, invalid_image_spawn_request, random_loopback_ip},
 };
 use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
@@ -268,7 +265,7 @@ struct TestFixture {
     agent: Agent,
 }
 
-async fn do_spawn_request(mut request: SpawnRequest) -> (TestFixture, BackendStateSubscription) {
+async fn do_spawn_request(request: &mut SpawnRequest) -> (TestFixture, BackendStateSubscription) {
     let nats = Nats::new().await.unwrap();
     let connection = nats.connection().await.unwrap();
     let controller_mock = MockController::new(connection.clone()).await.unwrap();
@@ -287,6 +284,7 @@ async fn do_spawn_request(mut request: SpawnRequest) -> (TestFixture, BackendSta
         .unwrap();
 
     request.drone_id = drone_id.clone();
+
     controller_mock.spawn_backend(&request).await.unwrap();
     (
         TestFixture {
@@ -301,8 +299,8 @@ async fn do_spawn_request(mut request: SpawnRequest) -> (TestFixture, BackendSta
 
 #[integration_test]
 async fn invalid_container_fails() {
-    let req = invalid_image_spawn_request().await;
-    let (ctx, mut sub) = do_spawn_request(req.clone()).await;
+    let mut req = invalid_image_spawn_request().await;
+    let (ctx, mut sub) = do_spawn_request(&mut req).await;
     let log_subscription = ctx
         .nats_connection
         .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
@@ -329,22 +327,44 @@ async fn invalid_container_fails() {
 
 #[integration_test]
 async fn check_that_logs_work() {
-    let req = three_logs_image_spawn_request().await;
-    let (ctx, _) = do_spawn_request(req.clone()).await;
+    let mut req = base_spawn_request().await;
+    req.executable.env.insert("EXIT_CODE".into(), "2".into());
+    req.executable.env.insert("EXIT_TIMEOUT".into(), "5".into());
+
+    let (ctx, mut status_sub) = do_spawn_request(&mut req).await;
     let mut log_subscription = Box::pin(
         ctx.nats_connection
             .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
             .await
             .unwrap()
-            .timeout(Duration::from_secs(1)),
+            .timeout(Duration::from_secs(10)),
     );
+
+    status_sub
+        .wait_for_state(BackendState::Ready, 2000)
+        .await
+        .unwrap();
+
+    let proxy_route = ctx
+        .agent
+        .db
+        .get_proxy_route(req.backend_id.id())
+        .await
+        .unwrap()
+        .expect("Expected proxy route.");
+
+    let _result = reqwest::get(format!("http://{}/cgi-bin/logs.cgi", proxy_route.address)).await;
 
     for _ in 0..3 {
         assert_eq!(
             log_subscription.next().await.unwrap().unwrap().value.kind,
-            DroneLogMessageKind::Stdout
+            DroneLogMessageKind::Stderr
         );
     }
+    assert_eq!(
+        log_subscription.next().await.unwrap().unwrap().value.text,
+        "Backend exit code: 2"
+    );
 }
 
 #[integration_test]
