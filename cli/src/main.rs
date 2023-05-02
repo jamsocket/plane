@@ -43,6 +43,8 @@ enum Command {
         port: Option<u16>,
         #[clap(long, short)]
         env: Vec<String>,
+        #[clap(long)]
+        lock: Option<String>,
     },
     Status {
         backend: Option<String>,
@@ -212,13 +214,19 @@ async fn main() -> Result<()> {
                                 )
                             }
                             BackendMessageType::Assignment { drone, lock } => {
-                                format!(
+                                let mut text = format!(
                                     "is assigned to drone {}",
                                     drone.to_string().bright_yellow()
-                                )
+                                );
+                                if let Some(lock) = lock {
+                                    text.push_str(&format!(
+                                        " with lock {}",
+                                        lock.to_string().bright_yellow()
+                                    ));
+                                }
+                                text
                             }
                         };
-
                         format!("Backend: {} {}", backend.to_string().bright_cyan(), text)
                     }
                 };
@@ -298,6 +306,7 @@ async fn main() -> Result<()> {
             timeout,
             port,
             env,
+            lock,
         } => {
             let env: Result<HashMap<String, String>> = env
                 .iter()
@@ -327,6 +336,7 @@ async fn main() -> Result<()> {
                         volume_mounts: Vec::new(),
                     },
                     require_bearer_token: false,
+                    lock,
                 })
                 .await?;
 

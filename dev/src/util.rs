@@ -188,5 +188,6 @@ pub fn base_scheduler_request() -> ScheduleRequest {
             volume_mounts: vec![],
         },
         require_bearer_token: false,
+        lock: None,
     }
 }

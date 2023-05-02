@@ -30,6 +30,9 @@ pub struct ScheduleRequest {
 
     #[serde(default)]
     pub require_bearer_token: bool,
+
+    /// An optional lock to be held by the spawned backend.
+    pub lock: Option<String>,
 }
 
 impl ScheduleRequest {
