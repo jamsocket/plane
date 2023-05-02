@@ -46,6 +46,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                                 backend: spawn_request.backend_id.clone(),
                                 message: BackendMessageType::Assignment {
                                     drone: drone_id.clone(),
+                                    lock: None,
                                 },
                             }),
                         })

@@ -211,7 +211,7 @@ async fn main() -> Result<()> {
                                     timestamp.to_string().bright_yellow()
                                 )
                             }
-                            BackendMessageType::Assignment { drone } => {
+                            BackendMessageType::Assignment { drone, lock } => {
                                 format!(
                                     "is assigned to drone {}",
                                     drone.to_string().bright_yellow()

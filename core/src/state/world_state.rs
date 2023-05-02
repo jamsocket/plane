@@ -76,6 +76,7 @@ pub struct ClusterState {
     pub drones: BTreeMap<DroneId, DroneState>,
     pub backends: BTreeMap<BackendId, BackendState>,
     pub txt_records: VecDeque<String>,
+    pub locks: BTreeMap<String, BackendId>,
 }
 
 impl ClusterState {
@@ -115,6 +116,18 @@ impl ClusterState {
     pub fn backend(&self, backend: &BackendId) -> Option<&BackendState> {
         self.backends.get(backend)
     }
+
+    pub fn locked(&self, lock: &str) -> Result<bool> {
+        if let Some(backend) = self.locks.get(lock) {
+            if let Some((_, state)) = self.backend(backend).and_then(|d| d.state_timestamp()) {
+                if !state.terminal() {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
 }
 
 #[derive(Default, Debug)]
@@ -150,7 +163,7 @@ pub struct BackendState {
 impl BackendState {
     fn apply(&mut self, message: BackendMessageType) {
         match message {
-            BackendMessageType::Assignment { drone } => self.drone = Some(drone),
+            BackendMessageType::Assignment { drone, lock } => self.drone = Some(drone),
             BackendMessageType::State {
                 state: status,
                 timestamp,
@@ -166,5 +179,26 @@ impl BackendState {
 
     pub fn state_timestamp(&self) -> Option<(chrono::DateTime<chrono::Utc>, agent::BackendState)> {
         self.states.last().copied()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::messages::state::BackendMessage;
+    use super::*;
+
+    #[test]
+    fn test_locks() {
+        let mut state = ClusterState::default();
+
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: BackendId::new("backend".into()),
+            message: BackendMessageType::Assignment {
+                drone: DroneId::new("drone".into()),
+                lock: Some("mylock".into()),
+            },
+        }));
+
+        assert!(state.locked("mylock").unwrap());
     }
 }
