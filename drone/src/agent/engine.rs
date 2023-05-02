@@ -19,7 +19,7 @@ pub enum EngineBackendStatus {
     Exited,
 
     /// The backend exited on its own with a failure state.
-    Failed,
+    Failed { code: u16 },
 
     /// The backend was terminated by external forces.
     Terminated,
