@@ -345,10 +345,16 @@ async fn main() -> Result<()> {
                     drone,
                     backend_id,
                     bearer_token,
+                    spawned,
                 } => {
                     let url = format!("https://{}.{}", backend_id, cluster);
 
-                    println!("Backend scheduled.");
+                    if spawned {
+                        println!("Backend scheduled.");
+                    } else {
+                        println!("A backend already held the desired lock.");
+                    }
+                    
                     println!("URL: {}", url.bright_green());
                     println!("Drone: {}", drone.to_string().bright_blue());
                     println!("Backend ID: {}", backend_id.to_string().bright_blue());

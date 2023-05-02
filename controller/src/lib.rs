@@ -21,12 +21,28 @@ pub mod run;
 mod scheduler;
 
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
-    let scheduler = Scheduler::new(state);
+    let scheduler = Scheduler::new(state.clone());
     let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
 
     while let Some(schedule_request) = schedule_request_sub.next().await {
         tracing::info!(spawn_request=?schedule_request.value, "Got spawn request");
+
+        if let Some(lock) = &schedule_request.value.lock {
+            // todo: never panic in this function
+            let state = state.state();
+            let cluster = state.cluster(&schedule_request.value.cluster).unwrap();
+            if cluster.locked(lock)? {
+                tracing::info!(lock=%lock, "Lock is held.");
+                
+
+                schedule_request
+                    .respond(&ScheduleResponse::NoDroneAvailable)
+                    .await?;
+                continue;
+            }
+        }
+
         let result = match scheduler.schedule(&schedule_request.value.cluster, Utc::now()) {
             Ok(drone_id) => {
                 let timer = Timer::new();
@@ -56,6 +72,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                             drone: drone_id,
                             backend_id: spawn_request.backend_id,
                             bearer_token: spawn_request.bearer_token.clone(),
+                            spawned: true,
                         }
                     }
                     Ok(false) => {

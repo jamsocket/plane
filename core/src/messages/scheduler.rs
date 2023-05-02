@@ -73,6 +73,10 @@ pub enum ScheduleResponse {
         backend_id: BackendId,
         #[serde(skip_serializing_if = "Option::is_none")]
         bearer_token: Option<String>,
+
+        /// False if we are returning information from an
+        /// already-running backend that held the desired lock.
+        spawned: bool,
     },
     NoDroneAvailable,
 }
