@@ -87,7 +87,14 @@ impl ClusterState {
                 drone.apply(message.message);
             }
             ClusterStateMessage::BackendMessage(message) => {
-                let backend = self.backends.entry(message.backend).or_default();
+                let backend = self.backends.entry(message.backend.clone()).or_default();
+
+                if let BackendMessageType::Assignment { lock, .. } = &message.message {
+                    if let Some(lock) = lock {
+                        self.locks.insert(lock.clone(), message.backend.clone());
+                    }
+                }
+
                 backend.apply(message.message);
             }
             ClusterStateMessage::AcmeMessage(message) => {
@@ -120,9 +127,10 @@ impl ClusterState {
     pub fn locked(&self, lock: &str) -> Result<bool> {
         if let Some(backend) = self.locks.get(lock) {
             if let Some((_, state)) = self.backend(backend).and_then(|d| d.state_timestamp()) {
-                if !state.terminal() {
-                    return Ok(true);
-                }
+                return Ok(!state.terminal())
+            } else {
+                // We might end up here if we check for the lock before the backend has started.
+                return Ok(true)
             }
         }
 
@@ -191,6 +199,10 @@ mod test {
     fn test_locks() {
         let mut state = ClusterState::default();
 
+        // Initially, no locks are held.
+        assert!(!state.locked("mylock").unwrap());
+
+        // Assign a backend to a drone and acquire a lock.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
             backend: BackendId::new("backend".into()),
             message: BackendMessageType::Assignment {
@@ -198,6 +210,7 @@ mod test {
                 lock: Some("mylock".into()),
             },
         }));
+
 
         assert!(state.locked("mylock").unwrap());
     }
