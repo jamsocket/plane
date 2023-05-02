@@ -125,16 +125,24 @@ impl ClusterState {
     }
 
     pub fn locked(&self, lock: &str) -> Result<bool> {
-        if let Some(backend) = self.locks.get(lock) {
-            if let Some((_, state)) = self.backend(backend).and_then(|d| d.state_timestamp()) {
-                return Ok(!state.terminal())
-            } else {
-                // We might end up here if we check for the lock before the backend has started.
-                return Ok(true)
-            }
-        }
+        let Some(lock_owner) = self.locks.get(lock) else {
+            // The lock does not exist.
+            return Ok(false)
+        };
+        
+        let Some(backend) = self.backends.get(lock_owner) else {
+            // The lock exists, but the backend has been purged.
+            // This must be true, because an assignment message is the only way to create a lock.
+            return Ok(false)
+        };
 
-        Ok(false)
+        let Some(state) = backend.state() else {
+            // The lock exists, and the backend exists, but has not yet sent a status message.
+            return Ok(true)
+        };
+
+        // The lock is held if the backend is in a non-terminal state.
+        Ok(!state.terminal())
     }
 }
 
@@ -192,8 +200,8 @@ impl BackendState {
 
 #[cfg(test)]
 mod test {
-    use crate::messages::state::BackendMessage;
     use super::*;
+    use crate::messages::state::BackendMessage;
 
     #[test]
     fn test_locks() {
@@ -211,7 +219,56 @@ mod test {
             },
         }));
 
+        assert!(state.locked("mylock").unwrap());
+
+        // Update the backend state to loading.
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: BackendId::new("backend".into()),
+            message: BackendMessageType::State {
+                state: agent::BackendState::Loading,
+                timestamp: Utc::now(),
+            },
+        }));
 
         assert!(state.locked("mylock").unwrap());
+
+        // Update the backend state to starting.
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: BackendId::new("backend".into()),
+            message: BackendMessageType::State {
+                state: agent::BackendState::Starting,
+                timestamp: Utc::now(),
+            },
+        }));
+
+        assert!(state.locked("mylock").unwrap());
+
+        // Update the backend state to ready.
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: BackendId::new("backend".into()),
+            message: BackendMessageType::State {
+                state: agent::BackendState::Ready,
+                timestamp: Utc::now(),
+            },
+        }));
+
+        assert!(state.locked("mylock").unwrap());
+
+        // Update the backend state to swept.
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: BackendId::new("backend".into()),
+            message: BackendMessageType::State {
+                state: agent::BackendState::Swept,
+                timestamp: Utc::now(),
+            },
+        }));
+
+        // The lock should now be free.
+        assert!(!state.locked("mylock").unwrap());
+
+        state.backends.remove(&BackendId::new("backend".into()));
+
+        // The lock should still be free.
+        assert!(!state.locked("mylock").unwrap());
     }
 }
