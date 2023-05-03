@@ -43,8 +43,8 @@ pub trait Engine: Send + Sync + 'static {
     /// Terminate a backend.
     async fn stop(&self, backend: &BackendId) -> Result<()>;
 
-	/// Download image.
-	async fn download_image(&self, image: String) -> Result<()>;
+    /// Download image.
+    async fn download_image(&self, image: String) -> Result<()>;
 
     fn log_stream(
         &self,

@@ -108,7 +108,7 @@ pub enum ScheduleResponse {
     },
     ScheduledImage {
         drone: DroneId,
-		image: String
+        image: String,
     },
     NoDroneAvailable,
 }

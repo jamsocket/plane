@@ -11,7 +11,10 @@ use chrono::Utc;
 use dashmap::DashMap;
 use plane_core::{
     messages::{
-        agent::{BackendState, DroneLogMessageKind, SpawnRequest, TerminationRequest, ImageDownloadRequest},
+        agent::{
+            BackendState, DroneLogMessageKind, ImageDownloadRequest, SpawnRequest,
+            TerminationRequest,
+        },
         drone_state::UpdateBackendStateMessage,
     },
     nats::TypedNats,
@@ -186,12 +189,14 @@ impl<E: Engine> Executor<E> {
         }
     }
 
-	pub async fn download_image(
-		&self,
-		image_download_request: &ImageDownloadRequest
-	) -> anyhow::Result<()> {
-		self.engine.download_image(image_download_request.image_url.clone()).await
-	}
+    pub async fn download_image(
+        &self,
+        image_download_request: &ImageDownloadRequest,
+    ) -> anyhow::Result<()> {
+        self.engine
+            .download_image(image_download_request.image_url.clone())
+            .await
+    }
 
     pub async fn resume_backends(&self) -> Result<()> {
         let backends = self.database.get_backends().await?;

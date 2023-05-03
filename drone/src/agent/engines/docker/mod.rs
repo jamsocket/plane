@@ -427,10 +427,7 @@ impl Engine for DockerInterface {
         self.stop_container(&backend.to_resource_name()).await
     }
 
-	async fn download_image(&self, image: String) -> Result<()> {
-		self.pull_image(
-			&image,
-			&None
-		).await
-	}
+    async fn download_image(&self, image: String) -> Result<()> {
+        self.pull_image(&image, &None).await
+    }
 }

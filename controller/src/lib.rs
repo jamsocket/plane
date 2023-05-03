@@ -5,8 +5,8 @@ use plane_core::{
     messages::{
         scheduler::{BackendResource, ImageResource, Resource, ScheduleRequest, ScheduleResponse},
         state::{
-            BackendMessage, BackendMessageType, ClusterStateMessage, ImageDownloadMessage,
-            WorldStateMessage, DroneMessage, DroneMessageType,
+            BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
+            DroneMessageType, ImageDownloadMessage, WorldStateMessage,
         },
     },
     nats::{MessageWithResponseHandle, TypedNats},
@@ -93,15 +93,20 @@ async fn schedule_image(
             if let true = nats.request(&image_download_request).await? {
                 nats.publish(&WorldStateMessage {
                     cluster: cluster.clone(),
-                    message: ClusterStateMessage::DroneMessage(
-						DroneMessage {
-							drone: drone_id.clone(),
-							message: DroneMessageType::Image(image.url.clone()) 
-						})
-				}).await?;
+                    message: ClusterStateMessage::DroneMessage(DroneMessage {
+                        drone: drone_id.clone(),
+                        message: DroneMessageType::Image(image.url.clone()),
+                    }),
+                })
+                .await?;
 
-                ScheduleResponse::ScheduledImage { drone: drone_id.clone(), image: image.url.clone() }
-            } else { panic!("shut up") }
+                ScheduleResponse::ScheduledImage {
+                    drone: drone_id.clone(),
+                    image: image.url.clone(),
+                }
+            } else {
+                panic!("shut up")
+            }
         }
         Err(SchedulerError::NoDroneAvailable) => {
             todo!();
@@ -126,9 +131,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     ) = schedule_request_sub.next().await
     {
         let result = match resource {
-            Resource::Image(image) => {
-				schedule_image(image, &scheduler, cluster, &nats).await?
-            }
+            Resource::Image(image) => schedule_image(image, &scheduler, cluster, &nats).await?,
             Resource::Backend(backend) => {
                 schedule_spawn(backend, &scheduler, cluster, &nats).await?
             }
