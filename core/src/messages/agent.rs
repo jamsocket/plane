@@ -437,6 +437,28 @@ impl SpawnRequest {
     }
 }
 
+impl TypedMessage for ImageDownloadRequest {
+    type Response = bool;
+
+    fn subject(&self) -> String {
+        format!(
+            "cluster.{}.drone.{}.image",
+            self.cluster.subject_name(),
+            self.drone_id.id()
+        )
+    }
+}
+
+impl ImageDownloadRequest {
+    pub fn subscribe_subject(cluster: &ClusterName, drone_id: &DroneId) -> SubscribeSubject<Self> {
+        SubscribeSubject::new(format!(
+            "cluster.{}.drone.{}.image",
+            cluster.subject_name(),
+            drone_id.id()
+        ))
+    }
+}
+
 /// A message telling a drone to terminate a backend.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TerminationRequest {
