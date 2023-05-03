@@ -67,9 +67,10 @@ async fn listen_for_image_requests(
 	while let Some(req) = sub.next().await {
 		req.respond(&true).await?;
 		let executor = executor.clone();
-		tokio::spawn(async move {
-			executor.download_image(req.value.image_url).await;
-		});
+
+		if let Err(e) = executor.download_image(&req.value).await {
+			tracing::error!("failed to pull image {} with error {}", req.value.image_url, e);
+		};
 	}
 								 
 	Err(anyhow!("image req subscription closed"))
