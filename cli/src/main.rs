@@ -33,6 +33,10 @@ struct Opts {
 enum Command {
     ListDrones,
     ListBackends,
+	DownloadImage {
+		cluster: String,
+		url: String
+	},
     Spawn {
         cluster: String,
         image: String,
@@ -93,6 +97,9 @@ async fn main() -> Result<()> {
         .await?;
 
     match opts.command {
+		Command::DownloadImage { cluster, url } => {
+			todo!()
+		},
         Command::Cleanup {
             dry_run,
             include_missing_state,
