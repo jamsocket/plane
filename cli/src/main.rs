@@ -4,8 +4,8 @@ use colored::Colorize;
 use plane_core::{
     messages::{
         agent::{
-            BackendState, BackendStateMessage, DockerExecutableConfig, ResourceLimits,
-            TerminationRequest, ImageDownloadRequest,
+            BackendState, BackendStateMessage, DockerExecutableConfig, ImageDownloadRequest,
+            ResourceLimits, TerminationRequest,
         },
         scheduler::{BackendResource, DrainDrone, Resource, ScheduleRequest, ScheduleResponse},
         state::{
@@ -34,7 +34,7 @@ enum Command {
     ListDrones,
     ListBackends,
     DownloadImage {
-		drone: String,
+        drone: String,
         cluster: String,
         url: String,
     },
@@ -98,13 +98,18 @@ async fn main() -> Result<()> {
         .await?;
 
     match opts.command {
-        Command::DownloadImage { cluster, url, drone  } => {
-			let result = nats.request(&ImageDownloadRequest {
-				image_url: url,
-				cluster: cluster.parse().unwrap(),
-				drone_id: DroneId::new(drone)
-			}).await?;
-
+        Command::DownloadImage {
+            cluster,
+            url,
+            drone,
+        } => {
+            let result = nats
+                .request(&ImageDownloadRequest {
+                    image_url: url,
+                    cluster: cluster.parse().unwrap(),
+                    drone_id: DroneId::new(drone),
+                })
+                .await?;
         }
         Command::Cleanup {
             dry_run,
