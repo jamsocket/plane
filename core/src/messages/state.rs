@@ -67,6 +67,7 @@ pub enum DroneMessageType {
         timestamp: chrono::DateTime<chrono::Utc>,
         state: DroneState,
     },
+    Image(String),
     KeepAlive {
         #[serde(with = "chrono::serde::ts_milliseconds")]
         timestamp: chrono::DateTime<chrono::Utc>,
@@ -95,7 +96,7 @@ pub enum BackendMessageType {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ImageDownloadMessage {
-	pub message: DroneId, 
+    pub message: DroneId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -133,6 +134,13 @@ impl TypedMessage for WorldStateMessage {
                 DroneMessageType::KeepAlive { .. } => {
                     format!(
                         "state.cluster.{}.drone.{}.keep_alive",
+                        self.cluster.subject_name(),
+                        message.drone
+                    )
+                }
+                DroneMessageType::Image(_) => {
+                    format!(
+                        "state.cluster.{}.drone.{}.image",
                         self.cluster.subject_name(),
                         message.drone
                     )
