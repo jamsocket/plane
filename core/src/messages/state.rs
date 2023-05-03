@@ -94,6 +94,11 @@ pub enum BackendMessageType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ImageDownloadMessage {
+	pub message: DroneId, 
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcmeDnsRecord {
     pub value: String,
 }
