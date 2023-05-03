@@ -3,13 +3,13 @@ use anyhow::anyhow;
 use chrono::Utc;
 use plane_core::{
     messages::{
-        scheduler::{Resource, ScheduleRequest, ScheduleResponse},
+        scheduler::{Resource, ScheduleRequest, ScheduleResponse, BackendResource},
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
     nats::{MessageWithResponseHandle, TypedNats},
     state::StateHandle,
     timing::Timer,
-    NeverResult,
+    NeverResult, types::ClusterName,
 };
 use scheduler::Scheduler;
 
@@ -20,24 +20,13 @@ pub mod plan;
 pub mod run;
 mod scheduler;
 
-pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
-    let scheduler = Scheduler::new(state);
-    let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
-    tracing::info!("Subscribed to spawn requests.");
-
-    while let Some(
-        ref msg @ MessageWithResponseHandle {
-            value:
-                ScheduleRequest {
-                    resource: Resource::Backend(ref backend),
-                    ref cluster,
-                },
-            ..
-        },
-    ) = schedule_request_sub.next().await
-    {
+async fn schedule_spawn(
+	backend: &BackendResource,
+	scheduler: &Scheduler,
+	cluster: &ClusterName,
+	nats: &TypedNats ) -> anyhow::Result<ScheduleResponse> {
         tracing::info!(spawn_request=?backend, "Got spawn request");
-        let result = match scheduler.schedule(cluster, Utc::now()) {
+        Ok(match scheduler.schedule(cluster, Utc::now()) {
             Ok(drone_id) => {
                 let timer = Timer::new();
                 let spawn_request = backend.schedule(cluster, &drone_id);
@@ -83,8 +72,26 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                     ScheduleResponse::NoDroneAvailable
                 }
             },
-        };
+        })
+}
 
+pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
+    let scheduler = Scheduler::new(state);
+    let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
+    tracing::info!("Subscribed to spawn requests.");
+
+    while let Some(
+        ref msg @ MessageWithResponseHandle {
+            value:
+                ScheduleRequest {
+                    resource: Resource::Backend(ref backend),
+                    ref cluster,
+                },
+            ..
+        },
+    ) = schedule_request_sub.next().await
+    {
+		let result = schedule_spawn(backend, &scheduler, cluster, &nats).await?;
         msg.respond(&result).await?;
     }
 
