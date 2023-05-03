@@ -124,25 +124,29 @@ impl ClusterState {
         self.backends.get(backend)
     }
 
-    pub fn locked(&self, lock: &str) -> Result<bool> {
+    pub fn locked(&self, lock: &str) -> Result<Option<BackendId>> {
         let Some(lock_owner) = self.locks.get(lock) else {
             // The lock does not exist.
-            return Ok(false)
+            return Ok(None)
         };
         
         let Some(backend) = self.backends.get(lock_owner) else {
             // The lock exists, but the backend has been purged.
             // This must be true, because an assignment message is the only way to create a lock.
-            return Ok(false)
+            return Ok(None)
         };
 
         let Some(state) = backend.state() else {
             // The lock exists, and the backend exists, but has not yet sent a status message.
-            return Ok(true)
+            return Ok(Some(lock_owner.clone()))
         };
 
         // The lock is held if the backend is in a non-terminal state.
-        Ok(!state.terminal())
+        if state.terminal() {
+            Ok(None)
+        } else {
+            Ok(Some(lock_owner.clone()))
+        }
     }
 }
 
@@ -206,57 +210,58 @@ mod test {
     #[test]
     fn test_locks() {
         let mut state = ClusterState::default();
+        let backend = BackendId::new_random();
 
         // Initially, no locks are held.
-        assert!(!state.locked("mylock").unwrap());
+        assert!(state.locked("mylock").unwrap().is_none());
 
         // Assign a backend to a drone and acquire a lock.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: BackendId::new("backend".into()),
+            backend: backend.clone(),
             message: BackendMessageType::Assignment {
                 drone: DroneId::new("drone".into()),
                 lock: Some("mylock".into()),
             },
         }));
 
-        assert!(state.locked("mylock").unwrap());
+        assert_eq!(backend, state.locked("mylock").unwrap().unwrap());
 
         // Update the backend state to loading.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: BackendId::new("backend".into()),
+            backend: backend.clone(),
             message: BackendMessageType::State {
                 state: agent::BackendState::Loading,
                 timestamp: Utc::now(),
             },
         }));
 
-        assert!(state.locked("mylock").unwrap());
+        assert_eq!(backend, state.locked("mylock").unwrap().unwrap());
 
         // Update the backend state to starting.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: BackendId::new("backend".into()),
+            backend: backend.clone(),
             message: BackendMessageType::State {
                 state: agent::BackendState::Starting,
                 timestamp: Utc::now(),
             },
         }));
 
-        assert!(state.locked("mylock").unwrap());
+        assert_eq!(backend, state.locked("mylock").unwrap().unwrap());
 
         // Update the backend state to ready.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: BackendId::new("backend".into()),
+            backend: backend.clone(),
             message: BackendMessageType::State {
                 state: agent::BackendState::Ready,
                 timestamp: Utc::now(),
             },
         }));
 
-        assert!(state.locked("mylock").unwrap());
+        assert_eq!(backend, state.locked("mylock").unwrap().unwrap());
 
         // Update the backend state to swept.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: BackendId::new("backend".into()),
+            backend: backend.clone(),
             message: BackendMessageType::State {
                 state: agent::BackendState::Swept,
                 timestamp: Utc::now(),
@@ -264,11 +269,11 @@ mod test {
         }));
 
         // The lock should now be free.
-        assert!(!state.locked("mylock").unwrap());
+        assert!(state.locked("mylock").unwrap().is_none());
 
         state.backends.remove(&BackendId::new("backend".into()));
 
         // The lock should still be free.
-        assert!(!state.locked("mylock").unwrap());
+        assert!(state.locked("mylock").unwrap().is_none());
     }
 }

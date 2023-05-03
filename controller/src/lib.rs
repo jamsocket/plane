@@ -29,15 +29,26 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
         tracing::info!(spawn_request=?schedule_request.value, "Got spawn request");
 
         if let Some(lock) = &schedule_request.value.lock {
+            tracing::info!(lock=%lock, "Request includes lock.");
             // todo: never panic in this function
-            let state = state.state();
-            let cluster = state.cluster(&schedule_request.value.cluster).unwrap();
-            if cluster.locked(lock)? {
+            let locked = {
+                let state = state.state();
+                let cluster = state.cluster(&schedule_request.value.cluster).unwrap();
+                cluster.locked(lock)?
+            };
+            tracing::info!(lock=%lock, ?locked, "Lock checked.");
+
+            if let Some(backend) = locked {
                 tracing::info!(lock=%lock, "Lock is held.");
-                
+
+                let drone = {
+                    let state = state.state();
+                    let cluster = state.cluster(&schedule_request.value.cluster).unwrap();
+                    cluster.backend(&backend).unwrap().drone.clone().unwrap()
+                };
 
                 schedule_request
-                    .respond(&ScheduleResponse::NoDroneAvailable)
+                    .respond(&ScheduleResponse::Scheduled { drone, backend_id: backend, bearer_token: None, spawned: false })
                     .await?;
                 continue;
             }
@@ -62,7 +73,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                                 backend: spawn_request.backend_id.clone(),
                                 message: BackendMessageType::Assignment {
                                     drone: drone_id.clone(),
-                                    lock: None,
+                                    lock: schedule_request.value.lock.clone(),
                                 },
                             }),
                         })

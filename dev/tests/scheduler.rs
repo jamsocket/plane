@@ -405,6 +405,8 @@ async fn schedule_request_lock() {
 
     let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, .. } = r1 else {panic!()};
 
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
     let r2 = mock_agent.schedule_locked(true, Some("foobar".to_string())).await.unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone2, backend_id: backend2, .. } = r2 else {panic!()};
