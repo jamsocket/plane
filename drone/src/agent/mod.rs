@@ -9,7 +9,7 @@ use hyper::Client;
 use plane_core::{
     logging::LogError,
     messages::{
-        agent::{DroneState, SpawnRequest, TerminationRequest},
+        agent::{DroneState, SpawnRequest, TerminationRequest, ImageDownloadRequest},
         drone_state::{DroneConnectRequest, DroneStatusMessage},
         scheduler::DrainDrone,
     },
@@ -53,6 +53,29 @@ pub async fn wait_port_ready(addr: &SocketAddr) -> Result<()> {
     Ok(())
 }
 
+
+async fn listen_for_image_requests(
+	cluster: &ClusterName,
+	drone_id: &DroneId,
+	executor: Executor<DockerInterface>,
+	nats: TypedNats,
+) -> NeverResult {
+	let mut sub = nats.subscribe(ImageDownloadRequest::subscribe_subject(cluster, drone_id)).await?;
+	tracing::info!("Listening for image download requests.");
+
+
+	while let Some(req) = sub.next().await {
+		req.respond(&true).await?;
+		let executor = executor.clone();
+		tokio::spawn(async move {
+			executor.download_image(req.value.image_url).await;
+		});
+	}
+								 
+	Err(anyhow!("image req subscription closed"))
+}
+	
+
 async fn listen_for_spawn_requests(
     cluster: &ClusterName,
     drone_id: &DroneId,
@@ -62,6 +85,8 @@ async fn listen_for_spawn_requests(
     let mut sub = nats
         .subscribe(SpawnRequest::subscribe_subject(cluster, drone_id))
         .await?;
+	//leaving a comment here so I don't forget
+	//Why do we call this here? can't we call it in the actual state machine?
     executor.resume_backends().await?;
     tracing::info!("Listening for spawn requests.");
 
