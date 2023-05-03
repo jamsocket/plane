@@ -5,7 +5,7 @@ use plane_core::{
     messages::{
         agent::{
             BackendState, BackendStateMessage, DockerExecutableConfig, ResourceLimits,
-            TerminationRequest,
+            TerminationRequest, ImageDownloadRequest,
         },
         scheduler::{BackendResource, DrainDrone, Resource, ScheduleRequest, ScheduleResponse},
         state::{
@@ -33,10 +33,11 @@ struct Opts {
 enum Command {
     ListDrones,
     ListBackends,
-	DownloadImage {
-		cluster: String,
-		url: String
-	},
+    DownloadImage {
+		drone: String,
+        cluster: String,
+        url: String,
+    },
     Spawn {
         cluster: String,
         image: String,
@@ -97,9 +98,14 @@ async fn main() -> Result<()> {
         .await?;
 
     match opts.command {
-		Command::DownloadImage { cluster, url } => {
-			todo!()
-		},
+        Command::DownloadImage { cluster, url, drone  } => {
+			let result = nats.request(&ImageDownloadRequest {
+				image_url: url,
+				cluster: cluster.parse().unwrap(),
+				drone_id: DroneId::new(drone)
+			}).await?;
+
+        }
         Command::Cleanup {
             dry_run,
             include_missing_state,
@@ -184,10 +190,10 @@ async fn main() -> Result<()> {
                                     continue;
                                 }
                                 format!("is alive at {}", timestamp.to_string().bright_blue())
-                            },
-							DroneMessageType::Image(ref image) => {
-								format!("image {} on drone {}", image, drone)
-							}
+                            }
+                            DroneMessageType::Image(ref image) => {
+                                format!("image {} on drone {}", image, drone)
+                            }
                             DroneMessageType::Metadata(metadata) => {
                                 format!(
                                     "has IP: {}, version: {}, git hash: {}",
@@ -358,9 +364,9 @@ async fn main() -> Result<()> {
                         println!("Bearer token: {}", bearer_token.bright_blue());
                     }
                 }
-				ScheduleResponse::ScheduledImage { drone, image } => {
-					println!("image {} on drone {}", image, drone)
-				}
+                ScheduleResponse::ScheduledImage { drone, image } => {
+                    println!("image {} on drone {}", image, drone)
+                }
                 ScheduleResponse::NoDroneAvailable => tracing::error!(
                     %cluster,
                     "Could not schedule backend because no drone was available for cluster."
