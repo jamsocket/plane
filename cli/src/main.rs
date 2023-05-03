@@ -177,7 +177,10 @@ async fn main() -> Result<()> {
                                     continue;
                                 }
                                 format!("is alive at {}", timestamp.to_string().bright_blue())
-                            }
+                            },
+							DroneMessageType::Image(ref image) => {
+								format!("image {} on drone {}", image, drone)
+							}
                             DroneMessageType::Metadata(metadata) => {
                                 format!(
                                     "has IP: {}, version: {}, git hash: {}",
@@ -333,7 +336,7 @@ async fn main() -> Result<()> {
                 .await?;
 
             match result {
-                ScheduleResponse::Scheduled {
+                ScheduleResponse::ScheduledBackend {
                     drone,
                     backend_id,
                     bearer_token,
@@ -348,6 +351,9 @@ async fn main() -> Result<()> {
                         println!("Bearer token: {}", bearer_token.bright_blue());
                     }
                 }
+				ScheduleResponse::ScheduledImage { drone, image } => {
+					println!("image {} on drone {}", image, drone)
+				}
                 ScheduleResponse::NoDroneAvailable => tracing::error!(
                     %cluster,
                     "Could not schedule backend because no drone was available for cluster."
