@@ -99,16 +99,17 @@ impl ScheduleRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ScheduleResponse {
-	//this is a quick hack, eventually scheduled should have a resource field instead of ScheduledX being enum variants
+    //this is a quick hack, eventually scheduled should have a resource field instead of ScheduledX being enum variants
     ScheduledBackend {
         drone: DroneId,
         backend_id: BackendId,
         #[serde(skip_serializing_if = "Option::is_none")]
         bearer_token: Option<String>,
     },
-	ScheduledImage {
-		drone: DroneId
-	},
+    ScheduledImage {
+        drone: DroneId,
+		image: String
+    },
     NoDroneAvailable,
 }
 
