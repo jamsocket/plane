@@ -3,8 +3,11 @@ use anyhow::anyhow;
 use chrono::Utc;
 use plane_core::{
     messages::{
-        scheduler::{BackendResource, Resource, ScheduleRequest, ScheduleResponse},
-        state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
+        scheduler::{BackendResource, ImageResource, Resource, ScheduleRequest, ScheduleResponse},
+        state::{
+            BackendMessage, BackendMessageType, ClusterStateMessage, ImageDownloadMessage,
+            WorldStateMessage, DroneMessage, DroneMessageType,
+        },
     },
     nats::{MessageWithResponseHandle, TypedNats},
     state::StateHandle,
@@ -52,7 +55,7 @@ async fn schedule_spawn(
                     })
                     .await?;
 
-                    ScheduleResponse::Scheduled {
+                    ScheduleResponse::ScheduledBackend {
                         drone: drone_id,
                         backend_id: spawn_request.backend_id,
                         bearer_token: spawn_request.bearer_token.clone(),
@@ -74,6 +77,35 @@ async fn schedule_spawn(
                 ScheduleResponse::NoDroneAvailable
             }
         },
+    })
+}
+
+async fn schedule_image(
+    image: &ImageResource,
+    scheduler: &Scheduler,
+    cluster: &ClusterName,
+    nats: &TypedNats,
+) -> anyhow::Result<ScheduleResponse> {
+    tracing::info!(image=?image, "Got Image Request");
+    Ok(match scheduler.schedule(cluster, Utc::now()) {
+        Ok(ref drone_id) => {
+            let image_download_request = image.schedule(cluster, drone_id);
+            if let true = nats.request(&image_download_request).await? {
+                nats.publish(&WorldStateMessage {
+                    cluster: cluster.clone(),
+                    message: ClusterStateMessage::DroneMessage(
+						DroneMessage {
+							drone: drone_id.clone(),
+							message: DroneMessageType::Image(image.url.clone()) 
+						})
+				}).await?;
+
+                ScheduleResponse::ScheduledImage { drone: drone_id.clone() }
+            } else { panic!("shut up") }
+        }
+        Err(SchedulerError::NoDroneAvailable) => {
+            todo!();
+        }
     })
 }
 
