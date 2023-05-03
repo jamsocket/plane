@@ -127,7 +127,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     {
         let result = match resource {
             Resource::Image(image) => {
-                todo!()
+				schedule_image(image, &scheduler, cluster, &nats).await?
             }
             Resource::Backend(backend) => {
                 schedule_spawn(backend, &scheduler, cluster, &nats).await?
