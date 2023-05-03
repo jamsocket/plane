@@ -121,6 +121,7 @@ impl ClusterState {
 pub struct DroneState {
     pub meta: Option<DroneMeta>,
     pub states: BTreeSet<(chrono::DateTime<chrono::Utc>, agent::DroneState)>,
+	pub images: BTreeSet<String>,
     pub last_seen: Option<chrono::DateTime<chrono::Utc>>,
 }
 
@@ -132,6 +133,7 @@ impl DroneState {
                 self.states.insert((timestamp, state));
             }
             DroneMessageType::KeepAlive { timestamp } => self.last_seen = Some(timestamp),
+			DroneMessageType::Image(ref image) => { self.images.insert(image.clone()); }
         }
     }
 
