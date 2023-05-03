@@ -3,13 +3,14 @@ use anyhow::anyhow;
 use chrono::Utc;
 use plane_core::{
     messages::{
-        scheduler::{Resource, ScheduleRequest, ScheduleResponse, BackendResource},
+        scheduler::{BackendResource, Resource, ScheduleRequest, ScheduleResponse},
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
     nats::{MessageWithResponseHandle, TypedNats},
     state::StateHandle,
     timing::Timer,
-    NeverResult, types::ClusterName,
+    types::ClusterName,
+    NeverResult,
 };
 use scheduler::Scheduler;
 
@@ -21,58 +22,59 @@ pub mod run;
 mod scheduler;
 
 async fn schedule_spawn(
-	backend: &BackendResource,
-	scheduler: &Scheduler,
-	cluster: &ClusterName,
-	nats: &TypedNats ) -> anyhow::Result<ScheduleResponse> {
-        tracing::info!(spawn_request=?backend, "Got spawn request");
-        Ok(match scheduler.schedule(cluster, Utc::now()) {
-            Ok(drone_id) => {
-                let timer = Timer::new();
-                let spawn_request = backend.schedule(cluster, &drone_id);
-                match nats.request(&spawn_request).await {
-                    Ok(true) => {
-                        tracing::info!(
-                            duration=?timer.duration(),
-                            backend_id=%spawn_request.backend_id,
-                            %drone_id,
-                            "Drone accepted backend."
-                        );
+    backend: &BackendResource,
+    scheduler: &Scheduler,
+    cluster: &ClusterName,
+    nats: &TypedNats,
+) -> anyhow::Result<ScheduleResponse> {
+    tracing::info!(spawn_request=?backend, "Got spawn request");
+    Ok(match scheduler.schedule(cluster, Utc::now()) {
+        Ok(drone_id) => {
+            let timer = Timer::new();
+            let spawn_request = backend.schedule(cluster, &drone_id);
+            match nats.request(&spawn_request).await {
+                Ok(true) => {
+                    tracing::info!(
+                        duration=?timer.duration(),
+                        backend_id=%spawn_request.backend_id,
+                        %drone_id,
+                        "Drone accepted backend."
+                    );
 
-                        nats.publish(&WorldStateMessage {
-                            cluster: cluster.clone(),
-                            message: ClusterStateMessage::BackendMessage(BackendMessage {
-                                backend: spawn_request.backend_id.clone(),
-                                message: BackendMessageType::Assignment {
-                                    drone: drone_id.clone(),
-                                },
-                            }),
-                        })
-                        .await?;
+                    nats.publish(&WorldStateMessage {
+                        cluster: cluster.clone(),
+                        message: ClusterStateMessage::BackendMessage(BackendMessage {
+                            backend: spawn_request.backend_id.clone(),
+                            message: BackendMessageType::Assignment {
+                                drone: drone_id.clone(),
+                            },
+                        }),
+                    })
+                    .await?;
 
-                        ScheduleResponse::Scheduled {
-                            drone: drone_id,
-                            backend_id: spawn_request.backend_id,
-                            bearer_token: spawn_request.bearer_token.clone(),
-                        }
-                    }
-                    Ok(false) => {
-                        tracing::warn!("Drone rejected backend.");
-                        ScheduleResponse::NoDroneAvailable
-                    }
-                    Err(error) => {
-                        tracing::warn!(?error, "Scheduler returned error.");
-                        ScheduleResponse::NoDroneAvailable
+                    ScheduleResponse::Scheduled {
+                        drone: drone_id,
+                        backend_id: spawn_request.backend_id,
+                        bearer_token: spawn_request.bearer_token.clone(),
                     }
                 }
-            }
-            Err(error) => match error {
-                SchedulerError::NoDroneAvailable => {
-                    tracing::warn!("No drone available.");
+                Ok(false) => {
+                    tracing::warn!("Drone rejected backend.");
                     ScheduleResponse::NoDroneAvailable
                 }
-            },
-        })
+                Err(error) => {
+                    tracing::warn!(?error, "Scheduler returned error.");
+                    ScheduleResponse::NoDroneAvailable
+                }
+            }
+        }
+        Err(error) => match error {
+            SchedulerError::NoDroneAvailable => {
+                tracing::warn!("No drone available.");
+                ScheduleResponse::NoDroneAvailable
+            }
+        },
+    })
 }
 
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
@@ -84,14 +86,22 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
         ref msg @ MessageWithResponseHandle {
             value:
                 ScheduleRequest {
-                    resource: Resource::Backend(ref backend),
+                    ref resource,
                     ref cluster,
                 },
             ..
         },
     ) = schedule_request_sub.next().await
     {
-		let result = schedule_spawn(backend, &scheduler, cluster, &nats).await?;
+        let result = match resource {
+            Resource::Image(image) => {
+                todo!()
+            }
+            Resource::Backend(backend) => {
+                schedule_spawn(backend, &scheduler, cluster, &nats).await?
+            }
+        };
+
         msg.respond(&result).await?;
     }
 
