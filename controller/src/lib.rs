@@ -100,7 +100,7 @@ async fn schedule_image(
 						})
 				}).await?;
 
-                ScheduleResponse::ScheduledImage { drone: drone_id.clone() }
+                ScheduleResponse::ScheduledImage { drone: drone_id.clone(), image: image.url.clone() }
             } else { panic!("shut up") }
         }
         Err(SchedulerError::NoDroneAvailable) => {
