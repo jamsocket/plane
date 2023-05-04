@@ -215,15 +215,12 @@ impl<E: Engine> Executor<E> {
         mut state: BackendState,
         recv_maybe: Option<Receiver<Signal>>,
     ) {
-        let mut recv = if recv_maybe.is_some() {
-            recv_maybe.unwrap()
-        } else {
+        let mut recv = recv_maybe.unwrap_or_else(|| {
             let (send, recv) = channel(1);
             self.backend_to_listener
                 .insert(spawn_request.backend_id.clone(), send);
             recv
-        };
-        //let (send, recv) = recv.is_some() { recv } else {channel(1)} } ;
+        });
 
         // the BackendMonitor must be created after the backend is ready
         // unless there's an error before the backend starts
