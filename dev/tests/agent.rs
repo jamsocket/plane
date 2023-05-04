@@ -701,25 +701,18 @@ async fn handle_termination_request() {
         .unwrap();
 
     let mut request = base_spawn_request().await;
-    // Ensure spawnee lives long enough to be terminated.
     request.drone_id = drone_id.clone();
-    request.max_idle_secs = Duration::from_secs(10_000);
 
     controller_mock
         .expect_status_message(&request.drone_id, &ClusterName::new("plane.test"), true, 0)
         .await
         .unwrap();
 
-    request.max_idle_secs = Duration::from_secs(1000);
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
         .unwrap();
 
     controller_mock.spawn_backend(&request).await.unwrap();
-    state_subscription
-        .wait_for_state(BackendState::Ready, 20_000)
-        .await
-        .unwrap();
 
     let termination_request = TerminationRequest {
         backend_id: request.backend_id.clone(),

@@ -74,6 +74,7 @@ async fn listen_for_spawn_requests(
 
                 req.respond(&true).await?;
                 tokio::spawn(async move {
+                    tracing::info!("spawning {:?}", &req.value.backend_id);
                     executor.start_backend(&req.value).await;
                 });
             }
@@ -99,6 +100,7 @@ async fn listen_for_termination_requests(
 
                 req.respond(&()).await?;
                 tokio::spawn(async move {
+                    tracing::info!("terminating {:?}", &req.value.backend_id);
                     let result = executor.kill_backend(&req.value).await;
                     if let Err(err) = result {
                         tracing::warn!(?err, "Executor failed to kill backend.");

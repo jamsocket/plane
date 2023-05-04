@@ -20,7 +20,7 @@ use plane_core::{
 use serde_json::json;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
-    sync::mpsc::{channel, Sender},
+    sync::mpsc::{channel, Receiver, Sender},
     task::JoinHandle,
 };
 use tokio_stream::StreamExt;
@@ -152,6 +152,10 @@ impl<E: Engine> Executor<E> {
     }
 
     pub async fn start_backend(&self, spawn_request: &SpawnRequest) {
+        let (send, recv) = channel(1);
+        self.backend_to_listener
+            .insert(spawn_request.backend_id.clone(), send);
+
         self.database
             .insert_backend(spawn_request)
             .await
@@ -166,7 +170,8 @@ impl<E: Engine> Executor<E> {
         )
         .await;
 
-        self.run_backend(spawn_request, BackendState::Loading).await
+        self.run_backend(spawn_request, BackendState::Loading, recv)
+            .await
     }
 
     pub async fn kill_backend(
@@ -197,17 +202,21 @@ impl<E: Engine> Executor<E> {
                 spec,
             } = backend;
             tracing::info!(%backend_id, ?state, "Resuming backend");
-            tokio::spawn(async move { executor.run_backend(&spec, state).await });
+            let (send, recv) = channel(1);
+            self.backend_to_listener.insert(backend_id.clone(), send);
+
+            tokio::spawn(async move { executor.run_backend(&spec, state, recv).await });
         }
 
         Ok(())
     }
 
-    async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
-        let (send, mut recv) = channel(1);
-        self.backend_to_listener
-            .insert(spawn_request.backend_id.clone(), send);
-
+    async fn run_backend(
+        &self,
+        spawn_request: &SpawnRequest,
+        mut state: BackendState,
+        mut recv: Receiver<Signal>,
+    ) {
         // the BackendMonitor must be created after the backend is ready
         // unless there's an error before the backend starts
         // this notifier is used to indicate that the BackendMonitor
