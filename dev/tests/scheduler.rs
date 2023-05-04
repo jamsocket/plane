@@ -106,7 +106,7 @@ impl MockAgent {
 
         // If the schedule request was successful, the state data structure
         // should be updated.
-        if let ScheduleResponse::Scheduled { backend_id, .. } = &result {
+        if let ScheduleResponse::ScheduledBackend { backend_id, .. } = &result {
             sleep(Duration::from_millis(100)).await;
 
             let state = self.state.state();
@@ -176,7 +176,7 @@ async fn one_drone_available() {
 
     sleep(Duration::from_millis(100)).await;
     let result = mock_agent.schedule_drone(&drone_id, false).await.unwrap();
-    assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));
+    assert!(matches!(result, ScheduleResponse::ScheduledBackend { drone, .. } if drone == drone_id));
 }
 
 #[integration_test]
@@ -287,7 +287,7 @@ async fn schedule_request_bearer_token() {
     sleep(Duration::from_millis(100)).await;
     let result = mock_agent.schedule_drone(&drone_id, true).await.unwrap();
 
-    if let ScheduleResponse::Scheduled {
+    if let ScheduleResponse::ScheduledBackend {
         drone,
         bearer_token,
         ..
