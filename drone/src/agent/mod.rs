@@ -71,11 +71,13 @@ async fn listen_for_spawn_requests(
         match req {
             Some(req) => {
                 let executor = executor.clone();
+                let (send, recv) = tokio::sync::mpsc::channel(1);
+                executor.initialize_listener(req.value.backend_id.clone(), send);
 
                 req.respond(&true).await?;
                 tokio::spawn(async move {
                     tracing::info!("spawning {:?}", &req.value.backend_id);
-                    executor.start_backend(&req.value).await;
+                    executor.start_backend(&req.value, recv).await;
                 });
             }
             None => return Err(anyhow!("Spawn request subscription closed.")),
