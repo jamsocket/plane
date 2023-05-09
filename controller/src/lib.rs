@@ -42,11 +42,14 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
             if let Some(backend) = locked {
                 tracing::info!(lock=%lock, "Lock is held.");
 
+                // Anything that fails to find the drone results in an error here, since we just
+                // checked that the lock is held which implies that the drone exists.
+
                 let drone = {
                     let state = state.state();
                     let cluster = state
                         .cluster(&schedule_request.value.cluster)
-                        .ok_or_else(|| anyhow!("Expected cluster to exist when lock is held."))?;
+                        .ok_or_else(|| anyhow!("Expected cluster to exist."))?;
                     cluster
                         .backend(&backend)
                         .ok_or_else(|| anyhow!("Lock held by a backend that doesn't exist."))?
@@ -61,6 +64,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                     .respond(&ScheduleResponse::Scheduled {
                         drone,
                         backend_id: backend,
+                        // TODO: return bearer token if one was used in the original spawn.
                         bearer_token: None,
                         spawned: false,
                     })
