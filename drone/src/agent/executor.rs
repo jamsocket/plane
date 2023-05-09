@@ -20,7 +20,7 @@ use plane_core::{
 use serde_json::json;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::{
-    sync::mpsc::{channel, Sender},
+    sync::mpsc::{channel, Receiver, Sender},
     task::JoinHandle,
 };
 use tokio_stream::StreamExt;
@@ -41,7 +41,7 @@ impl<T, E: Debug> LogError for Result<T, E> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Signal {
+pub enum Signal {
     /// Tells the executor to interrupt current step to recapture an external status
     /// change. This signal is sent after an engine detects an external status change,
     /// e.g. a backend has terminated itself with an error.
@@ -151,7 +151,11 @@ impl<E: Engine> Executor<E> {
         }
     }
 
-    pub async fn start_backend(&self, spawn_request: &SpawnRequest) {
+    pub fn initialize_listener(&self, backend_id: BackendId, send: Sender<Signal>) {
+        self.backend_to_listener.insert(backend_id, send);
+    }
+
+    pub async fn start_backend(&self, spawn_request: &SpawnRequest, recv: Receiver<Signal>) {
         self.database
             .insert_backend(spawn_request)
             .await
@@ -166,7 +170,8 @@ impl<E: Engine> Executor<E> {
         )
         .await;
 
-        self.run_backend(spawn_request, BackendState::Loading).await
+        self.run_backend(spawn_request, BackendState::Loading, Some(recv))
+            .await
     }
 
     pub async fn kill_backend(
@@ -197,16 +202,25 @@ impl<E: Engine> Executor<E> {
                 spec,
             } = backend;
             tracing::info!(%backend_id, ?state, "Resuming backend");
-            tokio::spawn(async move { executor.run_backend(&spec, state).await });
+
+            tokio::spawn(async move { executor.run_backend(&spec, state, None).await });
         }
 
         Ok(())
     }
 
-    async fn run_backend(&self, spawn_request: &SpawnRequest, mut state: BackendState) {
-        let (send, mut recv) = channel(1);
-        self.backend_to_listener
-            .insert(spawn_request.backend_id.clone(), send);
+    async fn run_backend(
+        &self,
+        spawn_request: &SpawnRequest,
+        mut state: BackendState,
+        recv_maybe: Option<Receiver<Signal>>,
+    ) {
+        let mut recv = recv_maybe.unwrap_or_else(|| {
+            let (send, recv) = channel(1);
+            self.backend_to_listener
+                .insert(spawn_request.backend_id.clone(), send);
+            recv
+        });
 
         // the BackendMonitor must be created after the backend is ready
         // unless there's an error before the backend starts
