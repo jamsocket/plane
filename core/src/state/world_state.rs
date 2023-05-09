@@ -50,7 +50,7 @@ impl StateHandle {
         self.0.read().expect("Could not acquire world_state lock.")
     }
 
-    pub fn write_state(&self) -> RwLockWriteGuard<WorldState> {
+    pub(crate) fn write_state(&self) -> RwLockWriteGuard<WorldState> {
         self.0.write().expect("Could not acquire world_state lock.")
     }
 }
@@ -89,10 +89,12 @@ impl ClusterState {
             ClusterStateMessage::BackendMessage(message) => {
                 let backend = self.backends.entry(message.backend.clone()).or_default();
 
-                if let BackendMessageType::Assignment { lock, .. } = &message.message {
-                    if let Some(lock) = lock {
-                        self.locks.insert(lock.clone(), message.backend.clone());
-                    }
+                // If the message is an assignment and includes a lock, we want to record it.
+                if let BackendMessageType::Assignment {
+                    lock: Some(lock), ..
+                } = &message.message
+                {
+                    self.locks.insert(lock.clone(), message.backend.clone());
                 }
 
                 backend.apply(message.message);
@@ -129,7 +131,7 @@ impl ClusterState {
             // The lock does not exist.
             return Ok(None)
         };
-        
+
         let Some(backend) = self.backends.get(lock_owner) else {
             // The lock exists, but the backend has been purged.
             // This must be true, because an assignment message is the only way to create a lock.
@@ -183,7 +185,7 @@ pub struct BackendState {
 impl BackendState {
     fn apply(&mut self, message: BackendMessageType) {
         match message {
-            BackendMessageType::Assignment { drone, lock } => self.drone = Some(drone),
+            BackendMessageType::Assignment { drone, .. } => self.drone = Some(drone),
             BackendMessageType::State {
                 state: status,
                 timestamp,

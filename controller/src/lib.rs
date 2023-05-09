@@ -30,10 +30,11 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
 
         if let Some(lock) = &schedule_request.value.lock {
             tracing::info!(lock=%lock, "Request includes lock.");
-            // todo: never panic in this function
             let locked = {
                 let state = state.state();
-                let cluster = state.cluster(&schedule_request.value.cluster).unwrap();
+                let cluster = state
+                    .cluster(&schedule_request.value.cluster)
+                    .ok_or_else(|| anyhow!("Cluster does not exist."))?;
                 cluster.locked(lock)?
             };
             tracing::info!(lock=%lock, ?locked, "Lock checked.");
@@ -43,12 +44,26 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
 
                 let drone = {
                     let state = state.state();
-                    let cluster = state.cluster(&schedule_request.value.cluster).unwrap();
-                    cluster.backend(&backend).unwrap().drone.clone().unwrap()
+                    let cluster = state
+                        .cluster(&schedule_request.value.cluster)
+                        .ok_or_else(|| anyhow!("Expected cluster to exist when lock is held."))?;
+                    cluster
+                        .backend(&backend)
+                        .ok_or_else(|| anyhow!("Lock held by a backend that doesn't exist."))?
+                        .drone
+                        .clone()
+                        .ok_or_else(|| {
+                            anyhow!("Lock held by a backend without a drone assignment.")
+                        })?
                 };
 
                 schedule_request
-                    .respond(&ScheduleResponse::Scheduled { drone, backend_id: backend, bearer_token: None, spawned: false })
+                    .respond(&ScheduleResponse::Scheduled {
+                        drone,
+                        backend_id: backend,
+                        bearer_token: None,
+                        spawned: false,
+                    })
                     .await?;
                 continue;
             }

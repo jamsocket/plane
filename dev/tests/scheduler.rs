@@ -107,7 +107,12 @@ impl MockAgent {
 
         // If the schedule request was successful, the state data structure
         // should be updated.
-        if let ScheduleResponse::Scheduled { backend_id, spawned, .. } = &result {
+        if let ScheduleResponse::Scheduled {
+            backend_id,
+            spawned,
+            ..
+        } = &result
+        {
             sleep(Duration::from_millis(100)).await;
             assert!(spawned);
 
@@ -143,11 +148,11 @@ impl MockAgent {
 
         // Publish scheduler request, but defer waiting for response.
         let result = self.nats.request(&request).await?;
-        
+
         match result {
             ScheduleResponse::Scheduled { spawned, .. } => {
                 assert_eq!(false, spawned, "Backend should not be spawned.");
-            },
+            }
             _ => {
                 panic!("Expected ScheduleResponse::Scheduled, got {:?}", result);
             }
@@ -205,7 +210,10 @@ async fn one_drone_available() {
         .unwrap();
 
     sleep(Duration::from_millis(100)).await;
-    let result = mock_agent.schedule_drone(&drone_id, false, None).await.unwrap();
+    let result = mock_agent
+        .schedule_drone(&drone_id, false, None)
+        .await
+        .unwrap();
     assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));
 }
 
@@ -315,7 +323,10 @@ async fn schedule_request_bearer_token() {
         .unwrap();
 
     sleep(Duration::from_millis(100)).await;
-    let result = mock_agent.schedule_drone(&drone_id, true, None).await.unwrap();
+    let result = mock_agent
+        .schedule_drone(&drone_id, true, None)
+        .await
+        .unwrap();
 
     if let ScheduleResponse::Scheduled {
         drone,
@@ -401,13 +412,19 @@ async fn schedule_request_lock() {
         .unwrap();
 
     sleep(Duration::from_millis(100)).await;
-    let r1 = mock_agent.schedule_drone(&drone_id, true, Some("foobar".to_string())).await.unwrap();
+    let r1 = mock_agent
+        .schedule_drone(&drone_id, true, Some("foobar".to_string()))
+        .await
+        .unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, .. } = r1 else {panic!()};
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let r2 = mock_agent.schedule_locked(true, Some("foobar".to_string())).await.unwrap();
+    let r2 = mock_agent
+        .schedule_locked(true, Some("foobar".to_string()))
+        .await
+        .unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone2, backend_id: backend2, .. } = r2 else {panic!()};
 

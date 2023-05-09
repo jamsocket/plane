@@ -43,6 +43,9 @@ enum Command {
         port: Option<u16>,
         #[clap(long, short)]
         env: Vec<String>,
+        /// Optional string to use as a lock. If another backend with the same
+        /// lock string is already running, the spawn will return that backend
+        /// instead of spawning a new one.
         #[clap(long)]
         lock: Option<String>,
     },
@@ -354,7 +357,7 @@ async fn main() -> Result<()> {
                     } else {
                         println!("A backend already held the desired lock.");
                     }
-                    
+
                     println!("URL: {}", url.bright_green());
                     println!("Drone: {}", drone.to_string().bright_blue());
                     println!("Backend ID: {}", backend_id.to_string().bright_blue());
