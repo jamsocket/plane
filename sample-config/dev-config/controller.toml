@@ -5,4 +5,4 @@ hosts = ["127.0.0.1"]
 
 [dns]
 port = 5354
-soa_email = test@example.com
+soa_email = "test@example.com"
