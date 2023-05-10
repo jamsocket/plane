@@ -182,7 +182,7 @@ async fn dns_a_record() {
 async fn dns_soa_record() {
     let dns = DnsServer::new(WorldState::default()).unwrap();
 
-    let result = dns.soa_record("plane.test").await.unwrap();
+    let result = dns.soa_record("something.plane.test").await.unwrap();
 
     assert_eq!(1, result.len());
 
