@@ -59,6 +59,7 @@ impl ClusterDnsServer {
         let name = request.query().name().to_string();
         let (backend_id, cluster_name) = name
             .split_once('.')
+            .and_then(|(backend_id, potential_cluster_name)| { potential_cluster_name.split_once('.').map(|_| { (backend_id, potential_cluster_name) }) })
             .or_dns_error(ResponseCode::NXDomain, || {
                 format!("Invalid name for this server {}", name)
             })?;
@@ -108,8 +109,9 @@ impl ClusterDnsServer {
                 Ok(responses)
             }
             RecordType::SOA => {
+				let mut response = Vec::new();
                 let name = request.query().name();
-                let soa_record = self
+                let soa_email = self
                     .soa_email
                     .as_ref()
                     .or_dns_error(ResponseCode::ServFail, || {
@@ -118,7 +120,7 @@ impl ClusterDnsServer {
 
                 let rdata = RData::SOA(SOA::new(
                     name.into(),
-                    soa_record.clone(),
+                    soa_email.clone(),
                     1,
                     7200,
                     7200,
