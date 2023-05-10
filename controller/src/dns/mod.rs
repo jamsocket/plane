@@ -61,14 +61,14 @@ impl ClusterDnsServer {
             .strip_suffix('.')
             .and_then(|name| name.split_once('.'))
             .and_then(|(backend_id, potential_cluster_name)| {
-                potential_cluster_name
-                    .contains('.')
-                    .then_some((backend_id, ClusterName::new(potential_cluster_name)))
+                potential_cluster_name.contains('.').then_some((
+                    BackendId::new(backend_id.into()),
+                    ClusterName::new(potential_cluster_name),
+                ))
             })
             .or_dns_error(ResponseCode::NXDomain, || {
                 format!("Invalid name for this server {}", name)
             })?;
-        let backend_id = BackendId::new(backend_id.into());
 
         tracing::info!(?cluster_name, %backend_id, "Received DNS record request.");
 
