@@ -119,7 +119,7 @@ impl ClusterDnsServer {
                     })?;
 
                 let rdata = RData::SOA(SOA::new(
-                    name.into(),
+					name.base_name().into(),
                     soa_email.clone(),
                     1,
                     7200,
