@@ -61,10 +61,9 @@ impl ClusterDnsServer {
             .strip_suffix('.')
             .and_then(|name| name.split_once('.'))
             .and_then(|(backend_id, potential_cluster_name)| {
-                match potential_cluster_name.matches('.').count() {
-                    0 => None,
-                    _ => Some((backend_id, ClusterName::new(potential_cluster_name))),
-                }
+                potential_cluster_name
+                    .contains('.')
+                    .then_some((backend_id, ClusterName::new(potential_cluster_name)))
             })
             .or_dns_error(ResponseCode::NXDomain, || {
                 format!("Invalid name for this server {}", name)
@@ -119,7 +118,7 @@ impl ClusterDnsServer {
                     })?;
 
                 let rdata = RData::SOA(SOA::new(
-					name.base_name().into(),
+                    name.base_name().into(),
                     soa_email.clone(),
                     1,
                     7200,
