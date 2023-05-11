@@ -58,16 +58,17 @@ impl ClusterDnsServer {
     async fn do_lookup(&self, request: &Request) -> Result<Vec<Record>> {
         let name = request.query().name().to_string();
         let (backend_id, cluster_name) = name
-            .split_once('.')
+            .strip_suffix('.')
+            .and_then(|name| name.split_once('.'))
+            .and_then(|(backend_id, potential_cluster_name)| {
+                potential_cluster_name.contains('.').then_some((
+                    BackendId::new(backend_id.into()),
+                    ClusterName::new(potential_cluster_name),
+                ))
+            })
             .or_dns_error(ResponseCode::NXDomain, || {
                 format!("Invalid name for this server {}", name)
             })?;
-        let backend_id = BackendId::new(backend_id.into());
-        let cluster_name = if let Some(cluster_name) = cluster_name.strip_suffix('.') {
-            ClusterName::new(cluster_name)
-        } else {
-            ClusterName::new(cluster_name)
-        };
 
         tracing::info!(?cluster_name, %backend_id, "Received DNS record request.");
 
@@ -109,7 +110,7 @@ impl ClusterDnsServer {
             }
             RecordType::SOA => {
                 let name = request.query().name();
-                let soa_record = self
+                let soa_email = self
                     .soa_email
                     .as_ref()
                     .or_dns_error(ResponseCode::ServFail, || {
@@ -117,8 +118,8 @@ impl ClusterDnsServer {
                     })?;
 
                 let rdata = RData::SOA(SOA::new(
-                    name.into(),
-                    soa_record.clone(),
+                    name.base_name().into(),
+                    soa_email.clone(),
                     1,
                     7200,
                     7200,
