@@ -35,7 +35,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                 let cluster = state
                     .cluster(&schedule_request.value.cluster)
                     .ok_or_else(|| anyhow!("Cluster does not exist."))?;
-                cluster.locked(lock)?
+                cluster.locked(lock)
             };
             tracing::info!(lock=%lock, ?locked, "Lock checked.");
 
