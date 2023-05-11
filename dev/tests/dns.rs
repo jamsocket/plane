@@ -54,7 +54,7 @@ impl DnsServer {
         let plan = DnsPlan {
             bind_ip: ip.into(),
             port: DNS_PORT,
-			domain_name: Some(Name::from_ascii("ns1.plane.test.")?),
+            domain_name: Some(Name::from_ascii("ns1.plane.test.")?),
             soa_email: Some(Name::from_ascii("admin.plane.test.")?),
             state,
         };

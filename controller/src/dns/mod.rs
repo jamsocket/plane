@@ -43,7 +43,7 @@ struct RecordKey {
 struct ClusterDnsServer {
     state: StateHandle,
     soa_email: Option<Name>,
-	domain_name: Option<Name>
+    domain_name: Option<Name>,
 }
 
 impl ClusterDnsServer {
@@ -53,7 +53,7 @@ impl ClusterDnsServer {
         ClusterDnsServer {
             state,
             soa_email: plan.soa_email.clone(),
-			domain_name: plan.domain_name.clone()
+            domain_name: plan.domain_name.clone(),
         }
     }
 
@@ -119,13 +119,15 @@ impl ClusterDnsServer {
                         "SOA record email not set in config.".to_string()
                     })?;
 
-				let authority_domain_name = self.domain_name.as_ref().or_dns_error(
-					ResponseCode::ServFail, || {
-					"domain name of dns server not set in config.".to_string()
-				})?;
+                let authority_domain_name = self
+                    .domain_name
+                    .as_ref()
+                    .or_dns_error(ResponseCode::ServFail, || {
+                        "domain name of dns server not set in config.".to_string()
+                    })?;
 
-				let rdata = RData::SOA(SOA::new(
-					authority_domain_name.clone(),
+                let rdata = RData::SOA(SOA::new(
+                    authority_domain_name.clone(),
                     soa_email.clone(),
                     1,
                     7200,

@@ -14,7 +14,7 @@ pub struct DnsPlan {
     pub port: u16,
     pub bind_ip: IpAddr,
     pub soa_email: Option<Name>,
-	pub domain_name: Option<Name>,
+    pub domain_name: Option<Name>,
     pub state: StateHandle,
 }
 
@@ -46,22 +46,25 @@ impl ControllerPlan {
                 None
             };
 
-			let domain_name = options.domain_name.
-				and_then(|ref name| { Name::from_utf8(name).or_else(|e| {
-					tracing::warn!(?e, "invalid domain name {}", name);
-					Err(e)
-				}).ok()
-				}).
-				or_else(|| {
-					tracing::warn!("domain_name not set, SOA requests will fail");
-					None
-				});
-				
+            let domain_name = options
+                .domain_name
+                .and_then(|ref name| {
+                    Name::from_utf8(name)
+                        .or_else(|e| {
+                            tracing::warn!(?e, "invalid domain name {}", name);
+                            Err(e)
+                        })
+                        .ok()
+                })
+                .or_else(|| {
+                    tracing::warn!("domain_name not set, SOA requests will fail");
+                    None
+                });
 
             Some(DnsPlan {
                 port: options.port,
                 bind_ip: options.bind_ip,
-				domain_name,
+                domain_name,
                 soa_email,
                 state: state.clone(),
             })
