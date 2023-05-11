@@ -175,7 +175,28 @@ async fn one_drone_available() {
 
     sleep(Duration::from_millis(100)).await;
     let result = mock_agent.schedule_drone(&drone_id, false).await.unwrap();
-    assert!(matches!(result, ScheduleResponse::Scheduled { drone, .. } if drone == drone_id));
+    assert!(matches!(&result, ScheduleResponse::Scheduled { drone, .. } if drone == &drone_id));
+    let backend_id = match result {
+        ScheduleResponse::Scheduled { backend_id, .. } => backend_id,
+        _ => panic!("Unexpected schedule response."),
+    };
+
+    // Confirm that the assignment is saved in the state.
+    let state2 = start_state_loop(nats_conn.clone()).await.unwrap();
+
+    let assigned_drone = state2
+        .state()
+        .cluster(&ClusterName::new("plane.test"))
+        .unwrap()
+        .backends
+        .get(&backend_id)
+        .unwrap()
+        .drone
+        .as_ref()
+        .unwrap()
+        .clone();
+
+    assert_eq!(drone_id, assigned_drone);
 }
 
 #[integration_test]
