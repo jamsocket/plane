@@ -50,9 +50,9 @@ impl ControllerPlan {
                 .domain_name
                 .and_then(|ref name| {
                     Name::from_utf8(name)
-                        .or_else(|e| {
+                        .map_err(|e| {
                             tracing::warn!(?e, "invalid domain name {}", name);
-                            Err(e)
+                            e
                         })
                         .ok()
                 })
