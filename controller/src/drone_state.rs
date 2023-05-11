@@ -69,15 +69,6 @@ fn convert_to_state_message(
                     },
                 }),
             },
-            WorldStateMessage {
-                cluster: msg.cluster.clone(),
-                message: ClusterStateMessage::BackendMessage(BackendMessage {
-                    backend: msg.backend.clone(),
-                    message: BackendMessageType::Assignment {
-                        drone: msg.drone.clone(),
-                    },
-                }),
-            },
         ],
     }
 }
@@ -275,20 +266,10 @@ mod test {
                         timestamp: time,
                     },
                 }),
-            },
-            WorldStateMessage {
-                cluster: ClusterName::new("plane.test"),
-                message: ClusterStateMessage::BackendMessage(BackendMessage {
-                    backend: backend.clone(),
-                    message: BackendMessageType::Assignment {
-                        drone: drone.clone(),
-                    },
-                }),
-            },
+            }
         ];
 
         assert_eq!(state_message, expected);
         assert!(!state_message.first().unwrap().overwrite());
-        assert!(state_message.last().unwrap().overwrite());
     }
 }
