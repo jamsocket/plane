@@ -20,7 +20,7 @@ pub struct DnsOptions {
     /// email.
     pub soa_email: Option<String>,
 
-    /// The domain name at which the A record for this DNS server is
+    /// A domain name whose A record is the IP of this DNS server 
     pub domain_name: Option<String>,
 }
 
