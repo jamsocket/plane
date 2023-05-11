@@ -86,7 +86,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                             "Drone accepted backend."
                         );
 
-                        nats.publish(&WorldStateMessage {
+                        nats.publish_jetstream(&WorldStateMessage {
                             cluster: schedule_request.value.cluster.clone(),
                             message: ClusterStateMessage::BackendMessage(BackendMessage {
                                 backend: spawn_request.backend_id.clone(),

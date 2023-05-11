@@ -69,20 +69,6 @@ fn convert_to_state_message(
                     },
                 }),
             },
-            // TODO: remove this message. It is no longer needed because the scheduler inserts the assignment when it
-            // schedules the backend. (DIS-910)
-            WorldStateMessage {
-                cluster: msg.cluster.clone(),
-                message: ClusterStateMessage::BackendMessage(BackendMessage {
-                    backend: msg.backend.clone(),
-                    message: BackendMessageType::Assignment {
-                        drone: msg.drone.clone(),
-                        // If the assignment is already recorded, setting this to None will not remove it.
-                        // When the scheduler grants a lock, it emits a BackendMessage that includes the lock.
-                        lock: None,
-                    },
-                }),
-            },
         ],
     }
 }
@@ -280,21 +266,10 @@ mod test {
                         timestamp: time,
                     },
                 }),
-            },
-            WorldStateMessage {
-                cluster: ClusterName::new("plane.test"),
-                message: ClusterStateMessage::BackendMessage(BackendMessage {
-                    backend: backend.clone(),
-                    message: BackendMessageType::Assignment {
-                        drone: drone.clone(),
-                        lock: None,
-                    },
-                }),
-            },
+            }
         ];
 
         assert_eq!(state_message, expected);
         assert!(!state_message.first().unwrap().overwrite());
-        assert!(state_message.last().unwrap().overwrite());
     }
 }

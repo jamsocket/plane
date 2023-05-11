@@ -41,6 +41,7 @@ impl ControllerPlan {
                         .context("soa_email contained non-ascii characters.")?,
                 )
             } else {
+                tracing::warn!("soa_email not set, SOA requests will fail");
                 None
             };
 
