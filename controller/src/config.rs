@@ -19,6 +19,9 @@ pub struct DnsOptions {
     /// however, the email provided here should be a normal "username@domain.tld"-format
     /// email.
     pub soa_email: Option<String>,
+
+	/// The domain name at which the A record for this DNS server is
+	pub domain_name: Option<String>
 }
 
 fn default_port() -> u16 {
