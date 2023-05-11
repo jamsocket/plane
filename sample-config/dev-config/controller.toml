@@ -6,3 +6,4 @@ hosts = ["127.0.0.1"]
 [dns]
 port = 5354
 soa_email = "test@example.com"
+domain_name = "ns1.example.com"
