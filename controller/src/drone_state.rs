@@ -58,18 +58,16 @@ fn convert_to_state_message(
                 }),
             },
         ],
-        DroneStateUpdate::BackendStateMessage(msg) => vec![
-            WorldStateMessage {
-                cluster: msg.cluster.clone(),
-                message: ClusterStateMessage::BackendMessage(BackendMessage {
-                    backend: msg.backend.clone(),
-                    message: BackendMessageType::State {
-                        state: msg.state,
-                        timestamp,
-                    },
-                }),
-            },
-        ],
+        DroneStateUpdate::BackendStateMessage(msg) => vec![WorldStateMessage {
+            cluster: msg.cluster.clone(),
+            message: ClusterStateMessage::BackendMessage(BackendMessage {
+                backend: msg.backend.clone(),
+                message: BackendMessageType::State {
+                    state: msg.state,
+                    timestamp,
+                },
+            }),
+        }],
     }
 }
 
@@ -256,18 +254,16 @@ mod test {
 
         let state_message = convert_to_state_message(time, &msg);
 
-        let expected = vec![
-            WorldStateMessage {
-                cluster: ClusterName::new("plane.test"),
-                message: ClusterStateMessage::BackendMessage(BackendMessage {
-                    backend: backend.clone(),
-                    message: BackendMessageType::State {
-                        state: BackendState::Starting,
-                        timestamp: time,
-                    },
-                }),
-            }
-        ];
+        let expected = vec![WorldStateMessage {
+            cluster: ClusterName::new("plane.test"),
+            message: ClusterStateMessage::BackendMessage(BackendMessage {
+                backend: backend.clone(),
+                message: BackendMessageType::State {
+                    state: BackendState::Starting,
+                    timestamp: time,
+                },
+            }),
+        }];
 
         assert_eq!(state_message, expected);
         assert!(!state_message.first().unwrap().overwrite());

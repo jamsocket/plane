@@ -54,6 +54,7 @@ impl DnsServer {
         let plan = DnsPlan {
             bind_ip: ip.into(),
             port: DNS_PORT,
+            domain_name: Some(Name::from_ascii("ns1.plane.test.")?),
             soa_email: Some(Name::from_ascii("admin.plane.test.")?),
             state,
         };
@@ -188,5 +189,5 @@ async fn dns_soa_record() {
 
     let result = result.first().unwrap();
     assert_eq!("admin.plane.test.", &result.rname().to_ascii());
-    assert_eq!("plane.test.", &result.mname().to_ascii());
+    assert_eq!("ns1.plane.test.", &result.mname().to_ascii());
 }
