@@ -3,8 +3,9 @@ use super::ErrorObj;
 use nats;
 use serde::Serialize;
 use std::boxed::Box;
-use std::error::Error;
 use std::str::FromStr;
+
+#[derive(Debug, Clone)]
 pub struct NatsSubjectComponent(pub String);
 
 #[derive(Serialize)]
@@ -16,12 +17,12 @@ pub struct DroneStatsMessage {
 }
 
 impl FromStr for NatsSubjectComponent {
-    type Err = Box<dyn Error>;
+    type Err = String;
     fn from_str(a: &str) -> Result<Self, Self::Err> {
         if a.contains(char::is_whitespace) {
             return Err("provided nats subject components contain whitespace!".into());
         }
-        Ok(NatsSubjectComponent(a.replace(".","_").into()))
+        Ok(NatsSubjectComponent(a.replace(".", "_").into()))
     }
 }
 
