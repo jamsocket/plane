@@ -55,7 +55,7 @@ jobs:
         id: build-and-push
         uses: depot/build-push-action@v1
         with:
-          context: "."
+          context: "./metrics"
           file: "metrics/Dockerfile"
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
