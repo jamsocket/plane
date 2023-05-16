@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use record_stats::{get_stats_recorder, Stats};
 use std::error::Error;
 use std::{thread, time};
-use utils::{get_nats_sender, DroneStatsMessage, NatsSubjectComponent};
+use utils::{get_nats_sender, Sender, DroneStatsMessage, NatsSubjectComponent};
 
 pub type ErrorObj = Box<dyn Error>;
 
@@ -47,7 +47,7 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<(), ErrorObj> {
     let cli_opts = Opts::parse();
-    let (cluster, drone, send): (_, _, Box<dyn Fn(String) -> Result<(), ErrorObj>>) =
+    let (cluster, drone, send): (_, _, Sender) =
         if let Some(Commands::Test) = cli_opts.test {
             let dummysend = Box::new(|msg: String| -> Result<(), ErrorObj> {
                 println!("{msg}");
