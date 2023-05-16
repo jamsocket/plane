@@ -1,6 +1,6 @@
 use super::record_stats::Stats;
 use super::ErrorObj;
-use nats;
+use async_nats as nats;
 use serde::Serialize;
 use std::boxed::Box;
 use std::str::FromStr;
@@ -26,13 +26,16 @@ impl FromStr for NatsSubjectComponent {
     }
 }
 
-pub type Sender = Box<dyn Fn(&str) -> Result<(), ErrorObj>>;
-pub fn get_nats_sender(nats_url: &str, subject: &str) -> Result<Sender, ErrorObj> {
-    let nc = nats::connect(nats_url)?;
+pub type Sender = Box<dyn Fn(&'static str) -> Result<(), ErrorObj>>;
+pub async fn get_nats_sender(nats_url: &str, subject: &str) -> Result<Sender, ErrorObj> {
+    let nc = nats::connect(nats_url).await?;
     let sub_clone = subject.to_owned();
 
-    Ok(Box::new(move |msg: &str| {
-        nc.publish(&sub_clone, msg)?;
+    Ok(Box::new(move |msg: &'static str| {
+		let msg = msg.clone();
+		let sub_clone = sub_clone.clone();
+		let nc = nc.clone();
+		tokio::spawn(async move { nc.publish(sub_clone.clone(), msg.clone().into()).await });
         Ok(())
     }))
 }
