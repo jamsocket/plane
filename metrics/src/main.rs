@@ -1,7 +1,6 @@
 pub mod record_stats;
 pub mod utils;
 
-use clap::builder::IntoResettable;
 use clap::{Parser, Subcommand};
 use record_stats::{get_stats_recorder, Stats};
 use std::error::Error;
@@ -45,13 +44,12 @@ enum Commands {
     Test,
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), ErrorObj> {
     let cli_opts = Opts::parse();
-    let (cluster, drone, send): (_, _, Box<dyn Fn(&str) -> Result<(), ErrorObj>>) =
+    let (cluster, drone, send): (_, _, Box<dyn Fn(String) -> Result<(), ErrorObj>>) =
         if let Some(Commands::Test) = cli_opts.test {
-            let dummysend = Box::new(|msg: &str| -> Result<(), ErrorObj> {
+            let dummysend = Box::new(|msg: String| -> Result<(), ErrorObj> {
                 println!("{msg}");
                 Ok(())
             });
@@ -79,7 +77,7 @@ async fn main() -> Result<(), ErrorObj> {
         let stats = record_stats();
         let to_send = append_stats(stats);
         let stats_json = serde_json::to_string(&to_send)?;
-        send(&stats_json)?;
+        send(stats_json)?;
         thread::sleep(time::Duration::from_millis(REPORTING_INTERVAL_MS));
     }
 }
