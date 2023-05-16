@@ -44,11 +44,12 @@ enum Commands {
     Test,
 }
 
-fn main() -> Result<(), ErrorObj> {
+#[tokio::main]
+async fn main() -> Result<(), ErrorObj> {
     let cli_opts = Opts::parse();
-    let (cluster, drone, send): (_, _, Box<dyn Fn(&str) -> Result<(), ErrorObj>>) =
+    let (cluster, drone, send): (_, _, Box<dyn Fn(&'static str) -> Result<(), ErrorObj>>) =
         if let Some(Commands::Test) = cli_opts.test {
-            let dummysend = Box::new(|msg: &str| -> Result<(), ErrorObj> {
+            let dummysend = Box::new(|msg: &'static str| -> Result<(), ErrorObj> {
                 println!("{msg}");
                 Ok(())
             });
@@ -61,7 +62,7 @@ fn main() -> Result<(), ErrorObj> {
                 "cluster.{}.drone.{}.stats",
                 cli_opts.cluster_name.0, cli_opts.drone_id.0
             );
-            let send = get_nats_sender(&cli_opts.nats_url, &nats_subject)?;
+            let send = get_nats_sender(&cli_opts.nats_url, &nats_subject).await?;
             (cli_opts.cluster_name.0, cli_opts.drone_id.0, send)
         };
     let mut record_stats = get_stats_recorder();
@@ -72,10 +73,12 @@ fn main() -> Result<(), ErrorObj> {
         stats,
     };
 
+    let stats_json = std::sync::Mutex::new("");
     loop {
         let stats = record_stats();
         let to_send = append_stats(stats);
-        let stats_json = serde_json::to_string(&to_send)?;
+        let mut stats_json = stats_json.lock().unwrap();
+        *stats_json = Box::leak(serde_json::to_string(&to_send)?.into_boxed_str());
         send(&stats_json)?;
         thread::sleep(time::Duration::from_millis(REPORTING_INTERVAL_MS));
     }
