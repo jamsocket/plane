@@ -26,12 +26,12 @@ impl FromStr for NatsSubjectComponent {
     }
 }
 
-pub type Sender = Box<dyn Fn(&'static str) -> Result<(), ErrorObj>>;
+pub type Sender = Box<dyn Fn(&str) -> Result<(), ErrorObj>>;
 pub async fn get_nats_sender(nats_url: &str, subject: &str) -> Result<Sender, ErrorObj> {
     let nc = nats::connect(nats_url).await?;
     let sub_clone = subject.to_owned();
 
-    Ok(Box::new(move |msg: &'static str| {
+    Ok(Box::new(move |msg: &str| {
         let msg = msg.clone();
         let sub_clone = sub_clone.clone();
         let nc = nc.clone();
