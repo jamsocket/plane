@@ -7,4 +7,5 @@ members = [
     "dev",
     "dev/integration-test",
     "drone",
+	"core/nats-macros"
 ]
