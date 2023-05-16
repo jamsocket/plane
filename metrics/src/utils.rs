@@ -22,20 +22,20 @@ impl FromStr for NatsSubjectComponent {
         if a.contains(char::is_whitespace) {
             return Err("provided nats subject components contain whitespace!".into());
         }
-        Ok(NatsSubjectComponent(a.replace(".", "_").into()))
+        Ok(NatsSubjectComponent(a.replace('.', "_")))
     }
 }
 
-pub type Sender = Box<dyn Fn(String) -> Result<(), ErrorObj>>;
+pub type Sender = Box<dyn Fn(&str) -> Result<(), ErrorObj>>;
 pub async fn get_nats_sender(nats_url: &str, subject: &str) -> Result<Sender, ErrorObj> {
     let nc = nats::connect(nats_url).await?;
-    let sub_clone = subject.to_owned();
+    let subject = subject.to_owned();
 
-    Ok(Box::new(move |msg: String| {
-        let msg = msg.clone();
-        let sub_clone = sub_clone.clone();
+    Ok(Box::new(move |msg: &str| {
+        let msg = msg.to_owned();
         let nc = nc.clone();
-        tokio::spawn(async move { nc.publish(sub_clone.clone(), msg.clone().into()).await });
+        let subject = subject.clone();
+        tokio::spawn(async move { nc.publish(subject, msg.clone().into()).await });
         Ok(())
     }))
 }
