@@ -4,8 +4,8 @@ members = [
     "cli",
     "controller",
     "core",
+	"core/nats-macros",
     "dev",
     "dev/integration-test",
     "drone",
-	"core/nats-macros"
 ]
