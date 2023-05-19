@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use quote::quote;
 use darling::FromDeriveInput;
 use syn::{self, parse_macro_input, DeriveInput};
@@ -14,11 +16,22 @@ pub fn derive_answer_fn(_item: TokenStream) -> TokenStream {
 	"fn answer() -> u32 { 42 }".parse().unwrap()
 }
 
+struct NatsSubjectString(String);
+
+impl FromStr for NatsSubjectString {
+	type Err = String;
+	fn from_str(inp: &str) -> Result<Self, Self::Err> {
+
+
+		Ok("test".into())
+	}
+
+}
+
 #[derive(FromDeriveInput)]
 #[darling(attributes(typed_message))]
 struct Opts {
-	name: String,
-	response: String 
+	subject: NatsSubjectString
 }
 
 #[proc_macro_derive(TypedMessage, attributes(typed_message))]
@@ -30,11 +43,9 @@ pub fn typed_message_impl(input: TokenStream) -> TokenStream {
 	//so finally I want
 	/*
 	#[derive(TypedMessage)]
-	#[TypedMessage(name=stats)]
+	#[TypedMessage("cluster.#cluster.backend.#backend.stats")]
 	pub struct BackendStatsMessage {
-	#[cluster]
 	pub cluster: ClusterName
-	#[backend]
 	pub backend: BackendId
 
 	}
