@@ -2,7 +2,7 @@
 name = "nats-macros"
 version = "0.3.19"
 edition = "2021"
-authors = ["Paul Butler <paul@driftingin.space>"]
+authors = ["Abhishek Cherath <abhi@driftingin.space>", "Paul Butler <paul@driftingin.space>"]
 homepage = "https://plane.dev"
 description = "Session backend orchestrator for ambitious browser-based apps."
 repository = "https://github.com/drifting-in-space/plane"
