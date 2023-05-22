@@ -1805,6 +1805,7 @@ dependencies = [
  "clap",
  "config",
  "dashmap",
+ "nats-macros",
  "rand",
  "serde",
  "serde_json",

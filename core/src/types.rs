@@ -40,6 +40,14 @@ impl Display for BackendId {
     }
 }
 
+/*
+impl Into<String> for BackendId {
+	fn into(self) -> String {
+		self.0.into()
+	}
+}
+*/
+
 impl BackendId {
     #[must_use]
     pub fn new(id: String) -> Self {
