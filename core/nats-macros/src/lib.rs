@@ -1,11 +1,25 @@
 use quote::{quote};
+use darling::{FromMeta, FromDeriveInput, FromField};
 use syn::{self, parse_macro_input, parse::Parse, DeriveInput, Attribute, parse::ParseStream, LitStr, __private::TokenStream2};
 use proc_macro::TokenStream;
+
+#[derive(FromDeriveInput, Default)]
+#[darling(default, attributes(my_trait))]
+struct Opts {
+    subject: NatsSubject,
+	response: Option<String>
+}
 
 #[derive(Debug)]
 struct NatsSubject {
 	fstring: String,
 	props: Vec<String>
+}
+
+impl FromMeta for NatsSubject {
+	fn from_string(value: &str) -> darling::Result<Self> {
+
+	}
 }
 
 impl Parse for NatsSubject {
