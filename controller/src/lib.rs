@@ -21,12 +21,58 @@ pub mod run;
 mod scheduler;
 
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
-    let scheduler = Scheduler::new(state);
+    let scheduler = Scheduler::new(state.clone());
     let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
 
     while let Some(schedule_request) = schedule_request_sub.next().await {
         tracing::info!(spawn_request=?schedule_request.value, "Got spawn request");
+
+        if let Some(lock) = &schedule_request.value.lock {
+            tracing::info!(lock=%lock, "Request includes lock.");
+            let locked = {
+                let state = state.state();
+                let cluster = state
+                    .cluster(&schedule_request.value.cluster)
+                    .ok_or_else(|| anyhow!("Cluster does not exist."))?;
+                cluster.locked(lock)
+            };
+            tracing::info!(lock=%lock, ?locked, "Lock checked.");
+
+            if let Some(backend) = locked {
+                tracing::info!(lock=%lock, "Lock is held.");
+
+                // Anything that fails to find the drone results in an error here, since we just
+                // checked that the lock is held which implies that the drone exists.
+
+                let drone = {
+                    let state = state.state();
+                    let cluster = state
+                        .cluster(&schedule_request.value.cluster)
+                        .ok_or_else(|| anyhow!("Expected cluster to exist."))?;
+                    cluster
+                        .backend(&backend)
+                        .ok_or_else(|| anyhow!("Lock held by a backend that doesn't exist."))?
+                        .drone
+                        .clone()
+                        .ok_or_else(|| {
+                            anyhow!("Lock held by a backend without a drone assignment.")
+                        })?
+                };
+
+                schedule_request
+                    .respond(&ScheduleResponse::Scheduled {
+                        drone,
+                        backend_id: backend,
+                        // TODO: return bearer token if one was used in the original spawn.
+                        bearer_token: None,
+                        spawned: false,
+                    })
+                    .await?;
+                continue;
+            }
+        }
+
         let result = match scheduler.schedule(&schedule_request.value.cluster, Utc::now()) {
             Ok(drone_id) => {
                 let timer = Timer::new();
@@ -46,6 +92,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                                 backend: spawn_request.backend_id.clone(),
                                 message: BackendMessageType::Assignment {
                                     drone: drone_id.clone(),
+                                    lock: schedule_request.value.lock.clone(),
                                 },
                             }),
                         })
@@ -55,6 +102,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                             drone: drone_id,
                             backend_id: spawn_request.backend_id,
                             bearer_token: spawn_request.bearer_token.clone(),
+                            spawned: true,
                         }
                     }
                     Ok(false) => {

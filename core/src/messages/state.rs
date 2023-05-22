@@ -85,6 +85,7 @@ pub struct BackendMessage {
 pub enum BackendMessageType {
     Assignment {
         drone: DroneId,
+        lock: Option<String>,
     },
     State {
         state: BackendState,
