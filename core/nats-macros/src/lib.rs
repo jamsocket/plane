@@ -4,7 +4,7 @@ use syn::{self, parse_macro_input, parse::Parse, DeriveInput, Attribute, parse::
 use proc_macro::TokenStream;
 
 #[derive(FromDeriveInput )]
-#[darling(attributes(my_trait))]
+#[darling(attributes(typed_message))]
 struct Opts {
     subject: NatsSubject,
 	response: Option<String>
@@ -24,9 +24,9 @@ impl FromMeta for NatsSubject {
 		for prop in props.clone() {
 			fstring = fstring.replace(&("#".to_owned()+prop.as_str()), "{}");
 		}
-		let propstr = props.iter().map(|prop| "self".to_owned() + prop.as_str() + ".to_string()").collect::<Vec<String>>().join(",");
+		let propstr = props.iter().map(|prop| "self.".to_owned() + prop.as_str() + ".to_string()").collect::<Vec<String>>().join(",");
 		let sub : syn::Item = syn::parse_str(
-			&("format!(".to_owned() + fstring.as_str() + "," + propstr.as_str() + ")")).unwrap();
+			&("format!(\"".to_owned() + fstring.as_str() + "\"," + propstr.as_str() + ");")).unwrap();
 
 		Ok(NatsSubject { fcall: sub })
 	}
@@ -57,14 +57,16 @@ pub fn typed_message_impl(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as DeriveInput);
 	let opts = Opts::from_derive_input(&ast).expect("Wrong options!");
 	let typ = ast.ident;
-	let resp_typ = opts.response.unwrap_or("NoReply".to_string());
+	let resp_typ : syn::Type = syn::parse_str(
+		&opts.response.unwrap_or("NoReply".to_string())).expect("not a type!");
 	let fcall = opts.subject.fcall;
 	quote!{
 		impl TypedMessage for #typ {
 			type Response = #resp_typ;
 
 			fn subject(&self) -> String {
-				#fcall
+				let subj = #fcall
+				return subj
 			}
 		}
 	}.into()
