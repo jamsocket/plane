@@ -1,8 +1,5 @@
-use std::str::FromStr;
-
-use quote::quote;
-use darling::FromDeriveInput;
-use syn::{self, parse_macro_input, parse::Parse, DeriveInput, Attribute, Meta, parse::ParseStream};
+use quote::{quote};
+use syn::{self, parse_macro_input, parse::Parse, DeriveInput, Attribute, parse::ParseStream, LitStr, __private::TokenStream2};
 use proc_macro::TokenStream;
 
 #[proc_macro]
@@ -16,6 +13,7 @@ pub fn derive_answer_fn(_item: TokenStream) -> TokenStream {
 	"fn answer() -> u32 { 42 }".parse().unwrap()
 }
 
+#[derive(Debug)]
 struct NatsSubject {
 	name: String,
 	props: Vec<(String, String)>
@@ -23,12 +21,11 @@ struct NatsSubject {
 
 impl Parse for NatsSubject {
 	fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-		//assert to make sure thing is a big string
-		let strput = input.to_string();
-		let strput = strput.split('#');
-		let mut out = strput.map(|each| { each.strip_suffix('.').unwrap().to_string() });
+		let lit: LitStr = input.parse()?;
+		let strput = lit.value(); //borrow checker wrangling
+		let mut out = strput.split('.').map(|each| { each.trim_start_matches("#").to_string() });
 		let name = out.next_back().unwrap();
-		let props = out.clone().zip(out.skip(1)).collect();
+		let props = out.clone().collect::<Vec<String>>().chunks_exact(2).map(|chunk| (chunk[0].clone(), chunk[1].clone())).collect();
 
 		Ok( Self {
 			props,
@@ -54,28 +51,40 @@ pub fn typed_message_impl(input: TokenStream) -> TokenStream {
 	}
 	*/
 
-	let input = parse_macro_input!(input as DeriveInput);
-	let subj = parse_typed_message(&input.attrs).unwrap();
+	let ast = parse_macro_input!(input as DeriveInput);
+	match parse_typed_message(&ast.attrs) {
+		Ok(subj) => {
+			let sub_str = subj.props.iter().map(
+				|(car, _)| car.clone()).collect::<Vec<String>>().join(".{}.") + ".{}." + subj.name.as_str();
+			let to_sub : TokenStream2 = syn::parse_str(subj.props.iter().map(|(_, cdr)| "self.".to_owned() + cdr.clone().as_str() + ".to_string()").collect::<Vec<String>>().join(",").as_str()).unwrap();
+			let typ = ast.ident;
+			quote!{
+				impl TypedMessage for #typ {
+					type Response = NoReply;
 
-	let sub_str = subj.props.iter().map(|(car, _)| car.clone()).collect::<Vec<String>>().join("{}") + subj.name.as_str();
-	let to_sub = subj.props.iter().map(|(_, cdr)| cdr.clone()).collect::<Vec<String>>().join(",");
-	quote!{
-		impl TypedMessage for #input.ident {
-			type Response = NoResponse;
-
-			fn subject(&self) -> String {
-				format!(#sub_str, #to_sub)
-			}
+					fn subject(&self) -> String {
+						format!(#sub_str, #to_sub)
+					}
+				}
+			}.into()
 		}
-	}.into()
+		Err(e) => {
+	            e.to_compile_error().into()		
+		}
+	}
 }
 
 
 fn parse_typed_message(attrs: &[Attribute]) -> Result<NatsSubject, syn::Error> {
 	for attr in attrs {
 		if attr.path().is_ident("typed_message") {
-			let subj: NatsSubject = attr.parse_args()?;
-			return Ok(subj);
+			let subj = attr.parse_args::<NatsSubject>();
+			match subj {
+				Ok(subj) => {
+					return Ok(subj);
+				}
+				Err(e) => return Err(syn::Error::new_spanned(attr, e)),
+			}
 		}
 	}
 	Err(syn::Error::new_spanned(attrs[0].clone(), "missing #[typed_message(\"...\")] attribute"))
