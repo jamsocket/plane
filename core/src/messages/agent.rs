@@ -1,6 +1,6 @@
 use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
-    types::{BackendId, ClusterName, DroneId},
+    types::{AsSubjectComponent, BackendId, ClusterName, DroneId},
 };
 #[allow(unused)] // Context is unused if bollard is not enabled.
 use anyhow::{anyhow, Context, Error};

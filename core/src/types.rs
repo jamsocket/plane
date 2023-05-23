@@ -40,13 +40,27 @@ impl Display for BackendId {
     }
 }
 
-/*
-impl Into<String> for BackendId {
-    fn into(self) -> String {
-        self.0.into()
+pub trait AsSubjectComponent {
+    fn as_subject_component(&self) -> String;
+}
+
+impl AsSubjectComponent for BackendId {
+    fn as_subject_component(&self) -> String {
+        self.to_resource_name()
     }
 }
-*/
+
+impl AsSubjectComponent for DroneId {
+    fn as_subject_component(&self) -> String {
+        self.id().into()
+    }
+}
+
+impl AsSubjectComponent for ClusterName {
+    fn as_subject_component(&self) -> String {
+        self.subject_name()
+    }
+}
 
 impl BackendId {
     #[must_use]

@@ -38,7 +38,7 @@ impl FromMeta for NatsSubjectMacroInvocation {
         //note: this can likely be cleaned up with some judicious use of quote! and tokens!
         let propstr = props
             .iter()
-            .map(|prop| "self.".to_owned() + prop.as_str() + ".to_string()")
+            .map(|prop| "self.".to_owned() + prop.as_str() + ".as_subject_component()")
             .collect::<Vec<String>>()
             .join(",");
         let sub: syn::Macro = syn::parse_str(
