@@ -80,7 +80,7 @@ pub async fn get_certificate(
             .context("Encoding authorization")?
             .context("No authorization value.")?;
 
-        tracing::info!("Requesting TXT record from platform.");
+        tracing::info!(?value, "Requesting TXT record from platform.");
 
         let result = nats
             .request(&SetAcmeDnsRecord {
@@ -101,6 +101,7 @@ pub async fn get_certificate(
             .await
             .context("Waiting for challenge")?;
         if challenge.status != ChallengeStatus::Valid {
+            tracing::warn!(?challenge, "Challenge status is not valid.");
             return Err(anyhow!("ACME challenge failed."));
         }
 
@@ -110,6 +111,7 @@ pub async fn get_certificate(
             .await
             .context("Waiting for authorization")?;
         if authorization.status != AuthorizationStatus::Valid {
+            tracing::warn!(?authorization, "Authorization status not valid.");
             return Err(anyhow!("ACME authorization failed."));
         }
     }
@@ -120,6 +122,7 @@ pub async fn get_certificate(
         .await
         .context("Waiting for order ready")?;
     if order.status != OrderStatus::Ready {
+        tracing::warn!(?order, "Order status is not ready.");
         return Err(anyhow!("ACME order failed."));
     }
 
@@ -135,6 +138,7 @@ pub async fn get_certificate(
         .context("Waiting for order to become done")?;
 
     if order.status != OrderStatus::Valid {
+        tracing::warn!(?order, "ACME order not valid.");
         return Err(anyhow!("ACME order not valid."));
     }
 
@@ -146,6 +150,7 @@ pub async fn get_certificate(
         .context("ACME order response didn't include certificate.")?;
 
     if cert.is_empty() {
+        tracing::warn!(?cert, "Certificate list is empty.");
         return Err(anyhow!("Certificate list is empty."));
     }
 

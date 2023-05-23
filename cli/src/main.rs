@@ -145,7 +145,7 @@ async fn main() -> Result<()> {
                         // TEMP: sleep a bit to avoid stressing NATS until
                         // we have a better grasp of performance implications.
                         // We probably don't need this, but it's cheap.
-                        tokio::time::sleep(Duration::from_millis(1_000)).await;
+                        tokio::time::sleep(Duration::from_millis(50)).await;
                     }
                 }
             }
