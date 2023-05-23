@@ -25,26 +25,23 @@ struct NatsSubjectMacroInvocation(syn::Macro);
 
 impl FromMeta for NatsSubjectMacroInvocation {
     fn from_string(value: &str) -> darling::Result<Self> {
-        let props: Vec<String> = value
+        let props: Vec<&str> = value
             .split('.')
-            .map(|ea| ea.strip_prefix('#'))
-            .filter(|ea| ea.is_some())
-            .map(|ea| ea.unwrap().to_string())
+            .filter_map(|ea| ea.strip_prefix('#'))
             .collect();
         let mut fstring = value.to_string();
         for prop in props.clone() {
-            fstring = fstring.replace(&("#".to_owned() + prop.as_str()), "{}");
+            fstring = fstring.replace(&("#".to_owned() + prop), "{}");
         }
         //note: this can likely be cleaned up with some judicious use of quote! and tokens!
         let propstr = props
             .iter()
-            .map(|prop| "self.".to_owned() + prop.as_str() + ".as_subject_component()")
-            .collect::<Vec<String>>()
-            .join(",");
-        let sub: syn::Macro = syn::parse_str(
-            &("format!(\"".to_owned() + fstring.as_str() + "\"," + propstr.as_str() + ")"),
-        )
-        .unwrap();
+            .map(|prop| "self.".to_owned() + prop + ".as_subject_component()")
+            .reduce(|a, b| a.to_owned() + "," + &b)
+            .unwrap();
+        let sub: syn::Macro =
+            syn::parse_str(&("format!(\"".to_owned() + fstring.as_str() + "\"," + &propstr + ")"))
+                .unwrap();
 
         Ok(NatsSubjectMacroInvocation(sub))
     }
