@@ -37,7 +37,7 @@ impl FromMeta for NatsSubjectMacroInvocation {
         let propstr = props
             .iter()
             .map(|prop| "self.".to_owned() + prop + ".as_subject_component()")
-            .reduce(|a, b| a.to_owned() + "," + &b)
+            .reduce(|a, b| a + "," + &b)
             .unwrap();
         let sub: syn::Macro =
             syn::parse_str(&("format!(\"".to_owned() + fstring.as_str() + "\"," + &propstr + ")"))
