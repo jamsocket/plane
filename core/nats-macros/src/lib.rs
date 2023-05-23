@@ -31,7 +31,7 @@ impl FromMeta for NatsSubjectMacroInvocation {
             .filter(|ea| ea.is_some())
             .map(|ea| ea.unwrap().to_string())
             .collect();
-        let mut fstring = value.clone().to_string();
+        let mut fstring = value.to_string();
         for prop in props.clone() {
             fstring = fstring.replace(&("#".to_owned() + prop.as_str()), "{}");
         }
