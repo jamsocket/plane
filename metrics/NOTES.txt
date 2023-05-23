@@ -1,0 +1,4 @@
+ docker run  --cgroupns host --pid host --name stats-agent -v /var/run/docker.sock:/var/run/docker.sock:ro -v /proc/:/host/proc/:ro -v /sys/fs/cgroup/:/host/sys/fs/cgroup:ro --net host -it 4de5
+
+the env variable NATS_URL should be set to nats url (in form nats://token@host:<PORT>)
+

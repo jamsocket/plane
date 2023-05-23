@@ -330,7 +330,6 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
 }
 
 impl TypedNats {
-    #[must_use]
     pub async fn new(nc: Client) -> Result<Self> {
         let jetstream = async_nats::jetstream::new(nc.clone());
 

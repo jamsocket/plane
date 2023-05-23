@@ -50,7 +50,7 @@ impl StateHandle {
         self.0.read().expect("Could not acquire world_state lock.")
     }
 
-    pub fn write_state(&self) -> RwLockWriteGuard<WorldState> {
+    pub(crate) fn write_state(&self) -> RwLockWriteGuard<WorldState> {
         self.0.write().expect("Could not acquire world_state lock.")
     }
 }
@@ -76,6 +76,7 @@ pub struct ClusterState {
     pub drones: BTreeMap<DroneId, DroneState>,
     pub backends: BTreeMap<BackendId, BackendState>,
     pub txt_records: VecDeque<String>,
+    pub locks: BTreeMap<String, BackendId>,
 }
 
 impl ClusterState {
@@ -86,7 +87,16 @@ impl ClusterState {
                 drone.apply(message.message);
             }
             ClusterStateMessage::BackendMessage(message) => {
-                let backend = self.backends.entry(message.backend).or_default();
+                let backend = self.backends.entry(message.backend.clone()).or_default();
+
+                // If the message is an assignment and includes a lock, we want to record it.
+                if let BackendMessageType::Assignment {
+                    lock: Some(lock), ..
+                } = &message.message
+                {
+                    self.locks.insert(lock.clone(), message.backend.clone());
+                }
+
                 backend.apply(message.message);
             }
             ClusterStateMessage::AcmeMessage(message) => {
@@ -114,6 +124,31 @@ impl ClusterState {
 
     pub fn backend(&self, backend: &BackendId) -> Option<&BackendState> {
         self.backends.get(backend)
+    }
+
+    pub fn locked(&self, lock: &str) -> Option<BackendId> {
+        let Some(lock_owner) = self.locks.get(lock) else {
+            // The lock does not exist.
+            return None
+        };
+
+        let Some(backend) = self.backends.get(lock_owner) else {
+            // The lock exists, but the backend has been purged.
+            // This must be true, because an assignment message is the only way to create a lock.
+            return None
+        };
+
+        let Some(state) = backend.state() else {
+            // The lock exists, and the backend exists, but has not yet sent a status message.
+            return Some(lock_owner.clone())
+        };
+
+        // The lock is held if the backend is in a non-terminal state.
+        if state.terminal() {
+            None
+        } else {
+            Some(lock_owner.clone())
+        }
     }
 }
 
@@ -150,7 +185,7 @@ pub struct BackendState {
 impl BackendState {
     fn apply(&mut self, message: BackendMessageType) {
         match message {
-            BackendMessageType::Assignment { drone } => self.drone = Some(drone),
+            BackendMessageType::Assignment { drone, .. } => self.drone = Some(drone),
             BackendMessageType::State {
                 state: status,
                 timestamp,
@@ -166,5 +201,81 @@ impl BackendState {
 
     pub fn state_timestamp(&self) -> Option<(chrono::DateTime<chrono::Utc>, agent::BackendState)> {
         self.states.last().copied()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::messages::state::BackendMessage;
+
+    #[test]
+    fn test_locks() {
+        let mut state = ClusterState::default();
+        let backend = BackendId::new_random();
+
+        // Initially, no locks are held.
+        assert!(state.locked("mylock").is_none());
+
+        // Assign a backend to a drone and acquire a lock.
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: backend.clone(),
+            message: BackendMessageType::Assignment {
+                drone: DroneId::new("drone".into()),
+                lock: Some("mylock".into()),
+            },
+        }));
+
+        assert_eq!(backend, state.locked("mylock").unwrap());
+
+        // Update the backend state to loading.
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: backend.clone(),
+            message: BackendMessageType::State {
+                state: agent::BackendState::Loading,
+                timestamp: Utc::now(),
+            },
+        }));
+
+        assert_eq!(backend, state.locked("mylock").unwrap());
+
+        // Update the backend state to starting.
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: backend.clone(),
+            message: BackendMessageType::State {
+                state: agent::BackendState::Starting,
+                timestamp: Utc::now(),
+            },
+        }));
+
+        assert_eq!(backend, state.locked("mylock").unwrap());
+
+        // Update the backend state to ready.
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: backend.clone(),
+            message: BackendMessageType::State {
+                state: agent::BackendState::Ready,
+                timestamp: Utc::now(),
+            },
+        }));
+
+        assert_eq!(backend, state.locked("mylock").unwrap());
+
+        // Update the backend state to swept.
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: backend.clone(),
+            message: BackendMessageType::State {
+                state: agent::BackendState::Swept,
+                timestamp: Utc::now(),
+            },
+        }));
+
+        // The lock should now be free.
+        assert!(state.locked("mylock").is_none());
+
+        state.backends.remove(&BackendId::new("backend".into()));
+
+        // The lock should still be free.
+        assert!(state.locked("mylock").is_none());
     }
 }

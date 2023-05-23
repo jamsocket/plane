@@ -71,6 +71,7 @@ impl Nats {
         let log_handle = tokio::spawn(async move {
             while let Some(v) = wiretap.next().await {
                 let message = std::str::from_utf8(&v.payload).unwrap();
+
                 output
                     .write_fmt(format_args!(
                         "{} {} {:?}: {}\n",

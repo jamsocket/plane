@@ -43,6 +43,11 @@ enum Command {
         port: Option<u16>,
         #[clap(long, short)]
         env: Vec<String>,
+        /// Optional string to use as a lock. If another backend with the same
+        /// lock string is already running, the spawn will return that backend
+        /// instead of spawning a new one.
+        #[clap(long)]
+        lock: Option<String>,
     },
     Status {
         backend: Option<String>,
@@ -211,14 +216,20 @@ async fn main() -> Result<()> {
                                     timestamp.to_string().bright_yellow()
                                 )
                             }
-                            BackendMessageType::Assignment { drone } => {
-                                format!(
+                            BackendMessageType::Assignment { drone, lock } => {
+                                let mut text = format!(
                                     "is assigned to drone {}",
                                     drone.to_string().bright_yellow()
-                                )
+                                );
+                                if let Some(lock) = lock {
+                                    text.push_str(&format!(
+                                        " with lock {}",
+                                        lock.to_string().bright_yellow()
+                                    ));
+                                }
+                                text
                             }
                         };
-
                         format!("Backend: {} {}", backend.to_string().bright_cyan(), text)
                     }
                 };
@@ -298,6 +309,7 @@ async fn main() -> Result<()> {
             timeout,
             port,
             env,
+            lock,
         } => {
             let env: Result<HashMap<String, String>> = env
                 .iter()
@@ -327,6 +339,7 @@ async fn main() -> Result<()> {
                         volume_mounts: Vec::new(),
                     },
                     require_bearer_token: false,
+                    lock,
                 })
                 .await?;
 
@@ -335,10 +348,16 @@ async fn main() -> Result<()> {
                     drone,
                     backend_id,
                     bearer_token,
+                    spawned,
                 } => {
                     let url = format!("https://{}.{}", backend_id, cluster);
 
-                    println!("Backend scheduled.");
+                    if spawned {
+                        println!("Backend scheduled.");
+                    } else {
+                        println!("A backend already held the desired lock.");
+                    }
+
                     println!("URL: {}", url.bright_green());
                     println!("Drone: {}", drone.to_string().bright_blue());
                     println!("Backend ID: {}", backend_id.to_string().bright_blue());
