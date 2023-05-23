@@ -232,7 +232,7 @@ fn drone_state_ready() -> DroneState {
 
 /// **DEPRECATED**. Will be removed in a future version of Plane.
 #[derive(Serialize, Deserialize, Debug, TypedMessage)]
-#[typed_message(subject = "cluster.#cluster.drone.#drone_id")]
+#[typed_message(subject = "cluster.#cluster.drone.#drone_id.status")]
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
     pub cluster: ClusterName,
