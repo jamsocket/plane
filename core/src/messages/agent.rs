@@ -2,12 +2,12 @@ use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
-use nats_macros::{self, TypedMessage};
 #[allow(unused)] // Context is unused if bollard is not enabled.
 use anyhow::{anyhow, Context, Error};
 #[cfg(feature = "bollard")]
 use bollard::container::{LogOutput, MemoryStatsStats, Stats};
 use chrono::{DateTime, Utc};
+use nats_macros::{self, TypedMessage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::serde_as;
@@ -55,13 +55,12 @@ pub enum DroneLogMessageKind {
 }
 
 #[derive(Serialize, Deserialize, Debug, TypedMessage)]
-#[typed_message("backend.#backend_id.logs")]
+#[typed_message(subject = "backend.#backend_id.logs")]
 pub struct DroneLogMessage {
     pub backend_id: BackendId,
     pub kind: DroneLogMessageKind,
     pub text: String,
 }
-
 
 impl DroneLogMessage {
     #[cfg(feature = "bollard")]
@@ -116,7 +115,7 @@ impl JetStreamable for DroneLogMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, TypedMessage)]
-#[typed_message("cluster.#cluster.backend.#backend_id.stats")]
+#[typed_message(subject = "cluster.#cluster.backend.#backend_id.stats")]
 pub struct BackendStatsMessage {
     pub cluster: ClusterName,
     pub backend_id: BackendId,
@@ -233,7 +232,7 @@ fn drone_state_ready() -> DroneState {
 
 /// **DEPRECATED**. Will be removed in a future version of Plane.
 #[derive(Serialize, Deserialize, Debug, TypedMessage)]
-#[typed_message("cluster.#cluster.drone.#drone_id")]
+#[typed_message(subject = "cluster.#cluster.drone.#drone_id")]
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
     pub cluster: ClusterName,
@@ -264,7 +263,7 @@ impl DroneStatusMessage {
 
 /// A message sent when a drone first connects to a controller.
 #[derive(Serialize, Deserialize, Debug, Clone, TypedMessage)]
-#[typed_message("cluster.#cluster.drone.register")]
+#[typed_message(subject = "cluster.#cluster.drone.register")]
 pub struct DroneConnectRequest {
     /// The ID of the drone.
     pub drone_id: DroneId,
@@ -320,7 +319,7 @@ pub struct DockerExecutableConfig {
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, TypedMessage)]
-#[typed_message("cluster.#cluster.drone.#drone_id.spawn")]
+#[typed_message(subject = "cluster.#cluster.drone.#drone_id.spawn")]
 pub struct SpawnRequest {
     pub cluster: ClusterName,
 
@@ -379,7 +378,7 @@ impl SpawnRequest {
 
 /// A message telling a drone to terminate a backend.
 #[derive(Serialize, Deserialize, Debug, Clone, TypedMessage)]
-#[typed_message("cluster.#cluster_id.backend.#backend_id.terminate")]
+#[typed_message(subject = "cluster.#cluster_id.backend.#backend_id.terminate")]
 pub struct TerminationRequest {
     pub cluster_id: ClusterName,
     pub backend_id: BackendId,
@@ -503,7 +502,7 @@ impl BackendState {
 /// Drones will send an UpdateBackendStateMessage and the controller
 /// will publish a BackendStateMessage.
 #[derive(Serialize, Deserialize, Debug, PartialEq, TypedMessage)]
-#[typed_message("backend.#backend.status")]
+#[typed_message(subject = "backend.#backend.status")]
 pub struct BackendStateMessage {
     /// The cluster the backend belongs to.
     pub cluster: ClusterName,
@@ -531,7 +530,6 @@ impl JetStreamable for BackendStateMessage {
         "backend_status"
     }
 }
-
 impl BackendStateMessage {
     pub fn subscribe_subject(backend_id: &BackendId) -> SubscribeSubject<Self> {
         SubscribeSubject::new(format!("backend.{}.status", backend_id.id()))
