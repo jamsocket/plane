@@ -319,7 +319,7 @@ pub struct DockerExecutableConfig {
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, TypedMessage)]
-#[typed_message(subject = "cluster.#cluster.drone.#drone_id.spawn")]
+#[typed_message(subject = "cluster.#cluster.drone.#drone_id.spawn", response = "bool")]
 pub struct SpawnRequest {
     pub cluster: ClusterName,
 
@@ -378,7 +378,10 @@ impl SpawnRequest {
 
 /// A message telling a drone to terminate a backend.
 #[derive(Serialize, Deserialize, Debug, Clone, TypedMessage)]
-#[typed_message(subject = "cluster.#cluster_id.backend.#backend_id.terminate")]
+#[typed_message(
+    subject = "cluster.#cluster_id.backend.#backend_id.terminate",
+    response = "()"
+)]
 pub struct TerminationRequest {
     pub cluster_id: ClusterName,
     pub backend_id: BackendId,
