@@ -55,7 +55,7 @@ pub enum DroneLogMessageKind {
 }
 
 #[derive(Serialize, Deserialize, Debug, TypedMessage)]
-#[typed_message(subject = "backend.#backend_id.logs")]
+#[typed_message(subject = "backend.#backend_id.log")]
 pub struct DroneLogMessage {
     pub backend_id: BackendId,
     pub kind: DroneLogMessageKind,
