@@ -46,7 +46,7 @@ pub trait AsSubjectComponent {
 
 impl AsSubjectComponent for BackendId {
     fn as_subject_component(&self) -> String {
-        self.to_resource_name()
+		self.id().into()
     }
 }
 
