@@ -33,12 +33,16 @@ impl FromMeta for NatsSubjectMacroInvocation {
         for prop in props.clone() {
             fstring = fstring.replace(&("#".to_owned() + prop), "{}");
         }
-        //note: this can likely be cleaned up with some judicious use of quote! and tokens!
         let propstr = props
             .iter()
-            .map(|prop| "self.".to_owned() + prop + ".as_subject_component()")
-            .reduce(|a, b| a + "," + &b)
-            .unwrap();
+            .map(|prop| {
+                "plane_core::types::AsSubjectComponent::as_subject_component(&self.".to_owned()
+                    + prop
+                    + ")"
+            })
+            .collect::<Vec<String>>()
+            .join(",");
+
         let sub: syn::Macro =
             syn::parse_str(&("format!(\"".to_owned() + fstring.as_str() + "\"," + &propstr + ")"))
                 .unwrap();
@@ -55,7 +59,7 @@ pub fn typed_message_impl(input: TokenStream) -> TokenStream {
     let resp_typ: syn::Type = opts.response.0;
     let fmacro = opts.subject.0;
     quote! {
-        impl TypedMessage for #typ {
+        impl plane_core::nats::TypedMessage for #typ {
             type Response = #resp_typ;
 
             fn subject(&self) -> String {
