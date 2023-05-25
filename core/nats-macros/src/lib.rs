@@ -1,7 +1,7 @@
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{self, parse_macro_input, DeriveInput};
+use syn::{self, parse_macro_input, DeriveInput, token, Token};
 
 #[derive(FromDeriveInput)]
 #[darling(attributes(typed_message))]
@@ -33,19 +33,30 @@ impl FromMeta for NatsSubjectMacroInvocation {
         for prop in props.clone() {
             fstring = fstring.replace(&("#".to_owned() + prop), "{}");
         }
-        let propstr = props
+		let as_subject_component_path : syn::Path = match std::env::var("CARGO_PKG_NAME").unwrap().as_str() {
+			"plane-core" => syn::parse_quote!{ crate::types::AsSubjectComponent },
+			_ => syn::parse_quote!{ plane_core::types::AsSubjectComponent }
+		};
+
+        let propexpr = props
             .iter()
             .map(|prop| {
-                "plane_core::types::AsSubjectComponent::as_subject_component(&self.".to_owned()
+				syn::parse_quote!{ #as_subject_component_path::as_subject_component( &self.#prop ) }
+				/*
+                "crate::types::AsSubjectComponent::as_subject_component(&self.".to_owned()
                     + prop
                     + ")"
+				*/
             })
-            .collect::<Vec<String>>()
-            .join(",");
+            .reduce(|a: syn::Expr, b| syn::parse_quote!{ #a , #b });
 
-        let sub: syn::Macro =
+        let sub: syn::Macro = syn::parse_quote!{
+			format!(#fstring, #propexpr)
+		};
+		/*
             syn::parse_str(&("format!(\"".to_owned() + fstring.as_str() + "\"," + &propstr + ")"))
                 .unwrap();
+		*/
 
         Ok(NatsSubjectMacroInvocation(sub))
     }
@@ -54,12 +65,16 @@ impl FromMeta for NatsSubjectMacroInvocation {
 #[proc_macro_derive(TypedMessage, attributes(typed_message))]
 pub fn typed_message_impl(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
+	let typed_message : syn::Path = match std::env::var("CARGO_PKG_NAME").unwrap().as_str() {
+		"plane-core" => syn::parse2( quote!{ crate::nats::TypedMessage }).unwrap(),
+		_ => syn::parse2( quote!{ plane_core::nats::TypedMessage }).unwrap()
+	};
     let opts = Opts::from_derive_input(&ast).expect("Wrong options!");
     let typ = ast.ident;
     let resp_typ: syn::Type = opts.response.0;
     let fmacro = opts.subject.0;
     quote! {
-        impl plane_core::nats::TypedMessage for #typ {
+        impl #typed_message for #typ {
             type Response = #resp_typ;
 
             fn subject(&self) -> String {
