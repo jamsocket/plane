@@ -1,7 +1,9 @@
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
+use proc_macro2;
 use quote::quote;
-use syn::{self, parse_macro_input, DeriveInput, token, Token};
+use syn::{self, parse_macro_input, DeriveInput};
+
 
 #[derive(FromDeriveInput)]
 #[darling(attributes(typed_message))]
@@ -28,36 +30,29 @@ impl FromMeta for NatsSubjectMacroInvocation {
         let props: Vec<&str> = value
             .split('.')
             .filter_map(|ea| ea.strip_prefix('#'))
-            .collect();
+            .collect::<Vec<&str>>();
+
         let mut fstring = value.to_string();
         for prop in props.clone() {
             fstring = fstring.replace(&("#".to_owned() + prop), "{}");
         }
 		let as_subject_component_path : syn::Path = match std::env::var("CARGO_PKG_NAME").unwrap().as_str() {
-			"plane-core" => syn::parse_quote!{ crate::types::AsSubjectComponent },
-			_ => syn::parse_quote!{ plane_core::types::AsSubjectComponent }
+			"plane-core" => syn::parse_quote!{ crate::types::AsSubjectComponent::as_subject_component },
+			_ => syn::parse_quote!{ plane_core::types::AsSubjectComponent::as_subject_component }
 		};
 
         let propexpr = props
             .iter()
             .map(|prop| {
-				syn::parse_quote!{ #as_subject_component_path::as_subject_component( &self.#prop ) }
-				/*
-                "crate::types::AsSubjectComponent::as_subject_component(&self.".to_owned()
-                    + prop
-                    + ")"
-				*/
+				let pr : proc_macro2::TokenStream = syn::parse_str(prop).unwrap();
+				let x = quote! { #as_subject_component_path(&self.#pr) };
+				x
             })
-            .reduce(|a: syn::Expr, b| syn::parse_quote!{ #a , #b });
+            .reduce(|a, b| quote! { #a, #b } ).unwrap();
 
         let sub: syn::Macro = syn::parse_quote!{
 			format!(#fstring, #propexpr)
 		};
-		/*
-            syn::parse_str(&("format!(\"".to_owned() + fstring.as_str() + "\"," + &propstr + ")"))
-                .unwrap();
-		*/
-
         Ok(NatsSubjectMacroInvocation(sub))
     }
 }

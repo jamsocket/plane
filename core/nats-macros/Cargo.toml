@@ -12,6 +12,7 @@ readme = "README.md"
 [dependencies]
 async-nats = "0.29.0"
 darling = "0.20.1"
+proc-macro2 = "1.0.59"
 quote = "1.0.27"
 syn = "2.0.16"
 
