@@ -3,7 +3,6 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{self, parse_macro_input, DeriveInput};
 
-
 #[derive(FromDeriveInput)]
 #[darling(attributes(typed_message))]
 struct Opts {
@@ -35,23 +34,29 @@ impl FromMeta for NatsSubjectMacroInvocation {
         for prop in props.clone() {
             fstring = fstring.replace(&("#".to_owned() + prop), "{}");
         }
-		let as_subject_component_path : syn::Path = match std::env::var("CARGO_PKG_NAME").unwrap().as_str() {
-			"plane-core" => syn::parse_quote!{ crate::types::AsSubjectComponent::as_subject_component },
-			_ => syn::parse_quote!{ plane_core::types::AsSubjectComponent::as_subject_component }
-		};
+        let as_subject_component_path: syn::Path = match std::env::var("CARGO_PKG_NAME")
+            .unwrap()
+            .as_str()
+        {
+            "plane-core" => {
+                syn::parse_quote! { crate::types::AsSubjectComponent::as_subject_component }
+            }
+            _ => syn::parse_quote! { plane_core::types::AsSubjectComponent::as_subject_component },
+        };
 
         let propexpr = props
             .iter()
             .map(|prop| {
-				let pr : proc_macro2::TokenStream = syn::parse_str(prop).unwrap();
-				let x = quote! { #as_subject_component_path(&self.#pr) };
-				x
+                let pr: proc_macro2::TokenStream = syn::parse_str(prop).unwrap();
+                let x = quote! { #as_subject_component_path(&self.#pr) };
+                x
             })
-            .reduce(|a, b| quote! { #a, #b } ).unwrap();
+            .reduce(|a, b| quote! { #a, #b })
+            .unwrap();
 
-        let sub: syn::Macro = syn::parse_quote!{
-			format!(#fstring, #propexpr)
-		};
+        let sub: syn::Macro = syn::parse_quote! {
+            format!(#fstring, #propexpr)
+        };
         Ok(NatsSubjectMacroInvocation(sub))
     }
 }
@@ -59,10 +64,10 @@ impl FromMeta for NatsSubjectMacroInvocation {
 #[proc_macro_derive(TypedMessage, attributes(typed_message))]
 pub fn typed_message_impl(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
-	let typed_message : syn::Path = match std::env::var("CARGO_PKG_NAME").unwrap().as_str() {
-		"plane-core" => syn::parse2( quote!{ crate::nats::TypedMessage }).unwrap(),
-		_ => syn::parse2( quote!{ plane_core::nats::TypedMessage }).unwrap()
-	};
+    let typed_message: syn::Path = match std::env::var("CARGO_PKG_NAME").unwrap().as_str() {
+        "plane-core" => syn::parse2(quote! { crate::nats::TypedMessage }).unwrap(),
+        _ => syn::parse2(quote! { plane_core::nats::TypedMessage }).unwrap(),
+    };
     let opts = Opts::from_derive_input(&ast).expect("Wrong options!");
     let typ = ast.ident;
     let resp_typ: syn::Type = opts.response.0;
