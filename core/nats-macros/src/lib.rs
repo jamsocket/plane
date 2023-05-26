@@ -65,8 +65,8 @@ impl FromMeta for NatsSubjectMacroInvocation {
 pub fn typed_message_impl(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let typed_message: syn::Path = match std::env::var("CARGO_PKG_NAME").unwrap().as_str() {
-        "plane-core" => syn::parse2(quote! { crate::nats::TypedMessage }).unwrap(),
-        _ => syn::parse2(quote! { plane_core::nats::TypedMessage }).unwrap(),
+        "plane-core" => syn::parse_quote! { crate::nats::TypedMessage },
+        _ => syn::parse_quote! { plane_core::nats::TypedMessage },
     };
     let opts = Opts::from_derive_input(&ast).expect("Wrong options!");
     let typ = ast.ident;
