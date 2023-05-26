@@ -1,5 +1,5 @@
 [package]
-name = "nats-macros"
+name = "plane-core-nats-macros"
 version = "0.3.19"
 edition = "2021"
 authors = ["Abhishek Cherath <abhi@driftingin.space>", "Paul Butler <paul@driftingin.space>"]

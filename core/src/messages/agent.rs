@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Error};
 #[cfg(feature = "bollard")]
 use bollard::container::{LogOutput, MemoryStatsStats, Stats};
 use chrono::{DateTime, Utc};
-use nats_macros::{self, TypedMessage};
+use plane_core_nats_macros::{self, TypedMessage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::serde_as;

@@ -27,7 +27,7 @@ tokio = {version = "1.20.1", features = ["signal"]}
 tokio-stream = "0.1.9"
 tracing = "0.1.36"
 tracing-stackdriver = "0.6.1"
-nats-macros = { path = "./nats-macros" }
+plane-core-nats-macros = { path = "./nats-macros" }
 tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
 url = "2.2.2"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }

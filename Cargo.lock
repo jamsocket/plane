@@ -1443,17 +1443,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nats-macros"
-version = "0.3.19"
-dependencies = [
- "async-nats",
- "darling",
- "proc-macro2",
- "quote",
- "syn 2.0.16",
-]
-
-[[package]]
 name = "nibble_vec"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1806,7 +1795,7 @@ dependencies = [
  "clap",
  "config",
  "dashmap",
- "nats-macros",
+ "plane-core-nats-macros",
  "rand",
  "serde",
  "serde_json",
@@ -1819,6 +1808,17 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "plane-core-nats-macros"
+version = "0.3.19"
+dependencies = [
+ "async-nats",
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.16",
 ]
 
 [[package]]
