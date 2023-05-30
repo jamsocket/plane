@@ -210,7 +210,10 @@ async fn one_drone_available() {
         .unwrap();
 
     sleep(Duration::from_millis(100)).await;
-    let result = mock_agent.schedule_drone(&drone_id, false, None).await.unwrap();
+    let result = mock_agent
+        .schedule_drone(&drone_id, false, None)
+        .await
+        .unwrap();
     assert!(matches!(&result, ScheduleResponse::Scheduled { drone, .. } if drone == &drone_id));
     let backend_id = match result {
         ScheduleResponse::Scheduled { backend_id, .. } => backend_id,
