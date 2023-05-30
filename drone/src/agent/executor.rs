@@ -272,7 +272,7 @@ impl<E: Engine> Executor<E> {
                                 continue;
                             },
                             Some(Signal::Terminate) => {
-								recv.close();
+                                recv.close();
                                 break Ok(Some(BackendState::Terminated))
                             },
                             None => {
