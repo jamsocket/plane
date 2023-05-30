@@ -20,7 +20,7 @@ pub async fn do_with_retry<T, E: Debug, Fut: Future<Output = Result<T, E>>, F: F
             Ok(value) => return Ok(value),
             Err(error) => {
                 if attempt >= retries {
-                    tracing::error!(final_error=?error, %retries, "All attempts failed, giving up.");
+                    tracing::warn!(final_error=?error, %retries, "All attempts failed, giving up.");
                     return Err(error);
                 } else if attempt == 1 {
                     tracing::warn!(error=?error, %retries, "Failed on first attempt; will keep retrying. Only the first and last error will be reported at the WARN level.");
