@@ -1,6 +1,6 @@
 [package]
 name = "plane-core-nats-macros"
-version = "0.3.19"
+version = "0.3.20"
 edition = "2021"
 authors = ["Abhishek Cherath <abhi@driftingin.space>", "Paul Butler <paul@driftingin.space>"]
 homepage = "https://plane.dev"
