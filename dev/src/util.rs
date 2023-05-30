@@ -104,7 +104,7 @@ pub async fn wait_for_url(url: &str, timeout_ms: u128) -> Result<()> {
 
 const TEST_IMAGE: &str = "ghcr.io/drifting-in-space/test-image:latest";
 
-pub async fn base_spawn_request() -> SpawnRequest {
+pub fn spawn_req_with_image(image: String) -> SpawnRequest {
     SpawnRequest {
         cluster: ClusterName::new("plane.test"),
         backend_id: BackendId::new_random(),
@@ -112,9 +112,7 @@ pub async fn base_spawn_request() -> SpawnRequest {
         metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
         max_idle_secs: Duration::from_secs(10),
         executable: DockerExecutableConfig {
-            image: build_image("test-images/buildable-test-server")
-                .await
-                .unwrap(),
+            image,
             env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
             credentials: None,
             resource_limits: Default::default(),
@@ -126,30 +124,28 @@ pub async fn base_spawn_request() -> SpawnRequest {
     }
 }
 
-async fn make_invalid_image() -> String {
-    build_image("test-images/invalid-image")
-        .await
-        .expect("invalid image should build")
+pub async fn base_spawn_request() -> SpawnRequest {
+    spawn_req_with_image(
+        build_image("test-images/buildable-test-server")
+            .await
+            .unwrap(),
+    )
 }
 
 pub async fn invalid_image_spawn_request() -> SpawnRequest {
-    SpawnRequest {
-        cluster: ClusterName::new("plane.test"),
-        backend_id: BackendId::new_random(),
-        drone_id: DroneId::new_random(),
-        metadata: vec![("foo".into(), "bar".into())].into_iter().collect(),
-        max_idle_secs: Duration::from_secs(10),
-        executable: DockerExecutableConfig {
-            image: make_invalid_image().await,
-            env: vec![("PORT".into(), "8080".into())].into_iter().collect(),
-            credentials: None,
-            resource_limits: Default::default(),
-            pull_policy: Default::default(),
-            port: None,
-            volume_mounts: vec![],
-        },
-        bearer_token: None,
-    }
+    spawn_req_with_image(
+        build_image("test-images/invalid-image")
+            .await
+            .expect("invalid image should build"),
+    )
+}
+
+pub async fn inactive_image_spawn_request() -> SpawnRequest {
+    spawn_req_with_image(
+        build_image("test-images/starts-but-no-server")
+            .await
+            .expect("inactive image should build"),
+    )
 }
 
 pub fn base_scheduler_request() -> ScheduleRequest {

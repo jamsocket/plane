@@ -19,7 +19,10 @@ use plane_dev::{
     resources::server::Server,
     scratch_dir,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{base_spawn_request, invalid_image_spawn_request, random_loopback_ip},
+    util::{
+        base_spawn_request, inactive_image_spawn_request, invalid_image_spawn_request,
+        random_loopback_ip,
+    },
 };
 use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
@@ -323,6 +326,21 @@ async fn invalid_container_fails() {
             .kind,
         DroneLogMessageKind::Meta
     );
+}
+
+#[integration_test]
+async fn inactive_container_times_out() {
+    let mut req = inactive_image_spawn_request().await;
+    let (_ctx, mut sub) = do_spawn_request(&mut req).await;
+    sub.expect_backend_status_message(BackendState::Loading, 30_000)
+        .await
+        .unwrap();
+    sub.expect_backend_status_message(BackendState::Starting, 30_000)
+        .await
+        .unwrap();
+    sub.expect_backend_status_message(BackendState::TimedOutBeforeReady, 60_000)
+        .await
+        .unwrap();
 }
 
 #[integration_test]

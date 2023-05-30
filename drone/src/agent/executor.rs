@@ -400,7 +400,10 @@ impl<E: Engine> Executor<E> {
                 };
 
                 tracing::info!(%backend_addr, "Got address from container.");
-                wait_port_ready(&backend_addr).await?;
+                if let Err(_err) = wait_port_ready(&backend_addr).await {
+                    tracing::warn!(%spawn_request.backend_id, "backend timed out before ready");
+                    return Ok(Some(BackendState::TimedOutBeforeReady));
+                }
 
                 self.database
                     .insert_proxy_route(
