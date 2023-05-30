@@ -402,8 +402,7 @@ impl<E: Engine> Executor<E> {
                 tracing::info!(%backend_addr, "Got address from container.");
                 if let Err(_err) = wait_port_ready(&backend_addr).await {
                     tracing::warn!(
-                        "backend {} timed out before ready",
-                        spawn_request.backend_id
+                        %spawn_request.backend_id,"backend timed out before ready"
                     );
                     return Ok(Some(BackendState::TimedOutBeforeReady));
                 }

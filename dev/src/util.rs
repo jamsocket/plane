@@ -123,6 +123,7 @@ pub fn spawn_req_with_image(image: String) -> SpawnRequest {
         bearer_token: None,
     }
 }
+
 pub async fn base_spawn_request() -> SpawnRequest {
     spawn_req_with_image(
         build_image("test-images/buildable-test-server")
