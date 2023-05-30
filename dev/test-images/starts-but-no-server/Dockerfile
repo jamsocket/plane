@@ -1,2 +1,2 @@
 FROM busybox:latest
-ENTRYPOINT [ "sh" ]
+ENTRYPOINT [ "sh", "-c", "sleep 1000" ]
