@@ -364,6 +364,9 @@ pub struct ResourceLimits {
 
     /// Maximum amount of memory container can use (in bytes)
     pub memory_limit_bytes: Option<i64>,
+
+    /// Maximum disk space container can use (in bytes)
+    pub disk_limit_bytes: Option<i64>
 }
 
 impl SpawnRequest {
