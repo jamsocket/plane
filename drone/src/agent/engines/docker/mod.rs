@@ -31,7 +31,7 @@ use plane_core::{
     timing::Timer,
     types::{BackendId, ClusterName},
 };
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 use std::{net::SocketAddr, pin::Pin};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
@@ -253,6 +253,14 @@ impl DockerInterface {
                             }]
                         },
                     ),
+                    storage_opt: executable_config
+                        .resource_limits
+                        .disk_limit_bytes
+                        .map(|lim| {
+                            vec![("size".to_string(), lim.to_string())]
+                                .into_iter()
+                                .collect()
+                        }),
                     device_requests,
                     mounts,
 
