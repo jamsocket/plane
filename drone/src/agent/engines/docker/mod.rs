@@ -253,6 +253,14 @@ impl DockerInterface {
                             }]
                         },
                     ),
+                    storage_opt: executable_config
+                        .resource_limits
+                        .disk_limit_bytes
+                        .map(|lim| {
+                            vec![("size".to_string(), lim.to_string())]
+                                .into_iter()
+                                .collect()
+                        }),
                     device_requests,
                     mounts,
 
