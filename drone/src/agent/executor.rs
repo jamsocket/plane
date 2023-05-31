@@ -258,29 +258,29 @@ impl<E: Engine> Executor<E> {
             }
 
             let next_state = loop {
-                if state == BackendState::Swept {
-                    // When sweeping, we ignore external state changes to avoid an infinite loop.
-                    break self.step(spawn_request, state).await;
-                } else {
-                    // Otherwise, we allow the step to be interrupted if the state changes (i.e.
-                    // if the container dies).
-                    tokio::select! {
-                        next_state = self.step(spawn_request, state) => break next_state,
-                        sig = recv.recv() => match sig {
-                            Some(Signal::Interrupt) => {
-                                tracing::info!("State may have updated externally.");
-                                continue;
-                            },
-                            Some(Signal::Terminate) => {
-                                recv.close();
-                                break Ok(Some(BackendState::Terminated))
-                            },
-                            None => {
-                                tracing::error!("Signal sender lost!");
-                                return
-                            }
+                //we ignore external state changes in a terminal state
+                //to avoid multiple destructor calls for backend.
+                state.terminal().then(|| recv.close());
+                tokio::select! {
+                    next_state = self.step(spawn_request, state) => break next_state,
+                    sig = recv.recv() => match sig {
+                        Some(Signal::Interrupt) => {
+                            tracing::info!("State may have updated externally.");
+                            continue;
                         },
-                    }
+                        Some(Signal::Terminate) => {
+                            break Ok(Some(BackendState::Terminated))
+                        },
+                        None => {
+                            if state.terminal() {
+                                tracing::info!(%state, "Channel closed, backend in terminal state");
+                            } else {
+                                tracing::error!(
+                                    %state, "Channel closed but backend not in terminal state");
+                            }
+                            return
+                        }
+                    },
                 };
             };
 
