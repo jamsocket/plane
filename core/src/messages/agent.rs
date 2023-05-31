@@ -346,9 +346,6 @@ pub struct SpawnRequest {
     pub bearer_token: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
-pub struct MemSize(i64);
-
 // eventually, this will be generic over executors
 // currently only applies to docker
 #[serde_as]
@@ -369,7 +366,7 @@ pub struct ResourceLimits {
     pub memory_limit_bytes: Option<i64>,
 
     /// Maximum disk space container can use (in bytes)
-    pub disk_limit_bytes: Option<MemSize>
+    pub disk_limit_bytes: Option<i64>
 }
 
 impl SpawnRequest {
