@@ -31,7 +31,7 @@ use plane_core::{
     timing::Timer,
     types::{BackendId, ClusterName},
 };
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 use std::{net::SocketAddr, pin::Pin};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
