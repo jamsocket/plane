@@ -98,10 +98,10 @@ async fn update_backend_state(
 ) {
     let message = UpdateBackendStateMessage {
         state,
-        cluster,
-        backend,
+        cluster: cluster.clone(),
+        backend: backend.clone(),
         time: Utc::now(),
-        drone,
+        drone: drone.clone(),
     };
     let nc = nc.clone();
 

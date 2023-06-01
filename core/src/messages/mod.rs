@@ -12,15 +12,15 @@ async fn add_jetstream_stream<T: JetStreamable>(
     jetstream: &async_nats::jetstream::Context,
 ) -> anyhow::Result<()> {
     let config = T::config();
-    tracing::debug!(name = config.name, "Creating jetstream stream.");
+    tracing::debug!(name = config.name, "Getting or creating jetstream stream.");
     let stream = jetstream
         .get_or_create_stream(config)
         .await
         .map_err(|d| anyhow!("Error: {d:?}"))?;
-    tracing::debug!(
+    tracing::info!(
         name = %stream.cached_info().config.name,
         created_at=%stream.cached_info().created,
-        "Created jetstream stream."
+        "Got jetstream stream."
     );
 
     Ok(())
