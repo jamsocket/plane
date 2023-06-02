@@ -98,15 +98,22 @@ async fn update_backend_state(
 ) {
     let message = UpdateBackendStateMessage {
         state,
-        cluster,
-        backend,
+        cluster: cluster.clone(),
+        backend: backend.clone(),
         time: Utc::now(),
-        drone,
+        drone: drone.clone(),
     };
     let nc = nc.clone();
 
     while let Err(error) = nc.request(&message).await {
-        tracing::error!(?error, "Failed to update backend state, retrying.");
+        tracing::error!(
+            ?error,
+            ?state,
+            ?cluster,
+            ?backend,
+            ?drone,
+            "Failed to update backend state, retrying."
+        );
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 }
