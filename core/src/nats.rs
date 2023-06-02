@@ -28,6 +28,7 @@ const NATS_WRONG_LAST_SEQUENCE_CODE: &str = "10071";
 #[derive(Serialize, Deserialize)]
 pub enum NoReply {}
 
+#[derive(Debug)]
 pub struct MessageMeta {
     pub timestamp: OffsetDateTime,
     pub pending: u64,
@@ -269,19 +270,14 @@ impl<T: DeserializeOwned> DelayedReply<T> {
 pub struct JetstreamSubscription<T: TypedMessage> {
     stream: Messages,
 
-    /// The sequence number of the last message as of the construction of this subscription.
-    init_sequence: u64,
-
-    /// The sequence number of the last message received by this subscription.
-    last_received_sequence: u64,
+    has_pending: bool,
 
     _ph: PhantomData<T>,
 }
 
 impl<T: TypedMessage> JetstreamSubscription<T> {
-    /// True if we have not received every message that occured before the subscription was created.
     pub fn has_pending(&self) -> bool {
-        self.last_received_sequence < self.init_sequence
+        self.has_pending
     }
 
     pub async fn next(&mut self) -> Option<(T, MessageMeta)> {
@@ -319,7 +315,7 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
                     }
                 };
 
-                self.last_received_sequence = meta.sequence;
+                self.has_pending = meta.pending > 0;
 
                 return Some((value, meta));
             } else {
@@ -371,9 +367,6 @@ impl TypedNats {
         let stream_name = T::stream_name();
 
         let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
-
-        let init_sequence = stream.cached_info().state.last_sequence;
-
         let deliver_subject = self.nc.new_inbox();
 
         let consumer = stream
@@ -390,11 +383,11 @@ impl TypedNats {
             .to_anyhow()?;
 
         let stream: Messages = consumer.messages().await.to_anyhow()?;
+        let has_pending = consumer.cached_info().num_pending > 0;
 
         Ok(JetstreamSubscription {
             stream,
-            init_sequence,
-            last_received_sequence: 0,
+            has_pending,
             _ph: PhantomData::default(),
         })
     }

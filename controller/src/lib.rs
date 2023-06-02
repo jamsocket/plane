@@ -26,7 +26,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     tracing::info!("Subscribed to spawn requests.");
 
     while let Some(schedule_request) = schedule_request_sub.next().await {
-        tracing::info!(spawn_request=?schedule_request.value, "Got spawn request");
+        tracing::info!(metadata=?schedule_request.value.metadata.clone(), "Got spawn request");
 
         if let Some(lock) = &schedule_request.value.lock {
             tracing::info!(lock=%lock, "Request includes lock.");
