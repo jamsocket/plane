@@ -234,6 +234,9 @@ impl ProxyService {
                                     "Upgraded connection closed with UnexpectedEof."
                                 );
                             }
+                            Err(error) if error.kind() == ErrorKind::TimedOut => {
+                                tracing::info!(?duration, "Upgraded connection timed out.");
+                            }
                             Err(error) => {
                                 tracing::error!(
                                     ?duration,
