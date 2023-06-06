@@ -266,8 +266,6 @@ impl<E: Engine> Executor<E> {
 
             let next_state = loop {
                 if state.terminal() {
-                    //we stop the signal handler to ensure that there are no double terminations
-                    recv.close();
                     //we ignore external state changes in a terminal state
                     //to avoid multiple destructor calls for backend.
                     break self.step(spawn_request, state).await;
@@ -283,14 +281,8 @@ impl<E: Engine> Executor<E> {
                                 break Ok(Some(BackendState::Terminated))
                             },
                             None => {
-                                if state.terminal() {
-                                    tracing::info!(%state, "Channel closed, backend in terminal state");
-                                    continue;
-                                } else {
-                                    tracing::error!(
-                                        %state, "Channel closed but backend not in terminal state");
-                                    return;
-                                }
+                                tracing::error!("Signal sender lost!");
+                                return
                             }
                         },
                     };
