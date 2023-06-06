@@ -265,30 +265,28 @@ impl<E: Engine> Executor<E> {
             }
 
             let next_state = loop {
-                //we ignore external state changes in a terminal state
-                //to avoid multiple destructor calls for backend.
-                state.terminal().then(|| recv.close());
-                tokio::select! {
-                    next_state = self.step(spawn_request, state) => break next_state,
-                    sig = recv.recv() => match sig {
-                        Some(Signal::Interrupt) => {
-                            tracing::info!("State may have updated externally.");
-                            continue;
-                        },
-                        Some(Signal::Terminate) => {
-                            break Ok(Some(BackendState::Terminated))
-                        },
-                        None => {
-                            if state.terminal() {
-                                tracing::info!(%state, "Channel closed, backend in terminal state");
-                            } else {
-                                tracing::error!(
-                                    %state, "Channel closed but backend not in terminal state");
+                if state.terminal() {
+                    //we ignore external state changes in a terminal state
+                    //to avoid multiple destructor calls for backend.
+                    break self.step(spawn_request, state).await;
+                } else {
+                    tokio::select! {
+                        next_state = self.step(spawn_request, state) => break next_state,
+                        sig = recv.recv() => match sig {
+                            Some(Signal::Interrupt) => {
+                                tracing::info!("State may have updated externally.");
+                                continue;
+                            },
+                            Some(Signal::Terminate) => {
+                                break Ok(Some(BackendState::Terminated))
+                            },
+                            None => {
+                                tracing::error!("Signal sender lost!");
+                                return
                             }
-                            return
-                        }
-                    },
-                };
+                        },
+                    };
+                }
             };
 
             match next_state {
