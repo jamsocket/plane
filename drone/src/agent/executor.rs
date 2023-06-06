@@ -265,9 +265,7 @@ impl<E: Engine> Executor<E> {
             }
 
             let next_state = loop {
-                //we ignore external state changes in a terminal state
-                //to avoid multiple destructor calls for backend.
-                state.terminal().then(|| recv.close());
+                
                 tokio::select! {
                     next_state = self.step(spawn_request, state) => break next_state,
                     sig = recv.recv() => match sig {
@@ -306,6 +304,9 @@ impl<E: Engine> Executor<E> {
                 }
                 Ok(None) => {
                     // Successful termination.
+                    //we ignore external state changes in a terminal state
+                    //to avoid multiple destructor calls for backend.
+                    state.terminal().then(|| recv.close());
                     tracing::info!("Backend terminated successfully.");
                     break;
                 }
