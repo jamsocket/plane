@@ -47,6 +47,7 @@ pub async fn start_state_loop(nc: TypedNats) -> Result<StateHandle> {
             while let Some((message, _)) = sub.next().await {
                 state_handle.write_state().apply(message);
             }
+            tracing::error!("World state stream closed! (Should never get here)");
         });
     }
 

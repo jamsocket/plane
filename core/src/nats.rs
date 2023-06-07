@@ -35,6 +35,15 @@ pub struct MessageMeta {
     pub sequence: u64,
 }
 
+fn random_string() -> String {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+
+    let result: Vec<u8> = thread_rng().sample_iter(&Alphanumeric).take(10).collect();
+    let result = String::from_utf8(result).unwrap();
+    format!("plane-{}", result)
+}
+
 impl TryFrom<jetstream::Message> for MessageMeta {
     type Error = anyhow::Error;
 
@@ -282,7 +291,9 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
 
     pub async fn next(&mut self) -> Option<(T, MessageMeta)> {
         loop {
+            tracing::info!("here6");
             if let Some(message) = self.stream.next().await {
+                tracing::info!("here7");
                 let message = match message {
                     Ok(message) => message,
                     Err(error) => {
@@ -319,6 +330,7 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
 
                 return Some((value, meta));
             } else {
+                tracing::info!("here5");
                 return None;
             }
         }
@@ -369,8 +381,11 @@ impl TypedNats {
         let stream = self.jetstream.get_stream(stream_name).await.to_anyhow()?;
         let deliver_subject = self.nc.new_inbox();
 
+        let name = random_string();
+
         let consumer = stream
             .create_consumer(async_nats::jetstream::consumer::push::Config {
+                durable_name: Some(name.clone()),
                 deliver_policy: DeliverPolicy::All,
                 filter_subject: subject,
                 deliver_subject,
