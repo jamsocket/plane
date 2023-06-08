@@ -291,9 +291,7 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
 
     pub async fn next(&mut self) -> Option<(T, MessageMeta)> {
         loop {
-            tracing::info!("here6");
             if let Some(message) = self.stream.next().await {
-                tracing::info!("here7");
                 let message = match message {
                     Ok(message) => message,
                     Err(error) => {
@@ -330,7 +328,6 @@ impl<T: TypedMessage> JetstreamSubscription<T> {
 
                 return Some((value, meta));
             } else {
-                tracing::info!("here5");
                 return None;
             }
         }
