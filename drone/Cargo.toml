@@ -22,7 +22,7 @@ plane-core = {path = "../core", version="0.3.5", features=["bollard"]}
 futures = "0.3.24"
 http = "0.2.7"
 hyper = { version = "0.14.19", features = ["server", "client", "http1", "http2", "tcp"] }
-notify = "5.0.0"
+notify = "6.0.0"
 openssl = "0.10.40"
 reqwest = { version = "0.11.11", features = ["native-tls"] }
 rustls = "0.21.0"
