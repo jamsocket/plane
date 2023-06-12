@@ -12,7 +12,6 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{server::conn::AddrIncoming, Server};
 use hyper::{Body, Request, Response, Uri};
 use plane_core::NeverResult;
-use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::{net::IpAddr, sync::Arc, time::Duration};
 use tokio::select;
@@ -76,18 +75,18 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
         let redirect_server = {
             let redirect_address = SocketAddr::new(options.bind_ip, 80);
             let redirect_service = make_service_fn(|_socket: &AddrStream| async move {
-                Ok::<_, Infallible>(service_fn(move |req: Request<Body>| async move {
+                Ok::<_, anyhow::Error>(service_fn(move |req: Request<Body>| async move {
                     let mut redir_uri_parts = req.uri().clone().into_parts();
                     redir_uri_parts.scheme = Some(Scheme::HTTPS);
-                    let redir_uri = Uri::from_parts(redir_uri_parts).unwrap();
+                    let redir_uri = Uri::from_parts(redir_uri_parts)?;
                     let mut res = Response::new(Body::empty());
                     *res.status_mut() = StatusCode::MOVED_PERMANENTLY;
                     res.headers_mut().insert(
                         LOCATION,
-                        HeaderValue::from_str(redir_uri.to_string().as_str()).unwrap(),
+                        HeaderValue::from_str(redir_uri.to_string().as_str())?,
                     );
 
-                    Ok::<_, Infallible>(res)
+                    Ok::<_, anyhow::Error>(res)
                 }))
             });
             Server::bind(&redirect_address).serve(redirect_service)
