@@ -453,7 +453,6 @@ async fn schedule_request_lock() {
     assert_eq!(backend1, backend2);
 }
 
-
 #[integration_test]
 async fn schedule_request_lock_with_bearer_token() {
     let nats = Nats::new().await.unwrap();
