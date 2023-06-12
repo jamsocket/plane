@@ -4,7 +4,7 @@ use self::{
 };
 use crate::{database::DroneDatabase, keys::KeyCertPathPair};
 use anyhow::{anyhow, Context};
-use http::uri::Scheme;
+use http::uri::{Authority, Scheme};
 use http::StatusCode;
 use hyper::header::{HeaderValue, LOCATION};
 use hyper::server::conn::AddrStream;
@@ -78,6 +78,13 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
                 Ok::<_, anyhow::Error>(service_fn(move |req: Request<Body>| async move {
                     let mut redir_uri_parts = req.uri().clone().into_parts();
                     redir_uri_parts.scheme = Some(Scheme::HTTPS);
+                    redir_uri_parts.authority = Some(
+                        req.headers()
+                            .get("host")
+                            .ok_or_else(|| anyhow!("no host header"))?
+                            .to_str()?
+                            .parse()?,
+                    );
                     let redir_uri = Uri::from_parts(redir_uri_parts)?;
                     let mut res = Response::new(Body::empty());
                     *res.status_mut() = StatusCode::MOVED_PERMANENTLY;
