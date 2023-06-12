@@ -189,6 +189,7 @@ async fn status_lifecycle() {
                 message: BackendMessageType::Assignment {
                     drone: drone.clone(),
                     lock: None,
+                    bearer_token: None,
                 },
             }),
         },

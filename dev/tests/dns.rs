@@ -167,6 +167,7 @@ async fn dns_a_record() {
             message: BackendMessageType::Assignment {
                 drone: drone_id.clone(),
                 lock: None,
+                bearer_token: None,
             },
         }),
     });
