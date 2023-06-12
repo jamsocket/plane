@@ -45,27 +45,30 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                 // Anything that fails to find the drone results in an error here, since we just
                 // checked that the lock is held which implies that the drone exists.
 
-                let drone = {
+                let (drone, bearer_token) = {
                     let state = state.state();
                     let cluster = state
                         .cluster(&schedule_request.value.cluster)
                         .ok_or_else(|| anyhow!("Expected cluster to exist."))?;
-                    cluster
+
+                    let backend_state = cluster
                         .backend(&backend)
-                        .ok_or_else(|| anyhow!("Lock held by a backend that doesn't exist."))?
-                        .drone
-                        .clone()
-                        .ok_or_else(|| {
-                            anyhow!("Lock held by a backend without a drone assignment.")
-                        })?
+                        .ok_or_else(|| anyhow!("Lock held by a backend that doesn't exist."))?;
+
+                    let drone = backend_state.drone.clone().ok_or_else(|| {
+                        anyhow!("Lock held by a backend without a drone assignment.")
+                    })?;
+
+                    let bearer_token = backend_state.bearer_token.clone();
+
+                    (drone, bearer_token)
                 };
 
                 schedule_request
                     .respond(&ScheduleResponse::Scheduled {
                         drone,
                         backend_id: backend,
-                        // TODO: return bearer token if one was used in the original spawn.
-                        bearer_token: None,
+                        bearer_token,
                         spawned: false,
                     })
                     .await?;
@@ -93,6 +96,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                                 message: BackendMessageType::Assignment {
                                     drone: drone_id.clone(),
                                     lock: schedule_request.value.lock.clone(),
+                                    bearer_token: spawn_request.bearer_token.clone(),
                                 },
                             }),
                         })

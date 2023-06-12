@@ -179,13 +179,17 @@ impl DroneState {
 #[derive(Default, Debug)]
 pub struct BackendState {
     pub drone: Option<DroneId>,
+    pub bearer_token: Option<String>,
     pub states: BTreeSet<(chrono::DateTime<chrono::Utc>, agent::BackendState)>,
 }
 
 impl BackendState {
     fn apply(&mut self, message: BackendMessageType) {
         match message {
-            BackendMessageType::Assignment { drone, .. } => self.drone = Some(drone),
+            BackendMessageType::Assignment { drone, bearer_token, .. } => {
+                self.drone = Some(drone);
+                self.bearer_token = bearer_token;
+            },
             BackendMessageType::State {
                 state: status,
                 timestamp,
@@ -223,6 +227,7 @@ mod test {
             message: BackendMessageType::Assignment {
                 drone: DroneId::new("drone".into()),
                 lock: Some("mylock".into()),
+                bearer_token: None,
             },
         }));
 

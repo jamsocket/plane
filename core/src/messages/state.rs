@@ -86,6 +86,7 @@ pub enum BackendMessageType {
     Assignment {
         drone: DroneId,
         lock: Option<String>,
+        bearer_token: Option<String>,
     },
     State {
         state: BackendState,

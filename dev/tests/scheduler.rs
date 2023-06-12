@@ -434,7 +434,7 @@ async fn schedule_request_lock() {
 
     sleep(Duration::from_millis(100)).await;
     let r1 = mock_agent
-        .schedule_drone(&drone_id, true, Some("foobar".to_string()))
+        .schedule_drone(&drone_id, false, Some("foobar".to_string()))
         .await
         .unwrap();
 
@@ -451,4 +451,50 @@ async fn schedule_request_lock() {
 
     assert_eq!(drone1, drone2);
     assert_eq!(backend1, backend2);
+}
+
+
+#[integration_test]
+async fn schedule_request_lock_with_bearer_token() {
+    let nats = Nats::new().await.unwrap();
+    let nats_conn = nats.connection().await.unwrap();
+    let state = start_state_loop(nats_conn.clone()).await.unwrap();
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
+    let drone_id = DroneId::new_random();
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id).await;
+    sleep(Duration::from_millis(100)).await;
+
+    nats_conn
+        .publish(&DroneStatusMessage {
+            cluster: ClusterName::new("plane.test"),
+            drone_id: drone_id.clone(),
+            drone_version: PLANE_VERSION.to_string(),
+            ready: true,
+            state: DroneState::Ready,
+            running_backends: None,
+        })
+        .await
+        .unwrap();
+
+    sleep(Duration::from_millis(100)).await;
+    let r1 = mock_agent
+        .schedule_drone(&drone_id, true, Some("foobar".to_string()))
+        .await
+        .unwrap();
+
+    let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, bearer_token: bearer_token1, .. } = r1 else {panic!()};
+    assert!(bearer_token1.is_some());
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let r2 = mock_agent
+        .schedule_locked(true, Some("foobar".to_string()))
+        .await
+        .unwrap();
+
+    let ScheduleResponse::Scheduled { drone: drone2, backend_id: backend2, bearer_token: bearer_token2, .. } = r2 else {panic!()};
+
+    assert_eq!(drone1, drone2);
+    assert_eq!(backend1, backend2);
+    assert_eq!(bearer_token1, bearer_token2);
 }
