@@ -17,11 +17,18 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::task::Poll;
+use std::time::Duration;
 use time::OffsetDateTime;
 use tokio_stream::{Stream, StreamExt};
 
 /// This code is returned by NATS when an expected last sequence number is violated.
 const NATS_WRONG_LAST_SEQUENCE_CODE: &str = "10071";
+
+/// How long NATS should keep consumer state before forgetting it.
+/// This is effectively how long a subscriber can sustain a NATS outage. Even though
+/// we expect NATS outages to be short, there's little harm in making this too long;
+/// consumer state is minimal and we make efficient use of consumers.
+const INACTIVE_THRESHOLD_SECONDS: u64 = 60 * 60 * 12; // 12 hours
 
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
@@ -374,6 +381,7 @@ impl TypedNats {
                 deliver_policy: DeliverPolicy::All,
                 filter_subject: subject,
                 deliver_subject,
+                inactive_threshold: Duration::from_secs(INACTIVE_THRESHOLD_SECONDS),
                 max_ack_pending: 1, // NOTE: If you remove this or change the value,
                 // the resultant stream is no longer guaranteed to be in order, and call sites
                 // that rely on ordered messages will break, nondeterministically
