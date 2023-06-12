@@ -4,8 +4,15 @@ use self::{
 };
 use crate::{database::DroneDatabase, keys::KeyCertPathPair};
 use anyhow::{anyhow, Context};
+use http::uri::Scheme;
+use http::StatusCode;
+use hyper::header::{HeaderValue, LOCATION};
+use hyper::server::conn::AddrStream;
+use hyper::service::{make_service_fn, service_fn};
 use hyper::{server::conn::AddrIncoming, Server};
+use hyper::{Body, Request, Response, Uri};
 use plane_core::NeverResult;
+use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::{net::IpAddr, sync::Arc, time::Duration};
 use tokio::select;
@@ -66,7 +73,29 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
         let incoming =
             AddrIncoming::bind(&bind_address).context("Error binding port for HTTPS.")?;
         let server = Server::builder(TlsAcceptor::new(tls_cfg, incoming)).serve(make_proxy);
-        server.await.context("Error from TLS proxy.")?;
+        let redirect_server = {
+            let redirect_address = SocketAddr::new(options.bind_ip, 80);
+            let redirect_service = make_service_fn(|_socket: &AddrStream| async move {
+                Ok::<_, Infallible>(service_fn(move |req: Request<Body>| async move {
+                    let mut redir_uri_parts = req.uri().clone().into_parts();
+                    redir_uri_parts.scheme = Some(Scheme::HTTPS);
+                    let redir_uri = Uri::from_parts(redir_uri_parts).unwrap();
+                    let mut res = Response::new(Body::empty());
+                    *res.status_mut() = StatusCode::MOVED_PERMANENTLY;
+                    res.headers_mut().insert(
+                        LOCATION,
+                        HeaderValue::from_str(redir_uri.to_string().as_str()).unwrap(),
+                    );
+
+                    Ok::<_, Infallible>(res)
+                }))
+            });
+            Server::bind(&redirect_address).serve(redirect_service)
+        };
+        tokio::select! {
+            a = server => a.context("Error from TLS proxy.")?,
+            b = redirect_server => b.context("Error from HTTP redirect.")?
+        }
     } else {
         let server = Server::bind(&bind_address).serve(make_proxy);
         server.await.context("Error from non-TLS proxy.")?;
