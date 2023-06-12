@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.62"
-async-nats = "0.29.0"
+async-nats = { git = "https://github.com/nats-io/nats.rs.git", rev = "261ead4" }
 bollard = "0.14.0"
 chrono = { version="0.4.22", default_features = false }
 plane-core = {path = "../core"}
