@@ -4,7 +4,7 @@ use self::{
 };
 use crate::{database::DroneDatabase, keys::KeyCertPathPair};
 use anyhow::{anyhow, Context};
-use http::uri::{Authority, Scheme};
+use http::uri::Scheme;
 use http::StatusCode;
 use hyper::header::{HeaderValue, LOCATION};
 use hyper::server::conn::AddrStream;
@@ -29,6 +29,7 @@ pub struct ProxyOptions {
     pub bind_ip: IpAddr,
     pub bind_port: u16,
     pub key_pair: Option<KeyCertPathPair>,
+	pub bind_redir_port: Option<u16>,
     pub cluster_domain: String,
     pub passthrough: Option<SocketAddr>,
 }
@@ -73,7 +74,8 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
             AddrIncoming::bind(&bind_address).context("Error binding port for HTTPS.")?;
         let server = Server::builder(TlsAcceptor::new(tls_cfg, incoming)).serve(make_proxy);
         let redirect_server = {
-            let redirect_address = SocketAddr::new(options.bind_ip, 80);
+            let redirect_address = SocketAddr::new(
+				options.bind_ip, options.bind_redir_port.ok_or_else(|| anyhow!("no redir port!"))?);
             let redirect_service = make_service_fn(|_socket: &AddrStream| async move {
                 Ok::<_, anyhow::Error>(service_fn(move |req: Request<Body>| async move {
                     let mut redir_uri_parts = req.uri().clone().into_parts();
