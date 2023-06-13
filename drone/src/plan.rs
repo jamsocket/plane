@@ -48,8 +48,8 @@ impl DronePlan {
         };
 
         let proxy_options = if let Some(proxy_config) = config.proxy {
-            let (bind_port, bind_redir_port, key_pair) = if let Some((key_pair, https_port)) =
-                config.cert.clone().zip(proxy_config.https_port)
+            let (bind_port, bind_redir_port, key_pair) = if let (Some(key_pair), Some(https_port)) =
+                (config.cert.clone(), proxy_config.https_port)
             {
                 (https_port, Some(proxy_config.http_port), Some(key_pair))
             } else if config.cert.and(proxy_config.https_port).is_none() {
