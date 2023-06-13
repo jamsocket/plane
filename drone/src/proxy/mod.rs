@@ -57,7 +57,7 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
     );
     let bind_address = SocketAddr::new(options.bind_ip, options.bind_port);
 
-    if let Some(key_pair) = options.key_pair {
+    if let (Some(bind_redir_port), Some(key_pair)) = (options.bind_redir_port, options.key_pair) {
         let cert_refresher =
             CertRefresher::new(key_pair.clone()).context("Error building cert refresher.")?;
 
@@ -76,9 +76,7 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
         let redirect_server = {
             let redirect_address = SocketAddr::new(
                 options.bind_ip,
-                options
-                    .bind_redir_port
-                    .ok_or_else(|| anyhow!("no redir port!"))?,
+				bind_redir_port
             );
             let redirect_service = make_service_fn(|_socket: &AddrStream| async move {
                 Ok::<_, anyhow::Error>(service_fn(move |req: Request<Body>| async move {
