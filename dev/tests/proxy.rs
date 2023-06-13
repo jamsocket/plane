@@ -232,10 +232,10 @@ async fn simple_backend_proxy() {
         .unwrap();
 
     let req = client.get(format!(
-        "http://{}:{}{}/TESTING/PATHS",
+        "http://{}:{}{}",
         hostname,
         proxy.bind_redir_address.port(),
-        "/"
+        "/testing/paths"
     ));
     let response = req.send().await.unwrap();
 
