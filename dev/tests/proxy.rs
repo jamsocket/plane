@@ -2,7 +2,6 @@ use anyhow::anyhow;
 use anyhow::Result;
 use chrono::Utc;
 use futures::{SinkExt, StreamExt};
-use http::uri::Scheme;
 use http::StatusCode;
 use integration_test::integration_test;
 use plane_core::messages::agent::BackendState;
@@ -18,6 +17,7 @@ use plane_dev::{
 use plane_drone::database::DroneDatabase;
 use plane_drone::proxy::ProxyOptions;
 use plane_drone::proxy::PLANE_AUTH_COOKIE;
+use reqwest::redirect::Policy;
 use reqwest::Response;
 use reqwest::{Certificate, ClientBuilder};
 use std::net::SocketAddrV4;
@@ -226,6 +226,7 @@ async fn simple_backend_proxy() {
 
     let hostname = format!("{}.{}", "foobar", CLUSTER);
     let client = ClientBuilder::new()
+        .redirect(Policy::none())
         .resolve(&hostname, proxy.bind_redir_address)
         .build()
         .unwrap();
@@ -237,18 +238,6 @@ async fn simple_backend_proxy() {
         "/"
     ));
     let response = req.send().await.unwrap();
-
-    /*
-    let response = reqwest::get(format!(
-        "http://{}.{}:{}/{}",
-        "foobar",
-        CLUSTER,
-        proxy.bind_redir_address.port(),
-        "/"
-    ))
-    .await
-    .expect("Failed to send request");
-    */
 
     assert_eq!(StatusCode::PERMANENT_REDIRECT, response.status());
     let mut https_uri = response.url().clone();
