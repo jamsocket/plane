@@ -52,6 +52,7 @@ impl DronePlan {
                 cluster_domain: config.cluster_domain.clone(),
                 db: db.clone(),
                 bind_ip: proxy_config.bind_ip,
+				bind_redir_port: Some(proxy_config.http_port),
                 bind_port: proxy_config.https_port,
                 key_pair: config.cert.clone(),
                 passthrough: proxy_config.passthrough,
