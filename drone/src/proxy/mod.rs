@@ -74,10 +74,7 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
             AddrIncoming::bind(&bind_address).context("Error binding port for HTTPS.")?;
         let server = Server::builder(TlsAcceptor::new(tls_cfg, incoming)).serve(make_proxy);
         let redirect_server = {
-            let redirect_address = SocketAddr::new(
-                options.bind_ip,
-				bind_redir_port
-            );
+            let redirect_address = SocketAddr::new(options.bind_ip, bind_redir_port);
             let redirect_service = make_service_fn(|_socket: &AddrStream| async move {
                 Ok::<_, anyhow::Error>(service_fn(move |req: Request<Body>| async move {
                     let mut redir_uri_parts = req.uri().clone().into_parts();
@@ -92,10 +89,8 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
                     let redir_uri = Uri::from_parts(redir_uri_parts)?;
                     let mut res = Response::new(Body::empty());
                     *res.status_mut() = StatusCode::PERMANENT_REDIRECT;
-                    res.headers_mut().insert(
-                        LOCATION,
-                        HeaderValue::from_str(&redir_uri.to_string())?,
-                    );
+                    res.headers_mut()
+                        .insert(LOCATION, HeaderValue::from_str(&redir_uri.to_string())?);
 
                     Ok::<_, anyhow::Error>(res)
                 }))

@@ -59,13 +59,13 @@ pub struct ProxyOptions {
     #[serde(default = "default_bind_address")]
     pub bind_ip: IpAddr,
     pub https_port: Option<u16>,
-	#[serde(default = "default_http_port")]
+    #[serde(default = "default_http_port")]
     pub http_port: u16,
     pub passthrough: Option<SocketAddr>,
 }
 
 fn default_http_port() -> u16 {
-	80
+    80
 }
 
 fn default_bind_address() -> IpAddr {
