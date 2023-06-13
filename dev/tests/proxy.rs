@@ -3,6 +3,7 @@ use anyhow::Result;
 use chrono::Utc;
 use futures::{SinkExt, StreamExt};
 use http::StatusCode;
+use http::uri::Scheme;
 use integration_test::integration_test;
 use plane_core::messages::agent::BackendState;
 use plane_core::NeverResult;
@@ -72,6 +73,7 @@ impl Proxy {
             db: db.clone(),
             bind_ip: std::net::IpAddr::V4(bind_ip),
             bind_port: 4040,
+			bind_redir_port: Some(9090),
             key_pair: Some(certs.path_pair.clone()),
             cluster_domain: CLUSTER.into(),
             passthrough,
@@ -219,6 +221,15 @@ async fn simple_backend_proxy() {
         .update_backend_state(&sr.backend_id, BackendState::Ready)
         .await
         .unwrap();
+
+	let response = reqwest::get(
+		format!("http://{}.{}:{}/{}", "foobar", CLUSTER, proxy.bind_address.port(), "/")).await
+		.expect("Failed to send request");
+
+	assert_eq!(StatusCode::PERMANENT_REDIRECT, response.status());
+	let mut https_uri = response.url().clone();
+	https_uri.set_scheme("https").unwrap();
+	assert_eq!(response.headers().get("LOCATION").unwrap(), https_uri.as_str());
 
     proxy
         .db
