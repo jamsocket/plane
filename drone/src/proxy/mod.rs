@@ -105,8 +105,8 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
             Server::bind(&redirect_address).serve(redirect_service)
         };
         tokio::select! {
-            a = server => a.context("Error from TLS proxy.")?,
-            b = redirect_server => b.context("Error from HTTP redirect.")?
+            err = server => err.context("Error from TLS proxy.")?,
+            err = redirect_server => err.context("Error from HTTP redirect.")?
         }
     } else {
         let server = Server::bind(&bind_address).serve(make_proxy);
