@@ -94,7 +94,7 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
                     *res.status_mut() = StatusCode::PERMANENT_REDIRECT;
                     res.headers_mut().insert(
                         LOCATION,
-                        HeaderValue::from_str(redir_uri.to_string().as_str())?,
+                        HeaderValue::from_str(&redir_uri.to_string())?,
                     );
 
                     Ok::<_, anyhow::Error>(res)
