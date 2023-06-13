@@ -108,13 +108,20 @@ async fn main() -> Result<()> {
             for (cluster_name, cluster) in &state.clusters {
                 for (backend_id, backend) in &cluster.backends {
                     if let Some((timestamp, state)) = backend.state_timestamp() {
-                        if state != BackendState::Swept {
+                        if state == BackendState::Swept || state == BackendState::Terminated {
+                            println!(
+                                "Removing backend {} from cluster {}, {} at {}",
+                                backend_id, cluster_name, state, timestamp
+                            );
+                        } else if timestamp < chrono::Utc::now() - chrono::Duration::hours(24) && (state != BackendState::Ready) {
+                            println!(
+                                "Removing abandoned backend {} from cluster {}, last update was {} at {}",
+                                backend_id, cluster_name, state, timestamp
+                            );
+                        } else {
+                            // Ignore this backend.
                             continue;
                         }
-                        println!(
-                            "Removing backend {} from cluster {}, swept at {}",
-                            backend_id, cluster_name, timestamp
-                        );
                     } else if include_missing_state {
                         println!(
                             "Removing backend {} from cluster {}, no state information",
