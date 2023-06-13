@@ -93,7 +93,7 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
                     );
                     let redir_uri = Uri::from_parts(redir_uri_parts)?;
                     let mut res = Response::new(Body::empty());
-                    *res.status_mut() = StatusCode::MOVED_PERMANENTLY;
+                    *res.status_mut() = StatusCode::PERMANENT_REDIRECT;
                     res.headers_mut().insert(
                         LOCATION,
                         HeaderValue::from_str(redir_uri.to_string().as_str())?,
