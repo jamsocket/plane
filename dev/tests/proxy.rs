@@ -2,8 +2,8 @@ use anyhow::anyhow;
 use anyhow::Result;
 use chrono::Utc;
 use futures::{SinkExt, StreamExt};
-use http::StatusCode;
 use http::uri::Scheme;
+use http::StatusCode;
 use integration_test::integration_test;
 use plane_core::messages::agent::BackendState;
 use plane_core::NeverResult;
@@ -36,6 +36,7 @@ struct Proxy {
     #[allow(unused)]
     guard: LivenessGuard<NeverResult>,
     bind_address: SocketAddr,
+    bind_redir_address: SocketAddr,
     certs: SelfSignedCert,
     db: DroneDatabase,
 }
@@ -73,7 +74,7 @@ impl Proxy {
             db: db.clone(),
             bind_ip: std::net::IpAddr::V4(bind_ip),
             bind_port: 4040,
-			bind_redir_port: Some(9090),
+            bind_redir_port: Some(9090),
             key_pair: Some(certs.path_pair.clone()),
             cluster_domain: CLUSTER.into(),
             passthrough,
@@ -83,6 +84,7 @@ impl Proxy {
         let proxy = Proxy {
             guard,
             bind_address: SocketAddr::V4(SocketAddrV4::new(bind_ip, 4040)),
+            bind_redir_address: SocketAddr::V4(SocketAddrV4::new(bind_ip, 9090)),
             certs,
             db,
         };
@@ -222,14 +224,23 @@ async fn simple_backend_proxy() {
         .await
         .unwrap();
 
-	let response = reqwest::get(
-		format!("http://{}.{}:{}/{}", "foobar", CLUSTER, proxy.bind_address.port(), "/")).await
-		.expect("Failed to send request");
+    let response = reqwest::get(format!(
+        "http://{}.{}:{}/{}",
+        "foobar",
+        CLUSTER,
+        proxy.bind_redir_address.port(),
+        "/"
+    ))
+    .await
+    .expect("Failed to send request");
 
-	assert_eq!(StatusCode::PERMANENT_REDIRECT, response.status());
-	let mut https_uri = response.url().clone();
-	https_uri.set_scheme("https").unwrap();
-	assert_eq!(response.headers().get("LOCATION").unwrap(), https_uri.as_str());
+    assert_eq!(StatusCode::PERMANENT_REDIRECT, response.status());
+    let mut https_uri = response.url().clone();
+    https_uri.set_scheme("https").unwrap();
+    assert_eq!(
+        response.headers().get("LOCATION").unwrap(),
+        https_uri.as_str()
+    );
 
     proxy
         .db
