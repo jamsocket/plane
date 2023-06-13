@@ -224,6 +224,21 @@ async fn simple_backend_proxy() {
         .await
         .unwrap();
 
+    let hostname = format!("{}.{}", "foobar", CLUSTER);
+    let client = ClientBuilder::new()
+        .resolve(&hostname, proxy.bind_redir_address)
+        .build()
+        .unwrap();
+
+    let req = client.get(format!(
+        "http://{}:{}{}",
+        hostname,
+        proxy.bind_redir_address.port(),
+        "/"
+    ));
+    let response = req.send().await.unwrap();
+
+    /*
     let response = reqwest::get(format!(
         "http://{}.{}:{}/{}",
         "foobar",
@@ -233,6 +248,7 @@ async fn simple_backend_proxy() {
     ))
     .await
     .expect("Failed to send request");
+    */
 
     assert_eq!(StatusCode::PERMANENT_REDIRECT, response.status());
     let mut https_uri = response.url().clone();
