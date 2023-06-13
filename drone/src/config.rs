@@ -60,7 +60,8 @@ pub struct ProxyOptions {
     pub bind_ip: IpAddr,
     #[serde(default = "default_https_port")]
     pub https_port: u16,
-
+	#[serde(default = "default_http_port")]
+	pub http_port: u16,
     pub passthrough: Option<SocketAddr>,
 }
 
@@ -70,6 +71,10 @@ fn default_bind_address() -> IpAddr {
 
 fn default_https_port() -> u16 {
     443
+}
+
+fn default_http_port() -> u16 {
+	80
 }
 
 #[derive(Serialize, Deserialize)]
