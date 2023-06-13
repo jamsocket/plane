@@ -48,12 +48,22 @@ impl DronePlan {
         };
 
         let proxy_options = if let Some(proxy_config) = config.proxy {
+            let (bind_port, bind_redir_port, key_pair) = if let (Some(key_pair), Some(https_port)) =
+                (config.cert.clone(), proxy_config.https_port)
+            {
+                (https_port, Some(proxy_config.http_port), Some(key_pair))
+            } else if config.cert.and(proxy_config.https_port).is_none() {
+                (proxy_config.http_port, None, None)
+            } else {
+                panic!("must specify https_port and cert together");
+            };
             Some(ProxyOptions {
                 cluster_domain: config.cluster_domain.clone(),
                 db: db.clone(),
                 bind_ip: proxy_config.bind_ip,
-                bind_port: proxy_config.https_port,
-                key_pair: config.cert.clone(),
+                bind_redir_port,
+                bind_port,
+                key_pair,
                 passthrough: proxy_config.passthrough,
             })
         } else {

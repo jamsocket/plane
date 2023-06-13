@@ -17,6 +17,7 @@ use plane_dev::{
 use plane_drone::database::DroneDatabase;
 use plane_drone::proxy::ProxyOptions;
 use plane_drone::proxy::PLANE_AUTH_COOKIE;
+use reqwest::redirect::Policy;
 use reqwest::Response;
 use reqwest::{Certificate, ClientBuilder};
 use std::net::SocketAddrV4;
@@ -35,6 +36,7 @@ struct Proxy {
     #[allow(unused)]
     guard: LivenessGuard<NeverResult>,
     bind_address: SocketAddr,
+    bind_redir_address: SocketAddr,
     certs: SelfSignedCert,
     db: DroneDatabase,
 }
@@ -72,6 +74,7 @@ impl Proxy {
             db: db.clone(),
             bind_ip: std::net::IpAddr::V4(bind_ip),
             bind_port: 4040,
+            bind_redir_port: Some(9090),
             key_pair: Some(certs.path_pair.clone()),
             cluster_domain: CLUSTER.into(),
             passthrough,
@@ -81,6 +84,7 @@ impl Proxy {
         let proxy = Proxy {
             guard,
             bind_address: SocketAddr::V4(SocketAddrV4::new(bind_ip, 4040)),
+            bind_redir_address: SocketAddr::V4(SocketAddrV4::new(bind_ip, 9090)),
             certs,
             db,
         };
@@ -219,6 +223,29 @@ async fn simple_backend_proxy() {
         .update_backend_state(&sr.backend_id, BackendState::Ready)
         .await
         .unwrap();
+
+    let hostname = format!("{}.{}", "foobar", CLUSTER);
+    let client = ClientBuilder::new()
+        .redirect(Policy::none())
+        .resolve(&hostname, proxy.bind_redir_address)
+        .build()
+        .unwrap();
+
+    let req = client.get(format!(
+        "http://{}:{}{}",
+        hostname,
+        proxy.bind_redir_address.port(),
+        "/testing/paths"
+    ));
+    let response = req.send().await.unwrap();
+
+    assert_eq!(StatusCode::PERMANENT_REDIRECT, response.status());
+    let mut https_uri = response.url().clone();
+    https_uri.set_scheme("https").unwrap();
+    assert_eq!(
+        response.headers().get("LOCATION").unwrap(),
+        https_uri.as_str()
+    );
 
     proxy
         .db

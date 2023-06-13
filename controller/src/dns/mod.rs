@@ -91,7 +91,7 @@ impl ClusterDnsServer {
                 }
 
                 tracing::info!(?responses, ?cluster_name, %backend_id, "Returning TXT records.");
-                
+
                 Ok(responses)
             }
             RecordType::A => {
