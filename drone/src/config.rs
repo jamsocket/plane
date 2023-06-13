@@ -67,13 +67,6 @@ fn default_bind_address() -> IpAddr {
     IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))
 }
 
-fn default_https_port() -> u16 {
-    443
-}
-
-fn default_http_port() -> u16 {
-    80
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct AgentOptions {
