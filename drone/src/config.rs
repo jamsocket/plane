@@ -58,10 +58,8 @@ struct CertRefreshOptions {
 pub struct ProxyOptions {
     #[serde(default = "default_bind_address")]
     pub bind_ip: IpAddr,
-    #[serde(default = "default_https_port")]
-    pub https_port: u16,
-    #[serde(default = "default_http_port")]
-    pub http_port: u16,
+    pub https_port: Option<u16>,
+    pub http_port: Option<u16>,
     pub passthrough: Option<SocketAddr>,
 }
 
