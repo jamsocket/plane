@@ -188,10 +188,14 @@ pub struct BackendState {
 impl BackendState {
     fn apply(&mut self, message: BackendMessageType) {
         match message {
-            BackendMessageType::Assignment { drone, bearer_token, .. } => {
+            BackendMessageType::Assignment {
+                drone,
+                bearer_token,
+                ..
+            } => {
                 self.drone = Some(drone);
                 self.bearer_token = bearer_token;
-            },
+            }
             BackendMessageType::State {
                 state: status,
                 timestamp,

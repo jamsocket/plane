@@ -4,7 +4,13 @@ use self::{
 };
 use crate::{database::DroneDatabase, keys::KeyCertPathPair};
 use anyhow::{anyhow, Context};
+use http::uri::Scheme;
+use http::StatusCode;
+use hyper::header::{HeaderValue, LOCATION};
+use hyper::server::conn::AddrStream;
+use hyper::service::{make_service_fn, service_fn};
 use hyper::{server::conn::AddrIncoming, Server};
+use hyper::{Body, Request, Response, Uri};
 use plane_core::NeverResult;
 use std::net::SocketAddr;
 use std::{net::IpAddr, sync::Arc, time::Duration};
@@ -23,6 +29,7 @@ pub struct ProxyOptions {
     pub bind_ip: IpAddr,
     pub bind_port: u16,
     pub key_pair: Option<KeyCertPathPair>,
+    pub bind_redir_port: Option<u16>,
     pub cluster_domain: String,
     pub passthrough: Option<SocketAddr>,
 }
@@ -50,7 +57,7 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
     );
     let bind_address = SocketAddr::new(options.bind_ip, options.bind_port);
 
-    if let Some(key_pair) = options.key_pair {
+    if let (Some(bind_redir_port), Some(key_pair)) = (options.bind_redir_port, options.key_pair) {
         let cert_refresher =
             CertRefresher::new(key_pair.clone()).context("Error building cert refresher.")?;
 
@@ -66,7 +73,34 @@ async fn run_server(options: ProxyOptions, connection_tracker: ConnectionTracker
         let incoming =
             AddrIncoming::bind(&bind_address).context("Error binding port for HTTPS.")?;
         let server = Server::builder(TlsAcceptor::new(tls_cfg, incoming)).serve(make_proxy);
-        server.await.context("Error from TLS proxy.")?;
+        let redirect_server = {
+            let redirect_address = SocketAddr::new(options.bind_ip, bind_redir_port);
+            let redirect_service = make_service_fn(|_socket: &AddrStream| async move {
+                Ok::<_, anyhow::Error>(service_fn(move |req: Request<Body>| async move {
+                    let mut redir_uri_parts = req.uri().clone().into_parts();
+                    redir_uri_parts.scheme = Some(Scheme::HTTPS);
+                    redir_uri_parts.authority = Some(
+                        req.headers()
+                            .get("host")
+                            .ok_or_else(|| anyhow!("no host header"))?
+                            .to_str()?
+                            .parse()?,
+                    );
+                    let redir_uri = Uri::from_parts(redir_uri_parts)?;
+                    let mut res = Response::new(Body::empty());
+                    *res.status_mut() = StatusCode::PERMANENT_REDIRECT;
+                    res.headers_mut()
+                        .insert(LOCATION, HeaderValue::from_str(&redir_uri.to_string())?);
+
+                    Ok::<_, anyhow::Error>(res)
+                }))
+            });
+            Server::bind(&redirect_address).serve(redirect_service)
+        };
+        tokio::select! {
+            err = server => err.context("Error from TLS proxy.")?,
+            err = redirect_server => err.context("Error from HTTP redirect.")?
+        }
     } else {
         let server = Server::bind(&bind_address).serve(make_proxy);
         server.await.context("Error from non-TLS proxy.")?;
