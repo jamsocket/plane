@@ -447,9 +447,9 @@ impl TypedNats {
         Ok(sequence)
     }
 
-    pub async fn get_current_seq_id(&self, subject: String) -> Result<u64> {
+    pub async fn get_current_seq_id(&self, name: String) -> Result<u64> {
         self.jetstream
-            .get_stream(subject)
+            .get_stream(name)
             .await
             .to_anyhow()
             .map(|s| s.cached_info().state.last_sequence)
