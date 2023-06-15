@@ -108,6 +108,10 @@ impl WorldState {
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterState> {
         self.clusters.get(cluster)
     }
+
+	pub fn get_logical_time(&self) -> u64 {
+		self.logical_time
+	}
 }
 
 #[derive(Default, Debug)]
