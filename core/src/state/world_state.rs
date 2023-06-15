@@ -252,7 +252,65 @@ impl BackendState {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::messages::state::BackendMessage;
+    use crate::messages::state::{AcmeDnsRecord, BackendMessage};
+    use std::time::Duration;
+    use tokio::time::timeout;
+
+    #[tokio::test]
+    async fn test_wait_for_seq() {
+        let state = StateHandle::default();
+
+        timeout(Duration::from_secs(0), state.wait_for_seq(0))
+            .await
+            .expect("wait_for_seq(0) should return immediately");
+
+        // wait_for_seq(1) should block.
+        let seq1_1 = state.wait_for_seq(1);
+        let seq1_2 = state.wait_for_seq(1);
+        let seq2_1 = state.wait_for_seq(2);
+        let seq2_2 = state.wait_for_seq(2);
+        {
+            let result = timeout(Duration::from_secs(0), seq1_1).await;
+            assert!(result.is_err());
+        }
+
+        state.write_state().apply(
+            WorldStateMessage {
+                cluster: ClusterName::new("cluster"),
+                message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
+                    value: "value".into(),
+                }),
+            },
+            1,
+        );
+
+        // wait_for_seq(1) should now return.
+        timeout(Duration::from_secs(0), seq1_2)
+            .await
+            .expect("wait_for_seq(1) should return immediately");
+
+        {
+            let result = timeout(Duration::from_secs(0), seq2_1).await;
+            assert!(result.is_err());
+        }
+
+        state.write_state().apply(
+            WorldStateMessage {
+                cluster: ClusterName::new("cluster"),
+                message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
+                    value: "value".into(),
+                }),
+            },
+            2,
+        );
+
+        // wait_for_seq(2) should now return.
+        {
+            timeout(Duration::from_secs(0), seq2_2)
+                .await
+                .expect("wait_for_seq(2) should return immediately");
+        }
+    }
 
     #[test]
     fn test_locks() {
