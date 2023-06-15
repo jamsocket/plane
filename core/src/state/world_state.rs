@@ -14,7 +14,7 @@ use std::{
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::Notify;
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -71,10 +71,8 @@ impl StateHandle {
         if self.state().logical_time >= sequence {
             return;
         }
-        let mut receiver = {
-            self.write_state().get_listener(sequence)
-        };
-        let _ = receiver.recv().await;
+        let receiver = { self.write_state().get_listener(sequence) };
+        let _ = receiver.notified().await;
     }
 }
 
@@ -82,17 +80,17 @@ impl StateHandle {
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: HashMap<u64, Sender<()>>,
+    listeners: HashMap<u64, Arc<Notify>>,
 }
 
 impl WorldState {
-    pub fn get_listener(&mut self, sequence: u64) -> Receiver<()> {
+    pub fn get_listener(&mut self, sequence: u64) -> Arc<Notify> {
         match self.listeners.entry(sequence) {
-            Entry::Occupied(entry) => entry.get().subscribe(),
+            Entry::Occupied(entry) => entry.get().clone(),
             Entry::Vacant(entry) => {
-                let (tx, rx) = tokio::sync::broadcast::channel(1);
-                entry.insert(tx);
-                rx
+                let notify = Arc::new(Notify::new());
+                entry.insert(notify.clone());
+                notify
             }
         }
     }
@@ -103,7 +101,7 @@ impl WorldState {
         self.logical_time = sequence;
 
         if let Some(sender) = self.listeners.remove(&sequence) {
-            let _ = sender.send(());
+            sender.notify_waiters();
         }
     }
 
