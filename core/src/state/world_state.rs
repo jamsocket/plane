@@ -67,13 +67,6 @@ impl StateHandle {
             .write()
             .expect("Could not acquire world_state lock.")
     }
-
-    /** Block asynchronously until the given sequence number is reached. */
-    pub async fn wait_for_seq(&self, sequence: u64) {
-        if let Ok(receiver) = self.state().get_listener(sequence) {
-            let _ = receiver.notified().await;
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
