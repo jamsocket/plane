@@ -68,13 +68,14 @@ impl StateHandle {
 
     /** Block asynchronously until the given sequence number is reached. */
     pub async fn wait_for_seq(&self, sequence: u64) {
-        if self.state().logical_time >= sequence {
-            return;
+        if let Ok(receiver) = self.write_state().get_listener(sequence) {
+            let _ = receiver.notified().await;
         }
-        let receiver = { self.write_state().get_listener(sequence) };
-        let _ = receiver.notified().await;
     }
 }
+
+#[derive(Debug)]
+pub struct SequenceNumberInThePast;
 
 #[derive(Default, Debug)]
 pub struct WorldState {
@@ -84,13 +85,16 @@ pub struct WorldState {
 }
 
 impl WorldState {
-    pub fn get_listener(&mut self, sequence: u64) -> Arc<Notify> {
+    pub fn get_listener(&mut self, sequence: u64) -> Result<Arc<Notify>, SequenceNumberInThePast> {
+        if self.logical_time >= sequence {
+            return Err(SequenceNumberInThePast);
+        }
         match self.listeners.entry(sequence) {
-            Entry::Occupied(entry) => entry.get().clone(),
+            Entry::Occupied(entry) => Ok(entry.get().clone()),
             Entry::Vacant(entry) => {
                 let notify = Arc::new(Notify::new());
                 entry.insert(notify.clone());
-                notify
+                Ok(notify)
             }
         }
     }
@@ -107,10 +111,6 @@ impl WorldState {
 
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterState> {
         self.clusters.get(cluster)
-    }
-
-    pub fn get_logical_time(&self) -> u64 {
-        self.logical_time
     }
 }
 
