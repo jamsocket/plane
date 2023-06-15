@@ -447,14 +447,6 @@ impl TypedNats {
         Ok(sequence)
     }
 
-    pub async fn get_current_seq_id(&self, name: String) -> Result<u64> {
-        self.jetstream
-            .get_stream(name)
-            .await
-            .to_anyhow()
-            .map(|s| s.cached_info().state.last_sequence)
-    }
-
     /// Publishes a message to jetstream, but only if the subject is empty.
     pub async fn publish_jetstream_if_subject_empty<T>(&self, value: &T) -> Result<Option<u64>>
     where
