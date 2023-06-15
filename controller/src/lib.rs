@@ -34,7 +34,9 @@ async fn respond_to_schedule_req(
 
         if let Some(lock_ready_notifier) = lock_to_ready.get(lock) {
             lock_ready_notifier.notified().await;
-			lock_to_ready.remove(lock).expect("just checked that lock existed in readiness map");
+            lock_to_ready
+                .remove(lock)
+                .expect("just checked that lock existed in readiness map");
         }
 
         let locked = {
