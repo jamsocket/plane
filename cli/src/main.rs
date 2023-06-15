@@ -113,7 +113,9 @@ async fn main() -> Result<()> {
                                 "Removing backend {} from cluster {}, {} at {}",
                                 backend_id, cluster_name, state, timestamp
                             );
-                        } else if timestamp < chrono::Utc::now() - chrono::Duration::hours(24) && (state != BackendState::Ready) {
+                        } else if timestamp < chrono::Utc::now() - chrono::Duration::hours(24)
+                            && (state != BackendState::Ready)
+                        {
                             // This catches backends that remained in a non-ready and non-terminal state (Loading or Starting)
                             // for more than 24 hours. This either means we lost the drone, or the drone has a bug.
                             println!(

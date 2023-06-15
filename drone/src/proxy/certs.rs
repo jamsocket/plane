@@ -1,4 +1,4 @@
-use crate::keys::{load_certs, load_private_key, KeyCertPathPair};
+use crate::keys::{load_certs, load_private_key, KeyCertPaths};
 use anyhow::{Context, Result};
 use notify::{
     event::{AccessKind, AccessMode},
@@ -18,7 +18,7 @@ pub struct CertRefresher {
 }
 
 impl CertRefresher {
-    pub fn new(key_cert_path_pair: KeyCertPathPair) -> Result<Self> {
+    pub fn new(key_cert_path_pair: KeyCertPaths) -> Result<Self> {
         let (sender, receiver) = channel(None);
 
         if let Err(error) = Self::try_to_update_certs(&key_cert_path_pair, &sender) {
@@ -89,7 +89,7 @@ impl CertRefresher {
     }
 
     fn try_to_update_certs(
-        key_cert_path_pair: &KeyCertPathPair,
+        key_cert_path_pair: &KeyCertPaths,
         sender: &Sender<Option<Arc<CertifiedKey>>>,
     ) -> Result<()> {
         let cert_key_pair = Some(Arc::new(

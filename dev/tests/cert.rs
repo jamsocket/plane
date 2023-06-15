@@ -7,7 +7,7 @@ use plane_dev::{
     scratch_dir,
     timeout::{spawn_timeout, timeout},
 };
-use plane_drone::{cert::acme::AcmeEabConfiguration, cert::CertOptions, keys::KeyCertPathPair};
+use plane_drone::{cert::acme::AcmeEabConfiguration, cert::CertOptions, keys::KeyCertPaths};
 use serde_json::Value;
 use tokio::task::JoinHandle;
 
@@ -54,6 +54,11 @@ async fn cert_refresh() {
     let pebble = Pebble::new().await.unwrap();
     let conn = nats.connection().await.unwrap();
     let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await.unwrap();
+    let paths = KeyCertPaths {
+        key_path: scratch_dir("output").join("output.key"), // not actually used
+        cert_path: scratch_dir("output").join("output.pem"), // not actually used
+        account_key_path: None,
+    };
 
     let (_, certs) = timeout(
         60_000,
@@ -65,6 +70,9 @@ async fn cert_refresh() {
             "admin@plane.test",
             &pebble.client().unwrap(),
             None,
+            &paths
+                .load_account_key()
+                .expect("Expected to be able to generate account key."),
         ),
     )
     .await
@@ -86,9 +94,10 @@ async fn cert_refresh_full() {
     let conn = nats.connection().await.unwrap();
     let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await.unwrap();
     let output_dir = scratch_dir("output");
-    let key_paths = KeyCertPathPair {
+    let key_paths = KeyCertPaths {
         key_path: output_dir.join("output.key"),
         cert_path: output_dir.join("output.pem"),
+        account_key_path: Some(output_dir.join("account.key")),
     };
 
     timeout(
@@ -125,6 +134,11 @@ async fn cert_refresh_eab() {
     let pebble = Pebble::new_eab(&eab_keypair).await.unwrap();
     let conn = nats.connection().await.unwrap();
     let dns_handler = DummyDnsHandler::new(&conn, "plane.test").await.unwrap();
+    let paths = KeyCertPaths {
+        key_path: scratch_dir("output").join("output.key"), // not actually used
+        cert_path: scratch_dir("output").join("output.pem"), // not actually used
+        account_key_path: None,
+    };
 
     let (_, certs) = timeout(
         60_000,
@@ -136,6 +150,9 @@ async fn cert_refresh_eab() {
             "admin@plane.test",
             &pebble.client().unwrap(),
             Some(&eab_keypair),
+            &paths
+                .load_account_key()
+                .expect("Expected to be able to generate account key."),
         ),
     )
     .await

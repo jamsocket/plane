@@ -1,4 +1,4 @@
-use crate::{cert::acme::AcmeConfiguration, ip::IpSource, keys::KeyCertPathPair};
+use crate::{cert::acme::AcmeConfiguration, ip::IpSource, keys::KeyCertPaths};
 use plane_core::{nats_connection::NatsConnectionSpec, types::DroneId};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -101,7 +101,7 @@ pub struct DroneConfig {
 
     /// Paths to certificate and private key files. Required by proxy and
     /// certificate refresh.
-    pub cert: Option<KeyCertPathPair>,
+    pub cert: Option<KeyCertPaths>,
 
     /// Settings for ACME certificate refresh. If not provided, certificates
     /// are not refreshed by this drone process.
