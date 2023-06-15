@@ -34,8 +34,8 @@ async fn respond_to_schedule_req(
         tracing::info!(lock=%lock, "Request includes lock.");
 
         if let Some(lock_ready) = lock_to_ready.get(lock) {
-			lock_ready.notified().await;
-			lock_to_ready.remove(lock);
+            lock_ready.notified().await;
+            lock_to_ready.remove(lock);
         }
 
         let locked = {
@@ -109,9 +109,9 @@ async fn respond_to_schedule_req(
                         .await?;
 
                     if let Some(lock) = schedule_request.value.lock.clone() {
-						if let Ok(notify) = state.state().get_listener(seq_id) {
-							lock_to_ready.insert(lock, notify);
-						}
+                        if let Ok(notify) = state.state().get_listener(seq_id) {
+                            lock_to_ready.insert(lock, notify);
+                        }
                     }
 
                     Ok(ScheduleResponse::Scheduled {
