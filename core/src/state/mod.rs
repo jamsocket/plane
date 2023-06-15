@@ -14,12 +14,12 @@ async fn get_world_state_from_sub(
     let mut world_state = WorldState::default();
 
     while sub.has_pending() {
-        let (message, _) = sub
+        let (message, meta) = sub
             .next()
             .await
             .ok_or_else(|| anyhow!("State stream closed before pending messages read."))?;
 
-        world_state.apply(message);
+        world_state.apply(message, meta.sequence);
     }
 
     Ok(world_state)
@@ -44,8 +44,8 @@ pub async fn start_state_loop(nc: TypedNats) -> Result<StateHandle> {
     {
         let state_handle = state_handle.clone();
         tokio::spawn(async move {
-            while let Some((message, _)) = sub.next().await {
-                state_handle.write_state().apply(message);
+            while let Some((message, meta)) = sub.next().await {
+                state_handle.write_state().apply(message, meta.sequence);
             }
         });
     }

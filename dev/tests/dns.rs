@@ -118,7 +118,7 @@ async fn dns_txt_record() {
         message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
             value: "foobar".into(),
         }),
-    });
+    }, 1);
     let dns = DnsServer::new(state).unwrap();
     let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
     assert_eq!(vec!["foobar".to_string()], result);
@@ -132,13 +132,13 @@ async fn dns_multi_txt_record() {
         message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
             value: "foobar".into(),
         }),
-    });
+    }, 1);
     state.apply(WorldStateMessage {
         cluster: ClusterName::new("plane.test"),
         message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
             value: "foobaz".into(),
         }),
-    });
+    }, 2);
     let dns = DnsServer::new(state).unwrap();
 
     let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
@@ -159,7 +159,7 @@ async fn dns_a_record() {
                 git_hash: None,
             }),
         }),
-    });
+    }, 1);
     state.apply(WorldStateMessage {
         cluster: ClusterName::new("plane.test"),
         message: ClusterStateMessage::BackendMessage(BackendMessage {
@@ -170,7 +170,7 @@ async fn dns_a_record() {
                 bearer_token: None,
             },
         }),
-    });
+    }, 2);
 
     let dns = DnsServer::new(state).unwrap();
 
