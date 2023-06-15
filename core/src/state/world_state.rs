@@ -57,13 +57,15 @@ impl StateHandle {
 
 #[derive(Default, Debug)]
 pub struct WorldState {
+    logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
 }
 
 impl WorldState {
-    pub fn apply(&mut self, message: WorldStateMessage) {
+    pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
         let cluster = self.clusters.entry(message.cluster.clone()).or_default();
         cluster.apply(message.message);
+        self.logical_time = sequence;
     }
 
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterState> {
