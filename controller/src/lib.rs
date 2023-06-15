@@ -7,7 +7,7 @@ use plane_core::{
         scheduler::{ScheduleRequest, ScheduleResponse},
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
-    nats::{JetStreamable, MessageWithResponseHandle, TypedNats},
+    nats::{MessageWithResponseHandle, TypedNats},
     state::StateHandle,
     timing::Timer,
     NeverResult,
