@@ -10,17 +10,22 @@ use crate::{
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, VecDeque},
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
+use tokio::sync::Notify;
 
 #[derive(Default, Debug, Clone)]
-pub struct StateHandle(Arc<RwLock<WorldState>>);
+pub struct StateHandle {
+    state: Arc<RwLock<WorldState>>,
+}
 
 impl StateHandle {
     pub fn new(world_state: WorldState) -> Self {
-        Self(Arc::new(RwLock::new(world_state)))
+        Self {
+            state: Arc::new(RwLock::new(world_state)),
+        }
     }
 
     pub fn get_ready_drones(
@@ -28,7 +33,10 @@ impl StateHandle {
         cluster: &ClusterName,
         timestamp: DateTime<Utc>,
     ) -> Result<Vec<DroneId>> {
-        let world_state = self.0.read().expect("Could not acquire world_state lock.");
+        let world_state = self
+            .state
+            .read()
+            .expect("Could not acquire world_state lock.");
 
         let min_keepalive = timestamp - chrono::Duration::seconds(30);
 
@@ -47,11 +55,24 @@ impl StateHandle {
     }
 
     pub fn state(&self) -> RwLockReadGuard<WorldState> {
-        self.0.read().expect("Could not acquire world_state lock.")
+        self.state
+            .read()
+            .expect("Could not acquire world_state lock.")
     }
 
     pub(crate) fn write_state(&self) -> RwLockWriteGuard<WorldState> {
-        self.0.write().expect("Could not acquire world_state lock.")
+        self.state
+            .write()
+            .expect("Could not acquire world_state lock.")
+    }
+
+    /** Block asynchronously until the given sequence number is reached. */
+    pub async fn wait_for_seq(&self, sequence: u64) {
+        if self.state().logical_time >= sequence {
+            return;
+        }
+        let receiver = { self.write_state().get_listener(sequence) };
+        let _ = receiver.notified().await;
     }
 }
 
@@ -59,13 +80,29 @@ impl StateHandle {
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
+    listeners: HashMap<u64, Arc<Notify>>,
 }
 
 impl WorldState {
+    pub fn get_listener(&mut self, sequence: u64) -> Arc<Notify> {
+        match self.listeners.entry(sequence) {
+            Entry::Occupied(entry) => entry.get().clone(),
+            Entry::Vacant(entry) => {
+                let notify = Arc::new(Notify::new());
+                entry.insert(notify.clone());
+                notify
+            }
+        }
+    }
+
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
         let cluster = self.clusters.entry(message.cluster.clone()).or_default();
         cluster.apply(message.message);
         self.logical_time = sequence;
+
+        if let Some(sender) = self.listeners.remove(&sequence) {
+            sender.notify_waiters();
+        }
     }
 
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterState> {
@@ -217,7 +254,65 @@ impl BackendState {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::messages::state::BackendMessage;
+    use crate::messages::state::{AcmeDnsRecord, BackendMessage};
+    use std::time::Duration;
+    use tokio::time::timeout;
+
+    #[tokio::test]
+    async fn test_wait_for_seq() {
+        let state = StateHandle::default();
+
+        timeout(Duration::from_secs(0), state.wait_for_seq(0))
+            .await
+            .expect("wait_for_seq(0) should return immediately");
+
+        // wait_for_seq(1) should block.
+        let seq1_1 = state.wait_for_seq(1);
+        let seq1_2 = state.wait_for_seq(1);
+        let seq2_1 = state.wait_for_seq(2);
+        let seq2_2 = state.wait_for_seq(2);
+        {
+            let result = timeout(Duration::from_secs(0), seq1_1).await;
+            assert!(result.is_err());
+        }
+
+        state.write_state().apply(
+            WorldStateMessage {
+                cluster: ClusterName::new("cluster"),
+                message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
+                    value: "value".into(),
+                }),
+            },
+            1,
+        );
+
+        // wait_for_seq(1) should now return.
+        timeout(Duration::from_secs(0), seq1_2)
+            .await
+            .expect("wait_for_seq(1) should return immediately");
+
+        {
+            let result = timeout(Duration::from_secs(0), seq2_1).await;
+            assert!(result.is_err());
+        }
+
+        state.write_state().apply(
+            WorldStateMessage {
+                cluster: ClusterName::new("cluster"),
+                message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
+                    value: "value".into(),
+                }),
+            },
+            2,
+        );
+
+        // wait_for_seq(2) should now return.
+        {
+            timeout(Duration::from_secs(0), seq2_2)
+                .await
+                .expect("wait_for_seq(2) should return immediately");
+        }
+    }
 
     #[test]
     fn test_locks() {
