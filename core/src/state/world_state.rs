@@ -9,6 +9,8 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
+use dashmap::DashMap;
+use tokio::sync::Notify;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     net::IpAddr,
@@ -16,11 +18,15 @@ use std::{
 };
 
 #[derive(Default, Debug, Clone)]
-pub struct StateHandle(Arc<RwLock<WorldState>>);
+pub struct StateHandle {
+    state: Arc<RwLock<WorldState>>,
+}
 
 impl StateHandle {
     pub fn new(world_state: WorldState) -> Self {
-        Self(Arc::new(RwLock::new(world_state)))
+        Self {
+            state: Arc::new(RwLock::new(world_state)),
+        }
     }
 
     pub fn get_ready_drones(
@@ -28,7 +34,7 @@ impl StateHandle {
         cluster: &ClusterName,
         timestamp: DateTime<Utc>,
     ) -> Result<Vec<DroneId>> {
-        let world_state = self.0.read().expect("Could not acquire world_state lock.");
+        let world_state = self.state.read().expect("Could not acquire world_state lock.");
 
         let min_keepalive = timestamp - chrono::Duration::seconds(30);
 
@@ -47,11 +53,21 @@ impl StateHandle {
     }
 
     pub fn state(&self) -> RwLockReadGuard<WorldState> {
-        self.0.read().expect("Could not acquire world_state lock.")
+        self.state.read().expect("Could not acquire world_state lock.")
     }
 
     pub(crate) fn write_state(&self) -> RwLockWriteGuard<WorldState> {
-        self.0.write().expect("Could not acquire world_state lock.")
+        self.state.write().expect("Could not acquire world_state lock.")
+    }
+
+    /** Block asynchronously until the given sequence number is reached. */
+    pub async fn wait_for_seq(&self, sequence: u64) {
+        if self.state().logical_time >= sequence {
+            return;
+        }
+        let notify = Arc::new(Notify::new());
+        self.write_state().add_listener(sequence, notify.clone());
+        notify.notified().await;
     }
 }
 
@@ -59,13 +75,28 @@ impl StateHandle {
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
+    listeners: Arc<DashMap<u64, Vec<Arc<Notify>>>>,
 }
 
 impl WorldState {
+    pub fn add_listener(&mut self, sequence: u64, notify: Arc<Notify>) {
+        let mut listeners = self
+            .listeners
+            .entry(sequence)
+            .or_insert_with(Vec::new);
+        listeners.push(notify);
+    }
+
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
         let cluster = self.clusters.entry(message.cluster.clone()).or_default();
         cluster.apply(message.message);
         self.logical_time = sequence;
+
+        if let Some((_, listeners)) = self.listeners.remove(&sequence) {
+            for notify in listeners {
+                notify.notify_one();
+            }
+        }
     }
 
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterState> {
