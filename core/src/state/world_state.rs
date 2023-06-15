@@ -10,12 +10,12 @@ use crate::{
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use tokio::sync::Notify;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
+use tokio::sync::Notify;
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -34,7 +34,10 @@ impl StateHandle {
         cluster: &ClusterName,
         timestamp: DateTime<Utc>,
     ) -> Result<Vec<DroneId>> {
-        let world_state = self.state.read().expect("Could not acquire world_state lock.");
+        let world_state = self
+            .state
+            .read()
+            .expect("Could not acquire world_state lock.");
 
         let min_keepalive = timestamp - chrono::Duration::seconds(30);
 
@@ -53,11 +56,15 @@ impl StateHandle {
     }
 
     pub fn state(&self) -> RwLockReadGuard<WorldState> {
-        self.state.read().expect("Could not acquire world_state lock.")
+        self.state
+            .read()
+            .expect("Could not acquire world_state lock.")
     }
 
     pub(crate) fn write_state(&self) -> RwLockWriteGuard<WorldState> {
-        self.state.write().expect("Could not acquire world_state lock.")
+        self.state
+            .write()
+            .expect("Could not acquire world_state lock.")
     }
 
     /** Block asynchronously until the given sequence number is reached. */
@@ -80,10 +87,7 @@ pub struct WorldState {
 
 impl WorldState {
     pub fn add_listener(&mut self, sequence: u64, notify: Arc<Notify>) {
-        let mut listeners = self
-            .listeners
-            .entry(sequence)
-            .or_insert_with(Vec::new);
+        let mut listeners = self.listeners.entry(sequence).or_insert_with(Vec::new);
         listeners.push(notify);
     }
 

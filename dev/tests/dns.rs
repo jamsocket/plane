@@ -113,12 +113,15 @@ async fn dns_bad_request() {
 #[integration_test]
 async fn dns_txt_record() {
     let mut state = WorldState::default();
-    state.apply(WorldStateMessage {
-        cluster: ClusterName::new("plane.test"),
-        message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
-            value: "foobar".into(),
-        }),
-    }, 1);
+    state.apply(
+        WorldStateMessage {
+            cluster: ClusterName::new("plane.test"),
+            message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
+                value: "foobar".into(),
+            }),
+        },
+        1,
+    );
     let dns = DnsServer::new(state).unwrap();
     let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
     assert_eq!(vec!["foobar".to_string()], result);
@@ -127,18 +130,24 @@ async fn dns_txt_record() {
 #[integration_test]
 async fn dns_multi_txt_record() {
     let mut state = WorldState::default();
-    state.apply(WorldStateMessage {
-        cluster: ClusterName::new("plane.test"),
-        message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
-            value: "foobar".into(),
-        }),
-    }, 1);
-    state.apply(WorldStateMessage {
-        cluster: ClusterName::new("plane.test"),
-        message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
-            value: "foobaz".into(),
-        }),
-    }, 2);
+    state.apply(
+        WorldStateMessage {
+            cluster: ClusterName::new("plane.test"),
+            message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
+                value: "foobar".into(),
+            }),
+        },
+        1,
+    );
+    state.apply(
+        WorldStateMessage {
+            cluster: ClusterName::new("plane.test"),
+            message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
+                value: "foobaz".into(),
+            }),
+        },
+        2,
+    );
     let dns = DnsServer::new(state).unwrap();
 
     let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
@@ -149,28 +158,34 @@ async fn dns_multi_txt_record() {
 async fn dns_a_record() {
     let drone_id = DroneId::new_random();
     let mut state = WorldState::default();
-    state.apply(WorldStateMessage {
-        cluster: ClusterName::new("plane.test"),
-        message: ClusterStateMessage::DroneMessage(DroneMessage {
-            drone: drone_id.clone(),
-            message: DroneMessageType::Metadata(DroneMeta {
-                ip: Ipv4Addr::new(12, 12, 12, 12).into(),
-                version: "0.1.0".into(),
-                git_hash: None,
-            }),
-        }),
-    }, 1);
-    state.apply(WorldStateMessage {
-        cluster: ClusterName::new("plane.test"),
-        message: ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: BackendId::new("louie".to_string()),
-            message: BackendMessageType::Assignment {
+    state.apply(
+        WorldStateMessage {
+            cluster: ClusterName::new("plane.test"),
+            message: ClusterStateMessage::DroneMessage(DroneMessage {
                 drone: drone_id.clone(),
-                lock: None,
-                bearer_token: None,
-            },
-        }),
-    }, 2);
+                message: DroneMessageType::Metadata(DroneMeta {
+                    ip: Ipv4Addr::new(12, 12, 12, 12).into(),
+                    version: "0.1.0".into(),
+                    git_hash: None,
+                }),
+            }),
+        },
+        1,
+    );
+    state.apply(
+        WorldStateMessage {
+            cluster: ClusterName::new("plane.test"),
+            message: ClusterStateMessage::BackendMessage(BackendMessage {
+                backend: BackendId::new("louie".to_string()),
+                message: BackendMessageType::Assignment {
+                    drone: drone_id.clone(),
+                    lock: None,
+                    bearer_token: None,
+                },
+            }),
+        },
+        2,
+    );
 
     let dns = DnsServer::new(state).unwrap();
 
