@@ -9,8 +9,10 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
+use dashmap::mapref::entry::Entry;
+use dashmap::DashMap;
 use std::{
-    collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
@@ -68,24 +70,24 @@ impl StateHandle {
 
     /** Block asynchronously until the given sequence number is reached. */
     pub async fn wait_for_seq(&self, sequence: u64) {
-        if let Ok(receiver) = self.write_state().get_listener(sequence) {
+        if let Ok(receiver) = self.state().get_listener(sequence) {
             let _ = receiver.notified().await;
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SequenceNumberInThePast;
 
 #[derive(Default, Debug)]
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: HashMap<u64, Arc<Notify>>,
+    listeners: DashMap<u64, Arc<Notify>>,
 }
 
 impl WorldState {
-    pub fn get_listener(&mut self, sequence: u64) -> Result<Arc<Notify>, SequenceNumberInThePast> {
+    pub fn get_listener(&self, sequence: u64) -> Result<Arc<Notify>, SequenceNumberInThePast> {
         if self.logical_time >= sequence {
             return Err(SequenceNumberInThePast);
         }
@@ -104,7 +106,7 @@ impl WorldState {
         cluster.apply(message.message);
         self.logical_time = sequence;
 
-        if let Some(sender) = self.listeners.remove(&sequence) {
+        if let Some((_, sender)) = self.listeners.remove(&sequence) {
             sender.notify_waiters();
         }
     }
