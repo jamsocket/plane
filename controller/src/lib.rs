@@ -29,7 +29,7 @@ async fn respond_to_schedule_req(
     nats: TypedNats,
     state: StateHandle,
 ) -> anyhow::Result<ScheduleResponse> {
-    Ok(if let Some(lock) = &schedule_request.value.lock {
+    if let Some(lock) = &schedule_request.value.lock {
         tracing::info!(lock=%lock, "Request includes lock.");
 
         if let Some(lock_ready_notifier) = lock_to_ready.get(lock) {
@@ -71,86 +71,81 @@ async fn respond_to_schedule_req(
                 (drone, bearer_token)
             };
 
-            ScheduleResponse::Scheduled {
+            return Ok(ScheduleResponse::Scheduled {
                 drone,
                 backend_id: backend,
                 bearer_token,
                 spawned: false,
-            }
-        } else {
-            ScheduleResponse::NoDroneAvailable
+            });
         }
-    } else {
-        match scheduler.schedule(&schedule_request.value.cluster, Utc::now()) {
-            Ok(drone_id) => {
-                let timer = Timer::new();
-                let spawn_request = schedule_request.value.schedule(&drone_id);
-                match nats.request(&spawn_request).await {
-                    Ok(true) => {
-                        tracing::info!(
-                            duration=?timer.duration(),
-                            backend_id=%spawn_request.backend_id,
-                            %drone_id,
-                            "Drone accepted backend."
-                        );
+    }
+    match scheduler.schedule(&schedule_request.value.cluster, Utc::now()) {
+        Ok(drone_id) => {
+            let timer = Timer::new();
+            let spawn_request = schedule_request.value.schedule(&drone_id);
+            match nats.request(&spawn_request).await {
+                Ok(true) => {
+                    tracing::info!(
+                        duration=?timer.duration(),
+                        backend_id=%spawn_request.backend_id,
+                        %drone_id,
+                        "Drone accepted backend."
+                    );
 
-                        let seq_id = nats
-                            .publish_jetstream(&WorldStateMessage {
-                                cluster: schedule_request.value.cluster.clone(),
-                                message: ClusterStateMessage::BackendMessage(BackendMessage {
-                                    backend: spawn_request.backend_id.clone(),
-                                    message: BackendMessageType::Assignment {
-                                        drone: drone_id.clone(),
-                                        lock: schedule_request.value.lock.clone(),
-                                        bearer_token: spawn_request.bearer_token.clone(),
-                                    },
-                                }),
-                            })
-                            .await?;
+                    let seq_id = nats
+                        .publish_jetstream(&WorldStateMessage {
+                            cluster: schedule_request.value.cluster.clone(),
+                            message: ClusterStateMessage::BackendMessage(BackendMessage {
+                                backend: spawn_request.backend_id.clone(),
+                                message: BackendMessageType::Assignment {
+                                    drone: drone_id.clone(),
+                                    lock: schedule_request.value.lock.clone(),
+                                    bearer_token: spawn_request.bearer_token.clone(),
+                                },
+                            }),
+                        })
+                        .await?;
 
-                        if let Some(lock) = schedule_request.value.lock.clone() {
-                            let notify = std::sync::Arc::new(Notify::new());
-                            lock_to_ready.insert(lock, notify.clone());
-                            tokio::spawn(async move {
-                                while let Ok(current_seq) = nats
-                                    .get_current_seq_id(
-                                        WorldStateMessage::stream_name().to_string(),
-                                    )
-                                    .await
-                                {
-                                    if current_seq > seq_id {
-                                        break;
-                                    };
-                                }
-                                notify.notify_one();
-                            });
-                        }
+                    if let Some(lock) = schedule_request.value.lock.clone() {
+                        let notify = std::sync::Arc::new(Notify::new());
+                        lock_to_ready.insert(lock, notify.clone());
+                        tokio::spawn(async move {
+                            while let Ok(current_seq) = nats
+                                .get_current_seq_id(WorldStateMessage::stream_name().to_string())
+                                .await
+                            {
+                                if current_seq > seq_id {
+                                    break;
+                                };
+                            }
+                            notify.notify_one();
+                        });
+                    }
 
-                        ScheduleResponse::Scheduled {
-                            drone: drone_id,
-                            backend_id: spawn_request.backend_id,
-                            bearer_token: spawn_request.bearer_token.clone(),
-                            spawned: true,
-                        }
-                    }
-                    Ok(false) => {
-                        tracing::warn!("Drone rejected backend.");
-                        ScheduleResponse::NoDroneAvailable
-                    }
-                    Err(error) => {
-                        tracing::warn!(?error, "Scheduler returned error.");
-                        ScheduleResponse::NoDroneAvailable
-                    }
+                    return Ok(ScheduleResponse::Scheduled {
+                        drone: drone_id,
+                        backend_id: spawn_request.backend_id,
+                        bearer_token: spawn_request.bearer_token.clone(),
+                        spawned: true,
+                    });
+                }
+                Ok(false) => {
+                    tracing::warn!("Drone rejected backend.");
+                    return Ok(ScheduleResponse::NoDroneAvailable);
+                }
+                Err(error) => {
+                    tracing::warn!(?error, "Scheduler returned error.");
+                    return Ok(ScheduleResponse::NoDroneAvailable);
                 }
             }
-            Err(error) => match error {
-                SchedulerError::NoDroneAvailable => {
-                    tracing::warn!("No drone available.");
-                    ScheduleResponse::NoDroneAvailable
-                }
-            },
         }
-    })
+        Err(error) => match error {
+            SchedulerError::NoDroneAvailable => {
+                tracing::warn!("No drone available.");
+                return Ok(ScheduleResponse::NoDroneAvailable);
+            }
+        },
+    }
 }
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     let scheduler = Scheduler::new(state.clone());
