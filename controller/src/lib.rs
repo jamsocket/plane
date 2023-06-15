@@ -113,9 +113,9 @@ async fn respond_to_schedule_req(
                         let notify = std::sync::Arc::new(Notify::new());
                         lock_to_ready.insert(lock, notify.clone());
                         tokio::spawn(async move {
-							while state.state().get_logical_time() < seq_id {
-								tokio::time::sleep(std::time::Duration::from_millis(50)).await
-							};
+                            while state.state().get_logical_time() < seq_id {
+                                tokio::time::sleep(std::time::Duration::from_millis(50)).await
+                            }
                             notify.notify_one();
                         });
                     }
