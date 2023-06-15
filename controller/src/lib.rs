@@ -120,20 +120,20 @@ async fn respond_to_schedule_req(
                         });
                     }
 
-                    return Ok(ScheduleResponse::Scheduled {
+                    Ok(ScheduleResponse::Scheduled {
                         drone: drone_id,
                         backend_id: spawn_request.backend_id,
                         bearer_token: spawn_request.bearer_token.clone(),
                         spawned: true,
-                    });
+                    })
                 }
                 Ok(false) => {
                     tracing::warn!("Drone rejected backend.");
-                    return Ok(ScheduleResponse::NoDroneAvailable);
+                    Ok(ScheduleResponse::NoDroneAvailable)
                 }
                 Err(error) => {
                     tracing::warn!(?error, "Scheduler returned error.");
-                    return Ok(ScheduleResponse::NoDroneAvailable);
+                    Ok(ScheduleResponse::NoDroneAvailable)
                 }
             }
         }
