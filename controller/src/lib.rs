@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use crate::scheduler::SchedulerError;
 use anyhow::anyhow;
 use chrono::Utc;
-use dashmap::DashMap;
 use plane_core::{
     messages::{
         scheduler::{ScheduleRequest, ScheduleResponse},
@@ -25,18 +26,16 @@ mod scheduler;
 async fn respond_to_schedule_req(
     scheduler: Scheduler,
     schedule_request: &MessageWithResponseHandle<ScheduleRequest>,
-    lock_to_ready: DashMap<String, std::sync::Arc<Notify>>,
+    mut lock_to_ready: HashMap<String, std::sync::Arc<Notify>>,
     nats: TypedNats,
-    state: StateHandle,
+    ref state: StateHandle,
 ) -> anyhow::Result<ScheduleResponse> {
     if let Some(lock) = &schedule_request.value.lock {
         tracing::info!(lock=%lock, "Request includes lock.");
 
-        if let Some(lock_ready_notifier) = lock_to_ready.get(lock) {
-            lock_ready_notifier.notified().await;
-            lock_to_ready
-                .remove(lock)
-                .expect("just checked that lock existed in readiness map");
+        if let Some(lock_ready) = lock_to_ready.get(lock) {
+			lock_ready.notified().await;
+			lock_to_ready.remove(lock);
         }
 
         let locked = {
@@ -110,14 +109,9 @@ async fn respond_to_schedule_req(
                         .await?;
 
                     if let Some(lock) = schedule_request.value.lock.clone() {
-                        let notify = std::sync::Arc::new(Notify::new());
-                        lock_to_ready.insert(lock, notify.clone());
-                        tokio::spawn(async move {
-                            while state.state().get_logical_time() < seq_id {
-                                tokio::time::sleep(std::time::Duration::from_millis(50)).await
-                            }
-                            notify.notify_one();
-                        });
+						if let Ok(notify) = state.state().get_listener(seq_id) {
+							lock_to_ready.insert(lock, notify);
+						}
                     }
 
                     Ok(ScheduleResponse::Scheduled {
@@ -149,7 +143,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     let scheduler = Scheduler::new(state.clone());
     let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
-    let lock_to_ready: DashMap<String, std::sync::Arc<Notify>> = DashMap::new();
+    let lock_to_ready: HashMap<String, std::sync::Arc<Notify>> = HashMap::new();
 
     //wrap the whole thing in a func
     while let Some(schedule_request) = schedule_request_sub.next().await {
