@@ -134,7 +134,7 @@ async fn respond_to_schedule_req(
         Err(error) => match error {
             SchedulerError::NoDroneAvailable => {
                 tracing::warn!("No drone available.");
-                return Ok(ScheduleResponse::NoDroneAvailable);
+                Ok(ScheduleResponse::NoDroneAvailable)
             }
         },
     }
