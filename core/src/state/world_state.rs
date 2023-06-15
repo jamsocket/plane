@@ -9,13 +9,12 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use dashmap::DashMap;
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, VecDeque},
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use tokio::sync::Notify;
+use tokio::sync::broadcast::{Receiver, Sender};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -72,9 +71,10 @@ impl StateHandle {
         if self.state().logical_time >= sequence {
             return;
         }
-        let notify = Arc::new(Notify::new());
-        self.write_state().add_listener(sequence, notify.clone());
-        notify.notified().await;
+        let mut receiver = {
+            self.write_state().get_listener(sequence)
+        };
+        let _ = receiver.recv().await;
     }
 }
 
@@ -82,13 +82,19 @@ impl StateHandle {
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: Arc<DashMap<u64, Vec<Arc<Notify>>>>,
+    listeners: HashMap<u64, Sender<()>>,
 }
 
 impl WorldState {
-    pub fn add_listener(&mut self, sequence: u64, notify: Arc<Notify>) {
-        let mut listeners = self.listeners.entry(sequence).or_insert_with(Vec::new);
-        listeners.push(notify);
+    pub fn get_listener(&mut self, sequence: u64) -> Receiver<()> {
+        match self.listeners.entry(sequence) {
+            Entry::Occupied(entry) => entry.get().subscribe(),
+            Entry::Vacant(entry) => {
+                let (tx, rx) = tokio::sync::broadcast::channel(1);
+                entry.insert(tx);
+                rx
+            }
+        }
     }
 
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
@@ -96,10 +102,8 @@ impl WorldState {
         cluster.apply(message.message);
         self.logical_time = sequence;
 
-        if let Some((_, listeners)) = self.listeners.remove(&sequence) {
-            for notify in listeners {
-                notify.notify_one();
-            }
+        if let Some(sender) = self.listeners.remove(&sequence) {
+            let _ = sender.send(());
         }
     }
 
