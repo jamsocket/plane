@@ -14,6 +14,7 @@ COPY . .
 
 #note: this is safe because build container is transitory
 ENV SCCACHE_BUCKET=$SCCACHE_BUCKET AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID SCCACHE_REGION=$AWS_REGION
+ENV SCCACHE_C_CUSTOM_CACHE_BUSTER=drone
 
 RUN test $SCCACHE_BUCKET && \
     { RUSTC_WRAPPER=/usr/local/bin/sccache cargo build --bin=plane-drone --release && sccache --show-stats ; } || \
