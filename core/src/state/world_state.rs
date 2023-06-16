@@ -258,20 +258,21 @@ mod test {
     use tokio::time::timeout;
 
     #[tokio::test]
-    async fn test_wait_for_seq() {
+    async fn test_listener() {
         let state = StateHandle::default();
 
-        timeout(Duration::from_secs(0), state.wait_for_seq(0))
+        let zerolistener = state.state().get_listener(0).unwrap();
+        timeout(Duration::from_secs(0), zerolistener.notified())
             .await
             .expect("wait_for_seq(0) should return immediately");
 
-        // wait_for_seq(1) should block.
-        let seq1_1 = state.wait_for_seq(1);
-        let seq1_2 = state.wait_for_seq(1);
-        let seq2_1 = state.wait_for_seq(2);
-        let seq2_2 = state.wait_for_seq(2);
+        let onelistener = state.state().get_listener(1).unwrap();
+        let onelistener_2 = state.state().get_listener(1).unwrap();
+        let twolistener = state.state().get_listener(2).unwrap();
+        let twolistener_2 = state.state().get_listener(2).unwrap();
+        // onelistener should block.
         {
-            let result = timeout(Duration::from_secs(0), seq1_1).await;
+            let result = timeout(Duration::from_secs(0), onelistener.notified()).await;
             assert!(result.is_err());
         }
 
@@ -285,13 +286,14 @@ mod test {
             1,
         );
 
-        // wait_for_seq(1) should now return.
-        timeout(Duration::from_secs(0), seq1_2)
+        // onelistener should now return.
+        timeout(Duration::from_secs(0), onelistener_2.notified())
             .await
             .expect("wait_for_seq(1) should return immediately");
 
+        // twolistener should block
         {
-            let result = timeout(Duration::from_secs(0), seq2_1).await;
+            let result = timeout(Duration::from_secs(0), twolistener.notified()).await;
             assert!(result.is_err());
         }
 
@@ -305,9 +307,9 @@ mod test {
             2,
         );
 
-        // wait_for_seq(2) should now return.
+        // twolistener should now return.
         {
-            timeout(Duration::from_secs(0), seq2_2)
+            timeout(Duration::from_secs(0), twolistener_2.notified())
                 .await
                 .expect("wait_for_seq(2) should return immediately");
         }
