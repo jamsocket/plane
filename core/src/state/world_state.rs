@@ -14,9 +14,14 @@ use dashmap::DashMap;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     net::IpAddr,
+    ops::DerefMut,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use tokio::sync::Notify;
+use tokio::sync::{
+    broadcast::{Receiver, Sender},
+    mpsc::{UnboundedReceiver, UnboundedSender},
+    Mutex,
+};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -72,23 +77,53 @@ impl StateHandle {
 #[derive(Debug, Clone)]
 pub struct SequenceNumberInThePast;
 
+#[derive(Debug)]
+pub struct ClosableNotifier {
+    notifier: Sender<()>,
+}
+
+#[derive(Debug)]
+pub struct ClosableNotify(Receiver<()>);
+
+impl ClosableNotify {
+    pub async fn notified(&mut self) {
+        let _ = self.0.recv().await;
+    }
+}
+
+impl ClosableNotifier {
+    fn new() -> Self {
+        let (tx, _rx) = tokio::sync::broadcast::channel(128);
+        Self { notifier: tx }
+    }
+
+    fn notify(&self) -> ClosableNotify {
+        ClosableNotify(self.notifier.subscribe())
+    }
+
+    fn notify_waiters(&mut self) {
+        let _ = self.notifier.send(());
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: DashMap<u64, Arc<Notify>>,
+    listeners: DashMap<u64, ClosableNotifier>,
 }
 
 impl WorldState {
-    pub fn get_listener(&self, sequence: u64) -> Result<Arc<Notify>, SequenceNumberInThePast> {
+    pub fn get_listener(&self, sequence: u64) -> Result<ClosableNotify, SequenceNumberInThePast> {
         if self.logical_time >= sequence {
             return Err(SequenceNumberInThePast);
         }
         match self.listeners.entry(sequence) {
-            Entry::Occupied(entry) => Ok(entry.get().clone()),
+            Entry::Occupied(entry) => Ok(entry.get().notify()),
             Entry::Vacant(entry) => {
-                let notify = Arc::new(Notify::new());
-                entry.insert(notify.clone());
+                let notifier = ClosableNotifier::new();
+                let notify = notifier.notify();
+                entry.insert(notifier);
                 Ok(notify)
             }
         }
@@ -99,7 +134,7 @@ impl WorldState {
         cluster.apply(message.message);
         self.logical_time = sequence;
 
-        if let Some((_, sender)) = self.listeners.remove(&sequence) {
+        if let Some((_, mut sender)) = self.listeners.remove(&sequence) {
             sender.notify_waiters();
         }
     }
@@ -261,15 +296,13 @@ mod test {
     async fn test_listener() {
         let state = StateHandle::default();
 
-        let zerolistener = state.state().get_listener(0).unwrap();
-        timeout(Duration::from_secs(0), zerolistener.notified())
-            .await
-            .expect("wait_for_seq(0) should return immediately");
+        let zerolistener = state.state().get_listener(0);
+        assert!(zerolistener.is_err());
 
-        let onelistener = state.state().get_listener(1).unwrap();
-        let onelistener_2 = state.state().get_listener(1).unwrap();
-        let twolistener = state.state().get_listener(2).unwrap();
-        let twolistener_2 = state.state().get_listener(2).unwrap();
+        let mut onelistener = state.state().get_listener(1).unwrap();
+        let mut onelistener_2 = state.state().get_listener(1).unwrap();
+        let mut twolistener = state.state().get_listener(2).unwrap();
+        let mut twolistener_2 = state.state().get_listener(2).unwrap();
         // onelistener should block.
         {
             let result = timeout(Duration::from_secs(0), onelistener.notified()).await;
