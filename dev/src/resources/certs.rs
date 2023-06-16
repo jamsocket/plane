@@ -1,5 +1,5 @@
 use anyhow::Result;
-use plane_drone::keys::KeyCertPathPair;
+use plane_drone::keys::KeyCertPaths;
 use rcgen::generate_simple_self_signed;
 use std::{
     fs::{self, create_dir_all},
@@ -12,7 +12,7 @@ pub struct SelfSignedCert {
     pub key_pem: String,
     pub cert_pem: String,
     path: PathBuf,
-    pub path_pair: KeyCertPathPair,
+    pub path_pair: KeyCertPaths,
 }
 
 impl SelfSignedCert {
@@ -22,6 +22,7 @@ impl SelfSignedCert {
 
         let key_path = path.join("selfsigned.key");
         let cert_path = path.join("selfsigned.pem");
+        let account_path = path.join("account.key");
 
         let cert = generate_simple_self_signed(subject_alt_names)?;
 
@@ -31,9 +32,10 @@ impl SelfSignedCert {
         fs::write(&cert_path, &cert_pem)?;
         fs::write(&key_path, &key_pem)?;
 
-        let path_pair = KeyCertPathPair {
+        let path_pair = KeyCertPaths {
             cert_path,
             key_path,
+            account_key_path: Some(account_path),
         };
 
         Ok(SelfSignedCert {

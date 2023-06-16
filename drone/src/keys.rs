@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context, Result};
+use openssl::pkey::{PKey, Private};
 use rustls::{
     sign::{any_supported_type, CertifiedKey},
     Certificate, PrivateKey,
@@ -11,18 +12,39 @@ use std::{
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct KeyCertPathPair {
+pub struct KeyCertPaths {
     pub key_path: PathBuf,
     pub cert_path: PathBuf,
+    pub account_key_path: Option<PathBuf>,
 }
 
-impl KeyCertPathPair {
+impl KeyCertPaths {
     pub fn load_certified_key(&self) -> Result<CertifiedKey> {
         let certificate = load_certs(&self.cert_path).context("Loading certificates")?;
         let private_key = load_private_key(&self.key_path).context("Loading private key")?;
         let private_key = any_supported_type(&private_key).context("Parsing private key")?;
 
         Ok(CertifiedKey::new(certificate, private_key))
+    }
+
+    pub fn load_account_key(&self) -> Result<PKey<Private>> {
+        let Some(account_key_path) = &self.account_key_path else {
+            tracing::warn!("account_key_path not set; we will always generate a new account key.");
+            return acme2_eab::gen_rsa_private_key(4096).context("Generating private key");
+        };
+        let private_key: PKey<Private> = if account_key_path.exists() {
+            tracing::info!(?account_key_path, "Loading account key");
+            let pem = std::fs::read(account_key_path).context("Reading account key")?;
+            PKey::private_key_from_pem(&pem).context("Parsing account key")?
+        } else {
+            tracing::info!(?account_key_path, "Generating new account key.");
+            let private_key =
+                acme2_eab::gen_rsa_private_key(4096).context("Generating private key")?;
+            std::fs::write(account_key_path, private_key.private_key_to_pem_pkcs8()?)?;
+            private_key
+        };
+
+        Ok(private_key)
     }
 
     /// Return a vector of directories that we should listen for filesystem events on.

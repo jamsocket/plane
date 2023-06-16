@@ -1,4 +1,4 @@
-use crate::keys::KeyCertPathPair;
+use crate::keys::KeyCertPaths;
 use acme::AcmeEabConfiguration;
 use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
@@ -28,7 +28,7 @@ const MAX_SLEEP: Duration = Duration::from_secs(3600);
 pub struct CertOptions {
     pub cluster_domain: String,
     pub nats: TypedNats,
-    pub key_paths: KeyCertPathPair,
+    pub key_paths: KeyCertPaths,
     pub email: String,
     pub acme_server_url: String,
     pub acme_eab_keypair: Option<AcmeEabConfiguration>,
@@ -41,6 +41,7 @@ pub async fn get_certificate(
     mailto_email: &str,
     client: &Client,
     acme_eab_keypair: Option<&AcmeEabConfiguration>,
+    account_pkey: &PKey<Private>,
 ) -> Result<(PKey<Private>, Vec<X509>)> {
     let _span = tracing::info_span!("Getting certificate", %cluster_domain);
     let _span_guard = _span.enter();
@@ -52,6 +53,7 @@ pub async fn get_certificate(
         .context("Building directory")?;
 
     let mut builder = AccountBuilder::new(dir);
+    builder.private_key(account_pkey.clone());
     builder.contact(vec![format!("mailto:{}", mailto_email)]);
     if let Some(acme_eab_keypair) = acme_eab_keypair {
         let eab_key = PKey::hmac(&acme_eab_keypair.key).unwrap();
@@ -94,17 +96,21 @@ pub async fn get_certificate(
             return Err(anyhow!("Platform rejected TXT record."));
         }
 
-        tracing::info!("Validating challenge.");
-        let challenge = challenge.validate().await.context("Validating challenge")?;
-        let challenge = challenge
-            .wait_done(Duration::from_secs(5), 3)
-            .await
-            .context("Waiting for challenge")?;
         if challenge.status != ChallengeStatus::Valid {
-            tracing::warn!(?challenge, "Challenge status is not valid.");
-            return Err(anyhow!("ACME challenge failed."));
+            tracing::info!("Validating challenge.");
+            let challenge = challenge.validate().await.context("Validating challenge")?;
+            let challenge = challenge
+                .wait_done(Duration::from_secs(5), 3)
+                .await
+                .context("Waiting for challenge")?;
+            if challenge.status != ChallengeStatus::Valid {
+                tracing::warn!(?challenge, "Challenge status is not valid.");
+                return Err(anyhow!("ACME challenge failed."));
+            }    
+        } else {
+            tracing::info!("Challenge already valid.");
         }
-
+        
         tracing::info!("Validating authorization.");
         let authorization = auth
             .wait_done(Duration::from_secs(5), 3)
@@ -161,6 +167,7 @@ pub async fn get_certificate(
 
 pub async fn refresh_certificate(cert_options: &CertOptions, client: &Client) -> Result<()> {
     let nats = &cert_options.nats;
+    let account_pkey = cert_options.key_paths.load_account_key()?;
 
     let (pkey, certs) = get_certificate(
         &cert_options.cluster_domain,
@@ -169,6 +176,7 @@ pub async fn refresh_certificate(cert_options: &CertOptions, client: &Client) ->
         &cert_options.email,
         client,
         cert_options.acme_eab_keypair.as_ref(),
+        &account_pkey,
     )
     .await
     .context("Getting certificate")?;

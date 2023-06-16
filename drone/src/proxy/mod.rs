@@ -2,7 +2,7 @@ use self::{
     certs::CertRefresher, connection_tracker::ConnectionTracker, service::MakeProxyService,
     tls::TlsAcceptor,
 };
-use crate::{database::DroneDatabase, keys::KeyCertPathPair};
+use crate::{database::DroneDatabase, keys::KeyCertPaths};
 use anyhow::{anyhow, Context};
 use http::uri::Scheme;
 use http::StatusCode;
@@ -28,7 +28,7 @@ pub struct ProxyOptions {
     pub db: DroneDatabase,
     pub bind_ip: IpAddr,
     pub bind_port: u16,
-    pub key_pair: Option<KeyCertPathPair>,
+    pub key_pair: Option<KeyCertPaths>,
     pub bind_redir_port: Option<u16>,
     pub cluster_domain: String,
     pub passthrough: Option<SocketAddr>,
