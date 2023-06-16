@@ -14,7 +14,6 @@ use plane_core::{
     NeverResult,
 };
 use scheduler::Scheduler;
-use tokio::sync::Notify;
 
 mod config;
 pub mod dns;
@@ -26,16 +25,18 @@ mod scheduler;
 async fn respond_to_schedule_req(
     scheduler: Scheduler,
     schedule_request: &MessageWithResponseHandle<ScheduleRequest>,
-    mut lock_to_ready: HashMap<String, std::sync::Arc<Notify>>,
+    mut lock_to_ready: HashMap<String, u64>,
     nats: TypedNats,
     ref state: StateHandle,
 ) -> anyhow::Result<ScheduleResponse> {
     if let Some(lock) = &schedule_request.value.lock {
         tracing::info!(lock=%lock, "Request includes lock.");
 
-        if let Some(lock_ready) = lock_to_ready.get(lock) {
-            lock_ready.notified().await;
-            lock_to_ready.remove(lock);
+        if let Some(lock_ready) = lock_to_ready.remove(lock) {
+            let lock_notifier = state.state().get_listener(lock_ready);
+            if let Ok(mut lock_notifier) = lock_notifier {
+                lock_notifier.notified().await;
+            }
         }
 
         let locked = {
@@ -109,9 +110,7 @@ async fn respond_to_schedule_req(
                         .await?;
 
                     if let Some(lock) = schedule_request.value.lock.clone() {
-                        if let Ok(notify) = state.state().get_listener(seq_id) {
-                            lock_to_ready.insert(lock, notify);
-                        }
+                        lock_to_ready.insert(lock, seq_id);
                     }
 
                     Ok(ScheduleResponse::Scheduled {
@@ -143,7 +142,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     let scheduler = Scheduler::new(state.clone());
     let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
-    let lock_to_ready: HashMap<String, std::sync::Arc<Notify>> = HashMap::new();
+    let lock_to_ready: HashMap<String, u64> = HashMap::new();
 
     //wrap the whole thing in a func
     while let Some(schedule_request) = schedule_request_sub.next().await {
