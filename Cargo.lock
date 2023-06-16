@@ -1841,7 +1841,7 @@ dependencies = [
 
 [[package]]
 name = "plane-dev"
-version = "0.3.5"
+version = "0.3.23"
 dependencies = [
  "anyhow",
  "async-nats",
