@@ -14,9 +14,9 @@ dependencies = [
 
 [[package]]
 name = "acme2-eab"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5558047548cd686ed99f2d8fe7deb7e5441daeb3aef68c56707078c23ee93e30"
+checksum = "51597acd8e0be7cc375b5829160e0e023c40928b4c4ee93edad3210f8bff41bd"
 dependencies = [
  "base64 0.21.2",
  "hyper",
