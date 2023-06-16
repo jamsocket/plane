@@ -1,4 +1,4 @@
-FROM rust:1.79.0-buster as build
+FROM rust:1.70.0-buster as build
 
 ARG GIT_HASH
 ENV GIT_HASH=${GIT_HASH}
