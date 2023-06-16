@@ -14,13 +14,10 @@ use dashmap::DashMap;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     net::IpAddr,
-    ops::DerefMut,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 use tokio::sync::{
     broadcast::{Receiver, Sender},
-    mpsc::{UnboundedReceiver, UnboundedSender},
-    Mutex,
 };
 
 #[derive(Default, Debug, Clone)]
