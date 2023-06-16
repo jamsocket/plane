@@ -96,17 +96,21 @@ pub async fn get_certificate(
             return Err(anyhow!("Platform rejected TXT record."));
         }
 
-        tracing::info!("Validating challenge.");
-        let challenge = challenge.validate().await.context("Validating challenge")?;
-        let challenge = challenge
-            .wait_done(Duration::from_secs(5), 3)
-            .await
-            .context("Waiting for challenge")?;
         if challenge.status != ChallengeStatus::Valid {
-            tracing::warn!(?challenge, "Challenge status is not valid.");
-            return Err(anyhow!("ACME challenge failed."));
+            tracing::info!("Validating challenge.");
+            let challenge = challenge.validate().await.context("Validating challenge")?;
+            let challenge = challenge
+                .wait_done(Duration::from_secs(5), 3)
+                .await
+                .context("Waiting for challenge")?;
+            if challenge.status != ChallengeStatus::Valid {
+                tracing::warn!(?challenge, "Challenge status is not valid.");
+                return Err(anyhow!("ACME challenge failed."));
+            }    
+        } else {
+            tracing::info!("Challenge already valid.");
         }
-
+        
         tracing::info!("Validating authorization.");
         let authorization = auth
             .wait_done(Duration::from_secs(5), 3)
