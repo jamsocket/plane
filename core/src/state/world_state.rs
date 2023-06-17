@@ -72,7 +72,7 @@ impl StateHandle {
             return;
         }
         let receiver = { self.write_state().get_listener(sequence) };
-        let _ = receiver.notified().await;
+        receiver.notified().await;
     }
 }
 
