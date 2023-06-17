@@ -16,9 +16,7 @@ use std::{
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use tokio::sync::{
-    broadcast::{Receiver, Sender},
-};
+use tokio::sync::broadcast::{Receiver, Sender};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {

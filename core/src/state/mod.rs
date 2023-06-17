@@ -3,7 +3,7 @@ use crate::{
     nats::{JetstreamSubscription, TypedNats},
 };
 
-pub use self::world_state::{StateHandle, WorldState};
+pub use self::world_state::{SequenceNumberInThePast, ClosableNotify, ClusterState, StateHandle, WorldState};
 use anyhow::{anyhow, Result};
 
 mod world_state;

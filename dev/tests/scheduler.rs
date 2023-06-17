@@ -78,7 +78,7 @@ impl MockAgent {
         // Construct a scheduler request.
         let mut request = base_scheduler_request();
         request.require_bearer_token = request_bearer_token;
-        request.lock = lock;
+        request.lock = lock.clone();
 
         // Publish scheduler request, but defer waiting for response.
         let mut response_handle = self.nats.split_request(&request).await?;
@@ -129,6 +129,7 @@ impl MockAgent {
                 "Backend should be scheduled on the expected drone."
             );
         }
+		println!("schedule_drone {:?}; lock {:?}", result, lock);
 
         Ok(result)
     }
@@ -144,11 +145,12 @@ impl MockAgent {
         // Construct a scheduler request.
         let mut request = base_scheduler_request();
         request.require_bearer_token = request_bearer_token;
-        request.lock = lock;
+        request.lock = lock.clone();
 
         // Publish scheduler request, but defer waiting for response.
-        let result = self.nats.request(&request).await?;
+        let result = self.nats.request(&request).await.unwrap();
 
+        println!("schedule_locked {:?}; lock {:?}", result, lock.clone());
         match result {
             ScheduleResponse::Scheduled { spawned, .. } => {
                 assert_eq!(false, spawned, "Backend should not be spawned.");
@@ -157,6 +159,7 @@ impl MockAgent {
                 panic!("Expected ScheduleResponse::Scheduled, got {:?}", result);
             }
         }
+        println!("{:?}; lock {:?}", result, lock.clone());
 
         Ok(result)
     }
@@ -449,6 +452,19 @@ async fn schedule_request_lock() {
 
     let ScheduleResponse::Scheduled { drone: drone2, backend_id: backend2, .. } = r2 else {panic!()};
 
+    //scheduling multiple of the same lock should return the same drone
+    let (
+		Ok(ScheduleResponse::Scheduled { spawned: a, .. }),
+		Ok(ScheduleResponse::Scheduled { spawned: b, .. })
+	) = tokio::join!(
+			mock_agent.schedule_drone(&drone_id, false, Some("speedlock".to_string()))
+		,
+		async {
+			tokio::time::sleep(Duration::from_millis(300)).await;
+			mock_agent.schedule_locked(false, Some("speedlock".to_string())).await
+		}
+	) else { panic!("hello") };
+    assert_eq!(!a, b);
     assert_eq!(drone1, drone2);
     assert_eq!(backend1, backend2);
 }
