@@ -42,6 +42,7 @@ tokio-stream = "0.1.8"
 tracing = "0.1.36"
 async-trait = "0.1.58"
 serde_html_form = "0.2.0"
+containerd-client = "0.3.0"
 
 [[bin]]
 name = "plane-drone"

@@ -1,6 +1,6 @@
-use self::executor::Executor;
+use self::{executor::Executor, engine::Engine};
 use crate::{
-    agent::engines::docker::DockerInterface, config::DockerConfig, database::DroneDatabase,
+    agent::engines::{containerd::ContainerdInterface}, config::DockerConfig, database::DroneDatabase,
     ip::IpSource,
 };
 use anyhow::{anyhow, Result};
@@ -53,10 +53,10 @@ pub async fn wait_port_ready(addr: &SocketAddr) -> Result<()> {
     Ok(())
 }
 
-async fn listen_for_spawn_requests(
+async fn listen_for_spawn_requests<E: Engine>(
     cluster: &ClusterName,
     drone_id: &DroneId,
-    executor: Executor<DockerInterface>,
+    executor: Executor<E>,
     nats: TypedNats,
 ) -> NeverResult {
     let mut sub = nats
@@ -85,8 +85,8 @@ async fn listen_for_spawn_requests(
     }
 }
 
-async fn listen_for_termination_requests(
-    executor: Executor<DockerInterface>,
+async fn listen_for_termination_requests<E: Engine>(
+    executor: Executor<E>,
     nats: TypedNats,
     cluster: ClusterName,
 ) -> NeverResult {
@@ -177,8 +177,11 @@ async fn listen_for_drain(
 pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
     let nats = &agent_opts.nats;
 
-    tracing::info!("Connecting to Docker.");
-    let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
+    // tracing::info!("Connecting to Docker.");
+    // let docker = DockerInterface::try_new(&agent_opts.docker_options).await?;
+
+    let engine = ContainerdInterface::new().await?;
+
     tracing::info!("Connecting to sqlite.");
     let db = agent_opts.db;
     let cluster = agent_opts.cluster_domain.clone();
@@ -194,7 +197,7 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     nats.request(&request).await?;
 
-    let executor = Executor::new(docker, db.clone(), nats.clone(), ip, cluster.clone());
+    let executor = Executor::new(engine, db.clone(), nats.clone(), ip, cluster.clone());
 
     let (send_state, recv_state) = watch::channel(DroneState::Ready);
 
