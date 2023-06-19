@@ -2014,6 +2014,7 @@ dependencies = [
  "notify",
  "openssl",
  "plane-core",
+ "prost-types",
  "reqwest",
  "rustls 0.21.2",
  "rustls-pemfile",

@@ -36,13 +36,14 @@ sqlx = { version = "0.6.1", features = [
     "macros",
     "offline",
 ] }
-tokio = { version = "1.18.2", features = ["rt", "signal"] }
+tokio = { version = "1.18.2", features = ["rt", "signal", "process"] }
 tokio-rustls = "0.24.0"
 tokio-stream = "0.1.8"
 tracing = "0.1.36"
 async-trait = "0.1.58"
 serde_html_form = "0.2.0"
 containerd-client = "0.3.0"
+prost-types = "0.11.9"
 
 [[bin]]
 name = "plane-drone"

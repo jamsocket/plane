@@ -7,7 +7,8 @@ WORKDIR /work
 
 COPY . .
 
-RUN cargo build --bin=plane-drone --release 
+RUN apt-get install protobuf-compiler -y
+RUN cargo build --bin=plane-drone --release
 
 FROM gcr.io/distroless/cc-debian11
 
