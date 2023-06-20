@@ -106,11 +106,11 @@ pub async fn get_certificate(
             if challenge.status != ChallengeStatus::Valid {
                 tracing::warn!(?challenge, "Challenge status is not valid.");
                 return Err(anyhow!("ACME challenge failed."));
-            }    
+            }
         } else {
             tracing::info!("Challenge already valid.");
         }
-        
+
         tracing::info!("Validating authorization.");
         let authorization = auth
             .wait_done(Duration::from_secs(5), 3)
