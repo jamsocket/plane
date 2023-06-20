@@ -128,11 +128,9 @@ impl WorldState {
         self.logical_time = sequence;
 
         if self.listeners.read().unwrap().contains_key(&sequence) {
-            self.listeners
-                .write()
-                .unwrap()
-                .remove(&sequence)
-                .map(|mut sender| sender.notify_waiters());
+            if let Some(mut sender) = self.listeners.write().unwrap().remove(&sequence) {
+                sender.notify_waiters();
+            }
         }
     }
 
