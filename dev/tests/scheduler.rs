@@ -129,7 +129,7 @@ impl MockAgent {
                 "Backend should be scheduled on the expected drone."
             );
         }
-		println!("schedule_drone {:?}; lock {:?}", result, lock);
+        println!("schedule_drone {:?}; lock {:?}", result, lock);
 
         Ok(result)
     }
