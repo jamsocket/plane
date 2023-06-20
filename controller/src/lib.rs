@@ -130,7 +130,6 @@ fn fetch_backend(
     })
 }
 
-//type WaitMap = Arc<RwLock<HashMap<String, Mutex<Option<ClosableNotify>>>>>;
 async fn dispatch(
     state: StateHandle,
     cluster_name: ClusterName,
