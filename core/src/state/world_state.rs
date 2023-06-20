@@ -9,10 +9,8 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use dashmap::mapref::entry::Entry;
-use dashmap::DashMap;
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, VecDeque},
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
@@ -105,7 +103,7 @@ impl ClosableNotifier {
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: DashMap<u64, ClosableNotifier>,
+    listeners: RwLock<HashMap<u64, ClosableNotifier>>,
 }
 
 impl WorldState {
@@ -113,7 +111,7 @@ impl WorldState {
         if self.logical_time >= sequence {
             return Err(SequenceNumberInThePast);
         }
-        match self.listeners.entry(sequence) {
+        match self.listeners.write().unwrap().entry(sequence) {
             Entry::Occupied(entry) => Ok(entry.get().notify()),
             Entry::Vacant(entry) => {
                 let notifier = ClosableNotifier::new();
@@ -129,8 +127,12 @@ impl WorldState {
         cluster.apply(message.message);
         self.logical_time = sequence;
 
-        if let Some((_, mut sender)) = self.listeners.remove(&sequence) {
-            sender.notify_waiters();
+        if self.listeners.read().unwrap().contains_key(&sequence) {
+            self.listeners
+                .write()
+                .unwrap()
+                .remove(&sequence)
+                .map(|mut sender| sender.notify_waiters());
         }
     }
 
