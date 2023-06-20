@@ -9,7 +9,7 @@ use plane_core::{
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
     nats::TypedNats,
-    state::{StateHandle, ClosableNotify, SequenceNumberInThePast},
+    state::{ClosableNotify, SequenceNumberInThePast, StateHandle},
     timing::Timer,
     types::{BackendId, ClusterName, DroneId},
     NeverResult,
@@ -55,17 +55,20 @@ async fn spawn_backend(
                 })
                 .await?;
 
-			tracing::info!(
-				logical_time=?seq_id,
-				"backend state updated at time"
-					);
+            tracing::info!(
+            logical_time=?seq_id,
+            "backend state updated at time"
+                );
 
-            Ok((ScheduleResponse::Scheduled {
-                drone,
-                backend_id: spawn_request.backend_id,
-                bearer_token: spawn_request.bearer_token.clone(),
-                spawned: true,
-            }, Some(seq_id)))
+            Ok((
+                ScheduleResponse::Scheduled {
+                    drone,
+                    backend_id: spawn_request.backend_id,
+                    bearer_token: spawn_request.bearer_token.clone(),
+                    spawned: true,
+                },
+                Some(seq_id),
+            ))
         }
         Ok(false) => {
             tracing::warn!("Drone rejected backend.");
@@ -103,13 +106,16 @@ fn fetch_backend(
 		panic!()
 	};
 
-	tracing::info!("fetching backend!");
+    tracing::info!("fetching backend!");
     let (drone, bearer_token) = {
-        let backend_state = cluster.backend(&backend)
-        .ok_or_else(|| anyhow!("Lock held by a backend that doesn't exist."))?;
+        let backend_state = cluster
+            .backend(&backend)
+            .ok_or_else(|| anyhow!("Lock held by a backend that doesn't exist."))?;
 
-        let drone = backend_state.drone.clone().
-        ok_or_else(|| anyhow!("Lock held by a backend without a drone assignment."))?;
+        let drone = backend_state
+            .drone
+            .clone()
+            .ok_or_else(|| anyhow!("Lock held by a backend without a drone assignment."))?;
 
         let bearer_token = backend_state.bearer_token.clone();
 
@@ -126,78 +132,78 @@ fn fetch_backend(
 
 type WaitMap = Arc<RwLock<HashMap<String, Mutex<Option<ClosableNotify>>>>>;
 async fn dispatch(
-	state: StateHandle,
-	cluster_name: ClusterName,
-	sr: ScheduleRequest,
-	scheduler: Scheduler,
-	nats: TypedNats,
-	lock: Option<String>,
-	lock_to_ready: WaitMap
-	) -> anyhow::Result<ScheduleResponse> {
-	tracing::info!("checking locks");
-	if let Some(ref lock) = lock {
-		{
-			tracing::info!("waiting on a read lock to lock_to_ready");
-			let w = lock_to_ready.read().await;
-			if !w.contains_key(lock) {
-				tracing::info!("insert empty mutex into lock_to_ready");
-				drop(w);
-				let mut wol = lock_to_ready.write().await;
-				wol.insert(lock.clone(), Mutex::new(None));
-			}
-		};
-		tracing::info!("waiting on a read lock to lock_to_ready");
-		let w = lock_to_ready.read().await;
-		let l = w.get(&lock.clone())
-			.map(|a| async {
-				let mut l = a.lock().await;
-				if l.is_some() {
-					l.as_mut().unwrap().notified().await;
-				}
-				l
-			}).unwrap().await;
+    state: StateHandle,
+    cluster_name: ClusterName,
+    sr: ScheduleRequest,
+    scheduler: Scheduler,
+    nats: TypedNats,
+    lock: Option<String>,
+    lock_to_ready: WaitMap,
+) -> anyhow::Result<ScheduleResponse> {
+    tracing::info!("checking locks");
+    if let Some(ref lock) = lock {
+        {
+            tracing::info!("waiting on a read lock to lock_to_ready");
+            let w = lock_to_ready.read().await;
+            if !w.contains_key(lock) {
+                tracing::info!("insert empty mutex into lock_to_ready");
+                drop(w);
+                let mut wol = lock_to_ready.write().await;
+                wol.insert(lock.clone(), Mutex::new(None));
+            }
+        };
+        tracing::info!("waiting on a read lock to lock_to_ready");
+        let w = lock_to_ready.read().await;
+        let l = w
+            .get(&lock.clone())
+            .map(|a| async {
+                let mut l = a.lock().await;
+                if l.is_some() {
+                    l.as_mut().unwrap().notified().await;
+                }
+                l
+            })
+            .unwrap()
+            .await;
 
-		if let Ok(backend) = locked_backend(&state, &cluster_name, lock.clone()) {
-			tracing::info!("fetch preexisting backend");
-			return fetch_backend(&state, cluster_name, backend)
-		} 
+        if let Ok(backend) = locked_backend(&state, &cluster_name, lock.clone()) {
+            tracing::info!("fetch preexisting backend");
+            return fetch_backend(&state, cluster_name, backend);
+        }
 
-		tracing::info!("spawn with lock");
-		let drone = scheduler.schedule(&cluster_name, Utc::now()).unwrap();
-		if let (res, Some(st)) = spawn_backend(nats.clone(), drone, &sr.clone()).await? {
-			tracing::info!("spawned! now updating lock_to_ready");
-			drop(l);
-			drop(w);
-			let mut wol = lock_to_ready.write().await;
-			tracing::info!("acquired lock on lock_to_ready");
-			match state.state().get_listener(st) {
-				Ok(listener) => {
-					wol.insert(lock.clone(), Mutex::new(Some(listener)));
-				},
-				Err(SequenceNumberInThePast) => {
-					tracing::warn!("tried to insert notifier after valid time");
-				}
-			}; 
-			Ok(res)
-		} else { panic!() }
-	} else {
-		match scheduler.schedule(&cluster_name, Utc::now()) {
-			Ok(drone_id) => {
-				Ok(spawn_backend(nats.clone(), drone_id, &sr.clone()).await?.0)
-			},
-			Err(SchedulerError::NoDroneAvailable) => {
-				Ok(ScheduleResponse::NoDroneAvailable)
-			}
-		}
-	}
+        tracing::info!("spawn with lock");
+        let drone = scheduler.schedule(&cluster_name, Utc::now()).unwrap();
+        if let (res, Some(st)) = spawn_backend(nats.clone(), drone, &sr.clone()).await? {
+            tracing::info!("spawned! now updating lock_to_ready");
+            drop(l);
+            drop(w);
+            let mut wol = lock_to_ready.write().await;
+            tracing::info!("acquired lock on lock_to_ready");
+            match state.state().get_listener(st) {
+                Ok(listener) => {
+                    wol.insert(lock.clone(), Mutex::new(Some(listener)));
+                }
+                Err(SequenceNumberInThePast) => {
+                    tracing::warn!("tried to insert notifier after valid time");
+                }
+            };
+            Ok(res)
+        } else {
+            panic!()
+        }
+    } else {
+        match scheduler.schedule(&cluster_name, Utc::now()) {
+            Ok(drone_id) => Ok(spawn_backend(nats.clone(), drone_id, &sr.clone()).await?.0),
+            Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
+        }
+    }
 }
 
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     let scheduler = Scheduler::new(state.clone());
     let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
-    let lock_to_ready: WaitMap =
-        std::sync::Arc::new(RwLock::new(HashMap::new()));
+    let lock_to_ready: WaitMap = std::sync::Arc::new(RwLock::new(HashMap::new()));
 
     while let Some(schedule_request) = schedule_request_sub.next().await {
         tracing::info!(metadata=?schedule_request.value.metadata.clone(), "Got spawn request");
@@ -214,17 +220,19 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
             let cluster_name = sr.cluster.clone();
 
             let response = dispatch(
-					state.clone(),
-					cluster_name,
-					sr,
-					scheduler.clone(),
-					nats.clone(),
-					lock.clone(),
-					lock_to_ready.clone()
-			).await.unwrap();
-			//.await else { panic!("really?") };
-			tracing::info!("all locks should have been dropped!");
-			tracing::info!(?response, "the response");
+                state.clone(),
+                cluster_name,
+                sr,
+                scheduler.clone(),
+                nats.clone(),
+                lock.clone(),
+                lock_to_ready.clone(),
+            )
+            .await
+            .unwrap();
+            //.await else { panic!("really?") };
+            tracing::info!("all locks should have been dropped!");
+            tracing::info!(?response, "the response");
 
             let Ok(_) = schedule_request.respond(&response).await else {
 				tracing::warn!(req = ?response, "schedule response failed to send"); return
