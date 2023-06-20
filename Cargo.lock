@@ -1789,7 +1789,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
- "dashmap",
  "futures",
  "plane-core",
  "rand",
@@ -1812,7 +1811,6 @@ dependencies = [
  "chrono",
  "clap",
  "config",
- "dashmap",
  "plane-core-nats-macros",
  "rand",
  "serde",
@@ -1832,7 +1830,6 @@ dependencies = [
 name = "plane-core-nats-macros"
 version = "0.3.23"
 dependencies = [
- "async-nats",
  "darling",
  "proc-macro2",
  "quote",

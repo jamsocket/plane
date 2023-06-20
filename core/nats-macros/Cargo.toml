@@ -10,7 +10,6 @@ license = "MIT"
 readme = "README.md"
 
 [dependencies]
-async-nats = { git = "https://github.com/nats-io/nats.rs.git", rev = "261ead4" }
 darling = "0.20.1"
 proc-macro2 = "1.0.59"
 quote = "1.0.27"

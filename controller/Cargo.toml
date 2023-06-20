@@ -14,7 +14,6 @@ anyhow = "1.0.64"
 async-trait = "0.1.57"
 chrono = { version="0.4.22", default_features = false }
 clap = { version = "4.0.4", features = ["derive"] }
-dashmap = "5.3.4"
 plane-core = {path = "../core", version="0.3.5"}
 futures = "0.3.24"
 rand = "0.8.5"
