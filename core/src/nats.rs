@@ -257,6 +257,12 @@ pub struct TypedNats {
     pub jetstream: jetstream::Context,
 }
 
+impl TypedNats {
+	pub async fn flush(&mut self) -> Result<()> {
+		self.nc.flush().await.map_err(|_| anyhow!("error flushing"))
+	}
+}
+
 pub struct DelayedReply<T: DeserializeOwned> {
     subscription: Subscriber,
     _ph: PhantomData<T>,
