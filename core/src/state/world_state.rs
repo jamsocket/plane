@@ -291,7 +291,11 @@ mod test {
     async fn test_listener() {
         let state = StateHandle::default();
 
-        let zerolistener = state.state().get_listener(0);
+        let mut zerolistener = state.state().get_listener(0);
+        timeout(Duration::from_secs(0), zerolistener.notified())
+            .await
+            .expect("zerolistener should return immediately");
+
 
         let mut onelistener = state.state().get_listener(1);
         let mut onelistener_2 = state.state().get_listener(1);
@@ -316,7 +320,7 @@ mod test {
         // onelistener should now return.
         timeout(Duration::from_secs(0), onelistener_2.notified())
             .await
-            .expect("wait_for_seq(1) should return immediately");
+            .expect("onelistener should return immediately");
 
         // twolistener should block
         {
