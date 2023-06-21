@@ -80,16 +80,17 @@ async fn spawn_backend(
     }
 }
 
+/// get backend associated with a lock or error
 fn backend_of_lock(
     state: &StateHandle,
     cluster_name: &ClusterName,
-    lock: String,
+    lock: &String,
 ) -> anyhow::Result<BackendId> {
     state
         .state()
         .cluster(cluster_name)
         .ok_or_else(|| anyhow!("no cluster"))?
-        .locked(&lock)
+        .locked(lock)
         .ok_or_else(|| anyhow!("no backend"))
 }
 
@@ -145,7 +146,7 @@ async fn dispatch(
             l.as_mut().unwrap().notified().await;
         }
 
-        if let Ok(backend) = backend_of_lock(&state, &cluster_name, lock_name.clone()) {
+        if let Ok(backend) = backend_of_lock(&state, &cluster_name, &lock_name) {
             tracing::info!(?backend, "fetch preexisting backend");
             return schedule_response_for_existing_backend(&state, cluster_name, backend);
         }
