@@ -9,7 +9,7 @@ use plane_core::{
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
     nats::TypedNats,
-    state::{ClosableNotify, SequenceNumberInThePast, StateHandle},
+    state::{ClosableNotify, StateHandle},
     timing::Timer,
     types::{BackendId, ClusterName, DroneId},
     NeverResult,

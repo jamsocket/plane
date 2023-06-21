@@ -4,7 +4,7 @@ use crate::{
 };
 
 pub use self::world_state::{
-    ClosableNotify, ClusterState, SequenceNumberInThePast, StateHandle, WorldState,
+    ClosableNotify, ClusterState, StateHandle, WorldState,
 };
 use anyhow::{anyhow, Result};
 
