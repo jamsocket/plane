@@ -15,10 +15,11 @@ use plane_core::{
     },
     nats::TypedNats,
     retry::do_with_retry,
+    supervisor::Supervisor,
     types::{ClusterName, DroneId},
     NeverResult,
 };
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::watch::{self, Receiver, Sender};
 
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -54,13 +55,13 @@ pub async fn wait_port_ready(addr: &SocketAddr) -> Result<()> {
 }
 
 async fn listen_for_spawn_requests(
-    cluster: &ClusterName,
-    drone_id: &DroneId,
+    cluster: ClusterName,
+    drone_id: DroneId,
     executor: Executor<DockerInterface>,
     nats: TypedNats,
 ) -> NeverResult {
     let mut sub = nats
-        .subscribe(SpawnRequest::subscribe_subject(cluster, drone_id))
+        .subscribe(SpawnRequest::subscribe_subject(&cluster, &drone_id))
         .await?;
     executor.resume_backends().await?;
     tracing::info!("Listening for spawn requests.");
@@ -117,7 +118,7 @@ async fn listen_for_termination_requests(
 /// Repeatedly publish a status message advertising this drone as available.
 async fn ready_loop(
     nc: TypedNats,
-    drone_id: &DroneId,
+    drone_id: DroneId,
     cluster: ClusterName,
     recv_state: Receiver<DroneState>,
     db: DroneDatabase,
@@ -150,7 +151,7 @@ async fn listen_for_drain(
     nc: TypedNats,
     drone_id: DroneId,
     cluster: ClusterName,
-    send_state: Sender<DroneState>,
+    send_state: Arc<Sender<DroneState>>,
 ) -> NeverResult {
     let mut sub = nc
         .subscribe(DrainDrone::subscribe_subject(drone_id, cluster))
@@ -174,7 +175,14 @@ async fn listen_for_drain(
     Err(anyhow!("Reached the end of DrainDrone subscription."))
 }
 
-pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
+pub struct AgentSupervisors {
+    _ready_loop: Supervisor,
+    _listen_for_drain: Supervisor,
+    _listen_for_spawn_requests: Supervisor,
+    _listen_for_termination_requests: Supervisor,
+}
+
+pub async fn run_agent(agent_opts: AgentOptions) -> Result<AgentSupervisors> {
     let nats = &agent_opts.nats;
 
     tracing::info!("Connecting to Docker.");
@@ -198,33 +206,68 @@ pub async fn run_agent(agent_opts: AgentOptions) -> NeverResult {
 
     let (send_state, recv_state) = watch::channel(DroneState::Ready);
 
-    tokio::select!(
-        result = ready_loop(
-            nats.clone(),
-            &agent_opts.drone_id,
-            cluster.clone(),
-            recv_state.clone(),
-            db,
-        ) => result,
+    let ready_loop = {
+        let nats = nats.clone();
+        let cluster = cluster.clone();
+        let db = db.clone();
+        let drone_id = agent_opts.drone_id.clone();
+        move || {
+            ready_loop(
+                nats.clone(),
+                drone_id.clone(),
+                cluster.clone(),
+                recv_state.clone(),
+                db.clone(),
+            )
+        }
+    };
 
-        result = listen_for_spawn_requests(
-            &cluster,
-            &agent_opts.drone_id,
-            executor.clone(),
-            nats.clone()
-        ) => result,
+    let listen_for_drain = {
+        let nats = nats.clone();
+        let cluster = cluster.clone();
+        let send_state = Arc::new(send_state);
+        let drone_id = agent_opts.drone_id.clone();
+        move || {
+            listen_for_drain(
+                nats.clone(),
+                drone_id.clone(),
+                cluster.clone(),
+                send_state.clone(),
+            )
+        }
+    };
 
-        result = listen_for_termination_requests(
-            executor.clone(),
-            nats.clone(),
-            cluster.clone(),
-        ) => result,
+    let listen_for_spawn_requests = {
+        let nats = nats.clone();
+        let cluster = cluster.clone();
+        let executor = executor.clone();
+        let drone_id = agent_opts.drone_id.clone();
+        move || {
+            listen_for_spawn_requests(
+                cluster.clone(),
+                drone_id.clone(),
+                executor.clone(),
+                nats.clone(),
+            )
+        }
+    };
 
-        result = listen_for_drain(
-            nats.clone(),
-            agent_opts.drone_id.clone(),
-            cluster.clone(),
-            send_state,
-        ) => result,
-    )
+    let listen_for_termination_requests = {
+        let nats = nats.clone();
+        let cluster = cluster.clone();
+        move || listen_for_termination_requests(executor.clone(), nats.clone(), cluster.clone())
+    };
+
+    Ok(AgentSupervisors {
+        _ready_loop: Supervisor::new("ready_loop", ready_loop),
+        _listen_for_drain: Supervisor::new("listen_for_drain", listen_for_drain),
+        _listen_for_spawn_requests: Supervisor::new(
+            "listen_for_spawn_requests",
+            listen_for_spawn_requests,
+        ),
+        _listen_for_termination_requests: Supervisor::new(
+            "listen_for_termination_requests",
+            listen_for_termination_requests,
+        ),
+    })
 }
