@@ -25,8 +25,8 @@ pub mod run;
 mod scheduler;
 
 async fn spawn_backend(
-    ref nats: TypedNats,
-    drone: DroneId,
+    nats: &TypedNats,
+    drone: &DroneId,
     schedule_request: &ScheduleRequest,
 ) -> anyhow::Result<(ScheduleResponse, Option<u64>)> {
     let timer = Timer::new();
@@ -61,7 +61,7 @@ async fn spawn_backend(
 
             Ok((
                 ScheduleResponse::Scheduled {
-                    drone,
+                    drone: drone.clone(),
                     backend_id: spawn_request.backend_id,
                     bearer_token: spawn_request.bearer_token.clone(),
                     spawned: true,
@@ -155,7 +155,7 @@ async fn dispatch(
             Ok(drone_id) => drone_id,
             Err(SchedulerError::NoDroneAvailable) => return Ok(ScheduleResponse::NoDroneAvailable),
         };
-        match spawn_backend(nats.clone(), drone, &sr.clone()).await? {
+        match spawn_backend(&nats, &drone, &sr.clone()).await? {
             (res, Some(st)) => {
                 *l = Some(state.state().get_listener(st));
                 Ok(res)
@@ -164,7 +164,7 @@ async fn dispatch(
         }
     } else {
         match scheduler.schedule(&cluster_name, Utc::now()) {
-            Ok(drone_id) => Ok(spawn_backend(nats.clone(), drone_id, &sr.clone()).await?.0),
+            Ok(drone_id) => Ok(spawn_backend(&nats, &drone_id, &sr.clone()).await?.0),
             Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
         }
     }
