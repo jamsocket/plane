@@ -1,0 +1,17 @@
+name: Rustfmt
+
+on:
+  pull_request:
+
+jobs:
+  check_format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+          override: true
+      - name: Check format
+        run: cargo fmt -- --check
