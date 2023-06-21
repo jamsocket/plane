@@ -140,9 +140,11 @@ async fn dispatch(
 ) -> anyhow::Result<ScheduleResponse> {
     tracing::info!("checking locks");
     if let Some((lock_name, lock)) = locker {
-        tracing::info!(?lock, "locking mutex for lock");
+        tracing::info!(?lock_name, "scheduling lock");
+        tracing::info!(?lock_name, "locking mutex for lock");
         let mut l = lock.lock().await;
         if l.is_some() {
+			tracing::info!(?lock_name, "waiting for logical time to reach locked backend update time");
             l.as_mut().unwrap().notified().await;
         }
 
@@ -195,7 +197,6 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
         let scheduler = scheduler.clone();
         tokio::spawn(async move {
             let sr = schedule_request.value.clone();
-            tracing::info!(?lock, "scheduling lock");
             let cluster_name = sr.cluster.clone();
 
             let Ok(response) = dispatch(
