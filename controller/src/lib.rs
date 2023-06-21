@@ -80,7 +80,7 @@ async fn spawn_backend(
     }
 }
 
-fn locked_backend(
+fn backend_of_lock(
     state: &StateHandle,
     cluster_name: &ClusterName,
     lock: String,
@@ -145,7 +145,7 @@ async fn dispatch(
             l.as_mut().unwrap().notified().await;
         }
 
-        if let Ok(backend) = locked_backend(&state, &cluster_name, lock_name.clone()) {
+        if let Ok(backend) = backend_of_lock(&state, &cluster_name, lock_name.clone()) {
             tracing::info!(?backend, "fetch preexisting backend");
             return schedule_response_for_existing_backend(&state, cluster_name, backend);
         }
