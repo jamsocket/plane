@@ -106,10 +106,10 @@ pub struct WorldState {
 impl WorldState {
     pub fn get_listener(&self, sequence: u64) -> ClosableNotify {
         if self.logical_time >= sequence {
-			let mut notifier = ClosableNotifier::new();
-			let notify = notifier.notify();
-			notifier.notify_waiters();
-			return notify;
+            let mut notifier = ClosableNotifier::new();
+            let notify = notifier.notify();
+            notifier.notify_waiters();
+            return notify;
         }
         match self.listeners.write().unwrap().entry(sequence) {
             Entry::Occupied(entry) => entry.get().notify(),
@@ -295,7 +295,6 @@ mod test {
         timeout(Duration::from_secs(0), zerolistener.notified())
             .await
             .expect("zerolistener should return immediately");
-
 
         let mut onelistener = state.state().get_listener(1);
         let mut onelistener_2 = state.state().get_listener(1);
