@@ -67,9 +67,6 @@ impl StateHandle {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct SequenceNumberInThePast;
-
 #[derive(Debug)]
 pub struct ClosableNotifier {
     notifier: Sender<()>,
@@ -107,17 +104,20 @@ pub struct WorldState {
 }
 
 impl WorldState {
-    pub fn get_listener(&self, sequence: u64) -> Result<ClosableNotify, SequenceNumberInThePast> {
+    pub fn get_listener(&self, sequence: u64) -> ClosableNotify {
         if self.logical_time >= sequence {
-            return Err(SequenceNumberInThePast);
+			let mut notifier = ClosableNotifier::new();
+			let notify = notifier.notify();
+			notifier.notify_waiters();
+			return notify;
         }
         match self.listeners.write().unwrap().entry(sequence) {
-            Entry::Occupied(entry) => Ok(entry.get().notify()),
+            Entry::Occupied(entry) => entry.get().notify(),
             Entry::Vacant(entry) => {
                 let notifier = ClosableNotifier::new();
                 let notify = notifier.notify();
                 entry.insert(notifier);
-                Ok(notify)
+                notify
             }
         }
     }
@@ -292,12 +292,11 @@ mod test {
         let state = StateHandle::default();
 
         let zerolistener = state.state().get_listener(0);
-        assert!(zerolistener.is_err());
 
-        let mut onelistener = state.state().get_listener(1).unwrap();
-        let mut onelistener_2 = state.state().get_listener(1).unwrap();
-        let mut twolistener = state.state().get_listener(2).unwrap();
-        let mut twolistener_2 = state.state().get_listener(2).unwrap();
+        let mut onelistener = state.state().get_listener(1);
+        let mut onelistener_2 = state.state().get_listener(1);
+        let mut twolistener = state.state().get_listener(2);
+        let mut twolistener_2 = state.state().get_listener(2);
         // onelistener should block.
         {
             let result = timeout(Duration::from_secs(0), onelistener.notified()).await;
