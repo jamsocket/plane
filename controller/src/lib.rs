@@ -158,14 +158,7 @@ async fn dispatch(
         };
         match spawn_backend(nats.clone(), drone, &sr.clone()).await? {
             (res, Some(st)) => {
-                match state.state().get_listener(st) {
-                    Ok(listener) => {
-                        *l = Some(listener);
-                    }
-                    Err(SequenceNumberInThePast) => {
-                        tracing::warn!("tried to insert notifier after valid time");
-                    }
-                };
+                *l = Some(state.state().get_listener(st));
                 Ok(res)
             }
             (res, None) => Ok(res),
