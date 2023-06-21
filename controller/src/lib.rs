@@ -89,12 +89,12 @@ fn locked_backend(
     state
         .state()
         .cluster(cluster_name)
-        .ok_or(anyhow!("no cluster"))?
+        .ok_or_else(|| anyhow!("no cluster"))?
         .locked(&lock)
-        .ok_or(anyhow!("no backend"))
+        .ok_or_else(|| anyhow!("no backend"))
 }
 
-fn fetch_backend(
+fn schedule_response_for_existing_backend(
     state: &StateHandle,
     cluster: ClusterName,
     backend: BackendId,
@@ -102,10 +102,10 @@ fn fetch_backend(
     // Anything that fails to find the drone results in an error here, since we just
     // checked that the lock is held which implies that the drone exists.
     let state = state.state();
-    let Some(cluster) = state.cluster(&cluster) else {
-		panic!()
-	};
-
+    tracing::info!("getting cluster from state");
+    let cluster = state
+        .cluster(&cluster)
+        .ok_or_else(|| anyhow!("no such cluster"))?;
     tracing::info!("fetching backend!");
     let (drone, bearer_token) = {
         let backend_state = cluster
@@ -148,7 +148,7 @@ async fn dispatch(
 
         if let Ok(backend) = locked_backend(&state, &cluster_name, lock_name.clone()) {
             tracing::info!(?backend, "fetch preexisting backend");
-            return fetch_backend(&state, cluster_name, backend);
+            return schedule_response_for_existing_backend(&state, cluster_name, backend);
         }
 
         tracing::info!("spawn with lock");
