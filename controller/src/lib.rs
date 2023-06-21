@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::scheduler::SchedulerError;
 use anyhow::anyhow;
 use chrono::Utc;
@@ -15,6 +13,7 @@ use plane_core::{
     NeverResult,
 };
 use scheduler::Scheduler;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
