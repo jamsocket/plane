@@ -6,16 +6,13 @@ use plane_core::{
         scheduler::{ScheduleRequest, ScheduleResponse},
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
-    nats::TypedNats,
-    state::{ClosableNotify, StateHandle},
+    nats::{TypedNats, MessageWithResponseHandle},
+    state::StateHandle,
     timing::Timer,
     types::{BackendId, ClusterName, DroneId},
     NeverResult,
 };
 use scheduler::Scheduler;
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 mod config;
 pub mod dns;
@@ -24,11 +21,12 @@ pub mod plan;
 pub mod run;
 mod scheduler;
 
+type LogicalTime = u64;
 async fn spawn_backend(
     nats: &TypedNats,
     drone: &DroneId,
     schedule_request: &ScheduleRequest,
-) -> anyhow::Result<(ScheduleResponse, Option<u64>)> {
+) -> anyhow::Result<(ScheduleResponse, Option<LogicalTime>)> {
     let timer = Timer::new();
     let spawn_request = schedule_request.schedule(&drone);
     match nats.request(&spawn_request).await {
@@ -130,23 +128,16 @@ fn schedule_response_for_existing_backend(
     })
 }
 
-async fn dispatch(
-    state: StateHandle,
-    cluster_name: ClusterName,
-    sr: ScheduleRequest,
-    scheduler: Scheduler,
-    nats: TypedNats,
-    locker: Option<(String, Arc<Mutex<Option<ClosableNotify>>>)>,
+async fn process_response(
+    state: &StateHandle,
+    sr: &ScheduleRequest,
+    scheduler: &Scheduler,
+    nats: &TypedNats,
 ) -> anyhow::Result<ScheduleResponse> {
     tracing::info!("checking locks");
-    if let Some((lock_name, lock)) = locker {
+	let cluster_name = sr.cluster.clone();
+    if let Some(lock_name) = sr.lock.clone() {
         tracing::info!(?lock_name, "scheduling lock");
-        tracing::info!(?lock_name, "locking mutex for lock");
-        let mut l = lock.lock().await;
-        if l.is_some() {
-			tracing::info!(?lock_name, "waiting for logical time to reach locked backend update time");
-            l.as_mut().unwrap().notified().await;
-        }
 
         if let Ok(backend) = backend_of_lock(&state, &cluster_name, &lock_name) {
             tracing::info!(?backend, "fetch preexisting backend");
@@ -158,11 +149,9 @@ async fn dispatch(
             Ok(drone_id) => drone_id,
             Err(SchedulerError::NoDroneAvailable) => return Ok(ScheduleResponse::NoDroneAvailable),
         };
-        match spawn_backend(&nats, &drone, &sr.clone()).await? {
-            (res, Some(st)) => {
-                *l = Some(state.state().get_listener(st));
-                Ok(res)
-            }
+
+        match spawn_backend(&nats, &drone, &sr).await? {
+            (res, Some(_st)) => Ok(res),
             (res, None) => Ok(res),
         }
     } else {
@@ -173,50 +162,44 @@ async fn dispatch(
     }
 }
 
-type WaitMap = HashMap<String, Arc<Mutex<Option<ClosableNotify>>>>;
+async fn dispatch_schedule_request(
+	state: StateHandle,
+	schedule_request: MessageWithResponseHandle<ScheduleRequest>,
+	scheduler: Scheduler,
+	nats: TypedNats
+) -> anyhow::Result<()> {
+
+	let Ok(response) = process_response(
+		&state,
+		&schedule_request.value.clone(),
+		&scheduler,
+		&nats
+	).await else {
+		tracing::error!(?schedule_request.value, "schedule request failed");
+		panic!("failed to dispatch");
+	};
+
+	let Ok(_) = schedule_request.respond(&response).await else {
+		tracing::warn!(res = ?response, "schedule response failed to send");
+		panic!("failed to respond to schedule req");
+	};
+
+	Ok(())
+}
+
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     let scheduler = Scheduler::new(state.clone());
     let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
-    let mut lock_to_ready: WaitMap = HashMap::new();
 
     while let Some(schedule_request) = schedule_request_sub.next().await {
         tracing::info!(metadata=?schedule_request.value.metadata.clone(), "Got spawn request");
-
-        let nats = nats.clone();
-        let schedule_request = schedule_request.clone();
-        let state = state.clone();
-        let lock = schedule_request.value.lock.clone();
-        let lock_to_ready = &mut lock_to_ready;
-        let lock_mut_maybe = lock.clone().map(|lock| {
-            lock_to_ready
-                .entry(lock)
-                .or_insert(Arc::new(Mutex::new(None)))
-                .clone()
-        });
-        let scheduler = scheduler.clone();
-        tokio::spawn(async move {
-            let sr = schedule_request.value.clone();
-            let cluster_name = sr.cluster.clone();
-
-            let Ok(response) = dispatch(
-                state.clone(),
-                cluster_name,
-                sr.clone(),
-                scheduler.clone(),
-                nats.clone(),
-                sr.lock.clone().zip(lock_mut_maybe)
-            ).await else {
-				tracing::error!(?sr, "schedule request failed");
-				panic!("failed to dispatch");
-			};
-            tracing::info!(?response, "the response");
-
-            let Ok(_) = schedule_request.respond(&response).await else {
-				tracing::warn!(req = ?response, "schedule response failed to send");
-				panic!("failed to respond to schedule req");
-			};
-        });
+		tokio::spawn(dispatch_schedule_request(
+			state.clone(),
+			schedule_request.clone(),
+			scheduler.clone(),
+			nats.clone()
+		));
     }
 
     Err(anyhow!(
