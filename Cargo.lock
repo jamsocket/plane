@@ -1825,7 +1825,6 @@ dependencies = [
  "http",
  "hyper",
  "integration-test",
- "lazy_static",
  "openssl",
  "plane-controller",
  "plane-core",

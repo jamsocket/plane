@@ -110,11 +110,14 @@ impl Clone for ClosableNotify {
     }
 }
 
+type DebugCondition = fn(&WorldState) -> bool;
 #[derive(Default, Debug)]
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
     listeners: RwLock<HashMap<u64, ClosableNotify>>,
+    #[cfg(debug_assertions)]
+    debug_listeners: RwLock<Vec<(ClosableNotify, DebugCondition)>>,
 }
 
 impl WorldState {
@@ -139,6 +142,15 @@ impl WorldState {
         }
     }
 
+    #[cfg(debug_assertions)]
+    pub fn get_listener_for_predicate(&self, cond: fn(&WorldState) -> bool) -> ClosableNotify {
+        let notify = ClosableNotify::new();
+        tracing::info!(?cond, "inserting debug listener into vec");
+        self.debug_listeners.write().unwrap().push((notify.clone(), cond));
+        tracing::info!(?cond, "inserted debug listener into vec");
+        notify
+    }
+
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
         let cluster = self.clusters.entry(message.cluster.clone()).or_default();
         cluster.apply(message.message);
@@ -146,6 +158,24 @@ impl WorldState {
 
         if let Some(sender) = self.listeners.write().unwrap().remove(&sequence) {
             sender.notify_waiters();
+        }
+
+        if cfg!(debug_assertions) {
+            tracing::info!(?self.debug_listeners, "running debug listeners");
+            self.debug_listeners
+                .write()
+                .unwrap()
+                .retain_mut(|(notifier, cond)| {
+                    tracing::info!(?cond, "running cond");
+                    if cond(self) {
+                        tracing::info!(?cond, "cond holds!");
+                        notifier.notify_waiters();
+                        false
+                    } else {
+                        tracing::info!(?cond, "cond does not hold");
+                        true
+                    }
+                });
         }
     }
 
