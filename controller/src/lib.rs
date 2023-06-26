@@ -6,7 +6,7 @@ use plane_core::{
         scheduler::{ScheduleRequest, ScheduleResponse},
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
-    nats::{TypedNats, MessageWithResponseHandle},
+    nats::{MessageWithResponseHandle, TypedNats},
     state::StateHandle,
     timing::Timer,
     types::{BackendId, ClusterName, DroneId},
@@ -135,7 +135,7 @@ async fn process_response(
     nats: &TypedNats,
 ) -> anyhow::Result<ScheduleResponse> {
     tracing::info!("checking locks");
-	let cluster_name = sr.cluster.clone();
+    let cluster_name = sr.cluster.clone();
     if let Some(lock_name) = sr.lock.clone() {
         tracing::info!(?lock_name, "scheduling lock");
 
@@ -163,13 +163,12 @@ async fn process_response(
 }
 
 async fn dispatch_schedule_request(
-	state: StateHandle,
-	schedule_request: MessageWithResponseHandle<ScheduleRequest>,
-	scheduler: Scheduler,
-	nats: TypedNats
+    state: StateHandle,
+    schedule_request: MessageWithResponseHandle<ScheduleRequest>,
+    scheduler: Scheduler,
+    nats: TypedNats,
 ) -> anyhow::Result<()> {
-
-	let Ok(response) = process_response(
+    let Ok(response) = process_response(
 		&state,
 		&schedule_request.value.clone(),
 		&scheduler,
@@ -179,12 +178,12 @@ async fn dispatch_schedule_request(
 		panic!("failed to dispatch");
 	};
 
-	let Ok(_) = schedule_request.respond(&response).await else {
+    let Ok(_) = schedule_request.respond(&response).await else {
 		tracing::warn!(res = ?response, "schedule response failed to send");
 		panic!("failed to respond to schedule req");
 	};
 
-	Ok(())
+    Ok(())
 }
 
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
@@ -194,12 +193,12 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
 
     while let Some(schedule_request) = schedule_request_sub.next().await {
         tracing::info!(metadata=?schedule_request.value.metadata.clone(), "Got spawn request");
-		tokio::spawn(dispatch_schedule_request(
-			state.clone(),
-			schedule_request.clone(),
-			scheduler.clone(),
-			nats.clone()
-		));
+        tokio::spawn(dispatch_schedule_request(
+            state.clone(),
+            schedule_request.clone(),
+            scheduler.clone(),
+            nats.clone(),
+        ));
     }
 
     Err(anyhow!(
