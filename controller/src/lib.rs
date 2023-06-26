@@ -28,7 +28,7 @@ async fn spawn_backend(
     schedule_request: &ScheduleRequest,
 ) -> anyhow::Result<(ScheduleResponse, Option<LogicalTime>)> {
     let timer = Timer::new();
-    let spawn_request = schedule_request.schedule(&drone);
+    let spawn_request = schedule_request.schedule(drone);
     match nats.request(&spawn_request).await {
         Ok(true) => {
             tracing::info!(
@@ -82,7 +82,7 @@ async fn spawn_backend(
 fn backend_of_lock(
     state: &StateHandle,
     cluster_name: &ClusterName,
-    lock: &String,
+    lock: &str,
 ) -> anyhow::Result<BackendId> {
     state
         .state()
@@ -139,9 +139,9 @@ async fn process_response(
     if let Some(lock_name) = sr.lock.clone() {
         tracing::info!(?lock_name, "scheduling lock");
 
-        if let Ok(backend) = backend_of_lock(&state, &cluster_name, &lock_name) {
+        if let Ok(backend) = backend_of_lock(state, &cluster_name, &lock_name) {
             tracing::info!(?backend, "fetch preexisting backend");
-            return schedule_response_for_existing_backend(&state, cluster_name, backend);
+            return schedule_response_for_existing_backend(state, cluster_name, backend);
         }
 
         tracing::info!("spawn with lock");
@@ -150,13 +150,13 @@ async fn process_response(
             Err(SchedulerError::NoDroneAvailable) => return Ok(ScheduleResponse::NoDroneAvailable),
         };
 
-        match spawn_backend(&nats, &drone, &sr).await? {
+        match spawn_backend(nats, &drone, sr).await? {
             (res, Some(_st)) => Ok(res),
             (res, None) => Ok(res),
         }
     } else {
         match scheduler.schedule(&cluster_name, Utc::now()) {
-            Ok(drone_id) => Ok(spawn_backend(&nats, &drone_id, &sr.clone()).await?.0),
+            Ok(drone_id) => Ok(spawn_backend(nats, &drone_id, &sr.clone()).await?.0),
             Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
         }
     }
