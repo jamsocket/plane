@@ -61,6 +61,7 @@ async fn drone_main() -> Result<()> {
             refresh_loop(cert_options.clone())
         }))
     } else {
+        tracing::info!("Not starting cert refresh loop, no cert options provided.");
         None
     };
 
@@ -70,6 +71,7 @@ async fn drone_main() -> Result<()> {
             serve(proxy_options.clone())
         }))
     } else {
+        tracing::info!("Not starting proxy, no proxy options provided.");
         None
     };
 
@@ -79,8 +81,11 @@ async fn drone_main() -> Result<()> {
             run_agent(agent_options.clone())
         }))
     } else {
+        tracing::info!("Not starting agent, no agent options provided.");
         None
     };
+
+    tracing::info!("Initialization complete; running until interrupted.");
 
     wait_for_interrupt().await
 }
