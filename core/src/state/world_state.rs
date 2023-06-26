@@ -14,7 +14,7 @@ use std::{
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use tokio::sync::Notify;
+use tokio::sync::broadcast::{Receiver, Sender};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -65,14 +65,44 @@ impl StateHandle {
             .write()
             .expect("Could not acquire world_state lock.")
     }
+}
 
-    /** Block asynchronously until the given sequence number is reached. */
-    pub async fn wait_for_seq(&self, sequence: u64) {
-        if self.state().logical_time >= sequence {
-            return;
-        }
-        let receiver = { self.write_state().get_listener(sequence) };
-        receiver.notified().await;
+/*
+We want a thing that waits until notified, and importantly waits
+for that notify on all of its replicas.
+The default notifier from tokio does not behave the way we need
+since, if multiple clones are made, notify_one only causes the first
+to return immediately when it invokes the notification and awaits.
+notify_waiters does not cause even the first one to do that.
+Therefore, we implement our own notifier that can be closed and
+will return immediately on all its dependent notifies.
+*/
+#[derive(Debug, Clone)]
+pub struct ClosableNotifier {
+    notifier: Sender<()>,
+}
+
+#[derive(Debug)]
+pub struct ClosableNotify(Receiver<()>);
+
+impl ClosableNotify {
+    pub async fn notified(&mut self) {
+        let _ = self.0.recv().await;
+    }
+}
+
+impl ClosableNotifier {
+    fn new() -> Self {
+        let (tx, _rx) = tokio::sync::broadcast::channel(128);
+        Self { notifier: tx }
+    }
+
+    fn notify(&self) -> ClosableNotify {
+        ClosableNotify(self.notifier.subscribe())
+    }
+
+    fn notify_waiters(&mut self) {
+        let _ = self.notifier.send(());
     }
 }
 
@@ -80,16 +110,28 @@ impl StateHandle {
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: HashMap<u64, Arc<Notify>>,
+    listeners: RwLock<HashMap<u64, ClosableNotifier>>,
 }
 
 impl WorldState {
-    pub fn get_listener(&mut self, sequence: u64) -> Arc<Notify> {
-        match self.listeners.entry(sequence) {
-            Entry::Occupied(entry) => entry.get().clone(),
+    pub fn logical_time(&self) -> u64 {
+        self.logical_time
+    }
+
+    pub fn get_listener(&self, sequence: u64) -> ClosableNotify {
+        if self.logical_time >= sequence {
+            let mut notifier = ClosableNotifier::new();
+            let notify = notifier.notify();
+            // this makes it so the notify returns immediately.
+            notifier.notify_waiters();
+            return notify;
+        }
+        match self.listeners.write().unwrap().entry(sequence) {
+            Entry::Occupied(entry) => entry.get().notify(),
             Entry::Vacant(entry) => {
-                let notify = Arc::new(Notify::new());
-                entry.insert(notify.clone());
+                let notifier = ClosableNotifier::new();
+                let notify = notifier.notify();
+                entry.insert(notifier);
                 notify
             }
         }
@@ -99,9 +141,11 @@ impl WorldState {
         let cluster = self.clusters.entry(message.cluster.clone()).or_default();
         cluster.apply(message.message);
         self.logical_time = sequence;
-
-        if let Some(sender) = self.listeners.remove(&sequence) {
-            sender.notify_waiters();
+	
+        if self.listeners.read().unwrap().contains_key(&sequence) {
+            if let Some(mut sender) = self.listeners.write().unwrap().remove(&sequence) {
+                sender.notify_waiters();
+            }
         }
     }
 
@@ -259,20 +303,21 @@ mod test {
     use tokio::time::timeout;
 
     #[tokio::test]
-    async fn test_wait_for_seq() {
+    async fn test_listener() {
         let state = StateHandle::default();
 
-        timeout(Duration::from_secs(0), state.wait_for_seq(0))
+        let mut zerolistener = state.state().get_listener(0);
+        timeout(Duration::from_secs(0), zerolistener.notified())
             .await
-            .expect("wait_for_seq(0) should return immediately");
+            .expect("zerolistener should return immediately");
 
-        // wait_for_seq(1) should block.
-        let seq1_1 = state.wait_for_seq(1);
-        let seq1_2 = state.wait_for_seq(1);
-        let seq2_1 = state.wait_for_seq(2);
-        let seq2_2 = state.wait_for_seq(2);
+        let mut onelistener = state.state().get_listener(1);
+        let mut onelistener_2 = state.state().get_listener(1);
+        let mut twolistener = state.state().get_listener(2);
+        let mut twolistener_2 = state.state().get_listener(2);
+        // onelistener should block.
         {
-            let result = timeout(Duration::from_secs(0), seq1_1).await;
+            let result = timeout(Duration::from_secs(0), onelistener.notified()).await;
             assert!(result.is_err());
         }
 
@@ -286,13 +331,14 @@ mod test {
             1,
         );
 
-        // wait_for_seq(1) should now return.
-        timeout(Duration::from_secs(0), seq1_2)
+        // onelistener should now return.
+        timeout(Duration::from_secs(0), onelistener_2.notified())
             .await
-            .expect("wait_for_seq(1) should return immediately");
+            .expect("onelistener should return immediately");
 
+        // twolistener should block
         {
-            let result = timeout(Duration::from_secs(0), seq2_1).await;
+            let result = timeout(Duration::from_secs(0), twolistener.notified()).await;
             assert!(result.is_err());
         }
 
@@ -306,9 +352,9 @@ mod test {
             2,
         );
 
-        // wait_for_seq(2) should now return.
+        // twolistener should now return.
         {
-            timeout(Duration::from_secs(0), seq2_2)
+            timeout(Duration::from_secs(0), twolistener_2.notified())
                 .await
                 .expect("wait_for_seq(2) should return immediately");
         }
