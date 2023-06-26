@@ -141,7 +141,7 @@ impl WorldState {
         let cluster = self.clusters.entry(message.cluster.clone()).or_default();
         cluster.apply(message.message);
         self.logical_time = sequence;
-	
+
         if self.listeners.read().unwrap().contains_key(&sequence) {
             if let Some(mut sender) = self.listeners.write().unwrap().remove(&sequence) {
                 sender.notify_waiters();
