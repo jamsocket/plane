@@ -24,8 +24,8 @@ use plane_dev::{
         random_loopback_ip,
     },
 };
-use plane_drone::config::DockerConfig;
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
+use plane_drone::{agent::AgentSupervisors, config::DockerConfig};
 use serde_json::json;
 use std::net::IpAddr;
 use std::time::Duration;
@@ -36,7 +36,7 @@ pub const CLUSTER_DOMAIN: &str = "plane.test";
 
 struct Agent {
     #[allow(unused)]
-    agent_guard: LivenessGuard<NeverResult>,
+    agent_guard: AgentSupervisors,
     pub db: DroneDatabase,
     #[allow(unused)]
     loop_guard: LivenessGuard<NeverResult>,
@@ -61,7 +61,9 @@ impl Agent {
             docker_options,
         };
 
-        let agent_guard = expect_to_stay_alive(plane_drone::agent::run_agent(agent_opts));
+        let agent_guard = plane_drone::agent::run_agent(agent_opts)
+            .await
+            .expect("Failed to start agent.");
         let loop_guard = expect_to_stay_alive(update_backend_state_loop(nc));
 
         Ok(Agent {
