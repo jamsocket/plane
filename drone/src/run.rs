@@ -77,7 +77,7 @@ async fn drone_main() -> Result<()> {
 
     #[allow(clippy::manual_map)]
     let _agent_supervisor = if let Some(agent_options) = agent_options {
-        Some(Supervisor::new("agent", run_agent(agent_options)))
+        Some(run_agent(agent_options).await?)
     } else {
         tracing::info!("Not starting agent, no agent options provided.");
         None
