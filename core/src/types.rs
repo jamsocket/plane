@@ -109,10 +109,6 @@ impl ClusterName {
         ClusterName(name.to_string())
     }
 
-	pub const fn const_new(name: String) -> Self {
-		ClusterName(name)
-	}
-
     pub fn hostname(&self) -> &str {
         &self.0
     }
