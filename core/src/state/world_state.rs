@@ -77,32 +77,36 @@ notify_waiters does not cause even the first one to do that.
 Therefore, we implement our own notifier that can be closed and
 will return immediately on all its dependent notifies.
 */
-#[derive(Debug, Clone)]
-pub struct ClosableNotifier {
-    notifier: Sender<()>,
-}
-
 #[derive(Debug)]
-pub struct ClosableNotify(Receiver<()>);
+pub struct ClosableNotify {
+    notifier: Arc<Sender<()>>,
+    rx: Receiver<()>,
+}
 
 impl ClosableNotify {
+    fn new() -> Self {
+        let (tx, rx) = tokio::sync::broadcast::channel(128);
+        Self {
+            notifier: Arc::new(tx),
+            rx,
+        }
+    }
+
     pub async fn notified(&mut self) {
-        let _ = self.0.recv().await;
+        let _ = self.rx.recv().await;
+    }
+
+    fn notify_waiters(&self) {
+        let _ = self.notifier.send(());
     }
 }
 
-impl ClosableNotifier {
-    fn new() -> Self {
-        let (tx, _rx) = tokio::sync::broadcast::channel(128);
-        Self { notifier: tx }
-    }
-
-    fn notify(&self) -> ClosableNotify {
-        ClosableNotify(self.notifier.subscribe())
-    }
-
-    fn notify_waiters(&mut self) {
-        let _ = self.notifier.send(());
+impl Clone for ClosableNotify {
+    fn clone(&self) -> Self {
+        Self {
+            notifier: self.notifier.clone(),
+            rx: self.notifier.subscribe(),
+        }
     }
 }
 
@@ -110,7 +114,7 @@ impl ClosableNotifier {
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: RwLock<HashMap<u64, ClosableNotifier>>,
+    listeners: RwLock<HashMap<u64, ClosableNotify>>,
 }
 
 impl WorldState {
@@ -120,18 +124,16 @@ impl WorldState {
 
     pub fn get_listener(&self, sequence: u64) -> ClosableNotify {
         if self.logical_time >= sequence {
-            let mut notifier = ClosableNotifier::new();
-            let notify = notifier.notify();
+            let notify = ClosableNotify::new();
             // this makes it so the notify returns immediately.
-            notifier.notify_waiters();
+            notify.notify_waiters();
             return notify;
         }
         match self.listeners.write().unwrap().entry(sequence) {
-            Entry::Occupied(entry) => entry.get().notify(),
+            Entry::Occupied(entry) => entry.get().clone(),
             Entry::Vacant(entry) => {
-                let notifier = ClosableNotifier::new();
-                let notify = notifier.notify();
-                entry.insert(notifier);
+                let notify = ClosableNotify::new();
+                entry.insert(notify.clone());
                 notify
             }
         }
@@ -142,10 +144,8 @@ impl WorldState {
         cluster.apply(message.message);
         self.logical_time = sequence;
 
-        if self.listeners.read().unwrap().contains_key(&sequence) {
-            if let Some(mut sender) = self.listeners.write().unwrap().remove(&sequence) {
-                sender.notify_waiters();
-            }
+        if let Some(sender) = self.listeners.write().unwrap().remove(&sequence) {
+            sender.notify_waiters();
         }
     }
 
