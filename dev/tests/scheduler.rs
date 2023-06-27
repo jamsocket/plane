@@ -75,7 +75,7 @@ impl MockAgent {
 
     /// This provides a way to spawn backends without needing different function calls
     /// for spawning vs retrieval.
-    pub async fn schedule_drone_no_split(
+    pub async fn schedule_drone(
         &self,
         drone_id: &DroneId,
         request_bearer_token: bool,
@@ -213,7 +213,7 @@ async fn one_drone_available() {
 
     drone_ready.notified().await;
     let result = mock_agent
-        .schedule_drone_no_split(&drone_id, false, None)
+        .schedule_drone(&drone_id, false, None)
         .await
         .unwrap();
 
@@ -282,7 +282,7 @@ async fn drone_not_ready() {
     drone_not_ready.notified().await;
 
     let result = mock_agent
-        .schedule_drone_no_split(&drone_id, false, None)
+        .schedule_drone(&drone_id, false, None)
         .await
         .unwrap();
 
@@ -333,7 +333,7 @@ async fn drone_becomes_not_ready() {
     drone_not_ready.notified().await;
 
     let result = mock_agent
-        .schedule_drone_no_split(&drone_id, false, None)
+        .schedule_drone(&drone_id, false, None)
         .await
         .unwrap();
 
@@ -367,7 +367,7 @@ async fn schedule_request_bearer_token() {
     drone_ready.notified().await;
 
     let result = mock_agent
-        .schedule_drone_no_split(&drone_id, true, None)
+        .schedule_drone(&drone_id, true, None)
         .await
         .unwrap();
 
@@ -456,14 +456,14 @@ async fn schedule_request_lock() {
     drone_ready.notified().await;
 
     let r1 = mock_agent
-        .schedule_drone_no_split(&drone_id, false, Some("foobar".to_string()))
+        .schedule_drone(&drone_id, false, Some("foobar".to_string()))
         .await
         .unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, .. } = r1 else {panic!()};
 
     let r2 = mock_agent
-        .schedule_drone_no_split(&drone_id, false, Some("foobar".to_string()))
+        .schedule_drone(&drone_id, false, Some("foobar".to_string()))
         .await
         .unwrap();
 
@@ -473,8 +473,8 @@ async fn schedule_request_lock() {
     assert_eq!(backend1, backend2);
 
     match tokio::join!(
-        mock_agent.schedule_drone_no_split(&drone_id, false, Some("speedlock".to_string())),
-        mock_agent.schedule_drone_no_split(&drone_id, false, Some("speedlock".to_string()))
+        mock_agent.schedule_drone(&drone_id, false, Some("speedlock".to_string())),
+        mock_agent.schedule_drone(&drone_id, false, Some("speedlock".to_string()))
     ) {
         (
             Ok(ScheduleResponse::Scheduled { spawned: a, .. }),
@@ -518,7 +518,7 @@ async fn schedule_request_lock_with_bearer_token() {
     drone_ready.notified().await;
 
     let r1 = mock_agent
-        .schedule_drone_no_split(&drone_id, true, Some("foobar".to_string()))
+        .schedule_drone(&drone_id, true, Some("foobar".to_string()))
         .await
         .unwrap();
 
@@ -526,7 +526,7 @@ async fn schedule_request_lock_with_bearer_token() {
     assert!(bearer_token1.is_some());
 
     let r2 = mock_agent
-        .schedule_drone_no_split(&drone_id, true, Some("foobar".to_string()))
+        .schedule_drone(&drone_id, true, Some("foobar".to_string()))
         .await
         .unwrap();
 
