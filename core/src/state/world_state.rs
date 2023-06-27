@@ -11,6 +11,7 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use std::{
     collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, VecDeque},
+    fmt::Debug,
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
@@ -110,14 +111,23 @@ impl Clone for ClosableNotify {
     }
 }
 
-type DebugCondition = fn(&WorldState) -> bool;
+pub trait DebugConditionT: Sync + Send + Fn(&WorldState) -> bool {}
+impl<F: Fn(&WorldState) -> bool + Send + Sync> DebugConditionT for F {}
+struct DebugCondition<F: DebugConditionT + Send + Sync>(F);
+impl<F: DebugConditionT + Send + Sync> Debug for DebugCondition<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Debug Condition")
+    }
+}
+type SizedDebugCondition = DebugCondition<Box<dyn DebugConditionT>>;
+
 #[derive(Default, Debug)]
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
     listeners: RwLock<HashMap<u64, ClosableNotify>>,
     #[cfg(debug_assertions)]
-    debug_listeners: RwLock<Vec<(ClosableNotify, DebugCondition)>>,
+    debug_listeners: RwLock<Vec<(ClosableNotify, SizedDebugCondition)>>,
 }
 
 impl WorldState {
@@ -143,11 +153,18 @@ impl WorldState {
     }
 
     #[cfg(debug_assertions)]
-    pub fn get_listener_for_predicate(&self, cond: fn(&WorldState) -> bool) -> ClosableNotify {
+    pub fn get_listener_for_predicate(
+        &self,
+        cond: impl DebugConditionT + 'static,
+    ) -> ClosableNotify {
         let notify = ClosableNotify::new();
+        let cond = DebugCondition(Box::new(cond) as Box<dyn DebugConditionT>);
+        //as &dyn DebugConditionT);
         tracing::info!(?cond, "inserting debug listener into vec");
-        self.debug_listeners.write().unwrap().push((notify.clone(), cond));
-        tracing::info!(?cond, "inserted debug listener into vec");
+        self.debug_listeners
+            .write()
+            .unwrap()
+            .push((notify.clone(), cond));
         notify
     }
 
@@ -167,7 +184,7 @@ impl WorldState {
                 .unwrap()
                 .retain_mut(|(notifier, cond)| {
                     tracing::info!(?cond, "running cond");
-                    if cond(self) {
+                    if cond.0(self) {
                         tracing::info!(?cond, "cond holds!");
                         notifier.notify_waiters();
                         false
