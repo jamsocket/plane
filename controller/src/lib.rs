@@ -52,10 +52,7 @@ async fn spawn_backend(
                 })
                 .await?;
 
-            tracing::info!(
-            logical_time=?seq_id,
-            "backend state updated at time"
-                );
+            tracing::info!(logical_time=?seq_id, "backend state updated at time");
 
             Ok((
                 ScheduleResponse::Scheduled {
