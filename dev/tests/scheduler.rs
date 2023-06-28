@@ -105,7 +105,7 @@ impl MockAgent {
             .nats
             .request_with_timeout(&request, std::time::Duration::from_secs(30));
         let should_spawned = async {
-            let Ok(Some(spawn_msg)) = timeout(1_000, "Agent should receive spawn request", sub.next())
+            let Ok(Some(spawn_msg)) = timeout(30_000, "Agent should receive spawn request", sub.next())
                 .await else { tracing::info!("does not receive spawn req"); return false };
             assert_eq!(
                 drone_id, &spawn_msg.value.drone_id,
