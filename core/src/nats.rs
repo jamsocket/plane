@@ -488,6 +488,21 @@ impl TypedNats {
         Ok(value)
     }
 
+    pub async fn request_with_timeout<T>(&self, value: &T, timeout: Duration) -> Result<T::Response>
+    where
+        T: TypedMessage,
+    {
+        let bytes = Bytes::from(serde_json::to_vec(value)?);
+
+        let request = async_nats::Request::new()
+            .payload(bytes)
+            .timeout(Some(timeout));
+        let fut = self.nc.send_request(value.subject(), request);
+        let result = fut.await.unwrap();
+        let value: T::Response = serde_json::from_slice(&result.payload)?;
+        Ok(value)
+    }
+
     pub async fn subscribe<T>(&self, subject: SubscribeSubject<T>) -> Result<TypedSubscription<T>>
     where
         T: TypedMessage,
