@@ -159,7 +159,6 @@ impl WorldState {
     ) -> ClosableNotify {
         let notify = ClosableNotify::new();
         let cond = DebugCondition(Box::new(cond) as Box<dyn DebugConditionT>);
-        //as &dyn DebugConditionT);
         tracing::info!(?cond, "inserting debug listener into vec");
         self.debug_listeners
             .write()
