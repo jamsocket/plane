@@ -110,24 +110,11 @@ impl Clone for ClosableNotify {
         }
     }
 }
-
-pub trait DebugConditionT: Sync + Send + Fn(&WorldState) -> bool {}
-impl<F: Fn(&WorldState) -> bool + Send + Sync> DebugConditionT for F {}
-struct DebugCondition<F: DebugConditionT + Send + Sync>(F);
-impl<F: DebugConditionT + Send + Sync> Debug for DebugCondition<F> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Debug Condition")
-    }
-}
-type SizedDebugCondition = DebugCondition<Box<dyn DebugConditionT>>;
-
 #[derive(Default, Debug)]
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: RwLock<HashMap<u64, ClosableNotify>>,
-    #[cfg(debug_assertions)]
-    debug_listeners: RwLock<Vec<(ClosableNotify, SizedDebugCondition)>>,
+    listeners: RwLock<BTreeMap<u64, ClosableNotify>>,
 }
 
 impl WorldState {
@@ -137,14 +124,15 @@ impl WorldState {
 
     pub fn get_listener(&self, sequence: u64) -> ClosableNotify {
         if self.logical_time >= sequence {
+            tracing::info!("immediately returning notify created");
             let notify = ClosableNotify::new();
             // this makes it so the notify returns immediately.
             notify.notify_waiters();
             return notify;
         }
         match self.listeners.write().unwrap().entry(sequence) {
-            Entry::Occupied(entry) => entry.get().clone(),
-            Entry::Vacant(entry) => {
+            std::collections::btree_map::Entry::Occupied(entry) => entry.get().clone(),
+            std::collections::btree_map::Entry::Vacant(entry) => {
                 let notify = ClosableNotify::new();
                 entry.insert(notify.clone());
                 notify
@@ -152,47 +140,20 @@ impl WorldState {
         }
     }
 
-    #[cfg(debug_assertions)]
-    pub fn get_listener_for_predicate(
-        &self,
-        cond: impl DebugConditionT + 'static,
-    ) -> ClosableNotify {
-        let notify = ClosableNotify::new();
-        let cond = DebugCondition(Box::new(cond) as Box<dyn DebugConditionT>);
-        tracing::info!(?cond, "inserting debug listener into vec");
-        self.debug_listeners
-            .write()
-            .unwrap()
-            .push((notify.clone(), cond));
-        notify
-    }
-
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
+        tracing::info!(?message, ?sequence, "World state message!");
         let cluster = self.clusters.entry(message.cluster.clone()).or_default();
         cluster.apply(message.message);
         self.logical_time = sequence;
 
-        if let Some(sender) = self.listeners.write().unwrap().remove(&sequence) {
-            sender.notify_waiters();
-        }
-
-        if cfg!(debug_assertions) {
-            tracing::info!(?self.debug_listeners, "running debug listeners");
-            self.debug_listeners
-                .write()
-                .unwrap()
-                .retain_mut(|(notifier, cond)| {
-                    tracing::info!(?cond, "running cond");
-                    if cond.0(self) {
-                        tracing::info!(?cond, "cond holds!");
-                        notifier.notify_waiters();
-                        false
-                    } else {
-                        tracing::info!(?cond, "cond does not hold");
-                        true
-                    }
-                });
-        }
+        let mut listeners = self.listeners.write().unwrap();
+        *listeners = {
+            let b = listeners.split_off(&sequence);
+            for (_, sender) in listeners.iter() {
+                sender.notify_waiters();
+            }
+            b
+        };
     }
 
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterState> {
