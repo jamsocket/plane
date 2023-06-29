@@ -138,17 +138,11 @@ async fn process_response(
         }
 
         tracing::info!("spawn with lock");
-        let drone = match scheduler.schedule(&cluster_name, Utc::now()) {
-            Ok(drone_id) => drone_id,
-            Err(SchedulerError::NoDroneAvailable) => return Ok(ScheduleResponse::NoDroneAvailable),
-        };
+    }
 
-        spawn_backend(nats, &drone, sr).await
-    } else {
-        match scheduler.schedule(&cluster_name, Utc::now()) {
-            Ok(drone_id) => spawn_backend(nats, &drone_id, &sr.clone()).await,
-            Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
-        }
+    match scheduler.schedule(&cluster_name, Utc::now()) {
+        Ok(drone_id) => spawn_backend(nats, &drone_id, &sr.clone()).await,
+        Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
     }
 }
 
