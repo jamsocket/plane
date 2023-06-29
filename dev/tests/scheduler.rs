@@ -12,7 +12,7 @@ use plane_core::{
         scheduler::ScheduleResponse,
     },
     nats::TypedNats,
-    state::{start_state_loop, ClosableNotify, StateHandle},
+    state::{start_state_loop, StateHandle},
     types::{BackendId, ClusterName, DroneId},
     NeverResult,
 };
@@ -260,7 +260,7 @@ async fn drone_not_ready() {
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
 
-    let mut drone_not_ready =
+    let drone_not_ready =
         drone_not_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
 
     nats_conn
@@ -537,7 +537,7 @@ async fn schedule_request_lock_with_bearer_token() {
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
-    let mut drone_ready =
+    let drone_ready =
         drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
 
     nats_conn
