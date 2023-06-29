@@ -10,7 +10,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use std::{
-    collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fmt::Debug,
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
