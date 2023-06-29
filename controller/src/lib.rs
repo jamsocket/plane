@@ -21,12 +21,11 @@ pub mod plan;
 pub mod run;
 mod scheduler;
 
-type LogicalTime = u64;
 async fn spawn_backend(
     nats: &TypedNats,
     drone: &DroneId,
     schedule_request: &ScheduleRequest,
-) -> anyhow::Result<(ScheduleResponse, Option<LogicalTime>)> {
+) -> anyhow::Result<ScheduleResponse> {
     let timer = Timer::new();
     let spawn_request = schedule_request.schedule(drone);
     match nats.request(&spawn_request).await {
@@ -54,23 +53,20 @@ async fn spawn_backend(
 
             tracing::info!(logical_time=?seq_id, "backend state updated at time");
 
-            Ok((
-                ScheduleResponse::Scheduled {
-                    drone: drone.clone(),
-                    backend_id: spawn_request.backend_id,
-                    bearer_token: spawn_request.bearer_token.clone(),
-                    spawned: true,
-                },
-                Some(seq_id),
-            ))
+            Ok(ScheduleResponse::Scheduled {
+                drone: drone.clone(),
+                backend_id: spawn_request.backend_id,
+                bearer_token: spawn_request.bearer_token.clone(),
+                spawned: true,
+            })
         }
         Ok(false) => {
             tracing::warn!("Drone rejected backend.");
-            Ok((ScheduleResponse::NoDroneAvailable, None))
+            Ok(ScheduleResponse::NoDroneAvailable)
         }
         Err(error) => {
             tracing::warn!(?error, "Scheduler returned error.");
-            Ok((ScheduleResponse::NoDroneAvailable, None))
+            Ok(ScheduleResponse::NoDroneAvailable)
         }
     }
 }
@@ -147,13 +143,10 @@ async fn process_response(
             Err(SchedulerError::NoDroneAvailable) => return Ok(ScheduleResponse::NoDroneAvailable),
         };
 
-        match spawn_backend(nats, &drone, sr).await? {
-            (res, Some(_st)) => Ok(res),
-            (res, None) => Ok(res),
-        }
+        spawn_backend(nats, &drone, sr).await
     } else {
         match scheduler.schedule(&cluster_name, Utc::now()) {
-            Ok(drone_id) => Ok(spawn_backend(nats, &drone_id, &sr.clone()).await?.0),
+            Ok(drone_id) => spawn_backend(nats, &drone_id, &sr.clone()).await,
             Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
         }
     }
