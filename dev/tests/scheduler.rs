@@ -19,7 +19,7 @@ use plane_core::{
 use plane_dev::{
     resources::nats::Nats,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{base_scheduler_request, random_loopback_ip},
+    util::{base_scheduler_request, random_loopback_ip, wait_for_predicate},
 };
 use std::net::IpAddr;
 
@@ -73,19 +73,19 @@ impl MockAgent {
         ));
 
         let drone_copy = drone_id.clone();
-        let mut drone_connected = state.state().get_listener_for_predicate(move |ws| {
+        let cluster_clone = cluster.clone();
+        //let mut drone_connected = state.state().get_listener_for_predicate(move |ws| {
+        let drone_connected = wait_for_predicate(state.clone(), move |ws| {
             tracing::info!(?ws, "current ws");
-            let cluster = ws.cluster(&PLANE_CLUSTER).unwrap();
+            let Some(cluster) = ws.cluster(&cluster_clone) else { return false };
             tracing::info!(?cluster, "cluster");
-            let drone = cluster.drone(&drone_copy);
-            drone.unwrap().meta.is_some()
+            let Some(drone) = cluster.drone(&drone_copy) else { return false };
+            drone.meta.is_some()
         });
 
-        let nats2 = nats.clone();
-        let (Ok(Ok(result)), _) = tokio::join!(
-            tokio::spawn(async move { nats2.request(&request).await }),
-            drone_connected.notified()
-        ) else { panic!() };
+        wait_for_predicate(state.clone(), |_| true).await;
+        let result = nats.request(&request).await.unwrap();
+        drone_connected.await;
 
         assert_eq!(true, result, "Drone connect request should succeed.");
 
@@ -153,34 +153,32 @@ impl MockAgent {
     }
 }
 
-fn drone_ready_notify(state: StateHandle, drone: DroneId, cluster: ClusterName) -> ClosableNotify {
-    state.state().get_listener_for_predicate(move |ws| {
+async fn drone_ready_notify(state: StateHandle, drone: DroneId, cluster: ClusterName) {
+    wait_for_predicate(state, move |ws| {
         tracing::info!(?ws, "current ws");
-        let cluster = ws.cluster(&cluster).unwrap();
+        let Some(cluster) = ws.cluster(&cluster) else { return false };
         tracing::info!(?cluster, "cluster");
-        let drone = cluster.drone(&drone);
+        let Some(drone) = cluster.drone(&drone) else { return false };
         tracing::info!(?drone, "drone");
-        let drone_state = drone.unwrap().state();
+        let Some(drone_state) = drone.state() else { return false };
         tracing::info!(?drone_state, "drone state");
-        drone_state.unwrap() == DroneState::Ready && drone.unwrap().last_seen.is_some()
+        drone_state == DroneState::Ready && drone.last_seen.is_some()
     })
+    .await
 }
 
-fn drone_not_ready_notify(
-    state: StateHandle,
-    drone: DroneId,
-    cluster: ClusterName,
-) -> ClosableNotify {
-    state.state().get_listener_for_predicate(move |ws| {
+async fn drone_not_ready_notify(state: StateHandle, drone: DroneId, cluster: ClusterName) {
+    wait_for_predicate(state, move |ws| {
         tracing::info!(?ws, "current ws");
-        let cluster = ws.cluster(&cluster).unwrap();
+        let Some(cluster) = ws.cluster(&cluster) else { return false };
         tracing::info!(?cluster, "cluster");
-        let drone = cluster.drone(&drone);
+        let Some(drone) = cluster.drone(&drone) else { return false };
         tracing::info!(?drone, "drone");
-        let drone_state = drone.unwrap().state();
+        let Some(drone_state) = drone.state() else { return false };
         tracing::info!(?drone_state, "drone state");
-        drone_state.unwrap() != DroneState::Ready && drone.unwrap().last_seen.is_some()
+        drone_state != DroneState::Ready && drone.last_seen.is_some()
     })
+    .await
 }
 
 #[integration_test]
@@ -216,8 +214,7 @@ async fn one_drone_available() {
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
 
-    let mut drone_ready =
-        drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -231,7 +228,7 @@ async fn one_drone_available() {
         .await
         .unwrap();
 
-    drone_ready.notified().await;
+    drone_ready.await;
     let result = mock_agent.schedule_drone(false, None).await.unwrap();
 
     assert!(matches!(&result, ScheduleResponse::Scheduled { drone, .. } if drone == &drone_id));
@@ -278,7 +275,7 @@ async fn drone_not_ready() {
         .await
         .unwrap();
 
-    drone_not_ready.notified().await;
+    drone_not_ready.await;
 
     let result = mock_agent.schedule_drone(false, None).await.unwrap();
 
@@ -294,8 +291,7 @@ async fn drone_becomes_not_ready() {
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
 
-    let mut drone_ready =
-        drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -309,9 +305,9 @@ async fn drone_becomes_not_ready() {
         .await
         .unwrap();
 
-    drone_ready.notified().await;
+    drone_ready.await;
 
-    let mut drone_not_ready =
+    let drone_not_ready =
         drone_not_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
 
     nats_conn
@@ -326,7 +322,7 @@ async fn drone_becomes_not_ready() {
         .await
         .unwrap();
 
-    drone_not_ready.notified().await;
+    drone_not_ready.await;
 
     let result = mock_agent.schedule_drone(false, None).await.unwrap();
 
@@ -342,8 +338,7 @@ async fn schedule_request_bearer_token() {
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
 
-    let mut drone_ready =
-        drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -357,7 +352,7 @@ async fn schedule_request_bearer_token() {
         .await
         .unwrap();
 
-    drone_ready.notified().await;
+    drone_ready.await;
 
     let result = mock_agent.schedule_drone(true, None).await.unwrap();
 
@@ -428,8 +423,7 @@ async fn schedule_request_lock() {
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
-    let mut drone_ready =
-        drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -443,7 +437,7 @@ async fn schedule_request_lock() {
         .await
         .unwrap();
 
-    drone_ready.notified().await;
+    drone_ready.await;
 
     let r1 = mock_agent
         .schedule_drone(false, Some("foobar".to_string()))
@@ -491,8 +485,7 @@ async fn schedule_request_lock() {
 
     let drone_id_2 = DroneId::new_random();
     let mock_agent_2 = MockAgent::new(nats_conn.clone(), &drone_id_2, state.clone()).await;
-    let mut drone_ready =
-        drone_ready_notify(state.clone(), drone_id_2.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(state.clone(), drone_id_2.clone(), PLANE_CLUSTER.clone());
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -506,7 +499,7 @@ async fn schedule_request_lock() {
         .await
         .unwrap();
 
-    drone_ready.notified().await;
+    drone_ready.await;
 
     //testing simultaneous schedule requests to multiple drones
     match tokio::join!(
@@ -559,7 +552,7 @@ async fn schedule_request_lock_with_bearer_token() {
         .await
         .unwrap();
 
-    drone_ready.notified().await;
+    drone_ready.await;
 
     let r1 = mock_agent
         .schedule_drone(true, Some("foobar".to_string()))
