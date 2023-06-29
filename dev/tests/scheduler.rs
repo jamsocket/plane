@@ -537,8 +537,7 @@ async fn schedule_request_lock_with_bearer_token() {
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
-    let drone_ready =
-        drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
 
     nats_conn
         .publish(&DroneStatusMessage {
