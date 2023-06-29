@@ -148,7 +148,7 @@ impl WorldState {
 
         let mut listeners = self.listeners.write().unwrap();
         *listeners = {
-            let b = listeners.split_off(&(sequence+1));
+            let b = listeners.split_off(&(sequence + 1));
             for (_, sender) in listeners.iter() {
                 sender.notify_waiters();
             }
