@@ -2,6 +2,7 @@ use crate::container::build_image;
 use anyhow::{anyhow, Result};
 use plane_core::messages::agent::{DockerExecutableConfig, SpawnRequest};
 use plane_core::messages::scheduler::ScheduleRequest;
+use plane_core::state::{StateHandle, WorldState};
 use plane_core::types::BackendId;
 use plane_core::types::ClusterName;
 use plane_core::types::DroneId;
@@ -166,4 +167,14 @@ pub fn base_scheduler_request() -> ScheduleRequest {
         require_bearer_token: false,
         lock: None,
     }
+}
+
+pub async fn wait_for_predicate(
+	state: StateHandle, predicate: impl Fn(&WorldState) -> bool + Send + Sync + 'static) {
+	loop {
+		let state = state.state();
+		let cur_logical_time = state.logical_time();
+		if predicate(&state) { return }
+		state.get_listener(cur_logical_time+1).notified().await;
+	}
 }
