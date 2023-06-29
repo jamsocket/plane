@@ -1,7 +1,6 @@
 use anyhow::Result;
 use chrono::Utc;
 use integration_test::integration_test;
-use lazy_static::lazy_static;
 use plane_controller::{
     drone_state::monitor_drone_state, run::update_backend_state_loop, run_scheduler,
 };
@@ -25,9 +24,6 @@ use std::net::IpAddr;
 
 pub const CLUSTER_DOMAIN: &str = "plane.test";
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
-lazy_static! {
-    static ref PLANE_CLUSTER: ClusterName = ClusterName::new(CLUSTER_DOMAIN);
-}
 
 struct MockAgent {
     nats: TypedNats,
@@ -214,7 +210,11 @@ async fn one_drone_available() {
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
 
-    let drone_ready = drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -239,7 +239,7 @@ async fn one_drone_available() {
 
     let ws = state.state();
     let assigned_drone = ws
-        .cluster(&PLANE_CLUSTER)
+        .cluster(&ClusterName::new(CLUSTER_DOMAIN))
         .unwrap()
         .backends
         .get(&backend_id)
@@ -260,8 +260,11 @@ async fn drone_not_ready() {
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
 
-    let drone_not_ready =
-        drone_not_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_not_ready = drone_not_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -291,7 +294,11 @@ async fn drone_becomes_not_ready() {
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
 
-    let drone_ready = drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -307,8 +314,11 @@ async fn drone_becomes_not_ready() {
 
     drone_ready.await;
 
-    let drone_not_ready =
-        drone_not_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_not_ready = drone_not_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -338,7 +348,11 @@ async fn schedule_request_bearer_token() {
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
 
-    let drone_ready = drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -423,7 +437,11 @@ async fn schedule_request_lock() {
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
-    let drone_ready = drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -485,11 +503,15 @@ async fn schedule_request_lock() {
 
     let drone_id_2 = DroneId::new_random();
     let mock_agent_2 = MockAgent::new(nats_conn.clone(), &drone_id_2, state.clone()).await;
-    let drone_ready = drone_ready_notify(state.clone(), drone_id_2.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id_2.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
-            cluster: PLANE_CLUSTER.clone(),
+            cluster: ClusterName::new(CLUSTER_DOMAIN).clone(),
             drone_id: drone_id_2.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: true,
@@ -537,11 +559,15 @@ async fn schedule_request_lock_with_bearer_token() {
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
     let drone_id = DroneId::new_random();
     let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
-    let drone_ready = drone_ready_notify(state.clone(), drone_id.clone(), PLANE_CLUSTER.clone());
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
-            cluster: PLANE_CLUSTER.clone(),
+            cluster: ClusterName::new(CLUSTER_DOMAIN).clone(),
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: true,
