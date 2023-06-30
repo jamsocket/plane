@@ -151,23 +151,21 @@ async fn dispatch_schedule_request(
     schedule_request: MessageWithResponseHandle<ScheduleRequest>,
     scheduler: Scheduler,
     nats: TypedNats,
-) -> anyhow::Result<()> {
+) {
     let Ok(response) = process_response(
-		&state,
-		&schedule_request.value.clone(),
-		&scheduler,
-		&nats
-	).await else {
-		tracing::error!(?schedule_request.value, "schedule request failed");
-		panic!("failed to dispatch");
-	};
+        &state,
+        &schedule_request.value.clone(),
+        &scheduler,
+        &nats
+    ).await else {
+        tracing::error!(?schedule_request.value, "schedule request failed");
+        return;
+    };
 
     let Ok(_) = schedule_request.respond(&response).await else {
-		tracing::warn!(res = ?response, "schedule response failed to send");
-		panic!("failed to respond to schedule req");
-	};
-
-    Ok(())
+        tracing::warn!(res = ?response, "schedule response failed to send");
+        return;
+    };
 }
 
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
