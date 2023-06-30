@@ -3,7 +3,9 @@ use anyhow::anyhow;
 use chrono::Utc;
 use plane_core::{
     messages::{
-        scheduler::{ScheduleRequest, ScheduleResponse},
+        scheduler::{
+            FetchBackendForLock, FetchBackendForLockResponse, ScheduleRequest, ScheduleResponse,
+        },
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
     nats::{MessageWithResponseHandle, TypedNats},
@@ -168,19 +170,63 @@ async fn dispatch_schedule_request(
     };
 }
 
+async fn dispatch_lock_request(
+    state: StateHandle,
+    lock_request: MessageWithResponseHandle<FetchBackendForLock>,
+) {
+    let mut response: FetchBackendForLockResponse = FetchBackendForLockResponse::NoBackendForLock;
+    if let Ok(backend) = backend_of_lock(
+        &state,
+        &lock_request.value.cluster,
+        &lock_request.value.lock,
+    ) {
+        if let Ok(schedule_response) = schedule_response_for_existing_backend(
+            &state,
+            lock_request.value.cluster.clone(),
+            backend,
+        ) {
+            response = schedule_response.try_into().expect(
+                "already checked that backend exists, \
+                so schedule_response should be convertible to FetchBackendForLockResponse",
+            );
+        }
+    }
+    let Ok(_) = lock_request.respond(&response).await else {
+        tracing::warn!(res = ?response, "lock response failed to send");
+        return;
+    };
+}
+
 pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     let scheduler = Scheduler::new(state.clone());
     let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
 
-    while let Some(schedule_request) = schedule_request_sub.next().await {
-        tracing::info!(metadata=?schedule_request.value.metadata.clone(), "Got spawn request");
-        tokio::spawn(dispatch_schedule_request(
-            state.clone(),
-            schedule_request.clone(),
-            scheduler.clone(),
-            nats.clone(),
-        ));
+    let mut backend_for_lock_request_sub = nats
+        .subscribe(FetchBackendForLock::subscribe_subject())
+        .await?;
+
+    loop {
+        tokio::select! {
+            Some(schedule_request) = schedule_request_sub.next() => {
+                tracing::info!(metadata=?schedule_request.value.metadata.clone(), "Got spawn request");
+                tokio::spawn(dispatch_schedule_request(
+                    state.clone(),
+                    schedule_request.clone(),
+                    scheduler.clone(),
+                    nats.clone(),
+                ));
+            },
+            Some(backend_for_lock_req) = backend_for_lock_request_sub.next() => {
+                tracing::info!(metadata=?backend_for_lock_req.value.clone(),
+                               "Got locked backend request");
+                tokio::spawn(dispatch_lock_request(
+                    state.clone(),
+                    backend_for_lock_req.clone(),
+                ));
+            },
+            else => break
+        }
     }
 
     Err(anyhow!(
