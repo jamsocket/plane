@@ -97,7 +97,7 @@ impl ScheduleRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub enum FetchLockedBackendResponse {
+pub enum FetchBackendForLockResponse {
     Scheduled {
         drone: DroneId,
         backend_id: BackendId,
@@ -107,7 +107,7 @@ pub enum FetchLockedBackendResponse {
     NoBackendForLock,
 }
 
-impl TryFrom<ScheduleResponse> for FetchLockedBackendResponse {
+impl TryFrom<ScheduleResponse> for FetchBackendForLockResponse {
     type Error = anyhow::Error;
     fn try_from(schedule_response: ScheduleResponse) -> anyhow::Result<Self> {
         match schedule_response {
@@ -135,14 +135,14 @@ impl TryFrom<ScheduleResponse> for FetchLockedBackendResponse {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, TypedMessage)]
 #[typed_message(
     subject = "cluster.#cluster.fetch",
-    response = "FetchLockedBackendResponse"
+    response = "FetchBackendForLockResponse"
 )]
-pub struct FetchLockedBackend {
+pub struct FetchBackendForLock {
     pub cluster: ClusterName,
     pub lock: String,
 }
 
-impl FetchLockedBackend {
+impl FetchBackendForLock {
     pub fn subscribe_subject() -> SubscribeSubject<Self> {
         SubscribeSubject::new("cluster.*.fetch".into())
     }

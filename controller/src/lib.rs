@@ -4,7 +4,7 @@ use chrono::Utc;
 use plane_core::{
     messages::{
         scheduler::{
-            FetchLockedBackend, FetchLockedBackendResponse, ScheduleRequest, ScheduleResponse,
+            FetchBackendForLock, FetchBackendForLockResponse, ScheduleRequest, ScheduleResponse,
         },
         state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
     },
@@ -172,9 +172,9 @@ async fn dispatch_schedule_request(
 
 async fn dispatch_lock_request(
     state: StateHandle,
-    lock_request: MessageWithResponseHandle<FetchLockedBackend>,
+    lock_request: MessageWithResponseHandle<FetchBackendForLock>,
 ) {
-    let mut response: FetchLockedBackendResponse = FetchLockedBackendResponse::NoBackendForLock;
+    let mut response: FetchBackendForLockResponse = FetchBackendForLockResponse::NoBackendForLock;
     if let Ok(backend) = backend_of_lock(
         &state,
         &lock_request.value.cluster,
@@ -200,7 +200,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     tracing::info!("Subscribed to spawn requests.");
 
     let mut locked_backend_request_sub = nats
-        .subscribe(FetchLockedBackend::subscribe_subject())
+        .subscribe(FetchBackendForLock::subscribe_subject())
         .await?;
 
     loop {
