@@ -104,26 +104,32 @@ pub enum FetchLockedBackendResponse {
         #[serde(skip_serializing_if = "Option::is_none")]
         bearer_token: Option<String>,
     },
-    NoBackendForLock
+    NoBackendForLock,
 }
 
 impl TryFrom<ScheduleResponse> for FetchLockedBackendResponse {
     type Error = anyhow::Error;
     fn try_from(schedule_response: ScheduleResponse) -> anyhow::Result<Self> {
         match schedule_response {
-            ScheduleResponse::Scheduled { drone, backend_id, bearer_token, spawned } => {
+            ScheduleResponse::Scheduled {
+                drone,
+                backend_id,
+                bearer_token,
+                spawned,
+            } => {
                 if !spawned {
                     return Err(anyhow::anyhow!("must not have spawned to fetch backend"));
                 }
                 Ok(Self::Scheduled {
-                    drone, backend_id, bearer_token
+                    drone,
+                    backend_id,
+                    bearer_token,
                 })
-            },
-            ScheduleResponse::NoDroneAvailable => Ok(Self::NoBackendForLock)
+            }
+            ScheduleResponse::NoDroneAvailable => Ok(Self::NoBackendForLock),
         }
     }
 }
-
 
 /// Message sent to a controller to fetch a locked backend
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, TypedMessage)]
@@ -133,7 +139,7 @@ impl TryFrom<ScheduleResponse> for FetchLockedBackendResponse {
 )]
 pub struct FetchLockedBackend {
     pub cluster: ClusterName,
-    pub lock: String
+    pub lock: String,
 }
 
 impl FetchLockedBackend {
