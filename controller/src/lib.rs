@@ -15,7 +15,6 @@ use plane_core::{
     NeverResult,
 };
 use scheduler::Scheduler;
-use tokio_stream::{StreamExt, StreamMap};
 
 mod config;
 pub mod dns;
