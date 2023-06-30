@@ -3,6 +3,7 @@ use crate::{
     nats::{SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
+use plane_core_nats_macros::TypedMessage;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -93,6 +94,28 @@ impl ScheduleRequest {
     pub fn subscribe_subject() -> SubscribeSubject<Self> {
         SubscribeSubject::new("cluster.*.schedule".into())
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum FetchLockedBackendResponse {
+    Scheduled {
+        drone: DroneId,
+        backend_id: BackendId,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bearer_token: Option<String>,
+    },
+    NoBackendForLock
+}
+
+/// Message sent to a controller to fetch a locked backend
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, TypedMessage)]
+#[typed_message(
+    subject = "cluster.#cluster.fetch",
+    response = "FetchLockedBackendResponse"
+)]
+pub struct FetchLockedBackend {
+    pub cluster: ClusterName,
+    pub lock: String
 }
 
 /// Message sent to a drone to tell it to start draining.
