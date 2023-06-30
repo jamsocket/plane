@@ -186,8 +186,8 @@ async fn dispatch_lock_request(
             backend,
         ) {
             response = schedule_response.try_into().expect(
-                "already checked that backend exists, \\
-						 so schedule_response should be convertible to FetchBackendForLockResponse",
+                "already checked that backend exists, \
+                so schedule_response should be convertible to FetchBackendForLockResponse",
             );
         }
     }
