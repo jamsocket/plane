@@ -178,13 +178,12 @@ pub async fn wait_for_predicate(
             let mut notify = {
                 let state = state.state();
                 let cur_logical_time = state.logical_time();
-                let notify = state.get_listener(cur_logical_time + 1);
                 tracing::info!(?cur_logical_time, "waiting for predicate at time!");
                 if predicate(&state) {
                     tracing::info!("predicate returned true!");
                     return;
                 }
-                notify
+                state.get_listener(cur_logical_time + 1)
             };
             notify.notified().await;
         }
