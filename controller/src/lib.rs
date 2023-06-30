@@ -175,10 +175,16 @@ async fn dispatch_lock_request(
     lock_request: MessageWithResponseHandle<FetchLockedBackend>,
 ) {
     let mut response: FetchLockedBackendResponse = FetchLockedBackendResponse::NoBackendForLock;
-    if let Ok(backend) = backend_of_lock(&state, &lock_request.value.cluster, &lock_request.value.lock) {
-        if let Ok(schedule_response) =
-            schedule_response_for_existing_backend(&state, lock_request.value.cluster.clone(), backend)
-        {
+    if let Ok(backend) = backend_of_lock(
+        &state,
+        &lock_request.value.cluster,
+        &lock_request.value.lock,
+    ) {
+        if let Ok(schedule_response) = schedule_response_for_existing_backend(
+            &state,
+            lock_request.value.cluster.clone(),
+            backend,
+        ) {
             response = schedule_response.try_into().unwrap_or(response);
         }
     }
