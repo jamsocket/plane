@@ -174,12 +174,11 @@ async fn dispatch_schedule_request(
 async fn dispatch_lock_request(
     state: StateHandle,
     lock_request: MessageWithResponseHandle<FetchLockedBackend>,
-    nats: TypedNats,
 ) {
     let mut response: FetchLockedBackendResponse = FetchLockedBackendResponse::NoBackendForLock;
-    if let Ok(backend) = backend_of_lock(&state, &lock_request.value.cluster, &lock_request.lock) {
+    if let Ok(backend) = backend_of_lock(&state, &lock_request.value.cluster, &lock_request.value.lock) {
         if let Ok(schedule_response) =
-            schedule_response_for_existing_backend(&state, lock_request.value.cluster, backend)
+            schedule_response_for_existing_backend(&state, lock_request.value.cluster.clone(), backend)
         {
             response = schedule_response.try_into().unwrap_or(response);
         }
@@ -216,7 +215,6 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                 tokio::spawn(dispatch_lock_request(
                     state.clone(),
                     locked_backend_req.clone(),
-                    nats.clone(),
                 ));
             },
             else => break
