@@ -202,7 +202,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     let mut schedule_request_sub = nats.subscribe(ScheduleRequest::subscribe_subject()).await?;
     tracing::info!("Subscribed to spawn requests.");
 
-    let mut locked_backend_request_sub = nats
+    let mut backend_for_lock_request_sub = nats
         .subscribe(FetchBackendForLock::subscribe_subject())
         .await?;
 
@@ -217,12 +217,12 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                     nats.clone(),
                 ));
             },
-            Some(locked_backend_req) = locked_backend_request_sub.next() => {
-                tracing::info!(metadata=?locked_backend_req.value.clone(),
+            Some(backend_for_lock_req) = backend_for_lock_request_sub.next() => {
+                tracing::info!(metadata=?backend_for_lock_req.value.clone(),
                                "Got locked backend request");
                 tokio::spawn(dispatch_lock_request(
                     state.clone(),
-                    locked_backend_req.clone(),
+                    backend_for_lock_req.clone(),
                 ));
             },
             else => break
