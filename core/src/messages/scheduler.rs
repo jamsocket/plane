@@ -117,7 +117,7 @@ impl TryFrom<ScheduleResponse> for FetchLockedBackendResponse {
                 bearer_token,
                 spawned,
             } => {
-                if !spawned {
+                if spawned {
                     return Err(anyhow::anyhow!("must not have spawned to fetch backend"));
                 }
                 Ok(Self::Scheduled {
