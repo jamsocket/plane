@@ -107,6 +107,22 @@ pub enum FetchLockedBackendResponse {
     NoBackendForLock
 }
 
+impl TryFrom<ScheduleResponse> for FetchLockedBackendResponse {
+    type Error = anyhow::Error;
+    fn try_from(schedule_response: ScheduleResponse) -> anyhow::Result<Self> {
+        match schedule_response {
+            ScheduleResponse::Scheduled { drone, backend_id, bearer_token, spawned } => {
+                if !spawned {
+                    return Err(anyhow::anyhow!("must not have spawned to fetch backend"));
+                }
+                Ok(Self::Scheduled {
+                    drone, backend_id, bearer_token
+                })
+            },
+            ScheduleResponse::NoDroneAvailable => Ok(Self::NoBackendForLock)
+        }
+    }
+}
 
 
 /// Message sent to a controller to fetch a locked backend
