@@ -107,6 +107,8 @@ pub enum FetchLockedBackendResponse {
     NoBackendForLock
 }
 
+
+
 /// Message sent to a controller to fetch a locked backend
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, TypedMessage)]
 #[typed_message(
@@ -116,6 +118,12 @@ pub enum FetchLockedBackendResponse {
 pub struct FetchLockedBackend {
     pub cluster: ClusterName,
     pub lock: String
+}
+
+impl FetchLockedBackend {
+    pub fn subscribe_subject() -> SubscribeSubject<Self> {
+        SubscribeSubject::new("cluster.*.fetch".into())
+    }
 }
 
 /// Message sent to a drone to tell it to start draining.
