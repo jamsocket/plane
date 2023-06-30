@@ -15,7 +15,7 @@ use std::{
     net::IpAddr,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::Notify;
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -78,38 +78,29 @@ notify_waiters does not cause even the first one to do that.
 Therefore, we implement our own notifier that can be closed and
 will return immediately on all its dependent notifies.
 */
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ClosableNotify {
-    notifier: Arc<Sender<()>>,
-    rx: Receiver<()>,
+    notify: Arc<Notify>,
 }
 
 impl ClosableNotify {
     fn new() -> Self {
-        let (tx, rx) = tokio::sync::broadcast::channel(128);
         Self {
-            notifier: Arc::new(tx),
-            rx,
+            notify: Arc::new(Notify::new()),
         }
     }
 
     pub async fn notified(&mut self) {
-        let _ = self.rx.recv().await;
+        self.notify.notified().await;
+        self.notify.notify_one();
     }
 
     fn notify_waiters(&self) {
-        let _ = self.notifier.send(());
+        self.notify.notify_waiters();
+        self.notify.notify_one();
     }
 }
 
-impl Clone for ClosableNotify {
-    fn clone(&self) -> Self {
-        Self {
-            notifier: self.notifier.clone(),
-            rx: self.notifier.subscribe(),
-        }
-    }
-}
 #[derive(Default, Debug)]
 pub struct WorldState {
     logical_time: u64,
