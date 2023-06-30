@@ -199,28 +199,29 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
         .subscribe(FetchLockedBackend::subscribe_subject())
         .await?;
 
-    while tokio::select! {
-        Some(schedule_request) = schedule_request_sub.next() => {
-            tracing::info!(metadata=?schedule_request.value.metadata.clone(), "Got spawn request");
-            tokio::spawn(dispatch_schedule_request(
-                state.clone(),
-                schedule_request.clone(),
-                scheduler.clone(),
-                nats.clone(),
-            ));
-            true
-        },
-        Some(locked_backend_req) = locked_backend_request_sub.next() => {
-            tracing::info!(metadata=?locked_backend_req.value.clone(),
-                           "Got locked backend request");
-            tokio::spawn(dispatch_lock_request(
-                state.clone(),
-                locked_backend_req.clone(),
-                nats.clone(),
-            ));
-            true
+    loop {
+        tokio::select! {
+            Some(schedule_request) = schedule_request_sub.next() => {
+                tracing::info!(metadata=?schedule_request.value.metadata.clone(), "Got spawn request");
+                tokio::spawn(dispatch_schedule_request(
+                    state.clone(),
+                    schedule_request.clone(),
+                    scheduler.clone(),
+                    nats.clone(),
+                ));
+            },
+            Some(locked_backend_req) = locked_backend_request_sub.next() => {
+                tracing::info!(metadata=?locked_backend_req.value.clone(),
+                               "Got locked backend request");
+                tokio::spawn(dispatch_lock_request(
+                    state.clone(),
+                    locked_backend_req.clone(),
+                    nats.clone(),
+                ));
+            },
+            else => break
         }
-    } {}
+    }
 
     Err(anyhow!(
         "Scheduler stream closed before pending messages read."
