@@ -185,7 +185,10 @@ async fn dispatch_lock_request(
             lock_request.value.cluster.clone(),
             backend,
         ) {
-            response = schedule_response.try_into().unwrap_or(response);
+            response = schedule_response.try_into().expect(
+                "already checked that backend exists, \\
+						 so schedule_response should be convertible to FetchBackendForLockResponse",
+            );
         }
     }
     let Ok(_) = lock_request.respond(&response).await else {
