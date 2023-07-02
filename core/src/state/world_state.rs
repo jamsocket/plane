@@ -10,12 +10,14 @@ use crate::{
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     fmt::Debug,
+    future::ready,
     net::IpAddr,
+    pin::Pin,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use tokio::sync::Notify;
+use tokio::sync::broadcast::{channel, Sender};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -68,44 +70,11 @@ impl StateHandle {
     }
 }
 
-/*
-We want a thing that waits until notified, and importantly waits
-for that notify on all of its replicas.
-The default notifier from tokio does not behave the way we need
-since, if multiple clones are made, notify_one only causes the first
-to return immediately when it invokes the notification and awaits.
-notify_waiters does not cause even the first one to do that.
-Therefore, we implement our own notifier that can be closed and
-will return immediately on all its dependent notifies.
-*/
-#[derive(Debug, Clone)]
-pub struct ClosableNotify {
-    notify: Arc<Notify>,
-}
-
-impl ClosableNotify {
-    fn new() -> Self {
-        Self {
-            notify: Arc::new(Notify::new()),
-        }
-    }
-
-    pub async fn notified(&mut self) {
-        self.notify.notified().await;
-        self.notify.notify_one();
-    }
-
-    fn notify_waiters(&self) {
-        self.notify.notify_waiters();
-        self.notify.notify_one();
-    }
-}
-
 #[derive(Default, Debug)]
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: RwLock<BTreeMap<u64, ClosableNotify>>,
+    listeners: RwLock<BTreeMap<u64, Sender<()>>>,
 }
 
 impl WorldState {
@@ -113,22 +82,25 @@ impl WorldState {
         self.logical_time
     }
 
-    pub fn get_listener(&self, sequence: u64) -> ClosableNotify {
+    pub fn wait_for_seq(
+        &self,
+        sequence: u64,
+    ) -> Pin<Box<dyn core::future::Future<Output = ()> + Send + Sync>> {
         if self.logical_time >= sequence {
-            tracing::info!("immediately returning notify created");
-            let notify = ClosableNotify::new();
-            // this makes it so the notify returns immediately.
-            notify.notify_waiters();
-            return notify;
+            return Box::pin(ready(()));
         }
-        match self.listeners.write().unwrap().entry(sequence) {
-            std::collections::btree_map::Entry::Occupied(entry) => entry.get().clone(),
-            std::collections::btree_map::Entry::Vacant(entry) => {
-                let notify = ClosableNotify::new();
-                entry.insert(notify.clone());
-                notify
+        let mut recv = match self.listeners.write().unwrap().entry(sequence) {
+            Entry::Occupied(entry) => entry.get().subscribe(),
+            Entry::Vacant(entry) => {
+                let (send, recv) = channel(1024);
+                entry.insert(send);
+                recv
             }
-        }
+        };
+
+        Box::pin(async move {
+            recv.recv().await.unwrap();
+        })
     }
 
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
@@ -141,7 +113,7 @@ impl WorldState {
         *listeners = {
             let b = listeners.split_off(&(sequence + 1));
             for (_, sender) in listeners.iter() {
-                sender.notify_waiters();
+                sender.send(()).unwrap();
             }
             b
         };
@@ -304,18 +276,18 @@ mod test {
     async fn test_listener() {
         let state = StateHandle::default();
 
-        let mut zerolistener = state.state().get_listener(0);
-        timeout(Duration::from_secs(0), zerolistener.notified())
+        let zerolistener = state.state().wait_for_seq(0);
+        timeout(Duration::from_secs(0), zerolistener)
             .await
             .expect("zerolistener should return immediately");
 
-        let mut onelistener = state.state().get_listener(1);
-        let mut onelistener_2 = state.state().get_listener(1);
-        let mut twolistener = state.state().get_listener(2);
-        let mut twolistener_2 = state.state().get_listener(2);
+        let onelistener = state.state().wait_for_seq(1);
+        let onelistener_2 = state.state().wait_for_seq(1);
+        let twolistener = state.state().wait_for_seq(2);
+        let twolistener_2 = state.state().wait_for_seq(2);
         // onelistener should block.
         {
-            let result = timeout(Duration::from_secs(0), onelistener.notified()).await;
+            let result = timeout(Duration::from_secs(0), onelistener).await;
             assert!(result.is_err());
         }
 
@@ -330,13 +302,13 @@ mod test {
         );
 
         // onelistener should now return.
-        timeout(Duration::from_secs(0), onelistener_2.notified())
+        timeout(Duration::from_secs(0), onelistener_2)
             .await
             .expect("onelistener should return immediately");
 
         // twolistener should block
         {
-            let result = timeout(Duration::from_secs(0), twolistener.notified()).await;
+            let result = timeout(Duration::from_secs(0), twolistener).await;
             assert!(result.is_err());
         }
 
@@ -352,7 +324,7 @@ mod test {
 
         // twolistener should now return.
         {
-            timeout(Duration::from_secs(0), twolistener_2.notified())
+            timeout(Duration::from_secs(0), twolistener_2)
                 .await
                 .expect("wait_for_seq(2) should return immediately");
         }
