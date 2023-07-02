@@ -175,7 +175,7 @@ pub async fn wait_for_predicate(
 ) {
     tokio::spawn(async move {
         loop {
-            let mut notify = {
+            let notify = {
                 let state = state.state();
                 let cur_logical_time = state.logical_time();
                 tracing::info!(?cur_logical_time, "waiting for predicate at time!");
@@ -183,9 +183,9 @@ pub async fn wait_for_predicate(
                     tracing::info!("predicate returned true!");
                     return;
                 }
-                state.get_listener(cur_logical_time + 1)
+                state.wait_for_seq(cur_logical_time + 1)
             };
-            notify.notified().await;
+            notify.await;
         }
     })
     .await
