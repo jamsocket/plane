@@ -111,11 +111,11 @@ impl WorldState {
 
         let mut listeners = self.listeners.write().unwrap();
         *listeners = {
-            let b = listeners.split_off(&(sequence + 1));
+            let outstanding_listeners = listeners.split_off(&(sequence + 1));
             for (_, sender) in listeners.iter() {
                 sender.send(()).unwrap();
             }
-            b
+            outstanding_listeners
         };
     }
 
