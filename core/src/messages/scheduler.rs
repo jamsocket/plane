@@ -3,6 +3,7 @@ use crate::{
     nats::{SubscribeSubject, TypedMessage},
     types::{BackendId, ClusterName, DroneId},
 };
+use plane_core_nats_macros::TypedMessage;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -92,6 +93,58 @@ impl TypedMessage for ScheduleRequest {
 impl ScheduleRequest {
     pub fn subscribe_subject() -> SubscribeSubject<Self> {
         SubscribeSubject::new("cluster.*.schedule".into())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum FetchBackendForLockResponse {
+    Scheduled {
+        drone: DroneId,
+        backend_id: BackendId,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bearer_token: Option<String>,
+    },
+    NoBackendForLock,
+}
+
+impl TryFrom<ScheduleResponse> for FetchBackendForLockResponse {
+    type Error = anyhow::Error;
+    fn try_from(schedule_response: ScheduleResponse) -> anyhow::Result<Self> {
+        match schedule_response {
+            ScheduleResponse::Scheduled {
+                drone,
+                backend_id,
+                bearer_token,
+                spawned,
+            } => {
+                if spawned {
+                    return Err(anyhow::anyhow!("must not have spawned to fetch backend"));
+                }
+                Ok(Self::Scheduled {
+                    drone,
+                    backend_id,
+                    bearer_token,
+                })
+            }
+            ScheduleResponse::NoDroneAvailable => Ok(Self::NoBackendForLock),
+        }
+    }
+}
+
+/// Message sent to a controller to fetch a locked backend
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, TypedMessage)]
+#[typed_message(
+    subject = "cluster.#cluster.fetch",
+    response = "FetchBackendForLockResponse"
+)]
+pub struct FetchBackendForLock {
+    pub cluster: ClusterName,
+    pub lock: String,
+}
+
+impl FetchBackendForLock {
+    pub fn subscribe_subject() -> SubscribeSubject<Self> {
+        SubscribeSubject::new("cluster.*.fetch".into())
     }
 }
 

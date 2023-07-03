@@ -105,7 +105,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MessageWithResponseHandle<T>
 where
     T: TypedMessage,

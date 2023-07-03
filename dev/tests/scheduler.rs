@@ -8,7 +8,7 @@ use plane_core::{
     messages::{
         agent::{BackendState, BackendStateMessage, DroneState, SpawnRequest},
         drone_state::{DroneConnectRequest, DroneStatusMessage, UpdateBackendStateMessage},
-        scheduler::ScheduleResponse,
+        scheduler::{FetchBackendForLock, FetchBackendForLockResponse, ScheduleResponse},
     },
     nats::TypedNats,
     state::{start_state_loop, StateHandle},
@@ -147,6 +147,19 @@ impl MockAgent {
 
         return response;
     }
+
+    pub async fn fetch_locked(
+        &self,
+        cluster: ClusterName,
+        lock: String,
+    ) -> Result<FetchBackendForLockResponse> {
+        let req = FetchBackendForLock { cluster, lock };
+
+        let res = self.nats.request(&req).await?;
+
+        Ok(res)
+    }
+
 }
 
 async fn drone_ready_notify(state: StateHandle, drone: DroneId, cluster: ClusterName) {
@@ -549,6 +562,50 @@ async fn schedule_request_lock() {
             );
         }
     }
+}
+
+#[integration_test]
+async fn fetch_locked_backend() {
+    let nats = Nats::new().await.unwrap();
+    let nats_conn = nats.connection().await.unwrap();
+    let state = start_state_loop(nats_conn.clone()).await.unwrap();
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
+    let drone_id = DroneId::new_random();
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id).await;
+    sleep(Duration::from_millis(100)).await;
+
+    nats_conn
+        .publish(&DroneStatusMessage {
+            cluster: ClusterName::new("plane.test"),
+            drone_id: drone_id.clone(),
+            drone_version: PLANE_VERSION.to_string(),
+            ready: true,
+            state: DroneState::Ready,
+            running_backends: None,
+        })
+        .await
+        .unwrap();
+
+    sleep(Duration::from_millis(100)).await;
+    let r1 = mock_agent
+        .schedule_drone(&drone_id, false, Some("foobar".to_string()))
+        .await
+        .unwrap();
+
+    let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, .. } = r1 else {panic!()};
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let r2 = mock_agent
+        .fetch_locked(ClusterName::new("plane.test"), "foobar".to_string())
+        .await
+        .unwrap();
+
+    let FetchBackendForLockResponse::Scheduled { drone: drone2, backend_id: backend2, ..} = r2
+        else {panic!()};
+
+    assert_eq!(drone1, drone2);
+    assert_eq!(backend1, backend2);
 }
 
 #[integration_test]

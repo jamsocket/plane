@@ -7,6 +7,7 @@ use plane_core::{
 use rand::{seq::SliceRandom, thread_rng};
 use std::{error::Error, fmt::Display};
 
+#[derive(Clone)]
 pub struct Scheduler {
     state: StateHandle,
 }
