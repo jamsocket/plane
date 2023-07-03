@@ -159,7 +159,6 @@ impl MockAgent {
 
         Ok(res)
     }
-
 }
 
 async fn drone_ready_notify(state: StateHandle, drone: DroneId, cluster: ClusterName) {
@@ -578,7 +577,6 @@ async fn fetch_locked_backend() {
         ClusterName::new(CLUSTER_DOMAIN).clone(),
     );
 
-
     nats_conn
         .publish(&DroneStatusMessage {
             cluster: ClusterName::new("plane.test"),
@@ -591,7 +589,7 @@ async fn fetch_locked_backend() {
         .await
         .unwrap();
 
-	drone_ready.await;
+    drone_ready.await;
 
     let r1 = mock_agent
         .schedule_drone(false, Some("foobar".to_string()))
