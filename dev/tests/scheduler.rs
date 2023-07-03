@@ -128,6 +128,17 @@ impl MockAgent {
                 assert!(*spawned == true);
             }
 
+            let backend_id_copy = backend_id.clone();
+            let cluster_copy = cluster.clone();
+            wait_for_predicate(self.state.clone(), move |ws| {
+                let backend_id = &backend_id_copy;
+                let cluster = &cluster_copy;
+                ws.cluster(&cluster)
+                    .and_then(|cluster| cluster.backends.get(backend_id))
+                    .is_some()
+            })
+            .await;
+
             let state = self.state.state();
             let backend = state
                 .cluster(&cluster)
