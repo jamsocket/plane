@@ -70,7 +70,6 @@ impl MockAgent {
 
         let drone_copy = drone_id.clone();
         let cluster_clone = cluster.clone();
-        //let mut drone_connected = state.state().get_listener_for_predicate(move |ws| {
         let drone_connected = wait_for_predicate(state.clone(), move |ws| {
             tracing::info!(?ws, "current ws");
             let Some(cluster) = ws.cluster(&cluster_clone) else { return false };
@@ -79,7 +78,10 @@ impl MockAgent {
             drone.meta.is_some()
         });
 
+        // this waits for the state machine to initialize.
+        // which also implies the controller is ready for requests.
         wait_for_predicate(state.clone(), |_| true).await;
+
         let result = nats.request(&request).await.unwrap();
         drone_connected.await;
 
@@ -130,6 +132,10 @@ impl MockAgent {
 
             let backend_id_copy = backend_id.clone();
             let cluster_copy = cluster.clone();
+
+            // it's technically possible for the state to not
+            // incorporate the backend by the time the response
+            // returns, so we await it.
             wait_for_predicate(self.state.clone(), move |ws| {
                 let backend_id = &backend_id_copy;
                 let cluster = &cluster_copy;
