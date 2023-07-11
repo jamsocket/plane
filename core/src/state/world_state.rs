@@ -105,7 +105,6 @@ impl WorldState {
     }
 
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
-        tracing::info!(?message, ?sequence, "World state message!");
         let cluster = self.clusters.entry(message.cluster.clone()).or_default();
         cluster.apply(message.message);
         self.logical_time = sequence;
