@@ -31,6 +31,29 @@ impl StateHandle {
         }
     }
 
+    pub fn wait_for_seq(
+        &mut self,
+        sequence: u64,
+    ) -> Pin<Box<dyn core::future::Future<Output = ()> + Send + Sync>> {
+		let mut state = self.state.write().unwrap();
+        if state.logical_time >= sequence {
+            return Box::pin(ready(()));
+        }
+        let mut recv = match state.listeners.entry(sequence) {
+            Entry::Occupied(entry) => entry.get().subscribe(),
+            Entry::Vacant(entry) => {
+                let (send, recv) = channel(1024);
+                entry.insert(send);
+                recv
+            }
+        };
+
+        Box::pin(async move {
+            recv.recv().await.unwrap();
+        })
+    }
+
+
     pub fn get_ready_drones(
         &self,
         cluster: &ClusterName,
@@ -74,33 +97,12 @@ impl StateHandle {
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: RwLock<BTreeMap<u64, Sender<()>>>,
+    listeners: BTreeMap<u64, Sender<()>>,
 }
 
 impl WorldState {
     pub fn logical_time(&self) -> u64 {
         self.logical_time
-    }
-
-    pub fn wait_for_seq(
-        &self,
-        sequence: u64,
-    ) -> Pin<Box<dyn core::future::Future<Output = ()> + Send + Sync>> {
-        if self.logical_time >= sequence {
-            return Box::pin(ready(()));
-        }
-        let mut recv = match self.listeners.write().unwrap().entry(sequence) {
-            Entry::Occupied(entry) => entry.get().subscribe(),
-            Entry::Vacant(entry) => {
-                let (send, recv) = channel(1024);
-                entry.insert(send);
-                recv
-            }
-        };
-
-        Box::pin(async move {
-            recv.recv().await.unwrap();
-        })
     }
 
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
@@ -109,10 +111,9 @@ impl WorldState {
         cluster.apply(message.message);
         self.logical_time = sequence;
 
-        let mut listeners = self.listeners.write().unwrap();
-        *listeners = {
-            let outstanding_listeners = listeners.split_off(&(sequence + 1));
-            for (_, sender) in listeners.iter() {
+        self.listeners = {
+            let outstanding_listeners = self.listeners.split_off(&(sequence + 1));
+            for (_, sender) in self.listeners.iter() {
                 sender.send(()).unwrap();
             }
             outstanding_listeners
@@ -274,17 +275,17 @@ mod test {
 
     #[tokio::test]
     async fn test_listener() {
-        let state = StateHandle::default();
+        let mut state = StateHandle::default();
 
-        let zerolistener = state.state().wait_for_seq(0);
+        let zerolistener = state.wait_for_seq(0);
         timeout(Duration::from_secs(0), zerolistener)
             .await
             .expect("zerolistener should return immediately");
 
-        let onelistener = state.state().wait_for_seq(1);
-        let onelistener_2 = state.state().wait_for_seq(1);
-        let twolistener = state.state().wait_for_seq(2);
-        let twolistener_2 = state.state().wait_for_seq(2);
+        let onelistener = state.wait_for_seq(1);
+        let onelistener_2 = state.wait_for_seq(1);
+        let twolistener = state.wait_for_seq(2);
+        let twolistener_2 = state.wait_for_seq(2);
         // onelistener should block.
         {
             let result = timeout(Duration::from_secs(0), onelistener).await;

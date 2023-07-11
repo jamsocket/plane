@@ -170,22 +170,21 @@ pub fn base_scheduler_request() -> ScheduleRequest {
 }
 
 pub async fn wait_for_predicate(
-    state: StateHandle,
+    mut state: StateHandle,
     predicate: impl Fn(&WorldState) -> bool + Send + Sync + 'static,
 ) {
     tokio::spawn(async move {
         loop {
-            let notify = {
-                let state = state.state();
-                let cur_logical_time = state.logical_time();
-                tracing::info!(?cur_logical_time, "waiting for predicate at time!");
-                if predicate(&state) {
+            let cur_logical_time = {
+                let world_state = state.state();
+                if predicate(&world_state) {
                     tracing::info!("predicate returned true!");
                     return;
                 }
-                state.wait_for_seq(cur_logical_time + 1)
+                world_state.logical_time()
             };
-            notify.await;
+            tracing::info!(?cur_logical_time, "waiting for predicate at time!");
+            state.wait_for_seq(cur_logical_time + 1).await
         }
     })
     .await
