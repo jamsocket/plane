@@ -35,7 +35,7 @@ impl StateHandle {
         &mut self,
         sequence: u64,
     ) -> Pin<Box<dyn core::future::Future<Output = ()> + Send + Sync>> {
-		let mut state = self.state.write().unwrap();
+        let mut state = self.state.write().unwrap();
         if state.logical_time >= sequence {
             return Box::pin(ready(()));
         }
@@ -52,7 +52,6 @@ impl StateHandle {
             recv.recv().await.unwrap();
         })
     }
-
 
     pub fn get_ready_drones(
         &self,
