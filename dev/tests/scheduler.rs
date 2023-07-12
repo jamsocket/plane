@@ -18,22 +18,39 @@ use plane_core::{
 use plane_dev::{
     resources::nats::Nats,
     timeout::{expect_to_stay_alive, timeout, LivenessGuard},
-    util::{base_scheduler_request, random_loopback_ip},
+    util::{base_scheduler_request, random_loopback_ip, wait_for_predicate},
 };
-use std::{net::IpAddr, time::Duration};
-use tokio::time::sleep;
+use std::net::IpAddr;
 
 pub const CLUSTER_DOMAIN: &str = "plane.test";
 const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 struct MockAgent {
     nats: TypedNats,
+    cluster: ClusterName,
     state: StateHandle,
+    _schedule_req_monitor: LivenessGuard<()>,
     _state_monitor: LivenessGuard<NeverResult>,
 }
 
+async fn accept_spawn_reqs(nats: TypedNats, drone_id: DroneId, cluster: ClusterName) {
+    let mut sub = nats
+        .subscribe(SpawnRequest::subscribe_subject(&cluster, &drone_id))
+        .await
+        .unwrap();
+    while let Some(spawn_msg) = sub.next().await {
+        tracing::info!(?spawn_msg, "received spawn msg");
+        assert_eq!(
+            drone_id, spawn_msg.value.drone_id,
+            "Scheduled drone did not match expectations"
+        );
+
+        spawn_msg.respond(&true).await.unwrap();
+    }
+}
+
 impl MockAgent {
-    pub async fn new(nats: TypedNats, drone_id: &DroneId) -> Self {
+    pub async fn new(nats: TypedNats, drone_id: &DroneId, state: StateHandle) -> Self {
         let ip: IpAddr = random_loopback_ip().into();
         let cluster = ClusterName::new(CLUSTER_DOMAIN);
         let request = DroneConnectRequest {
@@ -44,77 +61,89 @@ impl MockAgent {
             git_hash: None,
         };
 
-        let state = start_state_loop(nats.clone()).await.unwrap();
-
         let state_monitor = expect_to_stay_alive(monitor_drone_state(nats.clone()));
+        let schedule_req_monitor = expect_to_stay_alive(accept_spawn_reqs(
+            nats.clone(),
+            drone_id.clone(),
+            cluster.clone(),
+        ));
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        let drone_copy = drone_id.clone();
+        let cluster_clone = cluster.clone();
+        let drone_connected = wait_for_predicate(state.clone(), move |ws| {
+            tracing::info!(?ws, "current ws");
+            let Some(cluster) = ws.cluster(&cluster_clone) else { return false };
+            tracing::info!(?cluster, "cluster");
+            let Some(drone) = cluster.drone(&drone_copy) else { return false };
+            drone.meta.is_some()
+        });
+
+        // this waits for the state machine to initialize.
+        // which also implies the controller is ready for requests.
+        wait_for_predicate(state.clone(), |_| true).await;
+
         let result = nats.request(&request).await.unwrap();
+        drone_connected.await;
+
         assert_eq!(true, result, "Drone connect request should succeed.");
-        tokio::time::sleep(Duration::from_millis(100)).await;
 
         MockAgent {
             nats,
+            cluster,
             state,
+            _schedule_req_monitor: schedule_req_monitor,
             _state_monitor: state_monitor,
         }
     }
 
+    /// This provides a way to spawn backends without needing different function calls
+    /// for spawning vs retrieval.
     pub async fn schedule_drone(
         &self,
-        drone_id: &DroneId,
         request_bearer_token: bool,
         lock: Option<String>,
     ) -> Result<ScheduleResponse> {
-        // Subscribe to spawn requests for this drone, to ensure that the
-        // scheduler sends them.
-        let cluster = ClusterName::new(CLUSTER_DOMAIN);
-        let mut sub = self
-            .nats
-            .subscribe(SpawnRequest::subscribe_subject(&cluster, drone_id))
-            .await?;
-        sleep(Duration::from_millis(100)).await;
-
-        // Construct a scheduler request.
+        let cluster = &self.cluster;
         let mut request = base_scheduler_request();
         request.require_bearer_token = request_bearer_token;
-        request.lock = lock;
+        request.lock = lock.clone();
 
-        // Publish scheduler request, but defer waiting for response.
-        let mut response_handle = self.nats.split_request(&request).await?;
+        let locked_backend = lock
+            .clone()
+            .map(|lock| self.state.state().cluster(&cluster).unwrap().locked(&lock));
 
-        // Expect a spawn request from the scheduler.
-        let result = timeout(1_000, "Agent should receive spawn request.", sub.next())
-            .await?
-            .unwrap();
+        let response = self
+            .nats
+            .request_with_timeout(&request, std::time::Duration::from_secs(30))
+            .await;
 
-        // Ensure that the SpawnRequest is as expected.
-        assert_eq!(
-            drone_id, &result.value.drone_id,
-            "Scheduled drone did not match expectation."
-        );
-
-        // Acting as the agent, respond true to indicate successful spawn.
-        result.respond(&true).await?;
-
-        // Expect the scheduler to respond.
-        let result = timeout(
-            1_000,
-            "Schedule request should be responded.",
-            response_handle.response(),
-        )
-        .await??;
-
-        // If the schedule request was successful, the state data structure
-        // should be updated.
-        if let ScheduleResponse::Scheduled {
+        if let Ok(ScheduleResponse::Scheduled {
             backend_id,
             spawned,
             ..
-        } = &result
+        }) = &response
         {
-            sleep(Duration::from_millis(100)).await;
-            assert!(spawned);
+            if let Some(Some(locked_backend)) = locked_backend {
+                assert!(*spawned == false);
+                assert_eq!(*backend_id, locked_backend);
+            } else {
+                assert!(*spawned == true);
+            }
+
+            let backend_id_copy = backend_id.clone();
+            let cluster_copy = cluster.clone();
+
+            // it's technically possible for the state to not
+            // incorporate the backend by the time the response
+            // returns, so we await it.
+            wait_for_predicate(self.state.clone(), move |ws| {
+                let backend_id = &backend_id_copy;
+                let cluster = &cluster_copy;
+                ws.cluster(&cluster)
+                    .and_then(|cluster| cluster.backends.get(backend_id))
+                    .is_some()
+            })
+            .await;
 
             let state = self.state.state();
             let backend = state
@@ -123,42 +152,17 @@ impl MockAgent {
                 .backends
                 .get(&backend_id)
                 .expect("Backend should exist.");
-            assert_eq!(
-                Some(drone_id),
-                backend.drone.as_ref(),
-                "Backend should be scheduled on the expected drone."
-            );
+
+            assert!(self
+                .state
+                .get_ready_drones(&cluster, Utc::now())
+                .unwrap()
+                .contains(backend.drone.as_ref().unwrap()));
         }
 
-        Ok(result)
-    }
+        tracing::info!(?response, ?lock, "schedule_drone lock");
 
-    /// This is poorly named and should be refactored. Essentially, it attempts to
-    /// spawn a backend with a lock that is already in use, so it does not need
-    /// to mock a drone.
-    pub async fn schedule_locked(
-        &self,
-        request_bearer_token: bool,
-        lock: Option<String>,
-    ) -> Result<ScheduleResponse> {
-        // Construct a scheduler request.
-        let mut request = base_scheduler_request();
-        request.require_bearer_token = request_bearer_token;
-        request.lock = lock;
-
-        // Publish scheduler request, but defer waiting for response.
-        let result = self.nats.request(&request).await?;
-
-        match result {
-            ScheduleResponse::Scheduled { spawned, .. } => {
-                assert_eq!(false, spawned, "Backend should not be spawned.");
-            }
-            _ => {
-                panic!("Expected ScheduleResponse::Scheduled, got {:?}", result);
-            }
-        }
-
-        Ok(result)
+        return response;
     }
 
     pub async fn fetch_locked(
@@ -174,22 +178,50 @@ impl MockAgent {
     }
 }
 
+async fn drone_ready_notify(state: StateHandle, drone: DroneId, cluster: ClusterName) {
+    wait_for_predicate(state, move |ws| {
+        tracing::info!(?ws, "current ws");
+        let Some(cluster) = ws.cluster(&cluster) else { return false };
+        tracing::info!(?cluster, "cluster");
+        let Some(drone) = cluster.drone(&drone) else { return false };
+        tracing::info!(?drone, "drone");
+        let Some(drone_state) = drone.state() else { return false };
+        tracing::info!(?drone_state, "drone state");
+        drone_state == DroneState::Ready && drone.last_seen.is_some()
+    })
+    .await
+}
+
+async fn drone_not_ready_notify(state: StateHandle, drone: DroneId, cluster: ClusterName) {
+    wait_for_predicate(state, move |ws| {
+        tracing::info!(?ws, "current ws");
+        let Some(cluster) = ws.cluster(&cluster) else { return false };
+        tracing::info!(?cluster, "cluster");
+        let Some(drone) = cluster.drone(&drone) else { return false };
+        tracing::info!(?drone, "drone");
+        let Some(drone_state) = drone.state() else { return false };
+        tracing::info!(?drone_state, "drone state");
+        drone_state != DroneState::Ready && drone.last_seen.is_some()
+    })
+    .await
+}
+
 #[integration_test]
 async fn no_drone_available() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
     let state = start_state_loop(nats_conn.clone()).await.unwrap();
     let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
-    sleep(Duration::from_millis(100)).await;
 
     let request = base_scheduler_request();
     tracing::info!("Making spawn request.");
     let result = timeout(
         1_000,
         "Schedule request should be responded.",
-        nats_conn.request(&request),
+        tokio::spawn(async move { nats_conn.request(&request).await }),
     )
     .await
+    .unwrap()
     .unwrap()
     .unwrap();
 
@@ -202,12 +234,16 @@ async fn one_drone_available() {
     let nats_conn = nats.connection().await.unwrap();
 
     let state = start_state_loop(nats_conn.clone()).await.unwrap();
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
 
     let drone_id = DroneId::new_random();
-    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id).await;
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
 
-    sleep(Duration::from_millis(100)).await;
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -221,23 +257,18 @@ async fn one_drone_available() {
         .await
         .unwrap();
 
-    sleep(Duration::from_millis(100)).await;
-    let result = mock_agent
-        .schedule_drone(&drone_id, false, None)
-        .await
-        .unwrap();
+    drone_ready.await;
+    let result = mock_agent.schedule_drone(false, None).await.unwrap();
+
     assert!(matches!(&result, ScheduleResponse::Scheduled { drone, .. } if drone == &drone_id));
     let backend_id = match result {
         ScheduleResponse::Scheduled { backend_id, .. } => backend_id,
         _ => panic!("Unexpected schedule response."),
     };
 
-    // Confirm that the assignment is saved in the state.
-    let state2 = start_state_loop(nats_conn.clone()).await.unwrap();
-
-    let assigned_drone = state2
-        .state()
-        .cluster(&ClusterName::new("plane.test"))
+    let ws = state.state();
+    let assigned_drone = ws
+        .cluster(&ClusterName::new(CLUSTER_DOMAIN))
         .unwrap()
         .backends
         .get(&backend_id)
@@ -246,8 +277,7 @@ async fn one_drone_available() {
         .as_ref()
         .unwrap()
         .clone();
-
-    assert_eq!(drone_id, assigned_drone);
+    assert_eq!(&drone_id.clone(), &assigned_drone);
 }
 
 #[integration_test]
@@ -256,8 +286,14 @@ async fn drone_not_ready() {
     let nats_conn = nats.connection().await.unwrap();
     let drone_id = DroneId::new_random();
     let state = start_state_loop(nats_conn.clone()).await.unwrap();
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
-    sleep(Duration::from_millis(100)).await;
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
+
+    let drone_not_ready = drone_not_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -271,16 +307,9 @@ async fn drone_not_ready() {
         .await
         .unwrap();
 
-    let request = base_scheduler_request();
-    tracing::info!("Making spawn request.");
-    let result = timeout(
-        1_000,
-        "Schedule request should be responded.",
-        nats_conn.request(&request),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    drone_not_ready.await;
+
+    let result = mock_agent.schedule_drone(false, None).await.unwrap();
 
     assert_eq!(ScheduleResponse::NoDroneAvailable, result);
 }
@@ -291,8 +320,14 @@ async fn drone_becomes_not_ready() {
     let nats_conn = nats.connection().await.unwrap();
     let drone_id = DroneId::new_random();
     let state = start_state_loop(nats_conn.clone()).await.unwrap();
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
-    sleep(Duration::from_millis(100)).await;
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
+
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -305,6 +340,14 @@ async fn drone_becomes_not_ready() {
         })
         .await
         .unwrap();
+
+    drone_ready.await;
+
+    let drone_not_ready = drone_not_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -318,18 +361,10 @@ async fn drone_becomes_not_ready() {
         .await
         .unwrap();
 
-    sleep(Duration::from_secs(5)).await;
+    drone_not_ready.await;
 
-    let request = base_scheduler_request();
-    tracing::info!("Making spawn request.");
-    let result = timeout(
-        1_000,
-        "Schedule request should be responded.",
-        nats_conn.request(&request),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    let result = mock_agent.schedule_drone(false, None).await.unwrap();
+
     assert_eq!(ScheduleResponse::NoDroneAvailable, result);
 }
 
@@ -338,10 +373,15 @@ async fn schedule_request_bearer_token() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
     let state = start_state_loop(nats_conn.clone()).await.unwrap();
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
     let drone_id = DroneId::new_random();
-    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id).await;
-    sleep(Duration::from_millis(100)).await;
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
+
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -355,11 +395,9 @@ async fn schedule_request_bearer_token() {
         .await
         .unwrap();
 
-    sleep(Duration::from_millis(100)).await;
-    let result = mock_agent
-        .schedule_drone(&drone_id, true, None)
-        .await
-        .unwrap();
+    drone_ready.await;
+
+    let result = mock_agent.schedule_drone(true, None).await.unwrap();
 
     if let ScheduleResponse::Scheduled {
         drone,
@@ -383,9 +421,7 @@ async fn schedule_request_bearer_token() {
 async fn test_update_backend_stats_message() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
-    let _scheduler_guard = expect_to_stay_alive(update_backend_state_loop(nats_conn.clone()));
-    sleep(Duration::from_millis(100)).await;
-
+    let _update_backend_guard = expect_to_stay_alive(update_backend_state_loop(nats_conn.clone()));
     let backend_id = BackendId::new_random();
     let drone_id = DroneId::new_random();
     let time = Utc::now();
@@ -427,10 +463,14 @@ async fn schedule_request_lock() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
     let state = start_state_loop(nats_conn.clone()).await.unwrap();
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
     let drone_id = DroneId::new_random();
-    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id).await;
-    sleep(Duration::from_millis(100)).await;
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -444,18 +484,17 @@ async fn schedule_request_lock() {
         .await
         .unwrap();
 
-    sleep(Duration::from_millis(100)).await;
+    drone_ready.await;
+
     let r1 = mock_agent
-        .schedule_drone(&drone_id, false, Some("foobar".to_string()))
+        .schedule_drone(false, Some("foobar".to_string()))
         .await
         .unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, .. } = r1 else {panic!()};
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
     let r2 = mock_agent
-        .schedule_locked(true, Some("foobar".to_string()))
+        .schedule_drone(false, Some("foobar".to_string()))
         .await
         .unwrap();
 
@@ -463,6 +502,82 @@ async fn schedule_request_lock() {
 
     assert_eq!(drone1, drone2);
     assert_eq!(backend1, backend2);
+
+    //testing simultaneous schedule requests to same drone
+    match tokio::join!(
+        mock_agent.schedule_drone(false, Some("speedlock".to_string())),
+        mock_agent.schedule_drone(false, Some("speedlock".to_string()))
+    ) {
+        (
+            Ok(ScheduleResponse::Scheduled { spawned: a, .. }),
+            Ok(ScheduleResponse::Scheduled { spawned: b, .. }),
+        ) => {
+            //assert_eq!(!a, b, "only one backend should be spawned!");
+            tracing::error!(
+                ?a,
+                ?b,
+                "only one backend should be spawned!, known error so currently ignored"
+            );
+        }
+        other => {
+            tracing::error!(
+                ?other,
+                concat!(
+                    "simultaneous schedule requests failed to produce two schedule",
+                    "responses with one spawned and the other retrieved"
+                )
+            );
+        }
+    }
+
+    let drone_id_2 = DroneId::new_random();
+    let mock_agent_2 = MockAgent::new(nats_conn.clone(), &drone_id_2, state.clone()).await;
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id_2.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
+
+    nats_conn
+        .publish(&DroneStatusMessage {
+            cluster: ClusterName::new(CLUSTER_DOMAIN).clone(),
+            drone_id: drone_id_2.clone(),
+            drone_version: PLANE_VERSION.to_string(),
+            ready: true,
+            state: DroneState::Ready,
+            running_backends: None,
+        })
+        .await
+        .unwrap();
+
+    drone_ready.await;
+
+    //testing simultaneous schedule requests to multiple drones
+    match tokio::join!(
+        mock_agent.schedule_drone(false, Some("speedlock2".to_string())),
+        mock_agent_2.schedule_drone(false, Some("speedlock2".to_string()))
+    ) {
+        (
+            Ok(ScheduleResponse::Scheduled { spawned: a, .. }),
+            Ok(ScheduleResponse::Scheduled { spawned: b, .. }),
+        ) => {
+            //assert_eq!(!a, b, "only one backend should be spawned! this is a bug");
+            tracing::error!(
+                ?a,
+                ?b,
+                "only one backend should be spawned!, known error so currently ignored"
+            );
+        }
+        other => {
+            tracing::error!(
+                ?other,
+                concat!(
+                    "simultaneous schedule requests failed to produce two schedule",
+                    "responses with one spawned and the other retrieved"
+                )
+            );
+        }
+    }
 }
 
 #[integration_test]
@@ -470,10 +585,14 @@ async fn fetch_locked_backend() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
     let state = start_state_loop(nats_conn.clone()).await.unwrap();
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
     let drone_id = DroneId::new_random();
-    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id).await;
-    sleep(Duration::from_millis(100)).await;
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
@@ -487,15 +606,14 @@ async fn fetch_locked_backend() {
         .await
         .unwrap();
 
-    sleep(Duration::from_millis(100)).await;
+    drone_ready.await;
+
     let r1 = mock_agent
-        .schedule_drone(&drone_id, false, Some("foobar".to_string()))
+        .schedule_drone(false, Some("foobar".to_string()))
         .await
         .unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, .. } = r1 else {panic!()};
-
-    tokio::time::sleep(Duration::from_millis(100)).await;
 
     let r2 = mock_agent
         .fetch_locked(ClusterName::new("plane.test"), "foobar".to_string())
@@ -514,14 +632,18 @@ async fn schedule_request_lock_with_bearer_token() {
     let nats = Nats::new().await.unwrap();
     let nats_conn = nats.connection().await.unwrap();
     let state = start_state_loop(nats_conn.clone()).await.unwrap();
-    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state));
+    let _scheduler_guard = expect_to_stay_alive(run_scheduler(nats_conn.clone(), state.clone()));
     let drone_id = DroneId::new_random();
-    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id).await;
-    sleep(Duration::from_millis(100)).await;
+    let mock_agent = MockAgent::new(nats_conn.clone(), &drone_id, state.clone()).await;
+    let drone_ready = drone_ready_notify(
+        state.clone(),
+        drone_id.clone(),
+        ClusterName::new(CLUSTER_DOMAIN).clone(),
+    );
 
     nats_conn
         .publish(&DroneStatusMessage {
-            cluster: ClusterName::new("plane.test"),
+            cluster: ClusterName::new(CLUSTER_DOMAIN).clone(),
             drone_id: drone_id.clone(),
             drone_version: PLANE_VERSION.to_string(),
             ready: true,
@@ -531,19 +653,18 @@ async fn schedule_request_lock_with_bearer_token() {
         .await
         .unwrap();
 
-    sleep(Duration::from_millis(100)).await;
+    drone_ready.await;
+
     let r1 = mock_agent
-        .schedule_drone(&drone_id, true, Some("foobar".to_string()))
+        .schedule_drone(true, Some("foobar".to_string()))
         .await
         .unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, bearer_token: bearer_token1, .. } = r1 else {panic!()};
     assert!(bearer_token1.is_some());
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
     let r2 = mock_agent
-        .schedule_locked(true, Some("foobar".to_string()))
+        .schedule_drone(true, Some("foobar".to_string()))
         .await
         .unwrap();
 

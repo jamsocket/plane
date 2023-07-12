@@ -10,11 +10,14 @@ use crate::{
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use std::{
-    collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, VecDeque},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
+    fmt::Debug,
+    future::ready,
     net::IpAddr,
+    pin::Pin,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use tokio::sync::Notify;
+use tokio::sync::broadcast::{channel, Sender};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -26,6 +29,31 @@ impl StateHandle {
         Self {
             state: Arc::new(RwLock::new(world_state)),
         }
+    }
+
+    pub fn wait_for_seq(
+        // note: this is exclusively borrowed to prevent deadlocks
+        // that can result from awaiting wait_for_seq
+        // while holding a handle to .state()
+        &mut self,
+        sequence: u64,
+    ) -> Pin<Box<dyn core::future::Future<Output = ()> + Send + Sync>> {
+        let mut state = self.state.write().unwrap();
+        if state.logical_time >= sequence {
+            return Box::pin(ready(()));
+        }
+        let mut recv = match state.listeners.entry(sequence) {
+            Entry::Occupied(entry) => entry.get().subscribe(),
+            Entry::Vacant(entry) => {
+                let (send, recv) = channel(1024);
+                entry.insert(send);
+                recv
+            }
+        };
+
+        Box::pin(async move {
+            recv.recv().await.unwrap();
+        })
     }
 
     pub fn get_ready_drones(
@@ -65,34 +93,18 @@ impl StateHandle {
             .write()
             .expect("Could not acquire world_state lock.")
     }
-
-    /** Block asynchronously until the given sequence number is reached. */
-    pub async fn wait_for_seq(&self, sequence: u64) {
-        if self.state().logical_time >= sequence {
-            return;
-        }
-        let receiver = { self.write_state().get_listener(sequence) };
-        receiver.notified().await;
-    }
 }
 
 #[derive(Default, Debug)]
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: HashMap<u64, Arc<Notify>>,
+    listeners: BTreeMap<u64, Sender<()>>,
 }
 
 impl WorldState {
-    pub fn get_listener(&mut self, sequence: u64) -> Arc<Notify> {
-        match self.listeners.entry(sequence) {
-            Entry::Occupied(entry) => entry.get().clone(),
-            Entry::Vacant(entry) => {
-                let notify = Arc::new(Notify::new());
-                entry.insert(notify.clone());
-                notify
-            }
-        }
+    pub fn logical_time(&self) -> u64 {
+        self.logical_time
     }
 
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
@@ -100,9 +112,13 @@ impl WorldState {
         cluster.apply(message.message);
         self.logical_time = sequence;
 
-        if let Some(sender) = self.listeners.remove(&sequence) {
-            sender.notify_waiters();
-        }
+        self.listeners = {
+            let outstanding_listeners = self.listeners.split_off(&(sequence + 1));
+            for (_, sender) in self.listeners.iter() {
+                sender.send(()).unwrap();
+            }
+            outstanding_listeners
+        };
     }
 
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterState> {
@@ -259,20 +275,21 @@ mod test {
     use tokio::time::timeout;
 
     #[tokio::test]
-    async fn test_wait_for_seq() {
-        let state = StateHandle::default();
+    async fn test_listener() {
+        let mut state = StateHandle::default();
 
-        timeout(Duration::from_secs(0), state.wait_for_seq(0))
+        let zerolistener = state.wait_for_seq(0);
+        timeout(Duration::from_secs(0), zerolistener)
             .await
-            .expect("wait_for_seq(0) should return immediately");
+            .expect("zerolistener should return immediately");
 
-        // wait_for_seq(1) should block.
-        let seq1_1 = state.wait_for_seq(1);
-        let seq1_2 = state.wait_for_seq(1);
-        let seq2_1 = state.wait_for_seq(2);
-        let seq2_2 = state.wait_for_seq(2);
+        let onelistener = state.wait_for_seq(1);
+        let onelistener_2 = state.wait_for_seq(1);
+        let twolistener = state.wait_for_seq(2);
+        let twolistener_2 = state.wait_for_seq(2);
+        // onelistener should block.
         {
-            let result = timeout(Duration::from_secs(0), seq1_1).await;
+            let result = timeout(Duration::from_secs(0), onelistener).await;
             assert!(result.is_err());
         }
 
@@ -286,13 +303,14 @@ mod test {
             1,
         );
 
-        // wait_for_seq(1) should now return.
-        timeout(Duration::from_secs(0), seq1_2)
+        // onelistener should now return.
+        timeout(Duration::from_secs(0), onelistener_2)
             .await
-            .expect("wait_for_seq(1) should return immediately");
+            .expect("onelistener should return immediately");
 
+        // twolistener should block
         {
-            let result = timeout(Duration::from_secs(0), seq2_1).await;
+            let result = timeout(Duration::from_secs(0), twolistener).await;
             assert!(result.is_err());
         }
 
@@ -306,9 +324,9 @@ mod test {
             2,
         );
 
-        // wait_for_seq(2) should now return.
+        // twolistener should now return.
         {
-            timeout(Duration::from_secs(0), seq2_2)
+            timeout(Duration::from_secs(0), twolistener_2)
                 .await
                 .expect("wait_for_seq(2) should return immediately");
         }
