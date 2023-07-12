@@ -32,6 +32,9 @@ impl StateHandle {
     }
 
     pub fn wait_for_seq(
+        // note: this is exclusively borrowed to prevent deadlocks
+        // that can result from awaiting wait_for_seq
+        // while holding a handle to .state()
         &mut self,
         sequence: u64,
     ) -> Pin<Box<dyn core::future::Future<Output = ()> + Send + Sync>> {
