@@ -1,3 +1,5 @@
+use std::{borrow::BorrowMut, sync::Arc};
+
 use crate::scheduler::SchedulerError;
 use anyhow::anyhow;
 use chrono::Utc;
@@ -6,15 +8,19 @@ use plane_core::{
         scheduler::{
             FetchBackendForLock, FetchBackendForLockResponse, ScheduleRequest, ScheduleResponse,
         },
-        state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
+        state::{
+            BackendLockMessage, BackendLockMessageType, BackendMessage, BackendMessageType,
+            ClusterLockMessage, ClusterLockMessageType, ClusterStateMessage, WorldStateMessage,
+        },
     },
-    nats::{MessageWithResponseHandle, TypedNats},
+    nats::{MessageWithResponseHandle, SubscribeSubject, TypedNats},
     state::StateHandle,
     timing::Timer,
-    types::{BackendId, ClusterName, DroneId},
+    types::{BackendId, ClusterName, DroneId, PlaneLockState},
     NeverResult,
 };
 use scheduler::Scheduler;
+use tokio::sync::Barrier;
 
 mod config;
 pub mod dns;
@@ -46,12 +52,25 @@ async fn spawn_backend(
                         backend: spawn_request.backend_id.clone(),
                         message: BackendMessageType::Assignment {
                             drone: drone.clone(),
-                            lock: schedule_request.lock.clone(),
                             bearer_token: spawn_request.bearer_token.clone(),
                         },
                     }),
                 })
                 .await?;
+            if let Some(ref lock) = schedule_request.lock {
+                tracing::info!(?lock, ?spawn_request.backend_id, "assigning lock");
+                nats.publish_jetstream(&WorldStateMessage {
+                    cluster: spawn_request.cluster.clone(),
+                    message: ClusterStateMessage::BackendMessage(BackendMessage {
+                        backend: spawn_request.backend_id.clone(),
+                        message: BackendMessageType::LockMessage(BackendLockMessage {
+                            lock: lock.clone(),
+                            message: BackendLockMessageType::Assign,
+                        }),
+                    }),
+                })
+                .await?;
+            }
 
             tracing::info!(logical_time=?seq_id, "backend state updated at time");
 
@@ -73,18 +92,50 @@ async fn spawn_backend(
     }
 }
 
+async fn wait_for_lock_if_announced(
+    state: &mut StateHandle,
+    lock: &str,
+    cluster_name: &ClusterName,
+    nats: &TypedNats,
+) -> anyhow::Result<()> {
+    tracing::info!("checking if announced!");
+    let PlaneLockState::Announced = state
+		.state()
+		.cluster(cluster_name)
+		.ok_or_else(|| anyhow!("no cluster"))?
+		.locked(lock) else { return Ok(()) } ;
+
+    tracing::info!("is announced");
+    let mut sub = nats
+        .subscribe_jetstream_subject(SubscribeSubject::<WorldStateMessage>::new(format!(
+            "state.cluster.{}.backend.*.lock.{}.assign",
+            cluster_name.subject_name(),
+            lock
+        )))
+        .await?;
+
+    tracing::info!("awaiting sub");
+    let msg = sub.next().await;
+    tracing::info!(?msg, "received wait for lock assignment");
+    let seq = msg.unwrap().1.sequence;
+    state.wait_for_seq(seq).await;
+    Ok(())
+}
 /// get backend associated with a lock or error
 fn backend_of_lock(
     state: &StateHandle,
     cluster_name: &ClusterName,
     lock: &str,
 ) -> anyhow::Result<BackendId> {
-    state
+    match state
         .state()
         .cluster(cluster_name)
         .ok_or_else(|| anyhow!("no cluster"))?
         .locked(lock)
-        .ok_or_else(|| anyhow!("no backend"))
+    {
+        PlaneLockState::Assigned { backend } => Ok(backend),
+        _ => Err(anyhow!("no backend!")),
+    }
 }
 
 fn schedule_response_for_existing_backend(
@@ -124,45 +175,77 @@ fn schedule_response_for_existing_backend(
 }
 
 async fn process_response(
-    state: &StateHandle,
+    state: &mut StateHandle,
     sr: &ScheduleRequest,
     scheduler: &Scheduler,
     nats: &TypedNats,
+    barrier: &Barrier,
 ) -> anyhow::Result<ScheduleResponse> {
     tracing::info!("checking locks");
     let cluster_name = sr.cluster.clone();
-    if let Some(lock_name) = sr.lock.clone() {
+    let schedule_response: Option<_> = if let Some(lock_name) = sr.lock.clone() {
         tracing::info!(?lock_name, "scheduling lock");
 
+        wait_for_lock_if_announced(state, &lock_name, &cluster_name, &nats).await?;
         if let Ok(backend) = backend_of_lock(state, &cluster_name, &lock_name) {
             tracing::info!(?backend, "fetch preexisting backend");
-            return schedule_response_for_existing_backend(state, cluster_name, backend);
+            Some(schedule_response_for_existing_backend(
+                state,
+                cluster_name.clone(),
+                backend,
+            ))
+        } else {
+            tracing::info!("announcing lock");
+            let seq_id = nats
+                .publish_jetstream(&WorldStateMessage {
+                    cluster: sr.cluster.clone(),
+                    message: ClusterStateMessage::LockMessage(ClusterLockMessage {
+                        lock: lock_name,
+                        message: ClusterLockMessageType::Announce,
+                    }),
+                })
+                .await?;
+            tracing::info!("wait seq");
+            state.to_owned().wait_for_seq(seq_id).await;
+            tracing::info!(?seq_id, "announced at log time");
+
+            tracing::info!("spawn with lock");
+            None
         }
-
-        tracing::info!("spawn with lock");
-    }
-
-    match scheduler.schedule(&cluster_name, Utc::now()) {
-        Ok(drone_id) => spawn_backend(nats, &drone_id, &sr.clone()).await,
-        Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
+    } else {
+        None
+    };
+    barrier.wait().await;
+    if let Some(schedule_response) = schedule_response {
+        tracing::info!("Returning existing backend");
+        return schedule_response;
+    } else {
+        match scheduler.schedule(&cluster_name, Utc::now()) {
+            Ok(drone_id) => spawn_backend(nats, &drone_id, &sr.clone()).await,
+            Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
+        }
     }
 }
 
 async fn dispatch_schedule_request(
-    state: StateHandle,
+    mut state: StateHandle,
     schedule_request: MessageWithResponseHandle<ScheduleRequest>,
     scheduler: Scheduler,
     nats: TypedNats,
+    barrier: Arc<Barrier>,
 ) {
     let Ok(response) = process_response(
-        &state,
+        &mut state,
         &schedule_request.value.clone(),
         &scheduler,
-        &nats
-    ).await else {
+        &nats,
+		&barrier
+    ).await.map_err(|e| tracing::error!("scheduling error {:?}", e)) else {
         tracing::error!(?schedule_request.value, "schedule request failed");
         return;
     };
+
+    tracing::info!("respond to schedule req");
 
     let Ok(_) = schedule_request.respond(&response).await else {
         tracing::warn!(res = ?response, "schedule response failed to send");
@@ -171,10 +254,18 @@ async fn dispatch_schedule_request(
 }
 
 async fn dispatch_lock_request(
-    state: StateHandle,
+    mut state: StateHandle,
     lock_request: MessageWithResponseHandle<FetchBackendForLock>,
+    nats: TypedNats,
 ) {
     let mut response: FetchBackendForLockResponse = FetchBackendForLockResponse::NoBackendForLock;
+
+    let Ok(_) = wait_for_lock_if_announced(&mut state, &lock_request.value.lock,
+							   &lock_request.value.cluster, &nats).await else {
+		tracing::error!("waiting for godot failed");
+		return;
+	};
+
     if let Ok(backend) = backend_of_lock(
         &state,
         &lock_request.value.cluster,
@@ -209,13 +300,16 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
     loop {
         tokio::select! {
             Some(schedule_request) = schedule_request_sub.next() => {
+                let proceed = std::sync::Arc::new(tokio::sync::Barrier::new(2));
                 tracing::info!(metadata=?schedule_request.value.metadata.clone(), "Got spawn request");
                 tokio::spawn(dispatch_schedule_request(
                     state.clone(),
                     schedule_request.clone(),
                     scheduler.clone(),
                     nats.clone(),
+                    proceed.clone()
                 ));
+                proceed.wait().await;
             },
             Some(backend_for_lock_req) = backend_for_lock_request_sub.next() => {
                 tracing::info!(metadata=?backend_for_lock_req.value.clone(),
@@ -223,6 +317,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                 tokio::spawn(dispatch_lock_request(
                     state.clone(),
                     backend_for_lock_req.clone(),
+                    nats.clone(),
                 ));
             },
             else => break
