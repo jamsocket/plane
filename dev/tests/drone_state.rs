@@ -37,7 +37,7 @@ impl StateTestFixture {
         let nats = Nats::new().await.unwrap();
         let conn = nats.connection().await.unwrap();
         let state = start_state_loop(conn.clone()).await.unwrap();
-        let lg = expect_to_stay_alive(monitor_drone_state(conn.clone()));
+        let lg = expect_to_stay_alive(monitor_drone_state(conn.clone(), state.clone()));
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
@@ -188,7 +188,6 @@ async fn status_lifecycle() {
                 backend: backend.clone(),
                 message: BackendMessageType::Assignment {
                     drone: drone.clone(),
-                    lock: None,
                     bearer_token: None,
                 },
             }),

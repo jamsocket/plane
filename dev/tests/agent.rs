@@ -11,6 +11,7 @@ use plane_core::{
         scheduler::DrainDrone,
     },
     nats::{TypedNats, TypedSubscription},
+    state::StateHandle,
     types::{BackendId, ClusterName, DroneId},
     NeverResult,
 };
@@ -81,7 +82,8 @@ struct MockController {
 
 impl MockController {
     pub async fn new(nats: TypedNats) -> Result<Self> {
-        let state_handle = expect_to_stay_alive(monitor_drone_state(nats.clone()));
+        let state_handle =
+            expect_to_stay_alive(monitor_drone_state(nats.clone(), StateHandle::default()));
 
         Ok(MockController {
             nats,
