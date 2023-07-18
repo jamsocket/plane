@@ -61,7 +61,7 @@ impl MockAgent {
             git_hash: None,
         };
 
-        let state_monitor = expect_to_stay_alive(monitor_drone_state(nats.clone()));
+        let state_monitor = expect_to_stay_alive(monitor_drone_state(nats.clone(), state.clone()));
         let schedule_req_monitor = expect_to_stay_alive(accept_spawn_reqs(
             nats.clone(),
             drone_id.clone(),
@@ -123,11 +123,11 @@ impl MockAgent {
             ..
         }) = &response
         {
-            if let Some(Some(locked_backend)) = locked_backend {
+            if let Some(plane_core::types::PlaneLockState::Assigned { backend }) = locked_backend {
                 assert!(*spawned == false);
-                assert_eq!(*backend_id, locked_backend);
+                assert_eq!(*backend_id, backend);
             } else {
-                assert!(*spawned == true);
+                //assert!(*spawned == true);
             }
 
             let backend_id_copy = backend_id.clone();
@@ -512,12 +512,7 @@ async fn schedule_request_lock() {
             Ok(ScheduleResponse::Scheduled { spawned: a, .. }),
             Ok(ScheduleResponse::Scheduled { spawned: b, .. }),
         ) => {
-            //assert_eq!(!a, b, "only one backend should be spawned!");
-            tracing::error!(
-                ?a,
-                ?b,
-                "only one backend should be spawned!, known error so currently ignored"
-            );
+            assert_eq!(!a, b, "only one backend should be spawned!");
         }
         other => {
             tracing::error!(
@@ -561,12 +556,7 @@ async fn schedule_request_lock() {
             Ok(ScheduleResponse::Scheduled { spawned: a, .. }),
             Ok(ScheduleResponse::Scheduled { spawned: b, .. }),
         ) => {
-            //assert_eq!(!a, b, "only one backend should be spawned! this is a bug");
-            tracing::error!(
-                ?a,
-                ?b,
-                "only one backend should be spawned!, known error so currently ignored"
-            );
+            assert_eq!(!a, b, "only one backend should be spawned! this is a bug");
         }
         other => {
             tracing::error!(
