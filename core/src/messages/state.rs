@@ -33,9 +33,21 @@ impl WorldStateMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ClusterStateMessage {
+    LockMessage(ClusterLockMessage),
     DroneMessage(DroneMessage),
     BackendMessage(BackendMessage),
     AcmeMessage(AcmeDnsRecord),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ClusterLockMessage {
+    pub lock: String,
+    pub message: ClusterLockMessageType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ClusterLockMessageType {
+    Announce,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -83,9 +95,9 @@ pub struct BackendMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BackendMessageType {
+    LockMessage(BackendLockMessage),
     Assignment {
         drone: DroneId,
-        lock: Option<String>,
         bearer_token: Option<String>,
     },
     State {
@@ -93,6 +105,17 @@ pub enum BackendMessageType {
         #[serde(with = "chrono::serde::ts_milliseconds")]
         timestamp: DateTime<Utc>,
     },
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BackendLockMessage {
+    pub lock: String,
+    pub message: BackendLockMessageType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum BackendLockMessageType {
+    Assign,
+    Remove,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -136,11 +159,33 @@ impl TypedMessage for WorldStateMessage {
                 }
             },
             ClusterStateMessage::BackendMessage(message) => match message.message {
+                BackendMessageType::LockMessage(BackendLockMessage {
+                    ref lock,
+                    message: BackendLockMessageType::Assign,
+                }) => {
+                    format!(
+                        "state.cluster.{}.backend.{}.lock.{}.assign",
+                        self.cluster.subject_name(),
+                        message.backend,
+                        lock
+                    )
+                }
                 BackendMessageType::Assignment { .. } => {
                     format!(
                         "state.cluster.{}.backend.{}",
                         self.cluster.subject_name(),
                         message.backend
+                    )
+                }
+                BackendMessageType::LockMessage(BackendLockMessage {
+                    ref lock,
+                    message: BackendLockMessageType::Remove,
+                }) => {
+                    format!(
+                        "state.cluster.{}.backend.{}.lock.{}.remove",
+                        self.cluster.subject_name(),
+                        message.backend,
+                        lock
                     )
                 }
                 BackendMessageType::State { state: status, .. } => {
@@ -155,6 +200,15 @@ impl TypedMessage for WorldStateMessage {
             ClusterStateMessage::AcmeMessage(_) => {
                 format!("state.cluster.{}.acme", self.cluster.subject_name())
             }
+            ClusterStateMessage::LockMessage(message) => match message.message {
+                ClusterLockMessageType::Announce => {
+                    format!(
+                        "state.cluster.{}.lock.{}.announce",
+                        self.cluster.subject_name(),
+                        message.lock
+                    )
+                }
+            },
         }
     }
 }
