@@ -168,6 +168,7 @@ impl ClusterState {
                     }
                 }
 
+                // If the backend is terminal, remove locks from map
                 if let BackendMessageType::State { state, .. } = message.message {
                     if state.terminal() {
                         for lock in &backend.locks {
