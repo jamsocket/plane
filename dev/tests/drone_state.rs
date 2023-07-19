@@ -67,9 +67,7 @@ async fn txt_record_from_drone() {
         assert!(result);
 
         let state = fixture.state.state();
-        let cluster = state
-            .cluster(&ClusterName::new("plane.test"))
-            .unwrap();
+        let cluster = state.cluster(&ClusterName::new("plane.test")).unwrap();
         assert_eq!(cluster.txt_records.len(), 1);
         assert_eq!(cluster.txt_records.back().unwrap(), "test123");
 
@@ -91,9 +89,7 @@ async fn txt_record_from_drone() {
         assert!(result);
 
         let state = fixture.state.state();
-        let cluster = state
-            .cluster(&ClusterName::new("plane.test"))
-            .unwrap();
+        let cluster = state.cluster(&ClusterName::new("plane.test")).unwrap();
         assert_eq!(cluster.txt_records.len(), 2);
         assert_eq!(cluster.txt_records.back().unwrap(), "test456");
     }
@@ -124,9 +120,7 @@ async fn txt_records_different_clusters() {
     let state = fixture.state.state();
 
     {
-        let cluster = state
-            .cluster(&ClusterName::new("plane.test"))
-            .unwrap();
+        let cluster = state.cluster(&ClusterName::new("plane.test")).unwrap();
         assert_eq!(cluster.txt_records.len(), 1);
         assert_eq!(cluster.txt_records.back().unwrap(), "test123");
     }
