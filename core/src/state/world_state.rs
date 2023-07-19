@@ -140,7 +140,9 @@ impl ClusterState {
         match message {
             ClusterStateMessage::LockMessage(message) => match message.message {
                 crate::messages::state::ClusterLockMessageType::Announce => {
-                    self.locks.insert(message.lock, PlaneLockState::Announced);
+                    if let Entry::Vacant(entry) = self.locks.entry(message.lock) {
+                        entry.insert(PlaneLockState::Announced);
+                    };
                 }
             },
             ClusterStateMessage::DroneMessage(message) => {

@@ -222,7 +222,7 @@ impl JetStreamable for WorldStateMessage {
         async_nats::jetstream::stream::Config {
             name: Self::stream_name().to_string(),
             subjects: vec!["state.>".to_string()],
-            max_messages_per_subject: 1,
+            max_messages_per_subject: 10,
             ..Default::default()
         }
     }
