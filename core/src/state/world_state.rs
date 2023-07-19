@@ -152,10 +152,10 @@ impl ClusterState {
             ClusterStateMessage::BackendMessage(message) => {
                 let backend = self.backends.entry(message.backend.clone()).or_default();
 
-                // If the message is an assignment and includes a lock, we want to record it.
+                // If the message is a lock assignment, we want to record it.
                 if let BackendMessageType::LockMessage(BackendLockMessage {
                     ref lock,
-                    message: crate::messages::state::BackendLockMessageType::Assign,
+                    message: BackendLockMessageType::Assign,
                 }) = message.message
                 {
                     match self.locks.entry(lock.clone()) {
