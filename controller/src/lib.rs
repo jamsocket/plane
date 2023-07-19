@@ -151,7 +151,7 @@ async fn announce_lock(
         })
         .await?;
 
-    tracing::info!(?seq_id, "sent announce, waiting for seq");
+    tracing::info!(?seq_id, "sent announce, will be in state at time");
 
     Ok(seq_id)
 }
