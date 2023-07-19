@@ -288,7 +288,7 @@ impl BackendState {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::messages::state::{AcmeDnsRecord, BackendMessage};
+    use crate::messages::state::{AcmeDnsRecord};
     use std::time::Duration;
     use tokio::time::timeout;
 

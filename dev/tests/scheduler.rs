@@ -85,7 +85,7 @@ impl MockAgent {
         let result = nats.request(&request).await.unwrap();
         drone_connected.await;
 
-        assert_eq!(true, result, "Drone connect request should succeed.");
+        assert!(result, "Drone connect request should succeed.");
 
         MockAgent {
             nats,
@@ -110,7 +110,7 @@ impl MockAgent {
 
         let locked_backend = lock
             .clone()
-            .map(|lock| self.state.state().cluster(&cluster).unwrap().locked(&lock));
+            .map(|lock| self.state.state().cluster(cluster).unwrap().locked(&lock));
 
         let response = self
             .nats
@@ -124,7 +124,7 @@ impl MockAgent {
         }) = &response
         {
             if let Some(plane_core::types::PlaneLockState::Assigned { backend }) = locked_backend {
-                assert!(*spawned == false);
+                assert!(!(*spawned));
                 assert_eq!(*backend_id, backend);
             } else {
                 //assert!(*spawned == true);
@@ -139,7 +139,7 @@ impl MockAgent {
             wait_for_predicate(self.state.clone(), move |ws| {
                 let backend_id = &backend_id_copy;
                 let cluster = &cluster_copy;
-                ws.cluster(&cluster)
+                ws.cluster(cluster)
                     .and_then(|cluster| cluster.backends.get(backend_id))
                     .is_some()
             })
@@ -147,22 +147,22 @@ impl MockAgent {
 
             let state = self.state.state();
             let backend = state
-                .cluster(&cluster)
+                .cluster(cluster)
                 .expect("Cluster should exist.")
                 .backends
-                .get(&backend_id)
+                .get(backend_id)
                 .expect("Backend should exist.");
 
             assert!(self
                 .state
-                .get_ready_drones(&cluster, Utc::now())
+                .get_ready_drones(cluster, Utc::now())
                 .unwrap()
                 .contains(backend.drone.as_ref().unwrap()));
         }
 
         tracing::info!(?response, ?lock, "schedule_drone lock");
 
-        return response;
+        response
     }
 
     pub async fn fetch_locked(
@@ -242,7 +242,7 @@ async fn one_drone_available() {
     let drone_ready = drone_ready_notify(
         state.clone(),
         drone_id.clone(),
-        ClusterName::new(CLUSTER_DOMAIN).clone(),
+        ClusterName::new(CLUSTER_DOMAIN),
     );
 
     nats_conn
@@ -292,7 +292,7 @@ async fn drone_not_ready() {
     let drone_not_ready = drone_not_ready_notify(
         state.clone(),
         drone_id.clone(),
-        ClusterName::new(CLUSTER_DOMAIN).clone(),
+        ClusterName::new(CLUSTER_DOMAIN),
     );
 
     nats_conn
@@ -326,7 +326,7 @@ async fn drone_becomes_not_ready() {
     let drone_ready = drone_ready_notify(
         state.clone(),
         drone_id.clone(),
-        ClusterName::new(CLUSTER_DOMAIN).clone(),
+        ClusterName::new(CLUSTER_DOMAIN),
     );
 
     nats_conn
@@ -346,7 +346,7 @@ async fn drone_becomes_not_ready() {
     let drone_not_ready = drone_not_ready_notify(
         state.clone(),
         drone_id.clone(),
-        ClusterName::new(CLUSTER_DOMAIN).clone(),
+        ClusterName::new(CLUSTER_DOMAIN),
     );
 
     nats_conn
@@ -380,7 +380,7 @@ async fn schedule_request_bearer_token() {
     let drone_ready = drone_ready_notify(
         state.clone(),
         drone_id.clone(),
-        ClusterName::new(CLUSTER_DOMAIN).clone(),
+        ClusterName::new(CLUSTER_DOMAIN),
     );
 
     nats_conn
@@ -469,7 +469,7 @@ async fn schedule_request_lock() {
     let drone_ready = drone_ready_notify(
         state.clone(),
         drone_id.clone(),
-        ClusterName::new(CLUSTER_DOMAIN).clone(),
+        ClusterName::new(CLUSTER_DOMAIN),
     );
 
     nats_conn
@@ -530,7 +530,7 @@ async fn schedule_request_lock() {
     let drone_ready = drone_ready_notify(
         state.clone(),
         drone_id_2.clone(),
-        ClusterName::new(CLUSTER_DOMAIN).clone(),
+        ClusterName::new(CLUSTER_DOMAIN),
     );
 
     nats_conn
@@ -581,7 +581,7 @@ async fn fetch_locked_backend() {
     let drone_ready = drone_ready_notify(
         state.clone(),
         drone_id.clone(),
-        ClusterName::new(CLUSTER_DOMAIN).clone(),
+        ClusterName::new(CLUSTER_DOMAIN),
     );
 
     nats_conn
@@ -628,7 +628,7 @@ async fn schedule_request_lock_with_bearer_token() {
     let drone_ready = drone_ready_notify(
         state.clone(),
         drone_id.clone(),
-        ClusterName::new(CLUSTER_DOMAIN).clone(),
+        ClusterName::new(CLUSTER_DOMAIN),
     );
 
     nats_conn
