@@ -215,15 +215,14 @@ async fn process_response(
 
             let my_announce_time = announce_lock(&lock_name, &cluster_name, nats, &my_uid).await?;
 
-            tracing::info!(?my_announce_time, "my announce time");
             state.wait_for_seq(my_announce_time).await;
             let lock_state = state
                 .state()
                 .cluster(&cluster_name)
-                .unwrap()
+                .expect("cluster should exist")
                 .locks
                 .get(&lock_name)
-                .unwrap()
+                .expect("lock should be in map after waiting for announce time")
                 .clone();
 
             match lock_state {
