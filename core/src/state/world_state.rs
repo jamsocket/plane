@@ -152,7 +152,6 @@ impl ClusterState {
             ClusterStateMessage::BackendMessage(message) => {
                 let backend = self.backends.entry(message.backend.clone()).or_default();
 
-                // replace this with a way to cache from backendstate
                 // If the message is an assignment and includes a lock, we want to record it.
                 if let BackendMessageType::LockMessage(BackendLockMessage {
                     ref lock,
