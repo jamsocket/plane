@@ -75,9 +75,8 @@ async fn controller_main() -> Result<()> {
 
         let monitor_drone_state = {
             let nats = nats.clone();
-            let state = state.clone();
             Supervisor::new("monitor_drone_state", move || {
-                monitor_drone_state(nats.clone(), state.clone())
+                monitor_drone_state(nats.clone())
             })
         };
 

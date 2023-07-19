@@ -82,8 +82,7 @@ struct MockController {
 
 impl MockController {
     pub async fn new(nats: TypedNats) -> Result<Self> {
-        let state_handle =
-            expect_to_stay_alive(monitor_drone_state(nats.clone(), StateHandle::default()));
+        let state_handle = expect_to_stay_alive(monitor_drone_state(nats.clone()));
 
         Ok(MockController {
             nats,

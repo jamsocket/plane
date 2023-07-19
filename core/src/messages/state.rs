@@ -11,7 +11,6 @@ use std::net::IpAddr;
 pub struct WorldStateMessage {
     pub cluster: ClusterName,
 
-    #[serde(flatten)]
     pub message: ClusterStateMessage,
 }
 
@@ -47,7 +46,7 @@ pub struct ClusterLockMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ClusterLockMessageType {
-    Announce,
+    Announce { uid: u128 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -115,7 +114,6 @@ pub struct BackendLockMessage {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BackendLockMessageType {
     Assign,
-    Remove,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -177,17 +175,6 @@ impl TypedMessage for WorldStateMessage {
                         message.backend
                     )
                 }
-                BackendMessageType::LockMessage(BackendLockMessage {
-                    ref lock,
-                    message: BackendLockMessageType::Remove,
-                }) => {
-                    format!(
-                        "state.cluster.{}.backend.{}.lock.{}.remove",
-                        self.cluster.subject_name(),
-                        message.backend,
-                        lock
-                    )
-                }
                 BackendMessageType::State { state: status, .. } => {
                     format!(
                         "state.cluster.{}.backend.{}.state.{}",
@@ -201,7 +188,7 @@ impl TypedMessage for WorldStateMessage {
                 format!("state.cluster.{}.acme", self.cluster.subject_name())
             }
             ClusterStateMessage::LockMessage(message) => match message.message {
-                ClusterLockMessageType::Announce => {
+                ClusterLockMessageType::Announce { .. } => {
                     format!(
                         "state.cluster.{}.lock.{}.announce",
                         self.cluster.subject_name(),

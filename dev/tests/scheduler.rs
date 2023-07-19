@@ -61,7 +61,7 @@ impl MockAgent {
             git_hash: None,
         };
 
-        let state_monitor = expect_to_stay_alive(monitor_drone_state(nats.clone(), state.clone()));
+        let state_monitor = expect_to_stay_alive(monitor_drone_state(nats.clone()));
         let schedule_req_monitor = expect_to_stay_alive(accept_spawn_reqs(
             nats.clone(),
             drone_id.clone(),

@@ -139,9 +139,9 @@ impl ClusterState {
     fn apply(&mut self, message: ClusterStateMessage) {
         match message {
             ClusterStateMessage::LockMessage(message) => match message.message {
-                crate::messages::state::ClusterLockMessageType::Announce => {
+                crate::messages::state::ClusterLockMessageType::Announce { uid } => {
                     if let Entry::Vacant(entry) = self.locks.entry(message.lock) {
-                        entry.insert(PlaneLockState::Announced);
+                        entry.insert(PlaneLockState::Announced { uid });
                     };
                 }
             },
@@ -169,12 +169,12 @@ impl ClusterState {
                     }
                 }
 
-                if let BackendMessageType::LockMessage(BackendLockMessage {
-                    ref lock,
-                    message: crate::messages::state::BackendLockMessageType::Remove,
-                }) = message.message
-                {
-                    self.locks.remove(lock);
+                if let BackendMessageType::State { state, .. } = message.message {
+                    if state.terminal() {
+                        for lock in &backend.locks {
+                            self.locks.remove(lock);
+                        }
+                    }
                 }
 
                 backend.apply(message.message);
@@ -252,14 +252,6 @@ impl BackendState {
         match message {
             BackendMessageType::LockMessage(BackendLockMessage {
                 lock,
-                message: BackendLockMessageType::Remove,
-            }) => {
-                if let Some(pos) = self.locks.iter().position(|x| *x == lock) {
-                    self.locks.swap_remove(pos);
-                }
-            }
-            BackendMessageType::LockMessage(BackendLockMessage {
-                lock,
                 message: BackendLockMessageType::Assign,
             }) => {
                 self.locks.push(lock);
@@ -277,6 +269,9 @@ impl BackendState {
                 timestamp,
             } => {
                 self.states.insert((timestamp, status));
+                if status.terminal() {
+                    self.locks.clear();
+                }
             }
         }
     }
