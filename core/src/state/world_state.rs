@@ -288,7 +288,9 @@ impl BackendState {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::messages::state::AcmeDnsRecord;
+    use crate::messages::state::{
+        AcmeDnsRecord, BackendMessage, ClusterLockMessage, ClusterLockMessageType,
+    };
     use std::time::Duration;
     use tokio::time::timeout;
 
@@ -352,12 +354,11 @@ mod test {
 
     #[test]
     fn test_locks() {
-        /*
         let mut state = ClusterState::default();
         let backend = BackendId::new_random();
 
         // Initially, no locks are held.
-        assert!(state.locked("mylock").is_none());
+        assert_eq!(state.locked("mylock"), PlaneLockState::Unlocked);
 
         // Assign a backend to a drone and acquire a lock.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
@@ -368,7 +369,29 @@ mod test {
             },
         }));
 
-        assert_eq!(backend, state.locked("mylock").unwrap());
+        // Announce a lock
+        state.apply(ClusterStateMessage::LockMessage(ClusterLockMessage {
+            lock: "mylock".to_string(),
+            message: ClusterLockMessageType::Announce { uid: 1 },
+        }));
+
+        assert_eq!(state.locked("mylock"), PlaneLockState::Announced { uid: 1 });
+
+        // assign backend to lock
+        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
+            backend: backend.clone(),
+            message: BackendMessageType::LockMessage(BackendLockMessage {
+                lock: "mylock".to_string(),
+                message: BackendLockMessageType::Assign,
+            }),
+        }));
+
+        assert_eq!(
+            state.locked("mylock"),
+            PlaneLockState::Assigned {
+                backend: backend.clone()
+            }
+        );
 
         // Update the backend state to loading.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
@@ -379,9 +402,7 @@ mod test {
             },
         }));
 
-        assert_eq!(backend, state.locked("mylock").unwrap());
-
-        // Update the backend state to starting.
+        // Update the backend state to starting
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
             backend: backend.clone(),
             message: BackendMessageType::State {
@@ -390,7 +411,12 @@ mod test {
             },
         }));
 
-        assert_eq!(backend, state.locked("mylock").unwrap());
+        assert_eq!(
+            state.locked("mylock"),
+            PlaneLockState::Assigned {
+                backend: backend.clone()
+            }
+        );
 
         // Update the backend state to ready.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
@@ -401,7 +427,12 @@ mod test {
             },
         }));
 
-        assert_eq!(backend, state.locked("mylock").unwrap());
+        assert_eq!(
+            state.locked("mylock"),
+            PlaneLockState::Assigned {
+                backend: backend.clone()
+            }
+        );
 
         // Update the backend state to swept.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
@@ -413,12 +444,11 @@ mod test {
         }));
 
         // The lock should now be free.
-        assert!(state.locked("mylock").is_none());
+        assert_eq!(state.locked("mylock"), PlaneLockState::Unlocked);
 
         state.backends.remove(&BackendId::new("backend".into()));
 
         // The lock should still be free.
-        assert!(state.locked("mylock").is_none());
-        */
+        assert_eq!(state.locked("mylock"), PlaneLockState::Unlocked);
     }
 }
