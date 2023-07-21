@@ -140,9 +140,16 @@ impl ClusterState {
         match message {
             ClusterStateMessage::LockMessage(message) => match message.message {
                 crate::messages::state::ClusterLockMessageType::Announce { uid } => {
-                    if let Entry::Vacant(entry) = self.locks.entry(message.lock) {
-                        entry.insert(PlaneLockState::Announced { uid });
-                    };
+                    match self.locks.entry(message.lock) {
+                        Entry::Vacant(entry) => {
+                            entry.insert(PlaneLockState::Announced { uid });
+                        }
+                        Entry::Occupied(entry) => {
+                            let lock = entry.key();
+                            let lock_state = entry.get();
+                            tracing::info!(?lock, ?lock_state, "lock already exists in map");
+                        }
+                    }
                 }
             },
             ClusterStateMessage::DroneMessage(message) => {
