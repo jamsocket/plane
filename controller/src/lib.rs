@@ -138,7 +138,7 @@ async fn announce_lock(
     lock: &str,
     cluster_name: &ClusterName,
     nats: &TypedNats,
-    uid: &u128,
+    uid: &u64,
 ) -> anyhow::Result<u64> {
     tracing::info!("announcing lock");
     let seq_id = nats
@@ -211,7 +211,7 @@ async fn process_response(
             ))
         } else {
             let mut rng = rand::rngs::StdRng::from_entropy();
-            let my_uid: u128 = rng.gen();
+            let my_uid: u64 = rng.gen();
 
             let my_announce_time = announce_lock(&lock_name, &cluster_name, nats, &my_uid).await?;
 

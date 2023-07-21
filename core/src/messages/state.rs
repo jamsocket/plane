@@ -47,7 +47,7 @@ pub struct ClusterLockMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ClusterLockMessageType {
-    Announce { uid: u128 },
+    Announce { uid: u64 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

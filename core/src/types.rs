@@ -97,7 +97,7 @@ pub type PlaneLockName = String;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum PlaneLockState {
     Unlocked,
-    Announced { uid: u128 },
+    Announced { uid: u64 },
     Assigned { backend: BackendId },
 }
 
