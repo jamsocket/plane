@@ -166,7 +166,9 @@ impl ClusterState {
                 }) = message.message
                 {
                     match self.locks.entry(lock.clone()) {
-                        Entry::Vacant(_) => panic!("lock must be announced before assignment"),
+                        Entry::Vacant(_) => {
+                            tracing::error!(?lock, "lock must be announced before assignment")
+                        }
                         Entry::Occupied(mut v) => {
                             *v.get_mut() = PlaneLockState::Assigned {
                                 backend: message.backend,
