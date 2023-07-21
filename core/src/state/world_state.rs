@@ -181,10 +181,9 @@ impl ClusterState {
 
                 // If the backend is terminal, remove locks from map
                 if let BackendMessageType::State { state, .. } = message.message {
-                    if state.terminal() {
-                        for lock in &backend.locks {
-                            self.locks.remove(lock);
-                        }
+                    if state.terminal() && backend.lock.is_some() {
+                        let lock = backend.lock.as_ref().unwrap();
+                        self.locks.remove(lock);
                     }
                 }
 
@@ -254,7 +253,7 @@ impl DroneState {
 pub struct BackendState {
     pub drone: Option<DroneId>,
     pub bearer_token: Option<String>,
-    pub locks: Vec<PlaneLockName>,
+    pub lock: Option<PlaneLockName>,
     pub states: BTreeSet<(chrono::DateTime<chrono::Utc>, agent::BackendState)>,
 }
 
@@ -265,7 +264,7 @@ impl BackendState {
                 lock,
                 message: BackendLockMessageType::Assign,
             }) => {
-                self.locks.push(lock);
+                self.lock = Some(lock);
             }
             BackendMessageType::Assignment {
                 drone,
@@ -281,7 +280,7 @@ impl BackendState {
             } => {
                 self.states.insert((timestamp, status));
                 if status.terminal() {
-                    self.locks.clear();
+                    self.lock = None
                 }
             }
         }
