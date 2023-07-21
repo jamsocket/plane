@@ -106,14 +106,15 @@ async fn wait_for_lock_assignment(
         .await?;
 
     tracing::info!("awaiting sub");
-    let msg = sub.next().await;
+    let msg = sub.next().await.ok_or_else(|| {
+        anyhow!("lock assignment subscription closed before receiving assignment")
+    })?;
     tracing::info!(?msg, "received wait for lock assignment");
-    let msg = msg.unwrap();
     let seq = msg.1.sequence;
     state.wait_for_seq(seq).await;
     let WorldStateMessage {
-		message : ClusterStateMessage::BackendMessage(
-			BackendMessage { backend, .. }), .. } = msg.0 else { panic!() };
+        message : ClusterStateMessage::BackendMessage(
+            BackendMessage { backend, .. }), .. } = msg.0 else { panic!() };
     Ok(backend)
 }
 
@@ -213,16 +214,16 @@ async fn process_response(
             let mut rng = rand::rngs::StdRng::from_entropy();
             let my_uid: u64 = rng.gen();
 
-            let my_announce_time = announce_lock(&lock_name, &cluster_name, nats, &my_uid).await?;
+            let seq = announce_lock(&lock_name, &cluster_name, nats, &my_uid).await?;
 
-            state.wait_for_seq(my_announce_time).await;
+            state.wait_for_seq(seq).await;
             let lock_state = state
                 .state()
                 .cluster(&cluster_name)
-                .expect("cluster should exist")
+                .ok_or_else(|| anyhow!("cluster should exist"))?
                 .locks
                 .get(&lock_name)
-                .expect("lock should be in map after waiting for announce time")
+                .ok_or_else(|| anyhow!("lock should be in map after waiting for announce time"))?
                 .clone();
 
             match lock_state {
