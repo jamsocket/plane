@@ -292,8 +292,6 @@ async fn dispatch_lock_request(
     lock_request: MessageWithResponseHandle<FetchBackendForLock>,
     nats: TypedNats,
 ) {
-    //let mut response: FetchBackendForLockResponse = FetchBackendForLockResponse::NoBackendForLock;
-
     let lock_name = &lock_request.value.lock;
     let cluster_name = &lock_request.value.cluster;
     let lock_state = state
