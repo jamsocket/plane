@@ -11,6 +11,7 @@ use std::net::IpAddr;
 pub struct WorldStateMessage {
     pub cluster: ClusterName,
 
+    #[serde(flatten)]
     pub message: ClusterStateMessage,
 }
 
