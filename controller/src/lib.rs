@@ -221,10 +221,7 @@ async fn process_response(
                 .state()
                 .cluster(&cluster_name)
                 .ok_or_else(|| anyhow!("cluster should exist"))?
-                .locks
-                .get(&lock_name)
-                .ok_or_else(|| anyhow!("lock should be in map after waiting for announce time"))?
-                .clone();
+                .locked(&lock_name);
 
             match lock_state {
                 PlaneLockState::Announced { uid } if uid == my_uid => None,
