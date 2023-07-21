@@ -297,10 +297,10 @@ async fn dispatch_lock_request(
     let lock_state = state
         .state()
         .cluster(cluster_name)
-        .unwrap()
+        .expect("cluster should exist")
         .locks
         .get(lock_name)
-        .unwrap()
+        .expect("lock should exist")
         .clone();
 
     let response = match lock_state {
