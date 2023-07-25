@@ -168,8 +168,7 @@ impl WorldState {
                                 tracing::error!(?lock, "lock announce expired");
                                 lock.remove_entry();
                             }
-                        } else {
-                        }
+                        } else {}
                     }
                     ListenerDefunctionalization::Nothing => {}
                 }
