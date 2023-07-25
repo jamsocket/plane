@@ -12,7 +12,10 @@ use crate::{
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use std::{
-    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
+    collections::{
+        btree_map::{Entry, OccupiedEntry},
+        BTreeMap, BTreeSet, VecDeque,
+    },
     fmt::Debug,
     future::ready,
     net::IpAddr,
@@ -133,8 +136,9 @@ impl WorldState {
         }) = message.message
         {
             let cluster_name = &message.cluster;
+            let wait_ticks = (self.clusters.len() * 1000) as u64;
             let mut recv = self.get_listener(
-                sequence + 1000,
+                sequence + wait_ticks,
                 ListenerDefunctionalization::RemoveLock {
                     lock: lock.clone(),
                     cluster: cluster_name.clone(),
@@ -142,6 +146,7 @@ impl WorldState {
             );
             tokio::spawn(async move {
                 recv.recv().await.unwrap();
+                tracing::info!(?wait_ticks, "lock removed if announced after waiting");
             });
         }
 
@@ -154,7 +159,17 @@ impl WorldState {
             for (_, (sender, listener_role)) in self.listeners.iter() {
                 match listener_role {
                     ListenerDefunctionalization::RemoveLock { lock, cluster } => {
-                        self.clusters.get_mut(cluster).unwrap().locks.remove(lock);
+                        if let Some(Entry::Occupied(lock)) = self
+                            .clusters
+                            .get_mut(cluster)
+                            .map(|cluster| cluster.locks.entry(lock.clone()))
+                        {
+                            if matches!(lock.get(), PlaneLockState::Announced { .. }) {
+                                tracing::error!(?lock, "lock announce expired");
+                                lock.remove_entry();
+                            }
+                        } else {
+                        }
                     }
                     ListenerDefunctionalization::Nothing => {}
                 }
