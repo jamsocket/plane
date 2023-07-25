@@ -104,7 +104,6 @@ async fn wait_for_lock_assignment(
         )))
         .await?;
 
-    tracing::info!("awaiting sub");
     let msg = sub.next().await.ok_or_else(|| {
         anyhow!("lock assignment subscription closed before receiving assignment")
     })?;
