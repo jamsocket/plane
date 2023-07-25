@@ -223,13 +223,13 @@ async fn process_response(
                 .state()
                 .cluster(&cluster_name)
                 .ok_or_else(|| anyhow!("cluster should exist"))?
-                .locked(&lock_name);
+                .locked(lock_name);
 
             match lock_state {
                 PlaneLockState::Announced { uid } if uid == my_uid => None,
                 PlaneLockState::Announced { .. } => {
                     let assigned_backend =
-                        wait_for_lock_assignment(state, &lock_name, &cluster_name, nats).await?;
+                        wait_for_lock_assignment(state, lock_name, &cluster_name, nats).await?;
                     Some(schedule_response_for_existing_backend(
                         state,
                         cluster_name.clone(),
