@@ -132,7 +132,7 @@ impl WorldState {
             message: ClusterLockMessageType::Announce { .. },
         }) = message.message
         {
-            let ref cluster_name = message.cluster;
+            let cluster_name = &message.cluster;
             let mut recv = self.get_listener(
                 sequence + 1000,
                 ListenerDefunctionalization::RemoveLock {
@@ -488,7 +488,7 @@ mod test {
 
         // Update the backend state to swept.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: backend.clone(),
+            backend,
             message: BackendMessageType::State {
                 state: agent::BackendState::Swept,
                 timestamp: Utc::now(),
