@@ -2,8 +2,9 @@ use crate::{
     messages::{
         agent,
         state::{
-            BackendLockMessage, BackendLockMessageType, BackendMessageType, ClusterStateMessage,
-            DroneMessageType, DroneMeta, WorldStateMessage,
+            BackendLockMessage, BackendLockMessageType, BackendMessageType, ClusterLockMessage,
+            ClusterLockMessageType, ClusterStateMessage, DroneMessageType, DroneMeta,
+            WorldStateMessage,
         },
     },
     types::{BackendId, ClusterName, DroneId, PlaneLockName, PlaneLockState},
@@ -18,7 +19,7 @@ use std::{
     pin::Pin,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use tokio::sync::broadcast::{channel, Sender};
+use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -43,14 +44,7 @@ impl StateHandle {
         if state.logical_time >= sequence {
             return Box::pin(ready(()));
         }
-        let mut recv = match state.listeners.entry(sequence) {
-            Entry::Occupied(entry) => entry.get().subscribe(),
-            Entry::Vacant(entry) => {
-                let (send, recv) = channel(1024);
-                entry.insert(send);
-                recv
-            }
-        };
+        let mut recv = state.get_listener(sequence, ListenerDefunctionalization::Nothing);
 
         Box::pin(async move {
             recv.recv().await.unwrap();
@@ -96,11 +90,20 @@ impl StateHandle {
     }
 }
 
+#[derive(Clone, Debug)]
+enum ListenerDefunctionalization {
+    RemoveLock {
+        lock: PlaneLockName,
+        cluster: ClusterName,
+    },
+    Nothing,
+}
+
 #[derive(Default, Debug)]
 pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: BTreeMap<u64, Sender<()>>,
+    listeners: BTreeMap<u64, (Sender<()>, ListenerDefunctionalization)>,
 }
 
 impl WorldState {
@@ -108,14 +111,53 @@ impl WorldState {
         self.logical_time
     }
 
+    fn get_listener(
+        &mut self,
+        sequence: u64,
+        listener_role: ListenerDefunctionalization,
+    ) -> Receiver<()> {
+        match self.listeners.entry(sequence) {
+            Entry::Occupied(entry) => entry.get().0.subscribe(),
+            Entry::Vacant(entry) => {
+                let (send, recv) = channel(1024);
+                entry.insert((send, listener_role));
+                recv
+            }
+        }
+    }
+
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
+        if let ClusterStateMessage::LockMessage(ClusterLockMessage {
+            ref lock,
+            message: ClusterLockMessageType::Announce { .. },
+        }) = message.message
+        {
+            let ref cluster_name = message.cluster;
+            let mut recv = self.get_listener(
+                sequence + 1000,
+                ListenerDefunctionalization::RemoveLock {
+                    lock: lock.clone(),
+                    cluster: cluster_name.clone(),
+                },
+            );
+            tokio::spawn(async move {
+                recv.recv().await.unwrap();
+            });
+        }
+
         let cluster = self.clusters.entry(message.cluster.clone()).or_default();
         cluster.apply(message.message);
         self.logical_time = sequence;
 
         self.listeners = {
             let outstanding_listeners = self.listeners.split_off(&(sequence + 1));
-            for (_, sender) in self.listeners.iter() {
+            for (_, (sender, listener_role)) in self.listeners.iter() {
+                match listener_role {
+                    ListenerDefunctionalization::RemoveLock { lock, cluster } => {
+                        self.clusters.get_mut(cluster).unwrap().locks.remove(lock);
+                    }
+                    ListenerDefunctionalization::Nothing => {}
+                }
                 sender.send(()).unwrap();
             }
             outstanding_listeners
