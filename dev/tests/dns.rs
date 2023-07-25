@@ -4,7 +4,7 @@ use plane_controller::{dns::serve_dns, plan::DnsPlan};
 use plane_core::{
     messages::state::{
         AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
-        DroneMessageType, DroneMeta, WorldStateMessage,
+        DroneMessageType, DroneMeta, WorldStateMessage, ClusterMessage,
     },
     state::{StateHandle, WorldState},
     types::{BackendId, ClusterName, DroneId},
@@ -114,12 +114,12 @@ async fn dns_bad_request() {
 async fn dns_txt_record() {
     let mut state = WorldState::default();
     state.apply(
-        WorldStateMessage {
+        WorldStateMessage::ClusterMessage(ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobar".into(),
             }),
-        },
+        }),
         1,
     );
     let dns = DnsServer::new(state).unwrap();
@@ -131,21 +131,21 @@ async fn dns_txt_record() {
 async fn dns_multi_txt_record() {
     let mut state = WorldState::default();
     state.apply(
-        WorldStateMessage {
+        WorldStateMessage::ClusterMessage(ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobar".into(),
             }),
-        },
+        }),
         1,
     );
     state.apply(
-        WorldStateMessage {
+        WorldStateMessage::ClusterMessage(ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobaz".into(),
             }),
-        },
+        }),
         2,
     );
     let dns = DnsServer::new(state).unwrap();
@@ -159,7 +159,7 @@ async fn dns_a_record() {
     let drone_id = DroneId::new_random();
     let mut state = WorldState::default();
     state.apply(
-        WorldStateMessage {
+        WorldStateMessage::ClusterMessage(ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::DroneMessage(DroneMessage {
                 drone: drone_id.clone(),
@@ -169,11 +169,11 @@ async fn dns_a_record() {
                     git_hash: None,
                 }),
             }),
-        },
+        }),
         1,
     );
     state.apply(
-        WorldStateMessage {
+        WorldStateMessage::ClusterMessage(ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: BackendId::new("louie".to_string()),
@@ -182,7 +182,7 @@ async fn dns_a_record() {
                     bearer_token: None,
                 },
             }),
-        },
+        }),
         2,
     );
 

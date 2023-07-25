@@ -10,7 +10,7 @@ use plane_core::{
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
         state::{
             BackendLockMessage, BackendLockMessageType, BackendMessage, BackendMessageType,
-            ClusterStateMessage, DroneMessage, DroneMessageType, WorldStateMessage,
+            ClusterStateMessage, DroneMessage, DroneMessageType, WorldStateMessage, ClusterMessage,
         },
     },
     nats_connection::NatsConnectionSpec,
@@ -178,7 +178,7 @@ async fn main() -> Result<()> {
                     break;
                 }
 
-                let WorldStateMessage { cluster, message } = message;
+                let WorldStateMessage::ClusterMessage(ClusterMessage { cluster, message }) = message else { continue };
 
                 let text = match message {
                     ClusterStateMessage::AcmeMessage(acme) => {

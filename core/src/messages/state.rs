@@ -8,25 +8,34 @@ use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct WorldStateMessage {
-    pub cluster: ClusterName,
+pub enum WorldStateMessage {
+	ClusterMessage(ClusterMessage),
+	HeartbeatMessage {
+		timestamp: DateTime<Utc>,
+		interval: std::time::Duration
+	}
+}
 
-    #[serde(flatten)]
-    pub message: ClusterStateMessage,
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ClusterMessage {
+	pub cluster: ClusterName,
+	#[serde(flatten)]
+	pub message: ClusterStateMessage,
 }
 
 impl WorldStateMessage {
     /// Whether this message can overwrite the previous message on the same subject.
     pub fn overwrite(&self) -> bool {
         !matches!(
-            self.message,
-            ClusterStateMessage::DroneMessage(DroneMessage {
+            self,
+            WorldStateMessage::ClusterMessage(ClusterMessage{message: ClusterStateMessage::DroneMessage(DroneMessage {
                 message: DroneMessageType::State { .. },
                 ..
-            }) | ClusterStateMessage::BackendMessage(BackendMessage {
+            }),..}) | WorldStateMessage::ClusterMessage(ClusterMessage{message: ClusterStateMessage::BackendMessage(BackendMessage {
                 message: BackendMessageType::State { .. },
                 ..
-            })
+            }),..}) | WorldStateMessage::HeartbeatMessage { .. }
         )
     }
 }
@@ -42,12 +51,14 @@ pub enum ClusterStateMessage {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ClusterLockMessage {
     pub lock: String,
+	pub uid: u64,
     pub message: ClusterLockMessageType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ClusterLockMessageType {
-    Announce { uid: u64 },
+    Announce,
+	Revoke
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -132,71 +143,85 @@ impl TypedMessage for WorldStateMessage {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        match &self.message {
-            ClusterStateMessage::DroneMessage(message) => match message.message {
-                DroneMessageType::Metadata { .. } => {
-                    format!(
-                        "state.cluster.{}.drone.{}.meta",
-                        self.cluster.subject_name(),
-                        message.drone
-                    )
-                }
-                DroneMessageType::State { state, .. } => {
-                    format!(
-                        "state.cluster.{}.drone.{}.status.{}",
-                        self.cluster.subject_name(),
-                        message.drone,
-                        state,
-                    )
-                }
-                DroneMessageType::KeepAlive { .. } => {
-                    format!(
-                        "state.cluster.{}.drone.{}.keep_alive",
-                        self.cluster.subject_name(),
-                        message.drone
-                    )
-                }
-            },
-            ClusterStateMessage::BackendMessage(message) => match message.message {
-                BackendMessageType::LockMessage(BackendLockMessage {
-                    ref lock,
-                    message: BackendLockMessageType::Assign,
-                }) => {
-                    format!(
-                        "state.cluster.{}.backend.{}.lock.{}.assign",
-                        self.cluster.subject_name(),
-                        message.backend,
-                        lock
-                    )
-                }
-                BackendMessageType::Assignment { .. } => {
-                    format!(
-                        "state.cluster.{}.backend.{}",
-                        self.cluster.subject_name(),
-                        message.backend
-                    )
-                }
-                BackendMessageType::State { state: status, .. } => {
-                    format!(
-                        "state.cluster.{}.backend.{}.state.{}",
-                        self.cluster.subject_name(),
-                        message.backend,
-                        status
-                    )
-                }
-            },
-            ClusterStateMessage::AcmeMessage(_) => {
-                format!("state.cluster.{}.acme", self.cluster.subject_name())
-            }
-            ClusterStateMessage::LockMessage(message) => match message.message {
-                ClusterLockMessageType::Announce { .. } => {
-                    format!(
-                        "state.cluster.{}.lock.{}.announce",
-                        self.cluster.subject_name(),
-                        message.lock
-                    )
-                }
-            },
+        match &self {
+			WorldStateMessage::HeartbeatMessage {..} => {
+				format!("state.heartbeat")
+			}
+			WorldStateMessage::ClusterMessage(message) => {
+				let cluster_subject_name = message.cluster.subject_name();
+				match &message.message {
+				ClusterStateMessage::DroneMessage(message) => match message.message {
+					DroneMessageType::Metadata { .. } => {
+						format!(
+							"state.cluster.{}.drone.{}.meta",
+							cluster_subject_name,
+							message.drone
+						)
+					}
+					DroneMessageType::State { state, .. } => {
+						format!(
+							"state.cluster.{}.drone.{}.status.{}",
+							cluster_subject_name,
+							message.drone,
+							state,
+						)
+					}
+					DroneMessageType::KeepAlive { .. } => {
+						format!(
+							"state.cluster.{}.drone.{}.keep_alive",
+							cluster_subject_name,
+							message.drone
+						)
+					}
+				},
+				ClusterStateMessage::BackendMessage(message) => match message.message {
+					BackendMessageType::LockMessage(BackendLockMessage {
+						ref lock,
+						message: BackendLockMessageType::Assign,
+					}) => {
+						format!(
+							"state.cluster.{}.backend.{}.lock.{}.assign",
+							cluster_subject_name,
+							message.backend,
+							lock
+						)
+					}
+					BackendMessageType::Assignment { .. } => {
+						format!(
+							"state.cluster.{}.backend.{}",
+							cluster_subject_name,
+							message.backend
+						)
+					}
+					BackendMessageType::State { state: status, .. } => {
+						format!(
+							"state.cluster.{}.backend.{}.state.{}",
+							cluster_subject_name,
+							message.backend,
+							status
+						)
+					}
+				},
+				ClusterStateMessage::AcmeMessage(_) => {
+					format!("state.cluster.{}.acme", cluster_subject_name)
+				}
+				ClusterStateMessage::LockMessage(message) => match message.message {
+					ClusterLockMessageType::Announce { .. } => {
+						format!(
+							"state.cluster.{}.lock.{}.announce",
+							cluster_subject_name,
+							message.lock
+						)
+					}
+					ClusterLockMessageType::Revoke { .. } => {
+						format!(
+							"state.cluster.{}.lock.{}.revoke",
+							cluster_subject_name,
+							message.lock
+						)
+					}
+				},
+			}}
         }
     }
 }
