@@ -17,8 +17,8 @@ use plane_core::{
     types::{BackendId, ClusterName, DroneId, PlaneLockState},
     NeverResult,
 };
-use rand::Rng;
 use rand::SeedableRng;
+use rand::{thread_rng, Rng};
 use scheduler::Scheduler;
 
 mod config;
@@ -201,20 +201,23 @@ async fn process_response(
 ) -> anyhow::Result<ScheduleResponse> {
     tracing::info!("checking locks");
     let cluster_name = sr.cluster.clone();
-    let schedule_response: Option<_> = if let Some(lock_name) = sr.lock.clone() {
+    let schedule_response: Option<_> = if let Some(lock_name) = sr.lock.as_ref() {
         tracing::info!(?lock_name, "scheduling lock");
 
-        if let Ok(Some(backend)) = backend_assigned_to_lock(state, &lock_name, &cluster_name) {
+        if let Ok(Some(backend)) = backend_assigned_to_lock(state, lock_name, &cluster_name) {
             Some(schedule_response_for_existing_backend(
                 state,
                 cluster_name.clone(),
                 backend,
             ))
         } else {
-            let mut rng = rand::rngs::StdRng::from_entropy();
-            let my_uid: u64 = rng.gen();
-
-            let seq = announce_lock(&lock_name, &cluster_name, nats, &my_uid).await?;
+            //let mut rng = rand::rngs::StdRng::from_entropy();
+            //let my_uid: u64 = rng.gen();
+            let my_uid: u64 = {
+                let mut rng = thread_rng();
+                rng.gen()
+            };
+            let seq = announce_lock(lock_name, &cluster_name, nats, &my_uid).await?;
 
             state.wait_for_seq(seq).await;
             let lock_state = state
