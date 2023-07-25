@@ -310,7 +310,7 @@ async fn dispatch_lock_request(
             if let Ok(schedule_response) = schedule_response {
                 schedule_response.try_into().expect(
                     "already checked that backend exists, \
-				 so schedule_response should be convertible to FetchBackendForLockResponse",
+                 so schedule_response should be convertible to FetchBackendForLockResponse",
                 )
             } else {
                 FetchBackendForLockResponse::NoBackendForLock
@@ -331,7 +331,7 @@ async fn dispatch_lock_request(
             if let Ok(schedule_response) = schedule_response {
                 schedule_response.try_into().expect(
                     "already checked that backend exists, \
-				 so schedule_response should be convertible to FetchBackendForLockResponse",
+                 so schedule_response should be convertible to FetchBackendForLockResponse",
                 )
             } else {
                 FetchBackendForLockResponse::NoBackendForLock
