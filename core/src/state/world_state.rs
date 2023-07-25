@@ -13,7 +13,7 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use std::{
     collections::{
-        btree_map::{Entry, OccupiedEntry},
+        btree_map::Entry,
         BTreeMap, BTreeSet, VecDeque,
     },
     fmt::Debug,
