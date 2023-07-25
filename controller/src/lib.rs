@@ -210,8 +210,6 @@ async fn process_response(
                 backend,
             ))
         } else {
-            //let mut rng = rand::rngs::StdRng::from_entropy();
-            //let my_uid: u64 = rng.gen();
             let my_uid: u64 = {
                 let mut rng = thread_rng();
                 rng.gen()
