@@ -17,7 +17,6 @@ use plane_core::{
     types::{BackendId, ClusterName, DroneId, PlaneLockState},
     NeverResult,
 };
-use rand::SeedableRng;
 use rand::{thread_rng, Rng};
 use scheduler::Scheduler;
 
