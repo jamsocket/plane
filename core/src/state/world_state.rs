@@ -3,22 +3,26 @@ use crate::{
         agent,
         state::{
             BackendLockMessage, BackendLockMessageType, BackendMessageType, ClusterStateMessage,
-            DroneMessageType, DroneMeta, WorldStateMessage 
+            DroneMessageType, DroneMeta, WorldStateMessage,
         },
     },
     types::{BackendId, ClusterName, DroneId, PlaneLockName, PlaneLockState},
 };
 use anyhow::{anyhow, Result};
+use async_nats::jetstream::consumer::OrderedPullConsumer;
 use chrono::{DateTime, Utc};
 use std::{
-    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
+    borrow::BorrowMut,
+    cell::RefCell,
+    cmp::Ordering,
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, BinaryHeap, VecDeque},
     fmt::Debug,
     future::ready,
     net::IpAddr,
     pin::Pin,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use tokio::sync::broadcast::{channel, Sender};
+use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -43,15 +47,7 @@ impl StateHandle {
         if state.logical_time >= sequence {
             return Box::pin(ready(()));
         }
-        let mut recv = match state.listeners.entry(sequence) {
-            Entry::Occupied(entry) => entry.get().subscribe(),
-            Entry::Vacant(entry) => {
-                let (send, recv) = channel(1024);
-                entry.insert(send);
-                recv
-            }
-        };
-
+        let mut recv = state.get_listener(sequence, ListenerDefunctionalization::Nothing);
         Box::pin(async move {
             recv.recv().await.unwrap();
         })
@@ -96,11 +92,61 @@ impl StateHandle {
     }
 }
 
+#[derive(Clone, Debug)]
+enum ListenerDefunctionalization {
+    RemoveLock {
+        lock: PlaneLockName,
+        cluster: ClusterName,
+    },
+    Nothing,
+}
+
+#[derive(Clone, Debug)]
+struct Listener<T: Ord + Eq> {
+    target: T,
+    role: ListenerDefunctionalization,
+    sender: Sender<()>,
+}
+
+impl<T: Ord + Eq> Listener<T> {
+    fn new(target: T, role: ListenerDefunctionalization) -> Self {
+        let (send, _recv) = channel(1);
+        Self {
+            target,
+            role,
+            sender: send,
+        }
+    }
+}
+
+impl<T: Ord + Eq> PartialEq for Listener<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.target == other.target
+    }
+}
+impl<T: Ord + Eq> PartialOrd for Listener<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.target
+            .partial_cmp(&other.target)
+            .map(Ordering::reverse)
+    }
+}
+
+impl<T: Ord + Eq> Eq for Listener<T> {}
+
+impl<T: Ord + Eq> Ord for Listener<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Ordering::reverse(self.target.cmp(&other.target))
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct WorldState {
     logical_time: u64,
+    clock_time: DateTime<Utc>,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
-    listeners: BTreeMap<u64, Sender<()>>,
+    listeners: BinaryHeap<Listener<u64>>,
+    duration_listeners: BinaryHeap<Listener<DateTime<Utc>>>,
 }
 
 impl WorldState {
@@ -108,23 +154,93 @@ impl WorldState {
         self.logical_time
     }
 
-    pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
-		match message {
-			WorldStateMessage::ClusterMessage(message) => {
-				let cluster = self.clusters.entry(message.cluster.clone()).or_default();
-				cluster.apply(message.message);
-			}
-			WorldStateMessage::HeartbeatMessage { .. } => {}
-		}
-        self.logical_time = sequence;
+    fn get_listener(
+        &mut self,
+        sequence: u64,
+        listener_role: ListenerDefunctionalization,
+    ) -> Receiver<()> {
+        let listener = Listener::new(sequence, listener_role);
+        let recv = listener.sender.subscribe();
+        self.listeners.push(listener);
+        recv
+    }
 
-        self.listeners = {
-            let outstanding_listeners = self.listeners.split_off(&(sequence + 1));
-            for (_, sender) in self.listeners.iter() {
-                sender.send(()).unwrap();
+    fn apply_listeners(&mut self) {
+        while self
+            .listeners
+            .peek()
+            .is_some_and(|l| l.target <= self.logical_time)
+        {
+            let listener = self.listeners.pop().unwrap();
+            self.apply_listener_func(listener.role);
+            if let Err(e) = listener.sender.send(()) {
+                tracing::info!(?self.logical_time, ?e, "failed to notify listener at seq");
             }
-            outstanding_listeners
-        };
+        }
+    }
+
+    fn apply_duration_listeners(&mut self) {
+        while self
+            .duration_listeners
+            .peek()
+            .is_some_and(|l| l.target <= self.clock_time)
+        {
+            let listener = self.duration_listeners.pop().unwrap();
+            self.apply_listener_func(listener.role);
+            if let Err(e) = listener.sender.send(()) {
+                tracing::info!(?self.clock_time, ?e, "failed to notify listener at time");
+            }
+        }
+    }
+
+    fn get_duration_listener(
+        &mut self,
+        duration: chrono::Duration,
+        listener_role: ListenerDefunctionalization,
+    ) -> Receiver<()> {
+        let duration_listener = Listener::new(self.clock_time + duration, listener_role);
+        self.duration_listeners.push(duration_listener.clone());
+        duration_listener.sender.subscribe()
+    }
+
+    fn apply_listener_func(&mut self, listener_role: ListenerDefunctionalization) {
+        match listener_role {
+            ListenerDefunctionalization::RemoveLock { lock, cluster } => {
+                if let Some(Entry::Occupied(lock)) = self
+                    .clusters
+                    .get_mut(&cluster)
+                    .map(|cluster| cluster.locks.entry(lock.clone()))
+                {
+                    if matches!(lock.get(), PlaneLockState::Announced { .. }) {
+                        tracing::error!(?lock, "lock announce expired");
+                        lock.remove_entry();
+                    }
+                }
+            }
+            ListenerDefunctionalization::Nothing => {}
+        }
+    }
+
+    pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
+        match message {
+            WorldStateMessage::ClusterMessage(message) => {
+                let cluster = self.clusters.entry(message.cluster.clone()).or_default();
+                cluster.apply(message.message);
+            }
+            WorldStateMessage::HeartbeatMessage {
+                interval,
+                timestamp,
+            } => {
+                if self.clock_time == DateTime::<Utc>::default() {
+                    self.clock_time = timestamp;
+                } else {
+                    self.clock_time += chrono::Duration::from_std(interval).unwrap();
+                }
+                self.apply_duration_listeners();
+            }
+        }
+        self.logical_time = sequence;
+        self.apply_listeners();
     }
 
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterState> {
@@ -155,24 +271,24 @@ impl ClusterState {
                             tracing::info!(?lock, ?lock_state, "lock already exists in map");
                         }
                     }
-                },
-				crate::messages::state::ClusterLockMessageType::Revoke => {
-					match self.locks.entry(message.lock) {
-						Entry::Vacant(entry) => {
-							let lock = entry.key();
-							tracing::info!(?lock, "requested revocation of nonexistent lock");
-						}
-						Entry::Occupied(entry) => {
-							if matches!(
-								entry.get(),
-								PlaneLockState::Announced { uid } if uid == &message.uid
-							) {
-								let (lock, _) = entry.remove_entry();
-								tracing::info!(?lock, "announced lock revoked");
-							}
-						}
-					}
-				}
+                }
+                crate::messages::state::ClusterLockMessageType::Revoke => {
+                    match self.locks.entry(message.lock) {
+                        Entry::Vacant(entry) => {
+                            let lock = entry.key();
+                            tracing::info!(?lock, "requested revocation of nonexistent lock");
+                        }
+                        Entry::Occupied(entry) => {
+                            if matches!(
+                                entry.get(),
+                                PlaneLockState::Announced { uid } if uid == &message.uid
+                            ) {
+                                let (lock, _) = entry.remove_entry();
+                                tracing::info!(?lock, "announced lock revoked");
+                            }
+                        }
+                    }
+                }
             },
             ClusterStateMessage::DroneMessage(message) => {
                 let drone = self.drones.entry(message.drone).or_default();
@@ -358,7 +474,7 @@ mod test {
         // onelistener should now return.
         timeout(Duration::from_secs(0), onelistener_2)
             .await
-            .expect("onelistener should return immediately");
+            .expect("onelistener should return");
 
         // twolistener should block
         {
@@ -384,6 +500,63 @@ mod test {
         }
     }
 
+    #[tokio::test]
+    async fn test_duration_listener() {
+        let state = StateHandle::default();
+        state.write_state().apply(
+            WorldStateMessage::HeartbeatMessage {
+                timestamp: Utc::now(),
+                interval: std::time::Duration::from_secs(10),
+            },
+            1,
+        );
+
+        let mut listener = state.write_state().get_duration_listener(
+            chrono::Duration::seconds(5),
+            ListenerDefunctionalization::Nothing,
+        );
+
+        state.write_state().apply(
+            WorldStateMessage::HeartbeatMessage {
+                timestamp: Utc::now(),
+                interval: std::time::Duration::from_secs(5),
+            },
+            2,
+        );
+
+        timeout(Duration::from_secs(0), listener.recv())
+            .await
+            .expect("listener1 should return")
+            .unwrap();
+
+        let mut listener1 = state.write_state().get_duration_listener(
+            chrono::Duration::seconds(6),
+            ListenerDefunctionalization::Nothing,
+        );
+        let mut listener2 = state.write_state().get_duration_listener(
+            chrono::Duration::seconds(8),
+            ListenerDefunctionalization::Nothing,
+        );
+
+        state.write_state().apply(
+            WorldStateMessage::HeartbeatMessage {
+                timestamp: Utc::now(),
+                interval: std::time::Duration::from_secs(7),
+            },
+            2,
+        );
+
+        timeout(Duration::from_secs(0), listener1.recv())
+            .await
+            .expect("listener1 should return")
+            .unwrap();
+        //listener2 should block
+        {
+            let result = timeout(Duration::from_secs(0), listener2.recv()).await;
+            assert!(result.is_err());
+        }
+    }
+
     #[test]
     fn test_locks() {
         let mut state = ClusterState::default();
@@ -403,9 +576,9 @@ mod test {
 
         // Announce a lock
         state.apply(ClusterStateMessage::LockMessage(ClusterLockMessage {
-			uid: 1,
+            uid: 1,
             lock: "mylock".to_string(),
-            message: ClusterLockMessageType::Announce
+            message: ClusterLockMessageType::Announce,
         }));
 
         assert_eq!(state.locked("mylock"), PlaneLockState::Announced { uid: 1 });
