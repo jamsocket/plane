@@ -4,20 +4,18 @@ use crate::drone_state::monitor_drone_state;
 use crate::plan::ControllerPlan;
 use crate::run_scheduler;
 use anyhow::{Context, Result};
-use chrono::Utc;
 use plane_core::cli::wait_for_interrupt;
 use plane_core::messages::agent::BackendStateMessage;
 use plane_core::messages::drone_state::UpdateBackendStateMessage;
 use plane_core::messages::logging::Component;
 use plane_core::messages::state::WorldStateMessage;
 use plane_core::nats::TypedNats;
-use plane_core::state::StateHandle;
 use plane_core::supervisor::Supervisor;
 use plane_core::{cli::init_cli, logging::TracingHandle, NeverResult};
 
 /// Receive UpdateBackendStateMessages over core NATS, and turn them into
 /// BackendStateMessages over JetStream.
-pub async fn update_backend_state_loop(nc: &TypedNats) -> NeverResult {
+pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
     //is this needed anymore? drone_state.rs seems to handle these.
     let mut sub = nc
         .subscribe(UpdateBackendStateMessage::subscribe_subject())
@@ -47,10 +45,10 @@ pub async fn update_backend_state_loop(nc: &TypedNats) -> NeverResult {
 }
 
 /// Heartbeat
-pub async fn heartbeat(nc: &TypedNats) -> NeverResult {
+pub async fn heartbeat(nc: TypedNats) -> NeverResult {
     loop {
         nc.publish_jetstream(&WorldStateMessage::HeartbeatMessage {
-            timestamp: Utc::now(),
+            timestamp: chrono::Utc::now(),
             interval: std::time::Duration::from_secs(1),
         })
         .await?;
@@ -70,21 +68,30 @@ async fn controller_main() -> Result<()> {
         state,
     } = plan;
 
-    let nats: &'static mut TypedNats = Box::leak(Box::new(nats));
-    let state: &'static mut StateHandle = Box::leak(Box::new(state));
-
-    tracing_handle.attach_nats(nats)?;
+    tracing_handle.attach_nats(nats.clone())?;
 
     let _scheduler_supervisors = if scheduler_plan.is_some() {
-        let scheduler = { Supervisor::new("scheduler", || run_scheduler(nats, state)) };
-
-        let backend_state = {
-            //let nats = nats.clone();
-            Supervisor::new("backend_state", || update_backend_state_loop(nats))
+        let scheduler = {
+            let nats = nats.clone();
+            let state = state.clone();
+            Supervisor::new("scheduler", move || {
+                run_scheduler(nats.clone(), state.clone())
+            })
         };
 
-        let monitor_drone_state =
-            { Supervisor::new("monitor_drone_state", || monitor_drone_state(nats)) };
+        let backend_state = {
+            let nats = nats.clone();
+            Supervisor::new("backend_state", move || {
+                update_backend_state_loop(nats.clone())
+            })
+        };
+
+        let monitor_drone_state = {
+            let nats = nats.clone();
+            Supervisor::new("monitor_drone_state", move || {
+                monitor_drone_state(nats.clone())
+            })
+        };
 
         Some([scheduler, backend_state, monitor_drone_state])
     } else {
@@ -98,9 +105,14 @@ async fn controller_main() -> Result<()> {
         None
     };
 
-    let _heartbeat_supervisor = { Supervisor::new("heartbeat", || heartbeat(nats)) };
+	let _heartbeat_supervisor = {
+		let nats = nats.clone();
+		Supervisor::new("monitor_drone_state", move || {
+			heartbeat(nats.clone())
+		})
+	};
 
-    wait_for_interrupt().await
+	wait_for_interrupt().await
 }
 
 pub fn run() -> Result<()> {
