@@ -2,8 +2,9 @@ use crate::{
     messages::{
         agent,
         state::{
-            BackendLockMessage, BackendLockMessageType, BackendMessageType, ClusterStateMessage,
-            DroneMessageType, DroneMeta, WorldStateMessage,
+            BackendLockMessage, BackendLockMessageType, BackendMessageType, ClusterLockMessage,
+            ClusterLockMessageType, ClusterMessage, ClusterStateMessage, DroneMessageType,
+            DroneMeta, WorldStateMessage,
         },
     },
     types::{BackendId, ClusterName, DroneId, PlaneLockName, PlaneLockState},
@@ -224,6 +225,20 @@ impl WorldState {
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
         match message {
             WorldStateMessage::ClusterMessage(message) => {
+                if let ClusterStateMessage::LockMessage(ClusterLockMessage {
+                    lock,
+                    message: ClusterLockMessageType::Announce,
+                    ..
+                }) = &message.message
+                {
+                    self.get_duration_listener(
+                        chrono::Duration::seconds(30),
+                        ListenerDefunctionalization::RemoveLock {
+                            cluster: message.cluster.clone(),
+                            lock: lock.clone(),
+                        },
+                    );
+                }
                 let cluster = self.clusters.entry(message.cluster.clone()).or_default();
                 cluster.apply(message.message);
             }
