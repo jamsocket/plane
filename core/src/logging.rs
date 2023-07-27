@@ -50,7 +50,7 @@ impl TracingHandle {
         Ok(TracingHandle { recv: Some(recv) })
     }
 
-    pub fn attach_nats(&mut self, nats: TypedNats) -> Result<()> {
+    pub fn attach_nats(&mut self, nats: &'static TypedNats) -> Result<()> {
         let recv = anyhow::Context::context(
             self.recv.take(),
             "connect_nats on TracingHandle should not be called more than once.",
