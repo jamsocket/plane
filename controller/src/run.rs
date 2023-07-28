@@ -107,7 +107,7 @@ async fn controller_main() -> Result<()> {
 
     let _heartbeat_supervisor = {
         let nats = nats.clone();
-        Supervisor::new("monitor_drone_state", move || heartbeat(nats.clone()))
+        Supervisor::new("heartbeat", move || heartbeat(nats.clone()))
     };
 
     wait_for_interrupt().await
