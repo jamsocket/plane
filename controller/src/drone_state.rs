@@ -4,8 +4,8 @@ use plane_core::{
     messages::{
         drone_state::DroneStateUpdate,
         state::{
-            AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
-            DroneMessageType, DroneMeta, WorldStateMessage, ClusterMessage
+            AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterMessage, ClusterStateMessage,
+            DroneMessage, DroneMessageType, DroneMeta, WorldStateMessage,
         },
     },
     nats::TypedNats,
@@ -19,15 +19,15 @@ fn convert_to_state_message(
     update: &DroneStateUpdate,
 ) -> Vec<WorldStateMessage> {
     match update {
-        DroneStateUpdate::AcmeMessage(msg) => vec![
-			WorldStateMessage::ClusterMessage(ClusterMessage {
-            cluster: msg.cluster.clone(),
-            message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
-                value: msg.value.clone(),
-            }),
-        })],
-        DroneStateUpdate::Connect(msg) => vec![
-			WorldStateMessage::ClusterMessage(ClusterMessage {
+        DroneStateUpdate::AcmeMessage(msg) => {
+            vec![WorldStateMessage::ClusterMessage(ClusterMessage {
+                cluster: msg.cluster.clone(),
+                message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
+                    value: msg.value.clone(),
+                }),
+            })]
+        }
+        DroneStateUpdate::Connect(msg) => vec![WorldStateMessage::ClusterMessage(ClusterMessage {
             cluster: msg.cluster.clone(),
             message: ClusterStateMessage::DroneMessage(DroneMessage {
                 drone: msg.drone_id.clone(),
@@ -60,17 +60,18 @@ fn convert_to_state_message(
                 }),
             }),
         ],
-        DroneStateUpdate::BackendStateMessage(msg) => vec![
-			WorldStateMessage::ClusterMessage(ClusterMessage {
-            cluster: msg.cluster.clone(),
-            message: ClusterStateMessage::BackendMessage(BackendMessage {
-                backend: msg.backend.clone(),
-                message: BackendMessageType::State {
-                    state: msg.state,
-                    timestamp,
-                },
-            }),
-        })],
+        DroneStateUpdate::BackendStateMessage(msg) => {
+            vec![WorldStateMessage::ClusterMessage(ClusterMessage {
+                cluster: msg.cluster.clone(),
+                message: ClusterStateMessage::BackendMessage(BackendMessage {
+                    backend: msg.backend.clone(),
+                    message: BackendMessageType::State {
+                        state: msg.state,
+                        timestamp,
+                    },
+                }),
+            })]
+        }
     }
 }
 
@@ -257,8 +258,7 @@ mod test {
 
         let state_message = convert_to_state_message(time, &msg);
 
-        let expected = vec![
-			WorldStateMessage::ClusterMessage(ClusterMessage {
+        let expected = vec![WorldStateMessage::ClusterMessage(ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend,

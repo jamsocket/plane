@@ -3,18 +3,20 @@ use anyhow::anyhow;
 use chrono::Utc;
 use plane_core::{
     messages::{
+        agent::SpawnRequest,
         scheduler::{
             FetchBackendForLock, FetchBackendForLockResponse, ScheduleRequest, ScheduleResponse,
         },
         state::{
             BackendLockMessage, BackendLockMessageType, BackendMessage, BackendMessageType,
-            ClusterLockMessage, ClusterLockMessageType, ClusterStateMessage, WorldStateMessage, ClusterMessage,
+            ClusterLockMessage, ClusterLockMessageType, ClusterMessage, ClusterStateMessage,
+            WorldStateMessage,
         },
     },
     nats::{MessageWithResponseHandle, SubscribeSubject, TypedNats},
     state::StateHandle,
     timing::Timer,
-    types::{BackendId, ClusterName, DroneId, PlaneLockState},
+    types::{AsSubjectComponent, BackendId, ClusterName, DroneId, PlaneLockState},
     NeverResult,
 };
 use rand::{thread_rng, Rng};
@@ -27,14 +29,49 @@ pub mod plan;
 pub mod run;
 mod scheduler;
 
-async fn spawn_backend(
+async fn make_spawn_request(
+    state: &mut StateHandle,
     nats: &TypedNats,
     drone: &DroneId,
     schedule_request: &ScheduleRequest,
+    lock_uid: Option<u64>,
+) -> anyhow::Result<SpawnRequest> {
+    let spawn_request = schedule_request.schedule(drone);
+    if let (Some(ref lock), Some(uid)) = (&schedule_request.lock, lock_uid) {
+        tracing::info!(?lock, ?spawn_request.backend_id, "assigning lock");
+        let lock_seq = nats
+            .publish_jetstream(&WorldStateMessage::ClusterMessage(ClusterMessage {
+                cluster: spawn_request.cluster.clone(),
+                message: ClusterStateMessage::BackendMessage(BackendMessage {
+                    backend: spawn_request.backend_id.clone(),
+                    message: BackendMessageType::LockMessage(BackendLockMessage {
+                        lock: lock.clone(),
+                        message: BackendLockMessageType::Assign { uid },
+                    }),
+                }),
+            }))
+            .await?;
+        state.wait_for_seq(lock_seq).await;
+        if matches!(
+            state.state().cluster(&spawn_request.cluster)
+                .ok_or_else(|| anyhow!("no such cluster"))?.locked(lock),
+            PlaneLockState::Assigned { backend } if {
+                backend != spawn_request.backend_id
+            }
+        ) {
+            return Err(anyhow!("lock assigned to different backend"));
+        }
+    }
+    Ok(spawn_request)
+}
+
+async fn spawn_backend(
+    nats: &TypedNats,
+    drone: &DroneId,
+    spawn_request: &SpawnRequest,
 ) -> anyhow::Result<ScheduleResponse> {
     let timer = Timer::new();
-    let spawn_request = schedule_request.schedule(drone);
-    match nats.request(&spawn_request).await {
+    match nats.request(spawn_request).await {
         Ok(true) => {
             tracing::info!(
                 duration=?timer.duration(),
@@ -45,7 +82,7 @@ async fn spawn_backend(
 
             let seq_id = nats
                 .publish_jetstream(&WorldStateMessage::ClusterMessage(ClusterMessage {
-                    cluster: schedule_request.cluster.clone(),
+                    cluster: spawn_request.cluster.clone(),
                     message: ClusterStateMessage::BackendMessage(BackendMessage {
                         backend: spawn_request.backend_id.clone(),
                         message: BackendMessageType::Assignment {
@@ -55,26 +92,12 @@ async fn spawn_backend(
                     }),
                 }))
                 .await?;
-            if let Some(ref lock) = schedule_request.lock {
-                tracing::info!(?lock, ?spawn_request.backend_id, "assigning lock");
-                nats.publish_jetstream(&WorldStateMessage::ClusterMessage(ClusterMessage {
-                    cluster: spawn_request.cluster.clone(),
-                    message: ClusterStateMessage::BackendMessage(BackendMessage {
-                        backend: spawn_request.backend_id.clone(),
-                        message: BackendMessageType::LockMessage(BackendLockMessage {
-                            lock: lock.clone(),
-                            message: BackendLockMessageType::Assign,
-                        }),
-                    }),
-                }))
-                .await?;
-            }
 
             tracing::info!(logical_time=?seq_id, "backend state updated at time");
 
             Ok(ScheduleResponse::Scheduled {
                 drone: drone.clone(),
-                backend_id: spawn_request.backend_id,
+                backend_id: spawn_request.backend_id.clone(),
                 bearer_token: spawn_request.bearer_token.clone(),
                 spawned: true,
             })
@@ -88,6 +111,35 @@ async fn spawn_backend(
             Ok(ScheduleResponse::NoDroneAvailable)
         }
     }
+}
+
+async fn wait_for_backend_assignment(
+    state: &mut StateHandle,
+    backend: &BackendId,
+    cluster_name: &ClusterName,
+    nats: &TypedNats,
+) -> anyhow::Result<DroneId> {
+    let mut sub = nats
+        .subscribe_jetstream_subject(SubscribeSubject::<WorldStateMessage>::new(format!(
+            "state.cluster.{}.backend.{}",
+            cluster_name.as_subject_component(),
+            backend.as_subject_component()
+        )))
+        .await?;
+
+    let msg = sub.next().await.ok_or_else(|| {
+        anyhow!("lock assignment subscription closed before receiving assignment")
+    })?;
+    tracing::info!(?msg, "received wait for lock assignment");
+    let seq = msg.1.sequence;
+    state.wait_for_seq(seq).await;
+    let WorldStateMessage::ClusterMessage(ClusterMessage {
+        message : ClusterStateMessage::BackendMessage(
+            BackendMessage {
+                message: BackendMessageType::Assignment {
+                    drone, ..}, ..}), .. }) = msg.0
+    else { panic!() };
+    Ok(drone)
 }
 
 async fn wait_for_lock_assignment(
@@ -145,8 +197,8 @@ async fn announce_lock(
             cluster: cluster_name.clone(),
             message: ClusterStateMessage::LockMessage(ClusterLockMessage {
                 lock: lock.to_string(),
-				uid: *uid,
-                message: ClusterLockMessageType::Announce
+                uid: *uid,
+                message: ClusterLockMessageType::Announce,
             }),
         }))
         .await?;
@@ -200,6 +252,8 @@ async fn process_response(
 ) -> anyhow::Result<ScheduleResponse> {
     tracing::info!("checking locks");
     let cluster_name = sr.cluster.clone();
+
+    let mut lock_uid = None;
     let schedule_response: Option<_> = if let Some(lock_name) = sr.lock.as_ref() {
         tracing::info!(?lock_name, "scheduling lock");
 
@@ -224,10 +278,16 @@ async fn process_response(
                 .locked(lock_name);
 
             match lock_state {
-                PlaneLockState::Announced { uid } if uid == my_uid => None,
+                PlaneLockState::Announced { uid } if uid == my_uid => {
+                    lock_uid = Some(uid);
+                    None
+                }
                 PlaneLockState::Announced { .. } => {
                     let assigned_backend =
                         wait_for_lock_assignment(state, lock_name, &cluster_name, nats).await?;
+                    //ensure drone assigned to backend
+                    wait_for_backend_assignment(state, &assigned_backend, &cluster_name, nats)
+                        .await?;
                     Some(schedule_response_for_existing_backend(
                         state,
                         cluster_name.clone(),
@@ -254,7 +314,10 @@ async fn process_response(
         schedule_response
     } else {
         match scheduler.schedule(&cluster_name, Utc::now()) {
-            Ok(drone_id) => spawn_backend(nats, &drone_id, &sr.clone()).await,
+            Ok(drone_id) => {
+                let spawn_req = make_spawn_request(state, nats, &drone_id, &sr, lock_uid).await?;
+                spawn_backend(nats, &drone_id, &spawn_req).await
+            }
             Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
         }
     }
@@ -318,8 +381,14 @@ async fn dispatch_lock_request(
             }
         }
         PlaneLockState::Announced { .. } => {
-            let assigned_backend =
-                wait_for_lock_assignment(&mut state, lock_name, cluster_name, &nats).await;
+            let assigned_backend = async {
+                let backend =
+                    wait_for_lock_assignment(&mut state, lock_name, cluster_name, &nats).await?;
+                //ensure drone assigned
+                wait_for_backend_assignment(&mut state, &backend, &cluster_name, &nats).await?;
+                Ok::<BackendId, anyhow::Error>(backend)
+            }
+            .await;
 
             let schedule_response = assigned_backend.and_then(|assigned_backend| {
                 schedule_response_for_existing_backend(

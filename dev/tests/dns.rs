@@ -3,8 +3,8 @@ use integration_test::integration_test;
 use plane_controller::{dns::serve_dns, plan::DnsPlan};
 use plane_core::{
     messages::state::{
-        AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
-        DroneMessageType, DroneMeta, WorldStateMessage, ClusterMessage,
+        AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterMessage, ClusterStateMessage,
+        DroneMessage, DroneMessageType, DroneMeta, WorldStateMessage,
     },
     state::{StateHandle, WorldState},
     types::{BackendId, ClusterName, DroneId},

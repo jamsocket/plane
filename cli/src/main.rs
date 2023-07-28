@@ -10,7 +10,7 @@ use plane_core::{
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
         state::{
             BackendLockMessage, BackendLockMessageType, BackendMessage, BackendMessageType,
-            ClusterStateMessage, DroneMessage, DroneMessageType, WorldStateMessage, ClusterMessage,
+            ClusterMessage, ClusterStateMessage, DroneMessage, DroneMessageType, WorldStateMessage,
         },
     },
     nats_connection::NatsConnectionSpec,
@@ -239,7 +239,7 @@ async fn main() -> Result<()> {
                             }
                             BackendMessageType::LockMessage(BackendLockMessage {
                                 lock,
-                                message: BackendLockMessageType::Assign,
+                                message: BackendLockMessageType::Assign { .. },
                             }) => {
                                 format!("is assigned lock {}", lock.bright_green())
                             }
