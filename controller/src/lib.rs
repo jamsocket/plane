@@ -315,7 +315,7 @@ async fn process_response(
     } else {
         match scheduler.schedule(&cluster_name, Utc::now()) {
             Ok(drone_id) => {
-                let spawn_req = make_spawn_request(state, nats, &drone_id, &sr, lock_uid).await?;
+                let spawn_req = make_spawn_request(state, nats, &drone_id, sr, lock_uid).await?;
                 spawn_backend(nats, &drone_id, &spawn_req).await
             }
             Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
@@ -385,7 +385,7 @@ async fn dispatch_lock_request(
                 let backend =
                     wait_for_lock_assignment(&mut state, lock_name, cluster_name, &nats).await?;
                 //ensure drone assigned
-                wait_for_backend_assignment(&mut state, &backend, &cluster_name, &nats).await?;
+                wait_for_backend_assignment(&mut state, &backend, cluster_name, &nats).await?;
                 Ok::<BackendId, anyhow::Error>(backend)
             }
             .await;

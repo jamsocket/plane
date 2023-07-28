@@ -241,7 +241,7 @@ impl WorldState {
                         ListenerDefunctionalization::RemoveLock {
                             cluster: message.cluster.clone(),
                             lock: lock.clone(),
-                            uid: uid.clone(),
+                            uid: *uid,
                         },
                     );
                 }
@@ -682,7 +682,7 @@ mod test {
 
         // Update the backend state to swept.
         state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: backend.clone(),
+            backend,
             message: BackendMessageType::State {
                 state: agent::BackendState::Swept,
                 timestamp: Utc::now(),

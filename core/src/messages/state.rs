@@ -150,7 +150,7 @@ impl TypedMessage for WorldStateMessage {
     fn subject(&self) -> String {
         match &self {
             WorldStateMessage::HeartbeatMessage { .. } => {
-                format!("state.heartbeat")
+                "state.heartbeat".to_string()
             }
             WorldStateMessage::ClusterMessage(message) => {
                 let cluster_subject_name = message.cluster.subject_name();
