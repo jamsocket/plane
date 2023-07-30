@@ -17,6 +17,7 @@ use std::{
     pin::Pin,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
+use time::OffsetDateTime;
 use tokio::sync::broadcast::{channel, Sender};
 
 #[derive(Default, Debug, Clone)]
@@ -100,6 +101,7 @@ pub struct WorldState {
     logical_time: u64,
     pub clusters: BTreeMap<ClusterName, ClusterState>,
     listeners: BTreeMap<u64, Sender<()>>,
+    last_heartbeat: Option<OffsetDateTime>,
 }
 
 impl WorldState {
@@ -107,9 +109,16 @@ impl WorldState {
         self.logical_time
     }
 
-    pub fn apply(&mut self, message: WorldStateMessage, sequence: u64) {
-        let cluster = self.clusters.entry(message.cluster.clone()).or_default();
-        cluster.apply(message.message);
+    pub fn apply(&mut self, message: WorldStateMessage, sequence: u64, timestamp: OffsetDateTime) {
+        match message {
+            WorldStateMessage::Heartbeat { .. } => {
+                self.last_heartbeat = Some(timestamp);
+            }
+            WorldStateMessage::ClusterMessage { message, cluster } => {
+                let cluster = self.clusters.entry(cluster).or_default();
+                cluster.apply(message);
+            }
+        }
         self.logical_time = sequence;
 
         self.listeners = {
@@ -277,6 +286,7 @@ mod test {
     #[tokio::test]
     async fn test_listener() {
         let mut state = StateHandle::default();
+        let now = OffsetDateTime::now_utc();
 
         let zerolistener = state.wait_for_seq(0);
         timeout(Duration::from_secs(0), zerolistener)
@@ -294,13 +304,14 @@ mod test {
         }
 
         state.write_state().apply(
-            WorldStateMessage {
+            WorldStateMessage::ClusterMessage {
                 cluster: ClusterName::new("cluster"),
                 message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                     value: "value".into(),
                 }),
             },
             1,
+            now,
         );
 
         // onelistener should now return.
@@ -315,13 +326,14 @@ mod test {
         }
 
         state.write_state().apply(
-            WorldStateMessage {
+            WorldStateMessage::ClusterMessage {
                 cluster: ClusterName::new("cluster"),
                 message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                     value: "value".into(),
                 }),
             },
             2,
+            now,
         );
 
         // twolistener should now return.

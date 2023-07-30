@@ -155,7 +155,7 @@ async fn status_lifecycle() {
     tracing::info!("Initializing drone metadata.");
     apply_state_message(
         &fixture.nats,
-        &WorldStateMessage {
+        &WorldStateMessage::ClusterMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::DroneMessage(DroneMessage {
                 drone: drone.clone(),
@@ -182,7 +182,7 @@ async fn status_lifecycle() {
     tracing::info!("Assigning backend to drone.");
     apply_state_message(
         &fixture.nats,
-        &WorldStateMessage {
+        &WorldStateMessage::ClusterMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -209,7 +209,7 @@ async fn status_lifecycle() {
     tracing::info!("Updating backend state to 'starting'.");
     apply_state_message(
         &fixture.nats,
-        &WorldStateMessage {
+        &WorldStateMessage::ClusterMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -235,7 +235,7 @@ async fn status_lifecycle() {
     tracing::info!("Updating backend state to 'loading'.");
     apply_state_message(
         &fixture.nats,
-        &WorldStateMessage {
+        &WorldStateMessage::ClusterMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -261,7 +261,7 @@ async fn status_lifecycle() {
     tracing::info!("Updating backend state to 'ready'.");
     apply_state_message(
         &fixture.nats,
-        &WorldStateMessage {
+        &WorldStateMessage::ClusterMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -287,7 +287,7 @@ async fn status_lifecycle() {
     tracing::info!("Updating backend state to 'swept'.");
     apply_state_message(
         &fixture.nats,
-        &WorldStateMessage {
+        &WorldStateMessage::ClusterMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -338,7 +338,7 @@ async fn repeated_backend_state_not_overwritten() {
     // Update the state of the backend to "starting".
     let result = apply_state_message(
         &fixture.nats,
-        &WorldStateMessage {
+        &WorldStateMessage::ClusterMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
@@ -368,7 +368,7 @@ async fn repeated_backend_state_not_overwritten() {
 
     let result = apply_state_message(
         &fixture.nats,
-        &WorldStateMessage {
+        &WorldStateMessage::ClusterMessage {
             cluster: cluster.clone(),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),

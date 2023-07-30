@@ -40,7 +40,7 @@ async fn spawn_backend(
             );
 
             let seq_id = nats
-                .publish_jetstream(&WorldStateMessage {
+                .publish_jetstream(&WorldStateMessage::ClusterMessage {
                     cluster: schedule_request.cluster.clone(),
                     message: ClusterStateMessage::BackendMessage(BackendMessage {
                         backend: spawn_request.backend_id.clone(),

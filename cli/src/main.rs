@@ -178,7 +178,10 @@ async fn main() -> Result<()> {
                     break;
                 }
 
-                let WorldStateMessage { cluster, message } = message;
+                let WorldStateMessage::ClusterMessage {cluster, message} = message else {
+                    // ignore heartbeats
+                    continue;
+                };
 
                 let text = match message {
                     ClusterStateMessage::AcmeMessage(acme) => {
