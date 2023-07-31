@@ -44,9 +44,23 @@ impl WorldStateMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ClusterStateMessage {
+    LockMessage(ClusterLockMessage),
     DroneMessage(DroneMessage),
     BackendMessage(BackendMessage),
     AcmeMessage(AcmeDnsRecord),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ClusterLockMessage {
+    pub lock: String,
+    pub uid: u64,
+    pub message: ClusterLockMessageType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ClusterLockMessageType {
+    Announce,
+    Revoke,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -94,9 +108,9 @@ pub struct BackendMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BackendMessageType {
+    LockMessage(BackendLockMessage),
     Assignment {
         drone: DroneId,
-        lock: Option<String>,
         bearer_token: Option<String>,
     },
     State {
@@ -104,6 +118,16 @@ pub enum BackendMessageType {
         #[serde(with = "chrono::serde::ts_milliseconds")]
         timestamp: DateTime<Utc>,
     },
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BackendLockMessage {
+    pub lock: String,
+    pub message: BackendLockMessageType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum BackendLockMessageType {
+    Assign { uid: u64 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

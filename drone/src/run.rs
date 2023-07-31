@@ -42,9 +42,9 @@ async fn drone_main() -> Result<()> {
         ..
     } = plan;
 
-    if let Some(nats) = &nats {
+    if let Some(nats) = nats {
         tracing_handle
-            .attach_nats(nats.clone())
+            .attach_nats(nats)
             .context("Attaching NATS to tracing handle")?;
     }
 

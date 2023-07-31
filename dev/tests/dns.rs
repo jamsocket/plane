@@ -3,8 +3,8 @@ use integration_test::integration_test;
 use plane_controller::{dns::serve_dns, plan::DnsPlan};
 use plane_core::{
     messages::state::{
-        AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
-        DroneMessageType, DroneMeta, WorldStateMessage,
+        AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterMessage, ClusterStateMessage,
+        DroneMessage, DroneMessageType, DroneMeta, WorldStateMessage,
     },
     state::{StateHandle, WorldState},
     types::{BackendId, ClusterName, DroneId},
@@ -120,7 +120,7 @@ async fn dns_txt_record() {
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobar".into(),
             }),
-        },
+        }),
         1,
         OffsetDateTime::now_utc(),
     );
@@ -138,7 +138,7 @@ async fn dns_multi_txt_record() {
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobar".into(),
             }),
-        },
+        }),
         1,
         OffsetDateTime::now_utc(),
     );
@@ -148,7 +148,7 @@ async fn dns_multi_txt_record() {
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobaz".into(),
             }),
-        },
+        }),
         2,
         OffsetDateTime::now_utc(),
     );
@@ -173,7 +173,7 @@ async fn dns_a_record() {
                     git_hash: None,
                 }),
             }),
-        },
+        }),
         1,
         OffsetDateTime::now_utc(),
     );
@@ -184,11 +184,10 @@ async fn dns_a_record() {
                 backend: BackendId::new("louie".to_string()),
                 message: BackendMessageType::Assignment {
                     drone: drone_id.clone(),
-                    lock: None,
                     bearer_token: None,
                 },
             }),
-        },
+        }),
         2,
         OffsetDateTime::now_utc(),
     );

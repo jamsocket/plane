@@ -8,6 +8,7 @@ use plane_core::cli::wait_for_interrupt;
 use plane_core::messages::agent::BackendStateMessage;
 use plane_core::messages::drone_state::UpdateBackendStateMessage;
 use plane_core::messages::logging::Component;
+use plane_core::messages::state::WorldStateMessage;
 use plane_core::nats::TypedNats;
 use plane_core::supervisor::Supervisor;
 use plane_core::{cli::init_cli, logging::TracingHandle, NeverResult};
@@ -15,6 +16,7 @@ use plane_core::{cli::init_cli, logging::TracingHandle, NeverResult};
 /// Receive UpdateBackendStateMessages over core NATS, and turn them into
 /// BackendStateMessages over JetStream.
 pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
+    //is this needed anymore? drone_state.rs seems to handle these.
     let mut sub = nc
         .subscribe(UpdateBackendStateMessage::subscribe_subject())
         .await?;
@@ -39,6 +41,18 @@ pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
 
         // Ack the message so that the drone doesn't keep retrying.
         msg.respond(&()).await?;
+    }
+}
+
+/// Heartbeat
+pub async fn heartbeat(nc: TypedNats) -> NeverResult {
+    loop {
+        nc.publish_jetstream(&WorldStateMessage::HeartbeatMessage {
+            timestamp: chrono::Utc::now(),
+            interval: std::time::Duration::from_secs(1),
+        })
+        .await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await
     }
 }
 
@@ -89,6 +103,11 @@ async fn controller_main() -> Result<()> {
         Some(Supervisor::new("dns", move || serve_dns(dns_plan.clone())))
     } else {
         None
+    };
+
+    let _heartbeat_supervisor = {
+        let nats = nats.clone();
+        Supervisor::new("heartbeat", move || heartbeat(nats.clone()))
     };
 
     wait_for_interrupt().await

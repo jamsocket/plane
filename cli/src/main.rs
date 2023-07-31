@@ -9,8 +9,8 @@ use plane_core::{
         },
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
         state::{
-            BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
-            DroneMessageType, WorldStateMessage,
+            BackendLockMessage, BackendLockMessageType, BackendMessage, BackendMessageType,
+            ClusterMessage, ClusterStateMessage, DroneMessage, DroneMessageType, WorldStateMessage,
         },
     },
     nats_connection::NatsConnectionSpec,
@@ -187,6 +187,9 @@ async fn main() -> Result<()> {
                     ClusterStateMessage::AcmeMessage(acme) => {
                         format!("ACME TXT entry: {}", acme.value.to_string().bright_blue())
                     }
+                    ClusterStateMessage::LockMessage(lock) => {
+                        format!("Lock : {:?}", lock.message)
+                    }
                     ClusterStateMessage::DroneMessage(drone) => {
                         let DroneMessage { drone, message } = drone;
 
@@ -230,18 +233,18 @@ async fn main() -> Result<()> {
                                     timestamp.to_string().bright_yellow()
                                 )
                             }
-                            BackendMessageType::Assignment { drone, lock, .. } => {
-                                let mut text = format!(
+                            BackendMessageType::Assignment { drone, .. } => {
+                                let text = format!(
                                     "is assigned to drone {}",
                                     drone.to_string().bright_yellow()
                                 );
-                                if let Some(lock) = lock {
-                                    text.push_str(&format!(
-                                        " with lock {}",
-                                        lock.to_string().bright_yellow()
-                                    ));
-                                }
                                 text
+                            }
+                            BackendMessageType::LockMessage(BackendLockMessage {
+                                lock,
+                                message: BackendLockMessageType::Assign { .. },
+                            }) => {
+                                format!("is assigned lock {}", lock.bright_green())
                             }
                         };
                         format!("Backend: {} {}", backend.to_string().bright_cyan(), text)
