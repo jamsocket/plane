@@ -5,6 +5,7 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::net::IpAddr;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -16,7 +17,7 @@ pub enum WorldStateMessage {
         message: ClusterStateMessage,
     },
     Heartbeat {
-        heartbeat: (),
+        heartbeat: Option<Value>,
     },
 }
 
@@ -190,8 +191,7 @@ mod tests {
         });
 
         let message: WorldStateMessage = serde_json::from_value(message).unwrap();
-
-        assert_eq!(message, WorldStateMessage::Heartbeat { heartbeat: () },);
+        assert_eq!(message, WorldStateMessage::Heartbeat { heartbeat: None });
     }
 
     #[test]
