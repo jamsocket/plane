@@ -19,7 +19,11 @@ async fn get_world_state_from_sub(
             .await
             .ok_or_else(|| anyhow!("State stream closed before pending messages read."))?;
 
-        world_state.apply(message, meta.sequence, meta.timestamp);
+        let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp_opt(
+            timestamp.unix_timestamp(), 0)
+                                  .ok_or_else(|| anyhow!("should convert to chrono"))?, Utc);
+
+        world_state.apply(message, meta.sequence, timestamp);
     }
 
     Ok(world_state)
