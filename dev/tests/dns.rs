@@ -18,6 +18,7 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
     str::Utf8Error,
 };
+use time::OffsetDateTime;
 use trust_dns_resolver::{
     config::{NameServerConfig, Protocol, ResolverConfig, ResolverOpts},
     error::{ResolveError, ResolveErrorKind},
@@ -114,13 +115,14 @@ async fn dns_bad_request() {
 async fn dns_txt_record() {
     let mut state = WorldState::default();
     state.apply(
-        WorldStateMessage {
+        WorldStateMessage::ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobar".into(),
             }),
         },
         1,
+        OffsetDateTime::now_utc(),
     );
     let dns = DnsServer::new(state).unwrap();
     let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
@@ -131,22 +133,24 @@ async fn dns_txt_record() {
 async fn dns_multi_txt_record() {
     let mut state = WorldState::default();
     state.apply(
-        WorldStateMessage {
+        WorldStateMessage::ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobar".into(),
             }),
         },
         1,
+        OffsetDateTime::now_utc(),
     );
     state.apply(
-        WorldStateMessage {
+        WorldStateMessage::ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobaz".into(),
             }),
         },
         2,
+        OffsetDateTime::now_utc(),
     );
     let dns = DnsServer::new(state).unwrap();
 
@@ -159,7 +163,7 @@ async fn dns_a_record() {
     let drone_id = DroneId::new_random();
     let mut state = WorldState::default();
     state.apply(
-        WorldStateMessage {
+        WorldStateMessage::ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::DroneMessage(DroneMessage {
                 drone: drone_id.clone(),
@@ -171,9 +175,10 @@ async fn dns_a_record() {
             }),
         },
         1,
+        OffsetDateTime::now_utc(),
     );
     state.apply(
-        WorldStateMessage {
+        WorldStateMessage::ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: BackendId::new("louie".to_string()),
@@ -185,6 +190,7 @@ async fn dns_a_record() {
             }),
         },
         2,
+        OffsetDateTime::now_utc(),
     );
 
     let dns = DnsServer::new(state).unwrap();

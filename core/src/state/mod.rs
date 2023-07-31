@@ -19,7 +19,7 @@ async fn get_world_state_from_sub(
             .await
             .ok_or_else(|| anyhow!("State stream closed before pending messages read."))?;
 
-        world_state.apply(message, meta.sequence);
+        world_state.apply(message, meta.sequence, meta.timestamp);
     }
 
     Ok(world_state)
@@ -45,7 +45,9 @@ pub async fn start_state_loop(nc: TypedNats) -> Result<StateHandle> {
         let state_handle = state_handle.clone();
         tokio::spawn(async move {
             while let Some((message, meta)) = sub.next().await {
-                state_handle.write_state().apply(message, meta.sequence);
+                state_handle
+                    .write_state()
+                    .apply(message, meta.sequence, meta.timestamp);
             }
         });
     }

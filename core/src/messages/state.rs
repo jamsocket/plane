@@ -5,29 +5,40 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::net::IpAddr;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct WorldStateMessage {
-    pub cluster: ClusterName,
-
-    #[serde(flatten)]
-    pub message: ClusterStateMessage,
+#[serde(untagged)]
+pub enum WorldStateMessage {
+    ClusterMessage {
+        cluster: ClusterName,
+        #[serde(flatten)]
+        message: ClusterStateMessage,
+    },
+    Heartbeat {
+        heartbeat: Option<Value>,
+    },
 }
 
 impl WorldStateMessage {
     /// Whether this message can overwrite the previous message on the same subject.
     pub fn overwrite(&self) -> bool {
-        !matches!(
-            self.message,
-            ClusterStateMessage::DroneMessage(DroneMessage {
-                message: DroneMessageType::State { .. },
-                ..
-            }) | ClusterStateMessage::BackendMessage(BackendMessage {
-                message: BackendMessageType::State { .. },
-                ..
-            })
-        )
+        #[allow(clippy::match_like_matches_macro)] // matches macro diminishes readability here.
+        match self {
+            WorldStateMessage::ClusterMessage { message, .. } => match message {
+                ClusterStateMessage::DroneMessage(DroneMessage {
+                    message: DroneMessageType::State { .. },
+                    ..
+                }) => false,
+                ClusterStateMessage::BackendMessage(BackendMessage {
+                    message: BackendMessageType::State { .. },
+                    ..
+                }) => false,
+                _ => true,
+            },
+            WorldStateMessage::Heartbeat { .. } => true,
+        }
     }
 }
 
@@ -110,51 +121,44 @@ impl TypedMessage for WorldStateMessage {
     type Response = NoReply;
 
     fn subject(&self) -> String {
-        match &self.message {
-            ClusterStateMessage::DroneMessage(message) => match message.message {
-                DroneMessageType::Metadata { .. } => {
-                    format!(
+        match &self {
+            WorldStateMessage::Heartbeat { .. } => "heartbeat".into(),
+            WorldStateMessage::ClusterMessage { message, cluster } => match message {
+                ClusterStateMessage::DroneMessage(message) => match message.message {
+                    DroneMessageType::Metadata { .. } => format!(
                         "state.cluster.{}.drone.{}.meta",
-                        self.cluster.subject_name(),
+                        cluster.subject_name(),
                         message.drone
-                    )
-                }
-                DroneMessageType::State { state, .. } => {
-                    format!(
+                    ),
+                    DroneMessageType::State { state, .. } => format!(
                         "state.cluster.{}.drone.{}.status.{}",
-                        self.cluster.subject_name(),
+                        cluster.subject_name(),
                         message.drone,
                         state,
-                    )
-                }
-                DroneMessageType::KeepAlive { .. } => {
-                    format!(
+                    ),
+                    DroneMessageType::KeepAlive { .. } => format!(
                         "state.cluster.{}.drone.{}.keep_alive",
-                        self.cluster.subject_name(),
+                        cluster.subject_name(),
                         message.drone
-                    )
-                }
-            },
-            ClusterStateMessage::BackendMessage(message) => match message.message {
-                BackendMessageType::Assignment { .. } => {
-                    format!(
-                        "state.cluster.{}.backend.{}",
-                        self.cluster.subject_name(),
+                    ),
+                },
+                ClusterStateMessage::BackendMessage(message) => match message.message {
+                    BackendMessageType::Assignment { .. } => format!(
+                        "state.cluster.{}.backend.{}.assignment",
+                        cluster.subject_name(),
                         message.backend
-                    )
-                }
-                BackendMessageType::State { state: status, .. } => {
-                    format!(
+                    ),
+                    BackendMessageType::State { state, .. } => format!(
                         "state.cluster.{}.backend.{}.state.{}",
-                        self.cluster.subject_name(),
+                        cluster.subject_name(),
                         message.backend,
-                        status
-                    )
+                        state
+                    ),
+                },
+                ClusterStateMessage::AcmeMessage(_) => {
+                    format!("state.cluster.{}.acme", cluster.subject_name())
                 }
             },
-            ClusterStateMessage::AcmeMessage(_) => {
-                format!("state.cluster.{}.acme", self.cluster.subject_name())
-            }
         }
     }
 }
@@ -171,5 +175,56 @@ impl JetStreamable for WorldStateMessage {
             max_messages_per_subject: 1,
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::messages::agent;
+    use serde_json::json;
+
+    #[test]
+    fn test_deserialize_heartbeat_message() {
+        let message = json!({
+            "heartbeat": null,
+        });
+
+        let message: WorldStateMessage = serde_json::from_value(message).unwrap();
+        assert_eq!(message, WorldStateMessage::Heartbeat { heartbeat: None });
+    }
+
+    #[test]
+    fn test_deserialize_cluster_message() {
+        // Ensures stability of cluster state message.
+
+        let message = json!({
+            "cluster": "cluster",
+            "DroneMessage": {
+                "State": {
+                    "state": "Ready",
+                    "timestamp": 1609459200000i64,
+                },
+                "drone": "drone",
+            }
+        });
+
+        let message: WorldStateMessage = serde_json::from_value(message).unwrap();
+
+        assert_eq!(
+            message,
+            WorldStateMessage::ClusterMessage {
+                cluster: ClusterName::new("cluster"),
+                message: ClusterStateMessage::DroneMessage(DroneMessage {
+                    drone: DroneId::new("drone".into()),
+                    message: DroneMessageType::State {
+                        state: agent::DroneState::Ready,
+                        timestamp: DateTime::parse_from_rfc3339("2021-01-01T00:00:00Z")
+                            .unwrap()
+                            .with_timezone(&Utc),
+                    }
+                })
+            }
+        );
     }
 }
