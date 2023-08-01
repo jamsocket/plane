@@ -20,7 +20,7 @@ use std::{
     pin::Pin,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard}
 };
-use time::OffsetDateTime;
+
 use tokio::sync::broadcast::{channel, Sender, Receiver};
 
 #[derive(Default, Debug, Clone)]
@@ -228,7 +228,7 @@ impl WorldState {
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64, timestamp: DateTime<Utc>) {
         match message {
 			WorldStateMessage::ClusterMessage { cluster, message} => {
-				let cluster = self.clusters.entry(cluster.clone()).or_default();
+				let cluster = self.clusters.entry(cluster).or_default();
 				cluster.apply(message, timestamp);
 			}
 			WorldStateMessage::Heartbeat {..} => {

@@ -85,7 +85,7 @@ impl MockAgent {
         let result = nats.request(&request).await.unwrap();
         drone_connected.await;
 
-        assert_eq!(true, result, "Drone connect request should succeed.");
+        assert!(result, "Drone connect request should succeed.");
 
         MockAgent {
             nats,
@@ -110,7 +110,7 @@ impl MockAgent {
 
         let locked_backend = lock
             .clone()
-            .map(|lock| self.state.state().cluster(&cluster).unwrap().locked(&lock));
+            .map(|lock| self.state.state().cluster(cluster).unwrap().locked(&lock));
 
         let response = self
             .nats
