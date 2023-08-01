@@ -6,7 +6,7 @@ use plane_core::{
         agent::BackendState,
         cert::SetAcmeDnsRecord,
         state::{
-            BackendMessage, BackendMessageType, ClusterMessage, ClusterStateMessage, DroneMessage,
+            BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
             DroneMessageType, DroneMeta, WorldStateMessage,
         },
     },
@@ -159,7 +159,7 @@ async fn status_lifecycle() {
                     ip,
                 }),
             }),
-        }),
+        },
     )
     .await
     .unwrap();
@@ -185,7 +185,7 @@ async fn status_lifecycle() {
                     bearer_token: None,
                 },
             }),
-        }),
+        },
     )
     .await
     .unwrap();
@@ -211,7 +211,7 @@ async fn status_lifecycle() {
                     timestamp: timestamp(1),
                 },
             }),
-        }),
+        },
     )
     .await
     .unwrap();
@@ -237,7 +237,7 @@ async fn status_lifecycle() {
                     timestamp: timestamp(2),
                 },
             }),
-        }),
+        },
     )
     .await
     .unwrap();
@@ -263,7 +263,7 @@ async fn status_lifecycle() {
                     timestamp: timestamp(3),
                 },
             }),
-        }),
+        },
     )
     .await
     .unwrap();
@@ -289,7 +289,7 @@ async fn status_lifecycle() {
                     timestamp: timestamp(4),
                 },
             }),
-        }),
+        },
     )
     .await
     .unwrap();
@@ -340,7 +340,7 @@ async fn repeated_backend_state_not_overwritten() {
                     timestamp: timestamp(1),
                 },
             }),
-        }),
+        },
     )
     .await
     .unwrap();
@@ -370,7 +370,7 @@ async fn repeated_backend_state_not_overwritten() {
                     timestamp: timestamp(2),
                 },
             }),
-        }),
+        },
     )
     .await
     .unwrap();
