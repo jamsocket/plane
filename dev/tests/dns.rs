@@ -3,13 +3,14 @@ use integration_test::integration_test;
 use plane_controller::{dns::serve_dns, plan::DnsPlan};
 use plane_core::{
     messages::state::{
-        AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterMessage, ClusterStateMessage,
+        AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage,
         DroneMessage, DroneMessageType, DroneMeta, WorldStateMessage,
     },
     state::{StateHandle, WorldState},
     types::{BackendId, ClusterName, DroneId},
     Never,
 };
+use chrono::Utc;
 use plane_dev::{
     timeout::{expect_to_stay_alive, LivenessGuard},
     util::random_loopback_ip,
@@ -18,7 +19,6 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
     str::Utf8Error,
 };
-use time::OffsetDateTime;
 use trust_dns_resolver::{
     config::{NameServerConfig, Protocol, ResolverConfig, ResolverOpts},
     error::{ResolveError, ResolveErrorKind},
@@ -120,9 +120,9 @@ async fn dns_txt_record() {
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobar".into(),
             }),
-        }),
+        },
         1,
-        OffsetDateTime::now_utc(),
+        Utc::now(),
     );
     let dns = DnsServer::new(state).unwrap();
     let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
@@ -138,9 +138,9 @@ async fn dns_multi_txt_record() {
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobar".into(),
             }),
-        }),
+        },
         1,
-        OffsetDateTime::now_utc(),
+        Utc::now(),
     );
     state.apply(
         WorldStateMessage::ClusterMessage {
@@ -148,9 +148,9 @@ async fn dns_multi_txt_record() {
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "foobaz".into(),
             }),
-        }),
+        },
         2,
-        OffsetDateTime::now_utc(),
+        Utc::now(),
     );
     let dns = DnsServer::new(state).unwrap();
 
@@ -173,9 +173,9 @@ async fn dns_a_record() {
                     git_hash: None,
                 }),
             }),
-        }),
+        },
         1,
-        OffsetDateTime::now_utc(),
+        Utc::now(),
     );
     state.apply(
         WorldStateMessage::ClusterMessage {
@@ -187,9 +187,9 @@ async fn dns_a_record() {
                     bearer_token: None,
                 },
             }),
-        }),
+        },
         2,
-        OffsetDateTime::now_utc(),
+		Utc::now()
     );
 
     let dns = DnsServer::new(state).unwrap();
