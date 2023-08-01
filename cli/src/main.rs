@@ -10,7 +10,7 @@ use plane_core::{
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
         state::{
             BackendLockMessage, BackendLockMessageType, BackendMessage, BackendMessageType,
-            ClusterMessage, ClusterStateMessage, DroneMessage, DroneMessageType, WorldStateMessage,
+            ClusterStateMessage, DroneMessage, DroneMessageType, WorldStateMessage,
         },
     },
     nats_connection::NatsConnectionSpec,
