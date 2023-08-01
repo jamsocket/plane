@@ -4,7 +4,7 @@ use plane_core::{
     messages::{
         drone_state::DroneStateUpdate,
         state::{
-            AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterMessage, ClusterStateMessage,
+            AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage,
             DroneMessage, DroneMessageType, DroneMeta, WorldStateMessage,
         },
     },
@@ -38,7 +38,7 @@ fn convert_to_state_message(
                         .unwrap_or("missing_drone_version".to_string()), // Existing drones do not report a version in their connect message.
                 }),
             }),
-        })],
+        }],
         DroneStateUpdate::DroneStatusMessage(msg) => vec![
             WorldStateMessage::ClusterMessage {
                 cluster: msg.cluster.clone(),
@@ -67,9 +67,9 @@ fn convert_to_state_message(
                     timestamp,
                 },
             }),
-        ],
+        }],
         DroneStateUpdate::BackendStateMessage(msg) => {
-            vec![WorldStateMessage::ClusterMessage(ClusterMessage {
+            vec![WorldStateMessage::ClusterMessage {
                 cluster: msg.cluster.clone(),
                 message: ClusterStateMessage::BackendMessage(BackendMessage {
                     backend: msg.backend.clone(),
@@ -78,7 +78,7 @@ fn convert_to_state_message(
                         timestamp,
                     },
                 }),
-            })]
+            }]
         }
     }
 }
@@ -197,7 +197,7 @@ mod test {
                     drone: drone_id,
                     message: DroneMessageType::KeepAlive { timestamp },
                 }),
-            }),
+            },
         ];
 
         assert_eq!(state_message, expected);
@@ -217,7 +217,7 @@ mod test {
             message: ClusterStateMessage::AcmeMessage(AcmeDnsRecord {
                 value: "test".to_string(),
             }),
-        })];
+        }];
 
         assert_eq!(state_message, expected);
         assert!(state_message.first().unwrap().overwrite());
@@ -245,7 +245,7 @@ mod test {
                     git_hash: None,
                 }),
             }),
-        })];
+        }];
 
         assert_eq!(state_message, expected);
         assert!(state_message.first().unwrap().overwrite());
@@ -275,7 +275,7 @@ mod test {
                     timestamp: time,
                 },
             }),
-        })];
+        }];
 
         assert_eq!(state_message, expected);
         assert!(!state_message.first().unwrap().overwrite());
