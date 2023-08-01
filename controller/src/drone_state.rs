@@ -68,18 +68,6 @@ fn convert_to_state_message(
                 },
             }),
         }],
-        DroneStateUpdate::BackendStateMessage(msg) => {
-            vec![WorldStateMessage::ClusterMessage {
-                cluster: msg.cluster.clone(),
-                message: ClusterStateMessage::BackendMessage(BackendMessage {
-                    backend: msg.backend.clone(),
-                    message: BackendMessageType::State {
-                        state: msg.state,
-                        timestamp,
-                    },
-                }),
-            }]
-        }
     }
 }
 
