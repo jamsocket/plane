@@ -91,23 +91,6 @@ impl StateHandle {
     }
 }
 
-#[derive(Clone, Debug)]
-enum ListenerDefunctionalization {
-    RemoveLock {
-        lock: PlaneLockName,
-        uid: u64,
-        cluster: ClusterName,
-    },
-    Nothing,
-}
-
-#[derive(Debug)]
-struct Listener<T: Ord + Eq> {
-    target: T,
-    role: ListenerDefunctionalization,
-    sender: Sender<()>,
-}
-
 #[derive(Debug)]
 struct RemoveLockEvt {
 	uid: u64,
