@@ -9,8 +9,7 @@ use plane_core::{
         },
         state::{
             BackendLockMessage, BackendLockMessageType, BackendMessage, BackendMessageType,
-            ClusterLockMessage, ClusterLockMessageType, ClusterStateMessage,
-            WorldStateMessage,
+            ClusterLockMessage, ClusterLockMessageType, ClusterStateMessage, WorldStateMessage,
         },
     },
     nats::{MessageWithResponseHandle, SubscribeSubject, TypedNats},

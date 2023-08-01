@@ -21,9 +21,10 @@ async fn get_world_state_from_sub(
             .ok_or_else(|| anyhow!("State stream closed before pending messages read."))?;
 
         let timestamp = DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_timestamp_opt(
-                meta.timestamp.unix_timestamp(), 0)
-                .ok_or_else(|| anyhow!("should convert to chrono"))?, Utc);
+            NaiveDateTime::from_timestamp_opt(meta.timestamp.unix_timestamp(), 0)
+                .ok_or_else(|| anyhow!("should convert to chrono"))?,
+            Utc,
+        );
 
         world_state.apply(message, meta.sequence, timestamp);
     }
@@ -52,15 +53,14 @@ pub async fn start_state_loop(nc: TypedNats) -> Result<StateHandle> {
         tokio::spawn(async move {
             while let Some((message, meta)) = sub.next().await {
                 let timestamp = DateTime::<Utc>::from_utc(
-                    NaiveDateTime::from_timestamp_opt(
-                        meta.timestamp.unix_timestamp(), 0)
-                        .ok_or_else(|| anyhow!("should convert to chrono"))?, Utc);
-
+                    NaiveDateTime::from_timestamp_opt(meta.timestamp.unix_timestamp(), 0)
+                        .ok_or_else(|| anyhow!("should convert to chrono"))?,
+                    Utc,
+                );
 
                 state_handle
                     .write_state()
                     .apply(message, meta.sequence, timestamp);
-
             }
             Ok::<(), anyhow::Error>(())
         });

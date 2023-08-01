@@ -1,7 +1,7 @@
 use super::agent::{BackendState, DroneState};
 use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
-    types::{BackendId, ClusterName, DroneId, AsSubjectComponent},
+    types::{AsSubjectComponent, BackendId, ClusterName, DroneId},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -148,15 +148,18 @@ impl TypedMessage for WorldStateMessage {
         match &self {
             WorldStateMessage::Heartbeat { .. } => "heartbeat".into(),
             WorldStateMessage::ClusterMessage { message, cluster } => match message {
-				ClusterStateMessage::LockMessage(message) => match message.message {
-					ClusterLockMessageType::Announce => format!(
-						"state.cluster.{}.lock.{}.announce",
-						cluster.as_subject_component(), message.lock),
-					ClusterLockMessageType::Revoke => format!(
-						"state.cluster.{}.lock.{}.revoke",
-						cluster.as_subject_component(),
-						message.lock)
-				}
+                ClusterStateMessage::LockMessage(message) => match message.message {
+                    ClusterLockMessageType::Announce => format!(
+                        "state.cluster.{}.lock.{}.announce",
+                        cluster.as_subject_component(),
+                        message.lock
+                    ),
+                    ClusterLockMessageType::Revoke => format!(
+                        "state.cluster.{}.lock.{}.revoke",
+                        cluster.as_subject_component(),
+                        message.lock
+                    ),
+                },
                 ClusterStateMessage::DroneMessage(message) => match message.message {
                     DroneMessageType::Metadata { .. } => format!(
                         "state.cluster.{}.drone.{}.meta",
@@ -176,16 +179,16 @@ impl TypedMessage for WorldStateMessage {
                     ),
                 },
                 ClusterStateMessage::BackendMessage(message) => match message.message {
-					BackendMessageType::LockMessage(
-						BackendLockMessage {
-							ref lock,
-							message: BackendLockMessageType::Assign { .. }
-						}) => format!(
-						"state.cluster.{}.backend.{}.lock.{}.assign",
-						cluster.as_subject_component(),
-						message.backend,
-						lock),
-					BackendMessageType::Assignment { .. } => format!(
+                    BackendMessageType::LockMessage(BackendLockMessage {
+                        ref lock,
+                        message: BackendLockMessageType::Assign { .. },
+                    }) => format!(
+                        "state.cluster.{}.backend.{}.lock.{}.assign",
+                        cluster.as_subject_component(),
+                        message.backend,
+                        lock
+                    ),
+                    BackendMessageType::Assignment { .. } => format!(
                         "state.cluster.{}.backend.{}.assignment",
                         cluster.subject_name(),
                         message.backend

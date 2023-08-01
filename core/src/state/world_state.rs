@@ -2,9 +2,8 @@ use crate::{
     messages::{
         agent,
         state::{
-            BackendLockMessage, BackendLockMessageType, BackendMessageType,
-            ClusterStateMessage, DroneMessageType, DroneMeta,
-            WorldStateMessage,
+            BackendLockMessage, BackendLockMessageType, BackendMessageType, ClusterStateMessage,
+            DroneMessageType, DroneMeta, WorldStateMessage,
         },
     },
     types::{BackendId, ClusterName, DroneId, PlaneLockName, PlaneLockState},
@@ -18,10 +17,10 @@ use std::{
     future::ready,
     net::IpAddr,
     pin::Pin,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard}
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
-use tokio::sync::broadcast::{channel, Sender, Receiver};
+use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -93,20 +92,15 @@ impl StateHandle {
 
 #[derive(Debug)]
 struct RemoveLockEvt {
-	uid: u64,
-	lock: String,
-	time: DateTime<Utc>
+    uid: u64,
+    lock: String,
+    time: DateTime<Utc>,
 }
 
-
 impl RemoveLockEvt {
-	fn new(time: DateTime<Utc>, lock: String, uid: u64) -> Self {
-		Self {
-			uid,
-			lock,
-			time
-		}
-	}
+    fn new(time: DateTime<Utc>, lock: String, uid: u64) -> Self {
+        Self { uid, lock, time }
+    }
 }
 
 impl PartialEq for RemoveLockEvt {
@@ -119,12 +113,9 @@ impl Eq for RemoveLockEvt {}
 
 impl PartialOrd for RemoveLockEvt {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.time
-            .partial_cmp(&other.time)
-            .map(Ordering::reverse)
+        self.time.partial_cmp(&other.time).map(Ordering::reverse)
     }
 }
-
 
 impl Ord for RemoveLockEvt {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -134,18 +125,14 @@ impl Ord for RemoveLockEvt {
 
 #[derive(Debug)]
 struct SequenceListener {
-	sender: Sender<()>,
-	seq: u64
+    sender: Sender<()>,
+    seq: u64,
 }
-
 
 impl SequenceListener {
     fn new(seq: u64) -> Self {
         let (sender, _recv) = channel(1);
-        Self {
-            sender,
-			seq
-        }
+        Self { sender, seq }
     }
 }
 
@@ -159,9 +146,7 @@ impl Eq for SequenceListener {}
 
 impl PartialOrd for SequenceListener {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.seq
-            .partial_cmp(&other.seq)
-            .map(Ordering::reverse)
+        self.seq.partial_cmp(&other.seq).map(Ordering::reverse)
     }
 }
 
@@ -184,10 +169,7 @@ impl WorldState {
         self.logical_time
     }
 
-    fn get_listener(
-        &mut self,
-        sequence: u64,
-    ) -> Receiver<()> {
+    fn get_listener(&mut self, sequence: u64) -> Receiver<()> {
         let listener = SequenceListener::new(sequence);
         let recv = listener.sender.subscribe();
         self.listeners.push(listener);
@@ -207,18 +189,17 @@ impl WorldState {
         }
     }
 
-
     pub fn apply(&mut self, message: WorldStateMessage, sequence: u64, timestamp: DateTime<Utc>) {
         match message {
-			WorldStateMessage::ClusterMessage { cluster, message} => {
-				let cluster = self.clusters.entry(cluster).or_default();
-				cluster.apply(message, timestamp);
-			}
-			WorldStateMessage::Heartbeat {..} => {
-				self.clock_time = timestamp;
-				for cluster in self.clusters.values_mut() {
-					cluster.process_lock_announce_expiration(&timestamp);
-				}
+            WorldStateMessage::ClusterMessage { cluster, message } => {
+                let cluster = self.clusters.entry(cluster).or_default();
+                cluster.apply(message, timestamp);
+            }
+            WorldStateMessage::Heartbeat { .. } => {
+                self.clock_time = timestamp;
+                for cluster in self.clusters.values_mut() {
+                    cluster.process_lock_announce_expiration(&timestamp);
+                }
             }
         }
         self.logical_time = sequence;
@@ -240,33 +221,34 @@ pub struct ClusterState {
 }
 
 impl ClusterState {
-	fn revoke_lock(&mut self, lock:String, lock_uid: u64) {
-		match self.locks.entry(lock) {
-			Entry::Vacant(entry) => {
-				let lock = entry.key();
-				tracing::info!(?lock, "requested revocation of nonexistent lock");
-			}
-			Entry::Occupied(entry) => {
-				if matches!(
-					entry.get(),
-					PlaneLockState::Announced { uid } if *uid == lock_uid
-				) {
-					let (lock, _) = entry.remove_entry();
-					tracing::info!(?lock, "announced lock revoked");
-				}
-			}
-		}
-	}
-	fn apply(&mut self, message: ClusterStateMessage, timestamp: DateTime<Utc>) {
-		match message {
-			ClusterStateMessage::LockMessage(message) => match message.message {
+    fn revoke_lock(&mut self, lock: String, lock_uid: u64) {
+        match self.locks.entry(lock) {
+            Entry::Vacant(entry) => {
+                let lock = entry.key();
+                tracing::info!(?lock, "requested revocation of nonexistent lock");
+            }
+            Entry::Occupied(entry) => {
+                if matches!(
+                    entry.get(),
+                    PlaneLockState::Announced { uid } if *uid == lock_uid
+                ) {
+                    let (lock, _) = entry.remove_entry();
+                    tracing::info!(?lock, "announced lock revoked");
+                }
+            }
+        }
+    }
+    fn apply(&mut self, message: ClusterStateMessage, timestamp: DateTime<Utc>) {
+        match message {
+            ClusterStateMessage::LockMessage(message) => match message.message {
                 crate::messages::state::ClusterLockMessageType::Announce => {
                     match self.locks.entry(message.lock) {
                         Entry::Vacant(entry) => {
-                            self.lock_announce_expiration_queue.push(
-                                RemoveLockEvt::new(
-                                    timestamp + chrono::Duration::seconds(30),
-                                    entry.key().clone(), message.uid));
+                            self.lock_announce_expiration_queue.push(RemoveLockEvt::new(
+                                timestamp + chrono::Duration::seconds(30),
+                                entry.key().clone(),
+                                message.uid,
+                            ));
                             entry.insert(PlaneLockState::Announced { uid: message.uid });
                         }
                         Entry::Occupied(entry) => {
@@ -277,8 +259,8 @@ impl ClusterState {
                     }
                 }
                 crate::messages::state::ClusterLockMessageType::Revoke => {
-					self.revoke_lock(message.lock, message.uid);
-					/*
+                    self.revoke_lock(message.lock, message.uid);
+                    /*
                     match self.locks.entry(message.lock) {
                         Entry::Vacant(entry) => {
                             let lock = entry.key();
@@ -294,7 +276,7 @@ impl ClusterState {
                             }
                         }
                     }
-					*/
+                    */
                 }
             },
             ClusterStateMessage::DroneMessage(message) => {
@@ -352,17 +334,16 @@ impl ClusterState {
         }
     }
 
-	fn process_lock_announce_expiration(&mut self, clock_time: &DateTime<Utc>) {
+    fn process_lock_announce_expiration(&mut self, clock_time: &DateTime<Utc>) {
         while self
             .lock_announce_expiration_queue
             .peek()
             .is_some_and(|l| l.time <= *clock_time)
         {
-			let remove_lock_evt = self.lock_announce_expiration_queue.pop().unwrap();
-			self.revoke_lock(remove_lock_evt.lock,remove_lock_evt.uid); 
+            let remove_lock_evt = self.lock_announce_expiration_queue.pop().unwrap();
+            self.revoke_lock(remove_lock_evt.lock, remove_lock_evt.uid);
         }
-
-	}
+    }
 
     pub fn a_record_lookup(&self, backend: &BackendId) -> Option<IpAddr> {
         let backend = self.backends.get(backend)?;
@@ -489,7 +470,6 @@ mod test {
             assert!(result.is_err());
         }
 
-
         state.write_state().apply(
             WorldStateMessage::ClusterMessage {
                 cluster: ClusterName::new("cluster"),
@@ -498,7 +478,7 @@ mod test {
                 }),
             },
             1,
-			now
+            now,
         );
 
         // onelistener should now return.
@@ -520,7 +500,7 @@ mod test {
                 }),
             },
             2,
-			now
+            now,
         );
 
         // twolistener should now return.
@@ -541,42 +521,54 @@ mod test {
         assert_eq!(state.locked("mylock"), PlaneLockState::Unlocked);
 
         // Assign a backend to a drone and acquire a lock.
-        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: backend.clone(),
-            message: BackendMessageType::Assignment {
-                drone: DroneId::new("drone".into()),
-                bearer_token: None,
-            },
-        }), now);
+        state.apply(
+            ClusterStateMessage::BackendMessage(BackendMessage {
+                backend: backend.clone(),
+                message: BackendMessageType::Assignment {
+                    drone: DroneId::new("drone".into()),
+                    bearer_token: None,
+                },
+            }),
+            now,
+        );
 
         // Announce a lock
-        state.apply(ClusterStateMessage::LockMessage(ClusterLockMessage {
-            uid: 1,
-            lock: "mylock".to_string(),
-            message: ClusterLockMessageType::Announce,
-        }), now);
+        state.apply(
+            ClusterStateMessage::LockMessage(ClusterLockMessage {
+                uid: 1,
+                lock: "mylock".to_string(),
+                message: ClusterLockMessageType::Announce,
+            }),
+            now,
+        );
 
         assert_eq!(state.locked("mylock"), PlaneLockState::Announced { uid: 1 });
 
         // assigning with wrong uid should fail
-        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: backend.clone(),
-            message: BackendMessageType::LockMessage(BackendLockMessage {
-                lock: "mylock".to_string(),
-                message: BackendLockMessageType::Assign { uid: 2 },
+        state.apply(
+            ClusterStateMessage::BackendMessage(BackendMessage {
+                backend: backend.clone(),
+                message: BackendMessageType::LockMessage(BackendLockMessage {
+                    lock: "mylock".to_string(),
+                    message: BackendLockMessageType::Assign { uid: 2 },
+                }),
             }),
-        }), now);
+            now,
+        );
 
         assert_eq!(state.locked("mylock"), PlaneLockState::Announced { uid: 1 });
 
         // assign backend to lock
-        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: backend.clone(),
-            message: BackendMessageType::LockMessage(BackendLockMessage {
-                lock: "mylock".to_string(),
-                message: BackendLockMessageType::Assign { uid: 1 },
+        state.apply(
+            ClusterStateMessage::BackendMessage(BackendMessage {
+                backend: backend.clone(),
+                message: BackendMessageType::LockMessage(BackendLockMessage {
+                    lock: "mylock".to_string(),
+                    message: BackendLockMessageType::Assign { uid: 1 },
+                }),
             }),
-        }), now);
+            now,
+        );
 
         assert_eq!(
             state.locked("mylock"),
@@ -586,23 +578,29 @@ mod test {
         );
 
         // Update the backend state to loading.
-		let now = Utc::now();
-        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: backend.clone(),
-            message: BackendMessageType::State {
-                state: agent::BackendState::Loading,
-                timestamp: now,
-            },
-        }), now);
+        let now = Utc::now();
+        state.apply(
+            ClusterStateMessage::BackendMessage(BackendMessage {
+                backend: backend.clone(),
+                message: BackendMessageType::State {
+                    state: agent::BackendState::Loading,
+                    timestamp: now,
+                },
+            }),
+            now,
+        );
 
         // Update the backend state to starting
-        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: backend.clone(),
-            message: BackendMessageType::State {
-                state: agent::BackendState::Starting,
-                timestamp: now
-            },
-        }), now);
+        state.apply(
+            ClusterStateMessage::BackendMessage(BackendMessage {
+                backend: backend.clone(),
+                message: BackendMessageType::State {
+                    state: agent::BackendState::Starting,
+                    timestamp: now,
+                },
+            }),
+            now,
+        );
 
         assert_eq!(
             state.locked("mylock"),
@@ -612,13 +610,16 @@ mod test {
         );
 
         // Update the backend state to ready.
-        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend: backend.clone(),
-            message: BackendMessageType::State {
-                state: agent::BackendState::Ready,
-                timestamp: Utc::now(),
-            },
-        }), now);
+        state.apply(
+            ClusterStateMessage::BackendMessage(BackendMessage {
+                backend: backend.clone(),
+                message: BackendMessageType::State {
+                    state: agent::BackendState::Ready,
+                    timestamp: Utc::now(),
+                },
+            }),
+            now,
+        );
 
         assert_eq!(
             state.locked("mylock"),
@@ -628,13 +629,16 @@ mod test {
         );
 
         // Update the backend state to swept.
-        state.apply(ClusterStateMessage::BackendMessage(BackendMessage {
-            backend,
-            message: BackendMessageType::State {
-                state: agent::BackendState::Swept,
-                timestamp: Utc::now(),
-            },
-        }), now);
+        state.apply(
+            ClusterStateMessage::BackendMessage(BackendMessage {
+                backend,
+                message: BackendMessageType::State {
+                    state: agent::BackendState::Swept,
+                    timestamp: Utc::now(),
+                },
+            }),
+            now,
+        );
 
         // The lock should now be free.
         assert_eq!(state.locked("mylock"), PlaneLockState::Unlocked);
@@ -650,13 +654,9 @@ mod test {
         let state = StateHandle::default();
         let now = chrono::Utc::now();
 
-        state.write_state().apply(
-            WorldStateMessage::Heartbeat {
-				heartbeat: None
-            },
-            1,
-			now
-        );
+        state
+            .write_state()
+            .apply(WorldStateMessage::Heartbeat { heartbeat: None }, 1, now);
         state.write_state().apply(
             WorldStateMessage::ClusterMessage {
                 cluster: ClusterName::new("cluster"),
@@ -665,7 +665,7 @@ mod test {
                 }),
             },
             2,
-			now
+            now,
         );
         state.write_state().apply(
             WorldStateMessage::ClusterMessage {
@@ -677,7 +677,7 @@ mod test {
                 }),
             },
             3,
-			now
+            now,
         );
 
         assert_eq!(
@@ -689,14 +689,10 @@ mod test {
             PlaneLockState::Announced { uid: 1 }
         );
 
-		let now = now + chrono::Duration::seconds(30);
-        state.write_state().apply(
-            WorldStateMessage::Heartbeat {
-				heartbeat: None 
-			},
-            4,
-			now
-        );
+        let now = now + chrono::Duration::seconds(30);
+        state
+            .write_state()
+            .apply(WorldStateMessage::Heartbeat { heartbeat: None }, 4, now);
 
         assert_eq!(
             state

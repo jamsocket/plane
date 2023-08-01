@@ -1,16 +1,16 @@
 use anyhow::Result;
+use chrono::Utc;
 use integration_test::integration_test;
 use plane_controller::{dns::serve_dns, plan::DnsPlan};
 use plane_core::{
     messages::state::{
-        AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage,
-        DroneMessage, DroneMessageType, DroneMeta, WorldStateMessage,
+        AcmeDnsRecord, BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
+        DroneMessageType, DroneMeta, WorldStateMessage,
     },
     state::{StateHandle, WorldState},
     types::{BackendId, ClusterName, DroneId},
     Never,
 };
-use chrono::Utc;
 use plane_dev::{
     timeout::{expect_to_stay_alive, LivenessGuard},
     util::random_loopback_ip,
@@ -189,7 +189,7 @@ async fn dns_a_record() {
             }),
         },
         2,
-		Utc::now()
+        Utc::now(),
     );
 
     let dns = DnsServer::new(state).unwrap();

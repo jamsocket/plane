@@ -48,7 +48,7 @@ pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
 pub async fn heartbeat(nc: TypedNats) -> NeverResult {
     loop {
         nc.publish_jetstream(&WorldStateMessage::Heartbeat { heartbeat: None })
-        .await?;
+            .await?;
         tokio::time::sleep(std::time::Duration::from_secs(1)).await
     }
 }
