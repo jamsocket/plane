@@ -233,7 +233,7 @@ impl WorldState {
 			}
 			WorldStateMessage::Heartbeat {..} => {
 				self.clock_time = timestamp;
-				for (_, cluster) in &mut self.clusters {
+				for cluster in self.clusters.values_mut() {
 					cluster.process_lock_announce_expiration(&timestamp);
 				}
             }
