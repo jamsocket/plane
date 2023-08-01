@@ -9,7 +9,7 @@ use plane_core::{
         },
         state::{
             BackendLockMessage, BackendLockMessageType, BackendMessage, BackendMessageType,
-            ClusterLockMessage, ClusterLockMessageType, ClusterMessage, ClusterStateMessage,
+            ClusterLockMessage, ClusterLockMessageType, ClusterStateMessage,
             WorldStateMessage,
         },
     },
@@ -40,7 +40,7 @@ async fn make_spawn_request(
     if let (Some(ref lock), Some(uid)) = (&schedule_request.lock, lock_uid) {
         tracing::info!(?lock, ?spawn_request.backend_id, "assigning lock");
         let lock_seq = nats
-            .publish_jetstream(&WorldStateMessage::ClusterMessage(ClusterMessage {
+            .publish_jetstream(&WorldStateMessage::ClusterMessage {
                 cluster: spawn_request.cluster.clone(),
                 message: ClusterStateMessage::BackendMessage(BackendMessage {
                     backend: spawn_request.backend_id.clone(),
@@ -49,7 +49,7 @@ async fn make_spawn_request(
                         message: BackendLockMessageType::Assign { uid },
                     }),
                 }),
-            }))
+            })
             .await?;
         state.wait_for_seq(lock_seq).await;
         if matches!(
@@ -81,7 +81,7 @@ async fn spawn_backend(
             );
 
             let seq_id = nats
-                .publish_jetstream(&WorldStateMessage::ClusterMessage(ClusterMessage {
+                .publish_jetstream(&WorldStateMessage::ClusterMessage {
                     cluster: spawn_request.cluster.clone(),
                     message: ClusterStateMessage::BackendMessage(BackendMessage {
                         backend: spawn_request.backend_id.clone(),
@@ -90,7 +90,7 @@ async fn spawn_backend(
                             bearer_token: spawn_request.bearer_token.clone(),
                         },
                     }),
-                }))
+                })
                 .await?;
 
             tracing::info!(logical_time=?seq_id, "backend state updated at time");
@@ -133,11 +133,11 @@ async fn wait_for_backend_assignment(
     tracing::info!(?msg, "received wait for lock assignment");
     let seq = msg.1.sequence;
     state.wait_for_seq(seq).await;
-    let WorldStateMessage::ClusterMessage(ClusterMessage {
+    let WorldStateMessage::ClusterMessage {
         message : ClusterStateMessage::BackendMessage(
             BackendMessage {
                 message: BackendMessageType::Assignment {
-                    drone, ..}, ..}), .. }) = msg.0
+                    drone, ..}, ..}), .. } = msg.0
     else { panic!() };
     Ok(drone)
 }
@@ -162,9 +162,9 @@ async fn wait_for_lock_assignment(
     tracing::info!(?msg, "received wait for lock assignment");
     let seq = msg.1.sequence;
     state.wait_for_seq(seq).await;
-    let WorldStateMessage::ClusterMessage(ClusterMessage {
+    let WorldStateMessage::ClusterMessage {
         message : ClusterStateMessage::BackendMessage(
-            BackendMessage { backend, .. }), .. }) = msg.0 else { panic!() };
+            BackendMessage { backend, .. }), .. } = msg.0 else { panic!() };
     Ok(backend)
 }
 
@@ -193,14 +193,14 @@ async fn announce_lock(
 ) -> anyhow::Result<u64> {
     tracing::info!("announcing lock");
     let seq_id = nats
-        .publish_jetstream(&WorldStateMessage::ClusterMessage(ClusterMessage {
+        .publish_jetstream(&WorldStateMessage::ClusterMessage {
             cluster: cluster_name.clone(),
             message: ClusterStateMessage::LockMessage(ClusterLockMessage {
                 lock: lock.to_string(),
                 uid: *uid,
                 message: ClusterLockMessageType::Announce,
             }),
-        }))
+        })
         .await?;
 
     tracing::info!(?seq_id, "sent announce, will be in state at time");
