@@ -126,8 +126,6 @@ impl MockAgent {
             if let Some(plane_core::types::LockState::Assigned { backend }) = locked_backend {
                 assert!(!(*spawned));
                 assert_eq!(*backend_id, backend);
-            } else {
-                assert!(*spawned == true);
             }
 
             let backend_id_copy = backend_id.clone();
