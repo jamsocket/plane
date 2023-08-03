@@ -127,7 +127,7 @@ impl MockAgent {
                 assert!(!(*spawned));
                 assert_eq!(*backend_id, backend);
             } else {
-                //assert!(*spawned == true);
+                assert!(*spawned == true);
             }
 
             let backend_id_copy = backend_id.clone();
