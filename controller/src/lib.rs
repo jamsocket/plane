@@ -120,7 +120,7 @@ async fn wait_for_backend_assignment(
 ) -> anyhow::Result<DroneId> {
     let mut sub = nats
         .subscribe_jetstream_subject(SubscribeSubject::<WorldStateMessage>::new(format!(
-            "state.cluster.{}.backend.{}",
+            "state.cluster.{}.backend.{}.assignment",
             cluster_name.as_subject_component(),
             backend.as_subject_component()
         )))
@@ -129,7 +129,7 @@ async fn wait_for_backend_assignment(
     let msg = sub.next().await.ok_or_else(|| {
         anyhow!("lock assignment subscription closed before receiving assignment")
     })?;
-    tracing::info!(?msg, "received wait for lock assignment");
+    tracing::info!(?msg, "received wait for backend assignment");
     let seq = msg.1.sequence;
     state.wait_for_seq(seq).await;
     let WorldStateMessage::ClusterMessage {
