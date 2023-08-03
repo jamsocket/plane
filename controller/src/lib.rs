@@ -83,7 +83,7 @@ async fn wait_for_locked_backend_assignment(
     lock: &str,
     cluster_name: &ClusterName,
     nats: &TypedNats,
-) -> anyhow::Result<(DroneId, BackendId)> {
+) -> anyhow::Result<BackendId> {
     let mut sub = nats
         .subscribe_jetstream_subject(SubscribeSubject::<WorldStateMessage>::new(format!(
             "state.cluster.{}.backend.*.assignment.lock.{}",
@@ -104,10 +104,10 @@ async fn wait_for_locked_backend_assignment(
 			BackendMessage {
 				backend,
 				message: BackendMessageType::Assignment {
-					drone, lock_assignment: Some(_),..}, ..}), .. } = msg.0
+					lock_assignment: Some(_),..}, ..}), .. } = msg.0
 	else { panic!() };
 
-    Ok((drone, backend))
+    Ok(backend)
 }
 
 fn backend_assigned_to_lock(
@@ -229,7 +229,7 @@ async fn process_response(
                 }
                 PlaneLockState::Announced { .. } => {
                     //ensure drone assigned to backend
-                    let (_, assigned_backend) =
+                    let assigned_backend =
                         wait_for_locked_backend_assignment(state, lock_name, &cluster_name, nats)
                             .await?;
                     Some(schedule_response_for_existing_backend(
@@ -332,10 +332,9 @@ async fn dispatch_lock_request(
         }
         PlaneLockState::Announced { .. } => {
             let assigned_backend = async {
-                let (_, backend) =
+                let backend =
                     wait_for_locked_backend_assignment(&mut state, lock_name, cluster_name, &nats)
                         .await?;
-                //ensure drone assigned
                 Ok::<BackendId, anyhow::Error>(backend)
             }
             .await;
