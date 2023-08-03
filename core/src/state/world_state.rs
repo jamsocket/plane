@@ -2,8 +2,8 @@ use crate::{
     messages::{
         agent,
         state::{
-            BackendLockMessage, BackendLockMessageType, BackendMessageType, ClusterStateMessage,
-            DroneMessageType, DroneMeta, WorldStateMessage,
+            BackendLockAssignment, BackendMessageType, ClusterStateMessage, DroneMessageType,
+            DroneMeta, WorldStateMessage,
         },
     },
     types::{BackendId, ClusterName, DroneId, PlaneLockName, PlaneLockState},
@@ -260,23 +260,6 @@ impl ClusterState {
                 }
                 crate::messages::state::ClusterLockMessageType::Revoke => {
                     self.revoke_lock(message.lock, message.uid);
-                    /*
-                    match self.locks.entry(message.lock) {
-                        Entry::Vacant(entry) => {
-                            let lock = entry.key();
-                            tracing::info!(?lock, "requested revocation of nonexistent lock");
-                        }
-                        Entry::Occupied(entry) => {
-                            if matches!(
-                                entry.get(),
-                                PlaneLockState::Announced { uid } if uid == &message.uid
-                            ) {
-                                let (lock, _) = entry.remove_entry();
-                                tracing::info!(?lock, "announced lock revoked");
-                            }
-                        }
-                    }
-                    */
                 }
             },
             ClusterStateMessage::DroneMessage(message) => {
@@ -287,10 +270,14 @@ impl ClusterState {
                 let backend = self.backends.entry(message.backend.clone()).or_default();
 
                 // If the message is a lock assignment, we want to record it.
-                if let BackendMessageType::LockMessage(BackendLockMessage {
-                    ref lock,
-                    message: BackendLockMessageType::Assign { uid: assigned_uid },
-                }) = message.message
+                if let BackendMessageType::Assignment {
+                    lock_assignment:
+                        Some(BackendLockAssignment {
+                            ref lock,
+                            uid: assigned_uid,
+                        }),
+                    ..
+                } = message.message
                 {
                     match self.locks.entry(lock.clone()) {
                         Entry::Vacant(_) => {
@@ -406,19 +393,15 @@ pub struct BackendState {
 impl BackendState {
     fn apply(&mut self, message: BackendMessageType) {
         match message {
-            BackendMessageType::LockMessage(BackendLockMessage {
-                lock,
-                message: BackendLockMessageType::Assign { .. },
-            }) => {
-                self.lock = Some(lock);
-            }
+            //self.lock = Some(lock);
             BackendMessageType::Assignment {
                 drone,
                 bearer_token,
-                ..
+                lock_assignment,
             } => {
                 self.drone = Some(drone);
                 self.bearer_token = bearer_token;
+                self.lock = lock_assignment.map(|la| la.lock)
             }
             BackendMessageType::State {
                 state: status,
@@ -520,18 +503,6 @@ mod test {
         // Initially, no locks are held.
         assert_eq!(state.locked("mylock"), PlaneLockState::Unlocked);
 
-        // Assign a backend to a drone and acquire a lock.
-        state.apply(
-            ClusterStateMessage::BackendMessage(BackendMessage {
-                backend: backend.clone(),
-                message: BackendMessageType::Assignment {
-                    drone: DroneId::new("drone".into()),
-                    bearer_token: None,
-                },
-            }),
-            now,
-        );
-
         // Announce a lock
         state.apply(
             ClusterStateMessage::LockMessage(ClusterLockMessage {
@@ -544,28 +515,18 @@ mod test {
 
         assert_eq!(state.locked("mylock"), PlaneLockState::Announced { uid: 1 });
 
-        // assigning with wrong uid should fail
+        // Assign a backend to a drone and acquire a lock.
         state.apply(
             ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: backend.clone(),
-                message: BackendMessageType::LockMessage(BackendLockMessage {
-                    lock: "mylock".to_string(),
-                    message: BackendLockMessageType::Assign { uid: 2 },
-                }),
-            }),
-            now,
-        );
-
-        assert_eq!(state.locked("mylock"), PlaneLockState::Announced { uid: 1 });
-
-        // assign backend to lock
-        state.apply(
-            ClusterStateMessage::BackendMessage(BackendMessage {
-                backend: backend.clone(),
-                message: BackendMessageType::LockMessage(BackendLockMessage {
-                    lock: "mylock".to_string(),
-                    message: BackendLockMessageType::Assign { uid: 1 },
-                }),
+                message: BackendMessageType::Assignment {
+                    drone: DroneId::new("drone".into()),
+                    bearer_token: None,
+                    lock_assignment: Some(BackendLockAssignment {
+                        lock: "mylock".to_string(),
+                        uid: 1,
+                    }),
+                },
             }),
             now,
         );

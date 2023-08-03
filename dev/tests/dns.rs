@@ -183,6 +183,7 @@ async fn dns_a_record() {
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: BackendId::new("louie".to_string()),
                 message: BackendMessageType::Assignment {
+                    lock_assignment: None,
                     drone: drone_id.clone(),
                     bearer_token: None,
                 },
