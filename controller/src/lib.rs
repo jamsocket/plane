@@ -15,7 +15,7 @@ use plane_core::{
     nats::{MessageWithResponseHandle, SubscribeSubject, TypedNats},
     state::StateHandle,
     timing::Timer,
-    types::{BackendId, ClusterName, DroneId, PlaneLockState},
+    types::{BackendId, ClusterName, PlaneLockState},
     NeverResult,
 };
 use rand::{thread_rng, Rng};
