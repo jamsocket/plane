@@ -15,7 +15,7 @@ use plane_core::{
     nats::{MessageWithResponseHandle, SubscribeSubject, TypedNats},
     state::StateHandle,
     timing::Timer,
-    types::{BackendId, ClusterName, PlaneLockState},
+    types::{BackendId, ClusterName, LockState},
     NeverResult,
 };
 use rand::{thread_rng, Rng};
@@ -115,7 +115,7 @@ fn backend_assigned_to_lock(
     lock: &str,
     cluster_name: &ClusterName,
 ) -> anyhow::Result<Option<BackendId>> {
-    if let PlaneLockState::Assigned { backend } = state
+    if let LockState::Assigned { backend } = state
         .state()
         .cluster(cluster_name)
         .ok_or_else(|| anyhow!("no cluster"))?
@@ -220,14 +220,14 @@ async fn process_response(
                 .locked(lock_name);
 
             match lock_state {
-                PlaneLockState::Announced { uid } if uid == my_uid => {
+                LockState::Announced { uid } if uid == my_uid => {
                     lock_assignment = Some(BackendLockAssignment {
                         uid,
                         lock: lock_name.clone(),
                     });
                     None
                 }
-                PlaneLockState::Announced { .. } => {
+                LockState::Announced { .. } => {
                     //ensure drone assigned to backend
                     let assigned_backend =
                         wait_for_locked_backend_assignment(state, lock_name, &cluster_name, nats)
@@ -238,7 +238,7 @@ async fn process_response(
                         assigned_backend,
                     ))
                 }
-                PlaneLockState::Assigned { backend } => {
+                LockState::Assigned { backend } => {
                     //unlikely, but technically possible
                     Some(schedule_response_for_existing_backend(
                         state,
@@ -246,7 +246,7 @@ async fn process_response(
                         backend,
                     ))
                 }
-                PlaneLockState::Unlocked => {
+                LockState::Unlocked => {
                     return Err(anyhow!(
                         "lock {} just announced, hence should not be unlocked",
                         lock_name
@@ -314,7 +314,7 @@ async fn dispatch_lock_request(
         .clone();
 
     let response = match lock_state {
-        PlaneLockState::Assigned { backend } => {
+        LockState::Assigned { backend } => {
             let schedule_response = schedule_response_for_existing_backend(
                 &state,
                 lock_request.value.cluster.clone(),
@@ -330,7 +330,7 @@ async fn dispatch_lock_request(
                 FetchBackendForLockResponse::NoBackendForLock
             }
         }
-        PlaneLockState::Announced { .. } => {
+        LockState::Announced { .. } => {
             let assigned_backend = async {
                 let backend =
                     wait_for_locked_backend_assignment(&mut state, lock_name, cluster_name, &nats)

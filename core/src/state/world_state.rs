@@ -6,7 +6,7 @@ use crate::{
             DroneMeta, WorldStateMessage,
         },
     },
-    types::{BackendId, ClusterName, DroneId, PlaneLockName, PlaneLockState},
+    types::{BackendId, ClusterName, DroneId, LockState},
 };
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
@@ -216,7 +216,7 @@ pub struct ClusterState {
     pub drones: BTreeMap<DroneId, DroneState>,
     pub backends: BTreeMap<BackendId, BackendState>,
     pub txt_records: VecDeque<String>,
-    pub locks: BTreeMap<PlaneLockName, PlaneLockState>,
+    pub locks: BTreeMap<String, LockState>,
     lock_announce_expiration_queue: BinaryHeap<RemoveLockEvt>,
 }
 
@@ -230,7 +230,7 @@ impl ClusterState {
             Entry::Occupied(entry) => {
                 if matches!(
                     entry.get(),
-                    PlaneLockState::Announced { uid } if *uid == lock_uid
+                    LockState::Announced { uid } if *uid == lock_uid
                 ) {
                     let (lock, _) = entry.remove_entry();
                     tracing::info!(?lock, "announced lock revoked");
@@ -249,7 +249,7 @@ impl ClusterState {
                                 entry.key().clone(),
                                 message.uid,
                             ));
-                            entry.insert(PlaneLockState::Announced { uid: message.uid });
+                            entry.insert(LockState::Announced { uid: message.uid });
                         }
                         Entry::Occupied(entry) => {
                             let lock = entry.key();
@@ -287,14 +287,14 @@ impl ClusterState {
                         }
                         Entry::Occupied(v)
                             if matches!(
-                                *v.get(), PlaneLockState::Announced { uid } if assigned_uid != uid
+                                *v.get(), LockState::Announced { uid } if assigned_uid != uid
                             ) =>
                         {
                             tracing::error!(?lock, "lock must have same uid to assign");
                             return;
                         }
                         Entry::Occupied(mut v) => {
-                            *v.get_mut() = PlaneLockState::Assigned {
+                            *v.get_mut() = LockState::Assigned {
                                 backend: message.backend,
                             }
                         }
@@ -349,11 +349,11 @@ impl ClusterState {
         self.backends.get(backend)
     }
 
-    pub fn locked(&self, lock: &str) -> PlaneLockState {
+    pub fn locked(&self, lock: &str) -> LockState {
         if let Some(lock_state) = self.locks.get(lock) {
             lock_state.clone()
         } else {
-            PlaneLockState::Unlocked
+            LockState::Unlocked
         }
     }
 }
@@ -386,7 +386,7 @@ impl DroneState {
 pub struct BackendState {
     pub drone: Option<DroneId>,
     pub bearer_token: Option<String>,
-    pub lock: Option<PlaneLockName>,
+    pub lock: Option<String>,
     pub states: BTreeSet<(chrono::DateTime<chrono::Utc>, agent::BackendState)>,
 }
 
@@ -501,7 +501,7 @@ mod test {
         let now = chrono::Utc::now();
 
         // Initially, no locks are held.
-        assert_eq!(state.locked("mylock"), PlaneLockState::Unlocked);
+        assert_eq!(state.locked("mylock"), LockState::Unlocked);
 
         // Announce a lock
         state.apply(
@@ -513,7 +513,7 @@ mod test {
             now,
         );
 
-        assert_eq!(state.locked("mylock"), PlaneLockState::Announced { uid: 1 });
+        assert_eq!(state.locked("mylock"), LockState::Announced { uid: 1 });
 
         // Assign a backend to a drone and acquire a lock.
         state.apply(
@@ -533,7 +533,7 @@ mod test {
 
         assert_eq!(
             state.locked("mylock"),
-            PlaneLockState::Assigned {
+            LockState::Assigned {
                 backend: backend.clone()
             }
         );
@@ -565,7 +565,7 @@ mod test {
 
         assert_eq!(
             state.locked("mylock"),
-            PlaneLockState::Assigned {
+            LockState::Assigned {
                 backend: backend.clone()
             }
         );
@@ -584,7 +584,7 @@ mod test {
 
         assert_eq!(
             state.locked("mylock"),
-            PlaneLockState::Assigned {
+            LockState::Assigned {
                 backend: backend.clone()
             }
         );
@@ -602,12 +602,12 @@ mod test {
         );
 
         // The lock should now be free.
-        assert_eq!(state.locked("mylock"), PlaneLockState::Unlocked);
+        assert_eq!(state.locked("mylock"), LockState::Unlocked);
 
         state.backends.remove(&BackendId::new("backend".into()));
 
         // The lock should still be free.
-        assert_eq!(state.locked("mylock"), PlaneLockState::Unlocked);
+        assert_eq!(state.locked("mylock"), LockState::Unlocked);
     }
 
     #[tokio::test]
@@ -647,7 +647,7 @@ mod test {
                 .cluster(&ClusterName::new("cluster"))
                 .unwrap()
                 .locked("mylock"),
-            PlaneLockState::Announced { uid: 1 }
+            LockState::Announced { uid: 1 }
         );
 
         let now = now + chrono::Duration::seconds(30);
@@ -661,7 +661,7 @@ mod test {
                 .cluster(&ClusterName::new("cluster"))
                 .unwrap()
                 .locked("mylock"),
-            PlaneLockState::Unlocked
+            LockState::Unlocked
         );
     }
 }
