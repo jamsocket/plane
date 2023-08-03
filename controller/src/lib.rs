@@ -264,7 +264,6 @@ async fn process_response(
     } else {
         match scheduler.schedule(&cluster_name, Utc::now()) {
             Ok(drone_id) => {
-                //let spawn_req = make_spawn_request(state, nats, &drone_id, sr, lock_uid).await?;
                 let spawn_request = sr.schedule(&drone_id);
                 spawn_backend(nats, &spawn_request, lock_assignment.as_ref()).await
             }
