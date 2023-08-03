@@ -355,7 +355,7 @@ async fn dispatch_lock_request(
                 FetchBackendForLockResponse::NoBackendForLock
             }
         }
-        _ => FetchBackendForLockResponse::NoBackendForLock,
+        LockState::Unlocked => FetchBackendForLockResponse::NoBackendForLock,
     };
 
     let Ok(_) = lock_request.respond(&response).await else {
