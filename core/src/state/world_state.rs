@@ -2,8 +2,8 @@ use crate::{
     messages::{
         agent,
         state::{
-            BackendLockAssignment, BackendMessageType, ClusterStateMessage, DroneMessageType,
-            DroneMeta, WorldStateMessage,
+            BackendLockAssignment, BackendMessageType, ClusterLockMessageType, ClusterStateMessage,
+            DroneMessageType, DroneMeta, WorldStateMessage,
         },
     },
     types::{BackendId, ClusterName, DroneId, LockState},
@@ -241,24 +241,22 @@ impl ClusterState {
     fn apply(&mut self, message: ClusterStateMessage, timestamp: DateTime<Utc>) {
         match message {
             ClusterStateMessage::LockMessage(message) => match message.message {
-                crate::messages::state::ClusterLockMessageType::Announce => {
-                    match self.locks.entry(message.lock) {
-                        Entry::Vacant(entry) => {
-                            self.lock_announce_expiration_queue.push(RemoveLockEvt::new(
-                                timestamp + chrono::Duration::seconds(30),
-                                entry.key().clone(),
-                                message.uid,
-                            ));
-                            entry.insert(LockState::Announced { uid: message.uid });
-                        }
-                        Entry::Occupied(entry) => {
-                            let lock = entry.key();
-                            let lock_state = entry.get();
-                            tracing::info!(?lock, ?lock_state, "lock already exists in map");
-                        }
+                ClusterLockMessageType::Announce => match self.locks.entry(message.lock) {
+                    Entry::Vacant(entry) => {
+                        self.lock_announce_expiration_queue.push(RemoveLockEvt::new(
+                            timestamp + chrono::Duration::seconds(30),
+                            entry.key().clone(),
+                            message.uid,
+                        ));
+                        entry.insert(LockState::Announced { uid: message.uid });
                     }
-                }
-                crate::messages::state::ClusterLockMessageType::Revoke => {
+                    Entry::Occupied(entry) => {
+                        let lock = entry.key();
+                        let lock_state = entry.get();
+                        tracing::info!(?lock, ?lock_state, "lock already exists in map");
+                    }
+                },
+                ClusterLockMessageType::Revoke => {
                     self.revoke_lock(message.lock, message.uid);
                 }
             },

@@ -92,7 +92,6 @@ impl BackendId {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum LockState {
     Unlocked,

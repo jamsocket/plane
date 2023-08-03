@@ -123,7 +123,7 @@ impl MockAgent {
             ..
         }) = &response
         {
-            if let Some(plane_core::types::PlaneLockState::Assigned { backend }) = locked_backend {
+            if let Some(plane_core::types::LockState::Assigned { backend }) = locked_backend {
                 assert!(!(*spawned));
                 assert_eq!(*backend_id, backend);
             } else {
