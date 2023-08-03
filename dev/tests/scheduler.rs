@@ -554,7 +554,7 @@ async fn schedule_request_lock() {
             Ok(ScheduleResponse::Scheduled { spawned: a, .. }),
             Ok(ScheduleResponse::Scheduled { spawned: b, .. }),
         ) => {
-            assert_eq!(!a, b, "only one backend should be spawned! this is a bug");
+            assert_eq!(!a, b, "only one backend should be spawned!");
         }
         other => {
             tracing::error!(
