@@ -19,8 +19,9 @@ use std::{
     pin::Pin,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-
 use tokio::sync::broadcast::{channel, Receiver, Sender};
+
+const LOCK_ANNOUNCE_PERIOD_SECONDS: i64 = 30;
 
 #[derive(Default, Debug, Clone)]
 pub struct StateHandle {
@@ -245,7 +246,7 @@ impl ClusterState {
                     Entry::Vacant(entry) => {
                         self.lock_announce_expiration_queue
                             .push(RemoveLockEvent::new(
-                                timestamp + chrono::Duration::seconds(30),
+                                timestamp + chrono::Duration::seconds(LOCK_ANNOUNCE_PERIOD_SECONDS),
                                 entry.key().clone(),
                                 message.uid,
                             ));
