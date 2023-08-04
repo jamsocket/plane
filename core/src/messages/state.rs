@@ -143,7 +143,7 @@ impl WorldStateMessage {
         SubscribeSubject::<WorldStateMessage>::new(format!(
             "state.cluster.{}.backend.*.assignment.lock.{}",
             cluster.as_subject_component(),
-            lock
+            lock.as_subject_component()
         ))
     }
 }
@@ -193,7 +193,7 @@ impl TypedMessage for WorldStateMessage {
                         "state.cluster.{}.backend.{}.assignment.lock.{}",
                         cluster.subject_name(),
                         message.backend,
-                        lock
+                        lock.as_subject_component()
                     ),
                     BackendMessageType::Assignment { .. } => format!(
                         "state.cluster.{}.backend.{}.assignment",
