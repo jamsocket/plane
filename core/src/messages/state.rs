@@ -138,7 +138,7 @@ impl WorldStateMessage {
 
     pub fn assignment_with_lock_subscribe_subject(
         cluster: &ClusterName,
-        lock: &String,
+        lock: &str,
     ) -> SubscribeSubject<WorldStateMessage> {
         SubscribeSubject::<WorldStateMessage>::new(format!(
             "state.cluster.{}.backend.*.assignment.lock.{}",
