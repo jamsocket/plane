@@ -137,6 +137,13 @@ impl Display for ClusterName {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ResourceLock(String);
 
+impl TryFrom<String> for ResourceLock {
+	type Error = anyhow::Error;
+	fn try_from(value: String) -> Result<Self, Self::Error> {
+		Self::try_new(value)
+	}
+}
+
 impl Display for ResourceLock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.lock().fmt(f)
@@ -169,3 +176,4 @@ impl ResourceLock {
         &self.0
     }
 }
+
