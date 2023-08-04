@@ -12,7 +12,7 @@ use plane_core::{
     },
     nats::TypedNats,
     state::{start_state_loop, StateHandle},
-    types::{BackendId, ClusterName, DroneId},
+    types::{BackendId, ClusterName, DroneId, ResourceLock},
     NeverResult,
 };
 use plane_dev::{
@@ -101,7 +101,7 @@ impl MockAgent {
     pub async fn schedule_drone(
         &self,
         request_bearer_token: bool,
-        lock: Option<String>,
+        lock: Option<ResourceLock>,
     ) -> Result<ScheduleResponse> {
         let cluster = &self.cluster;
         let mut request = base_scheduler_request();
@@ -166,7 +166,7 @@ impl MockAgent {
     pub async fn fetch_locked(
         &self,
         cluster: ClusterName,
-        lock: String,
+        lock: plane_core::types::ResourceLock,
     ) -> Result<FetchBackendForLockResponse> {
         let req = FetchBackendForLock { cluster, lock };
 
@@ -484,15 +484,16 @@ async fn schedule_request_lock() {
 
     drone_ready.await;
 
+    let foobar: ResourceLock = "foobar".to_string().try_into().unwrap();
     let r1 = mock_agent
-        .schedule_drone(false, Some("foobar".to_string()))
+        .schedule_drone(false, Some(foobar.clone()))
         .await
         .unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, .. } = r1 else {panic!()};
 
     let r2 = mock_agent
-        .schedule_drone(false, Some("foobar".to_string()))
+        .schedule_drone(false, Some(foobar))
         .await
         .unwrap();
 
@@ -501,10 +502,12 @@ async fn schedule_request_lock() {
     assert_eq!(drone1, drone2);
     assert_eq!(backend1, backend2);
 
+    let speedlock: ResourceLock = "speedlock".to_string().try_into().unwrap();
+
     //testing simultaneous schedule requests to same drone
     match tokio::join!(
-        mock_agent.schedule_drone(false, Some("speedlock".to_string())),
-        mock_agent.schedule_drone(false, Some("speedlock".to_string()))
+        mock_agent.schedule_drone(false, Some(speedlock.clone())),
+        mock_agent.schedule_drone(false, Some(speedlock))
     ) {
         (
             Ok(ScheduleResponse::Scheduled { spawned: a, .. }),
@@ -545,10 +548,11 @@ async fn schedule_request_lock() {
 
     drone_ready.await;
 
+    let speedlock2: ResourceLock = "speedlock2".to_string().try_into().unwrap();
     //testing simultaneous schedule requests to multiple drones
     match tokio::join!(
-        mock_agent.schedule_drone(false, Some("speedlock2".to_string())),
-        mock_agent_2.schedule_drone(false, Some("speedlock2".to_string()))
+        mock_agent.schedule_drone(false, Some(speedlock2.clone())),
+        mock_agent_2.schedule_drone(false, Some(speedlock2))
     ) {
         (
             Ok(ScheduleResponse::Scheduled { spawned: a, .. }),
@@ -596,15 +600,16 @@ async fn fetch_locked_backend() {
 
     drone_ready.await;
 
+    let foobar: ResourceLock = "foobar".to_string().try_into().unwrap();
     let r1 = mock_agent
-        .schedule_drone(false, Some("foobar".to_string()))
+        .schedule_drone(false, Some(foobar.clone()))
         .await
         .unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, .. } = r1 else {panic!()};
 
     let r2 = mock_agent
-        .fetch_locked(ClusterName::new("plane.test"), "foobar".to_string())
+        .fetch_locked(ClusterName::new("plane.test"), foobar)
         .await
         .unwrap();
 
@@ -643,18 +648,16 @@ async fn schedule_request_lock_with_bearer_token() {
 
     drone_ready.await;
 
+    let foobar: ResourceLock = "foobar".to_string().try_into().unwrap();
     let r1 = mock_agent
-        .schedule_drone(true, Some("foobar".to_string()))
+        .schedule_drone(true, Some(foobar.clone()))
         .await
         .unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, bearer_token: bearer_token1, .. } = r1 else {panic!()};
     assert!(bearer_token1.is_some());
 
-    let r2 = mock_agent
-        .schedule_drone(true, Some("foobar".to_string()))
-        .await
-        .unwrap();
+    let r2 = mock_agent.schedule_drone(true, Some(foobar)).await.unwrap();
 
     let ScheduleResponse::Scheduled { drone: drone2, backend_id: backend2, bearer_token: bearer_token2, .. } = r2 else {panic!()};
 
