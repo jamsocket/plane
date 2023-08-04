@@ -391,7 +391,6 @@ pub struct BackendState {
 impl BackendState {
     fn apply(&mut self, message: BackendMessageType) {
         match message {
-            //self.lock = Some(lock);
             BackendMessageType::Assignment {
                 drone,
                 bearer_token,
