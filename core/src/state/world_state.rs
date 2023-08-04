@@ -113,7 +113,7 @@ impl Eq for RemoveLockEvt {}
 
 impl PartialOrd for RemoveLockEvt {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.time.partial_cmp(&other.time).map(Ordering::reverse)
+        Some(Ordering::reverse(self.time.cmp(&other.time)))
     }
 }
 
@@ -146,7 +146,7 @@ impl Eq for SequenceListener {}
 
 impl PartialOrd for SequenceListener {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.seq.partial_cmp(&other.seq).map(Ordering::reverse)
+        Some(Ordering::reverse(self.seq.cmp(&other.seq)))
     }
 }
 
