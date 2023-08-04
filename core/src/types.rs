@@ -165,7 +165,6 @@ impl AsSubjectComponent for ResourceLock {
 }
 
 impl ResourceLock {
-    #[must_use]
     pub fn try_new(lock: String) -> Result<Self, anyhow::Error> {
         let lock_len = lock.as_bytes().len();
         if lock_len > MAX_RESOURCE_LOCK_LENGTH_BYTES {
