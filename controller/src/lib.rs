@@ -85,11 +85,8 @@ async fn wait_for_locked_backend_assignment(
     nats: &TypedNats,
 ) -> anyhow::Result<BackendId> {
     let mut sub = nats
-        .subscribe_jetstream_subject(SubscribeSubject::<WorldStateMessage>::new(format!(
-            "state.cluster.{}.backend.*.assignment.lock.{}",
-            cluster_name.subject_name(),
-            lock
-        )))
+        .subscribe_jetstream_subject(
+			WorldStateMessage::assignment_with_lock_subscribe_subject(cluster_name, lock))
         .await?;
 
     let msg = sub.next().await.ok_or_else(|| {
