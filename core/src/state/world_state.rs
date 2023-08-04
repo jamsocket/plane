@@ -91,33 +91,33 @@ impl StateHandle {
 }
 
 #[derive(Debug)]
-struct RemoveLockEvt {
+struct RemoveLockEvent {
     uid: u64,
     lock: String,
     time: DateTime<Utc>,
 }
 
-impl RemoveLockEvt {
+impl RemoveLockEvent {
     fn new(time: DateTime<Utc>, lock: String, uid: u64) -> Self {
         Self { uid, lock, time }
     }
 }
 
-impl PartialEq for RemoveLockEvt {
+impl PartialEq for RemoveLockEvent {
     fn eq(&self, other: &Self) -> bool {
         self.time == other.time
     }
 }
 
-impl Eq for RemoveLockEvt {}
+impl Eq for RemoveLockEvent {}
 
-impl PartialOrd for RemoveLockEvt {
+impl PartialOrd for RemoveLockEvent {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(Ordering::reverse(self.time.cmp(&other.time)))
     }
 }
 
-impl Ord for RemoveLockEvt {
+impl Ord for RemoveLockEvent {
     fn cmp(&self, other: &Self) -> Ordering {
         Ordering::reverse(self.time.cmp(&other.time))
     }
@@ -176,7 +176,7 @@ impl WorldState {
         recv
     }
 
-    fn apply_listeners(&mut self) {
+    fn notify_listeners(&mut self) {
         while self
             .listeners
             .peek()
@@ -203,7 +203,7 @@ impl WorldState {
             }
         }
         self.logical_time = sequence;
-        self.apply_listeners();
+        self.notify_listeners();
     }
 
     pub fn cluster(&self, cluster: &ClusterName) -> Option<&ClusterState> {
@@ -217,7 +217,7 @@ pub struct ClusterState {
     pub backends: BTreeMap<BackendId, BackendState>,
     pub txt_records: VecDeque<String>,
     pub locks: BTreeMap<String, LockState>,
-    lock_announce_expiration_queue: BinaryHeap<RemoveLockEvt>,
+    lock_announce_expiration_queue: BinaryHeap<RemoveLockEvent>,
 }
 
 impl ClusterState {
@@ -243,11 +243,12 @@ impl ClusterState {
             ClusterStateMessage::LockMessage(message) => match message.message {
                 ClusterLockMessageType::Announce => match self.locks.entry(message.lock) {
                     Entry::Vacant(entry) => {
-                        self.lock_announce_expiration_queue.push(RemoveLockEvt::new(
-                            timestamp + chrono::Duration::seconds(30),
-                            entry.key().clone(),
-                            message.uid,
-                        ));
+                        self.lock_announce_expiration_queue
+                            .push(RemoveLockEvent::new(
+                                timestamp + chrono::Duration::seconds(30),
+                                entry.key().clone(),
+                                message.uid,
+                            ));
                         entry.insert(LockState::Announced { uid: message.uid });
                     }
                     Entry::Occupied(entry) => {
