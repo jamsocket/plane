@@ -6,7 +6,7 @@ use crate::{
             DroneMessageType, DroneMeta, WorldStateMessage,
         },
     },
-    types::{BackendId, ClusterName, DroneId, LockState},
+    types::{BackendId, ClusterName, DroneId, LockState, ResourceLock},
 };
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
@@ -94,12 +94,12 @@ impl StateHandle {
 #[derive(Debug)]
 struct RemoveLockEvent {
     uid: u64,
-    lock: String,
+    lock: ResourceLock,
     time: DateTime<Utc>,
 }
 
 impl RemoveLockEvent {
-    fn new(time: DateTime<Utc>, lock: String, uid: u64) -> Self {
+    fn new(time: DateTime<Utc>, lock: ResourceLock, uid: u64) -> Self {
         Self { uid, lock, time }
     }
 }
@@ -217,12 +217,12 @@ pub struct ClusterState {
     pub drones: BTreeMap<DroneId, DroneState>,
     pub backends: BTreeMap<BackendId, BackendState>,
     pub txt_records: VecDeque<String>,
-    pub locks: BTreeMap<String, LockState>,
+    pub locks: BTreeMap<ResourceLock, LockState>,
     lock_announce_expiration_queue: BinaryHeap<RemoveLockEvent>,
 }
 
 impl ClusterState {
-    fn revoke_lock(&mut self, lock: String, lock_uid: u64) {
+    fn revoke_lock(&mut self, lock: ResourceLock, lock_uid: u64) {
         match self.locks.entry(lock) {
             Entry::Vacant(entry) => {
                 let lock = entry.key();
@@ -349,7 +349,7 @@ impl ClusterState {
         self.backends.get(backend)
     }
 
-    pub fn locked(&self, lock: &str) -> LockState {
+    pub fn locked(&self, lock: &ResourceLock) -> LockState {
         if let Some(lock_state) = self.locks.get(lock) {
             lock_state.clone()
         } else {
@@ -386,7 +386,7 @@ impl DroneState {
 pub struct BackendState {
     pub drone: Option<DroneId>,
     pub bearer_token: Option<String>,
-    pub lock: Option<String>,
+    pub lock: Option<ResourceLock>,
     pub states: BTreeSet<(chrono::DateTime<chrono::Utc>, agent::BackendState)>,
 }
 
@@ -498,21 +498,22 @@ mod test {
         let mut state = ClusterState::default();
         let backend = BackendId::new_random();
         let now = chrono::Utc::now();
+        let mylock: ResourceLock = "mylock".to_string().try_into().unwrap();
 
         // Initially, no locks are held.
-        assert_eq!(state.locked("mylock"), LockState::Unlocked);
+        assert_eq!(state.locked(&mylock), LockState::Unlocked);
 
         // Announce a lock
         state.apply(
             ClusterStateMessage::LockMessage(ClusterLockMessage {
                 uid: 1,
-                lock: "mylock".to_string(),
+                lock: mylock.clone(),
                 message: ClusterLockMessageType::Announce,
             }),
             now,
         );
 
-        assert_eq!(state.locked("mylock"), LockState::Announced { uid: 1 });
+        assert_eq!(state.locked(&mylock), LockState::Announced { uid: 1 });
 
         // Assign a backend to a drone and acquire a lock.
         state.apply(
@@ -522,7 +523,7 @@ mod test {
                     drone: DroneId::new("drone".into()),
                     bearer_token: None,
                     lock_assignment: Some(BackendLockAssignment {
-                        lock: "mylock".to_string(),
+                        lock: mylock.clone(),
                         uid: 1,
                     }),
                 },
@@ -531,7 +532,7 @@ mod test {
         );
 
         assert_eq!(
-            state.locked("mylock"),
+            state.locked(&mylock),
             LockState::Assigned {
                 backend: backend.clone()
             }
@@ -563,7 +564,7 @@ mod test {
         );
 
         assert_eq!(
-            state.locked("mylock"),
+            state.locked(&mylock),
             LockState::Assigned {
                 backend: backend.clone()
             }
@@ -582,7 +583,7 @@ mod test {
         );
 
         assert_eq!(
-            state.locked("mylock"),
+            state.locked(&mylock),
             LockState::Assigned {
                 backend: backend.clone()
             }
@@ -601,18 +602,19 @@ mod test {
         );
 
         // The lock should now be free.
-        assert_eq!(state.locked("mylock"), LockState::Unlocked);
+        assert_eq!(state.locked(&mylock), LockState::Unlocked);
 
         state.backends.remove(&BackendId::new("backend".into()));
 
         // The lock should still be free.
-        assert_eq!(state.locked("mylock"), LockState::Unlocked);
+        assert_eq!(state.locked(&mylock), LockState::Unlocked);
     }
 
     #[tokio::test]
     async fn test_lock_announce_timeout() {
         let state = StateHandle::default();
         let now = chrono::Utc::now();
+        let mylock: ResourceLock = "mylock".to_string().try_into().unwrap();
 
         state
             .write_state()
@@ -631,7 +633,7 @@ mod test {
             WorldStateMessage::ClusterMessage {
                 cluster: ClusterName::new("cluster"),
                 message: ClusterStateMessage::LockMessage(ClusterLockMessage {
-                    lock: "mylock".to_string(),
+                    lock: mylock.clone(),
                     uid: 1,
                     message: ClusterLockMessageType::Announce,
                 }),
@@ -645,7 +647,7 @@ mod test {
                 .state()
                 .cluster(&ClusterName::new("cluster"))
                 .unwrap()
-                .locked("mylock"),
+                .locked(&mylock),
             LockState::Announced { uid: 1 }
         );
 
@@ -659,7 +661,7 @@ mod test {
                 .state()
                 .cluster(&ClusterName::new("cluster"))
                 .unwrap()
-                .locked("mylock"),
+                .locked(&mylock),
             LockState::Unlocked
         );
     }

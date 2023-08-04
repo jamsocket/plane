@@ -350,7 +350,7 @@ async fn main() -> Result<()> {
                         volume_mounts: Vec::new(),
                     },
                     require_bearer_token: false,
-                    lock,
+                    lock: lock.map(|lock| lock.try_into().unwrap()),
                 })
                 .await?;
 

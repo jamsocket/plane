@@ -15,7 +15,7 @@ use plane_core::{
     nats::{MessageWithResponseHandle, TypedNats},
     state::StateHandle,
     timing::Timer,
-    types::{BackendId, ClusterName, LockState},
+    types::{BackendId, ClusterName, LockState, ResourceLock},
     NeverResult,
 };
 use rand::{thread_rng, Rng};
@@ -80,7 +80,7 @@ async fn spawn_backend(
 
 async fn wait_for_locked_backend_assignment(
     state: &mut StateHandle,
-    lock: &str,
+    lock: &ResourceLock,
     cluster_name: &ClusterName,
     nats: &TypedNats,
 ) -> anyhow::Result<BackendId> {
@@ -110,7 +110,7 @@ async fn wait_for_locked_backend_assignment(
 
 fn backend_assigned_to_lock(
     state: &StateHandle,
-    lock: &str,
+    lock: &ResourceLock,
     cluster_name: &ClusterName,
 ) -> anyhow::Result<Option<BackendId>> {
     if let LockState::Assigned { backend } = state
@@ -126,7 +126,7 @@ fn backend_assigned_to_lock(
 }
 
 async fn announce_lock(
-    lock: &str,
+    lock: &ResourceLock,
     cluster_name: &ClusterName,
     nats: &TypedNats,
     uid: &u64,
@@ -136,7 +136,7 @@ async fn announce_lock(
         .publish_jetstream(&WorldStateMessage::ClusterMessage {
             cluster: cluster_name.clone(),
             message: ClusterStateMessage::LockMessage(ClusterLockMessage {
-                lock: lock.to_string(),
+                lock: lock.clone(),
                 uid: *uid,
                 message: ClusterLockMessageType::Announce,
             }),

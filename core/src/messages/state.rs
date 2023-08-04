@@ -1,7 +1,7 @@
 use super::agent::{BackendState, DroneState};
 use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
-    types::{AsSubjectComponent, BackendId, ClusterName, DroneId},
+    types::{AsSubjectComponent, BackendId, ClusterName, DroneId, ResourceLock},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -52,7 +52,7 @@ pub enum ClusterStateMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ClusterLockMessage {
-    pub lock: String,
+    pub lock: ResourceLock,
     pub uid: u64,
     pub message: ClusterLockMessageType,
 }
@@ -108,7 +108,7 @@ pub struct BackendMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BackendLockAssignment {
-    pub lock: String,
+    pub lock: ResourceLock,
     pub uid: u64,
 }
 
@@ -138,7 +138,7 @@ impl WorldStateMessage {
 
     pub fn assignment_with_lock_subscribe_subject(
         cluster: &ClusterName,
-        lock: &str,
+        lock: &ResourceLock,
     ) -> SubscribeSubject<WorldStateMessage> {
         SubscribeSubject::<WorldStateMessage>::new(format!(
             "state.cluster.{}.backend.*.assignment.lock.{}",

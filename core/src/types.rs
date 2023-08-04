@@ -138,10 +138,16 @@ impl Display for ClusterName {
 pub struct ResourceLock(String);
 
 impl TryFrom<String> for ResourceLock {
-	type Error = anyhow::Error;
-	fn try_from(value: String) -> Result<Self, Self::Error> {
-		Self::try_new(value)
-	}
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_new(value)
+    }
+}
+
+impl AsRef<str> for ResourceLock {
+    fn as_ref(&self) -> &str {
+        self.lock()
+    }
 }
 
 impl Display for ResourceLock {
@@ -176,4 +182,3 @@ impl ResourceLock {
         &self.0
     }
 }
-
