@@ -16,7 +16,6 @@ use plane_core::{cli::init_cli, logging::TracingHandle, NeverResult};
 /// Receive UpdateBackendStateMessages over core NATS, and turn them into
 /// BackendStateMessages over JetStream.
 pub async fn update_backend_state_loop(nc: TypedNats) -> NeverResult {
-    //is this needed anymore? drone_state.rs seems to handle these.
     let mut sub = nc
         .subscribe(UpdateBackendStateMessage::subscribe_subject())
         .await?;
