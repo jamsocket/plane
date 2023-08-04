@@ -105,7 +105,7 @@ async fn wait_for_locked_backend_assignment(
                 backend,
                 message: BackendMessageType::Assignment {
                     lock_assignment: Some(_),..}, ..}), .. } = msg.0
-    else { panic!() };
+    else { return Err(anyhow!("Non-assignment message received on assignment subject")) };
 
     Ok(backend)
 }
