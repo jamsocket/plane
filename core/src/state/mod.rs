@@ -22,7 +22,7 @@ async fn get_world_state_from_sub(
 
         let timestamp = DateTime::<Utc>::from_utc(
             NaiveDateTime::from_timestamp_opt(meta.timestamp.unix_timestamp(), 0)
-                .ok_or_else(|| anyhow!("should convert to chrono"))?,
+                .expect("should convert to chrono"),
             Utc,
         );
 
