@@ -291,7 +291,7 @@ async fn dispatch_schedule_request(
         Ok(schedule_response) => schedule_response,
     };
 
-    tracing::info!("respond to schedule req");
+    tracing::info!(?response, "responding to schedule request");
 
     let Ok(_) = schedule_request.respond(&response).await else {
         tracing::warn!(res = ?response, "schedule response failed to send");
