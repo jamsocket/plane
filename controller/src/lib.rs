@@ -12,7 +12,7 @@ use plane_core::{
             ClusterLockMessageType, ClusterStateMessage, WorldStateMessage,
         },
     },
-    nats::{MessageWithResponseHandle, SubscribeSubject, TypedNats},
+    nats::{MessageWithResponseHandle, TypedNats},
     state::StateHandle,
     timing::Timer,
     types::{BackendId, ClusterName, LockState},
@@ -276,14 +276,19 @@ async fn dispatch_schedule_request(
     scheduler: Scheduler,
     nats: TypedNats,
 ) {
-    let Ok(response) = process_response(
+    let response = match process_response(
         &mut state,
         &schedule_request.value.clone(),
         &scheduler,
-        &nats
-    ).await.map_err(|e| tracing::error!("scheduling error {:?}", e)) else {
-        tracing::error!(?schedule_request.value, "schedule request failed");
-        return;
+        &nats,
+    )
+    .await
+    {
+        Err(e) => {
+            tracing::error!(?e, ?schedule_request.value, "scheduling error");
+            return;
+        }
+        Ok(schedule_response) => schedule_response,
     };
 
     tracing::info!("respond to schedule req");
