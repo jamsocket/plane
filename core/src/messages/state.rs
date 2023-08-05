@@ -153,7 +153,7 @@ impl TypedMessage for WorldStateMessage {
 
     fn subject(&self) -> String {
         match &self {
-            WorldStateMessage::Heartbeat { .. } => "heartbeat".into(),
+            WorldStateMessage::Heartbeat { .. } => "state.heartbeat".into(),
             WorldStateMessage::ClusterMessage { message, cluster } => match message {
                 ClusterStateMessage::LockMessage(message) => match message.message {
                     ClusterLockMessageType::Announce => format!(

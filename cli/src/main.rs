@@ -188,7 +188,15 @@ async fn main() -> Result<()> {
                         format!("ACME TXT entry: {}", acme.value.to_string().bright_blue())
                     }
                     ClusterStateMessage::LockMessage(lock) => {
-                        format!("Lock : {:?}", lock.message)
+                        let lock_name = format!("{}", lock.lock);
+                        let uid = format!("{:x}", lock.uid);
+                        let lock_message = format!("{:?}", lock.message);
+                        format!(
+                            "Lock: {} (uid: {}) {}",
+                            lock_name.bright_cyan(),
+                            uid.bright_yellow(),
+                            lock_message.bright_magenta()
+                        )
                     }
                     ClusterStateMessage::DroneMessage(drone) => {
                         let DroneMessage { drone, message } = drone;
@@ -233,11 +241,22 @@ async fn main() -> Result<()> {
                                     timestamp.to_string().bright_yellow()
                                 )
                             }
-                            BackendMessageType::Assignment { drone, .. } => {
-                                let text = format!(
+                            BackendMessageType::Assignment { drone, lock_assignment, .. } => {
+                                let mut text = format!(
                                     "is assigned to drone {}",
                                     drone.to_string().bright_yellow()
                                 );
+
+                                if let Some(lock) = lock_assignment {
+                                    let lock_name = format!("{}", lock.lock);
+                                    let uid = format!("{:x}", lock.uid);
+                                    text.push_str(&format!(
+                                        " with lock {} (uid: {})",
+                                        lock_name.bright_cyan(),
+                                        uid.bright_yellow()
+                                    ));
+                                }
+
                                 text
                             }
                         };
