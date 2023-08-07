@@ -290,7 +290,7 @@ async fn do_spawn_request(request: &mut SpawnRequest) -> (TestFixture, BackendSt
 
     request.drone_id = drone_id.clone();
 
-    controller_mock.spawn_backend(&request).await.unwrap();
+    controller_mock.spawn_backend(request).await.unwrap();
     (
         TestFixture {
             nats_server: nats,

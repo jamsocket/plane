@@ -3,17 +3,22 @@ use anyhow::anyhow;
 use chrono::Utc;
 use plane_core::{
     messages::{
+        agent::SpawnRequest,
         scheduler::{
             FetchBackendForLock, FetchBackendForLockResponse, ScheduleRequest, ScheduleResponse,
         },
-        state::{BackendMessage, BackendMessageType, ClusterStateMessage, WorldStateMessage},
+        state::{
+            BackendLockAssignment, BackendMessage, BackendMessageType, ClusterLockMessage,
+            ClusterLockMessageType, ClusterStateMessage, WorldStateMessage,
+        },
     },
     nats::{MessageWithResponseHandle, TypedNats},
     state::StateHandle,
     timing::Timer,
-    types::{BackendId, ClusterName, DroneId},
+    types::{BackendId, ClusterName, LockState, ResourceLock},
     NeverResult,
 };
+use rand::{thread_rng, Rng};
 use scheduler::Scheduler;
 
 mod config;
@@ -25,12 +30,12 @@ mod scheduler;
 
 async fn spawn_backend(
     nats: &TypedNats,
-    drone: &DroneId,
-    schedule_request: &ScheduleRequest,
+    spawn_request: &SpawnRequest,
+    lock_assignment: Option<&BackendLockAssignment>,
 ) -> anyhow::Result<ScheduleResponse> {
     let timer = Timer::new();
-    let spawn_request = schedule_request.schedule(drone);
-    match nats.request(&spawn_request).await {
+    let drone = spawn_request.drone_id.clone();
+    match nats.request(spawn_request).await {
         Ok(true) => {
             tracing::info!(
                 duration=?timer.duration(),
@@ -41,13 +46,13 @@ async fn spawn_backend(
 
             let seq_id = nats
                 .publish_jetstream(&WorldStateMessage::ClusterMessage {
-                    cluster: schedule_request.cluster.clone(),
+                    cluster: spawn_request.cluster.clone(),
                     message: ClusterStateMessage::BackendMessage(BackendMessage {
                         backend: spawn_request.backend_id.clone(),
                         message: BackendMessageType::Assignment {
                             drone: drone.clone(),
-                            lock: schedule_request.lock.clone(),
                             bearer_token: spawn_request.bearer_token.clone(),
+                            lock_assignment: lock_assignment.cloned(),
                         },
                     }),
                 })
@@ -57,7 +62,7 @@ async fn spawn_backend(
 
             Ok(ScheduleResponse::Scheduled {
                 drone: drone.clone(),
-                backend_id: spawn_request.backend_id,
+                backend_id: spawn_request.backend_id.clone(),
                 bearer_token: spawn_request.bearer_token.clone(),
                 spawned: true,
             })
@@ -73,18 +78,74 @@ async fn spawn_backend(
     }
 }
 
-/// get backend associated with a lock or error
-fn backend_of_lock(
-    state: &StateHandle,
+async fn wait_for_locked_backend_assignment(
+    state: &mut StateHandle,
+    lock: &ResourceLock,
     cluster_name: &ClusterName,
-    lock: &str,
+    nats: &TypedNats,
 ) -> anyhow::Result<BackendId> {
-    state
+    let mut sub =
+        nats.subscribe_jetstream_subject(
+            WorldStateMessage::assignment_with_lock_subscribe_subject(cluster_name, lock),
+        )
+        .await?;
+
+    let msg = sub.next().await.ok_or_else(|| {
+        anyhow!("lock assignment subscription closed before receiving assignment")
+    })?;
+    tracing::info!(?msg, "received wait for locked backend assignment");
+    let seq = msg.1.sequence;
+    state.wait_for_seq(seq).await;
+
+    let WorldStateMessage::ClusterMessage {
+        message : ClusterStateMessage::BackendMessage(
+            BackendMessage {
+                backend,
+                message: BackendMessageType::Assignment {
+                    lock_assignment: Some(_),..}, ..}), .. } = msg.0
+    else { return Err(anyhow!("Non-assignment message received on assignment subject")) };
+
+    Ok(backend)
+}
+
+fn backend_assigned_to_lock(
+    state: &StateHandle,
+    lock: &ResourceLock,
+    cluster_name: &ClusterName,
+) -> anyhow::Result<Option<BackendId>> {
+    if let LockState::Assigned { backend } = state
         .state()
         .cluster(cluster_name)
         .ok_or_else(|| anyhow!("no cluster"))?
         .locked(lock)
-        .ok_or_else(|| anyhow!("no backend"))
+    {
+        Ok(Some(backend))
+    } else {
+        Ok(None)
+    }
+}
+
+async fn announce_lock(
+    lock: &ResourceLock,
+    cluster_name: &ClusterName,
+    nats: &TypedNats,
+    uid: &u64,
+) -> anyhow::Result<u64> {
+    tracing::info!("announcing lock");
+    let seq_id = nats
+        .publish_jetstream(&WorldStateMessage::ClusterMessage {
+            cluster: cluster_name.clone(),
+            message: ClusterStateMessage::LockMessage(ClusterLockMessage {
+                lock: lock.clone(),
+                uid: *uid,
+                message: ClusterLockMessageType::Announce,
+            }),
+        })
+        .await?;
+
+    tracing::info!(?seq_id, "sent announce, will be in state at time");
+
+    Ok(seq_id)
 }
 
 fn schedule_response_for_existing_backend(
@@ -124,45 +185,113 @@ fn schedule_response_for_existing_backend(
 }
 
 async fn process_response(
-    state: &StateHandle,
+    state: &mut StateHandle,
     sr: &ScheduleRequest,
     scheduler: &Scheduler,
     nats: &TypedNats,
 ) -> anyhow::Result<ScheduleResponse> {
     tracing::info!("checking locks");
     let cluster_name = sr.cluster.clone();
-    if let Some(lock_name) = sr.lock.clone() {
+
+    let mut lock_assignment = None;
+    let schedule_response: Option<_> = if let Some(lock_name) = sr.lock.as_ref() {
         tracing::info!(?lock_name, "scheduling lock");
 
-        if let Ok(backend) = backend_of_lock(state, &cluster_name, &lock_name) {
-            tracing::info!(?backend, "fetch preexisting backend");
-            return schedule_response_for_existing_backend(state, cluster_name, backend);
+        if let Ok(Some(backend)) = backend_assigned_to_lock(state, lock_name, &cluster_name) {
+            Some(schedule_response_for_existing_backend(
+                state,
+                cluster_name.clone(),
+                backend,
+            ))
+        } else {
+            let my_uid: u64 = {
+                let mut rng = thread_rng();
+                rng.gen()
+            };
+            let seq = announce_lock(lock_name, &cluster_name, nats, &my_uid).await?;
+
+            state.wait_for_seq(seq).await;
+            let lock_state = state
+                .state()
+                .cluster(&cluster_name)
+                .ok_or_else(|| anyhow!("cluster should exist"))?
+                .locked(lock_name);
+
+            match lock_state {
+                LockState::Announced { uid } if uid == my_uid => {
+                    lock_assignment = Some(BackendLockAssignment {
+                        uid,
+                        lock: lock_name.clone(),
+                    });
+                    None
+                }
+                LockState::Announced { .. } => {
+                    //ensure drone assigned to backend
+                    let assigned_backend =
+                        wait_for_locked_backend_assignment(state, lock_name, &cluster_name, nats)
+                            .await?;
+                    Some(schedule_response_for_existing_backend(
+                        state,
+                        cluster_name.clone(),
+                        assigned_backend,
+                    ))
+                }
+                LockState::Assigned { backend } => {
+                    //unlikely, but technically possible
+                    Some(schedule_response_for_existing_backend(
+                        state,
+                        cluster_name.clone(),
+                        backend,
+                    ))
+                }
+                LockState::Unlocked => {
+                    return Err(anyhow!(
+                        "lock {} just announced, hence should not be unlocked",
+                        lock_name
+                    ))
+                }
+            }
         }
+    } else {
+        None
+    };
 
-        tracing::info!("spawn with lock");
-    }
-
-    match scheduler.schedule(&cluster_name, Utc::now()) {
-        Ok(drone_id) => spawn_backend(nats, &drone_id, &sr.clone()).await,
-        Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
+    if let Some(schedule_response) = schedule_response {
+        tracing::info!("Returning existing backend");
+        schedule_response
+    } else {
+        match scheduler.schedule(&cluster_name, Utc::now()) {
+            Ok(drone_id) => {
+                let spawn_request = sr.schedule(&drone_id);
+                spawn_backend(nats, &spawn_request, lock_assignment.as_ref()).await
+            }
+            Err(SchedulerError::NoDroneAvailable) => Ok(ScheduleResponse::NoDroneAvailable),
+        }
     }
 }
 
 async fn dispatch_schedule_request(
-    state: StateHandle,
+    mut state: StateHandle,
     schedule_request: MessageWithResponseHandle<ScheduleRequest>,
     scheduler: Scheduler,
     nats: TypedNats,
 ) {
-    let Ok(response) = process_response(
-        &state,
+    let response = match process_response(
+        &mut state,
         &schedule_request.value.clone(),
         &scheduler,
-        &nats
-    ).await else {
-        tracing::error!(?schedule_request.value, "schedule request failed");
-        return;
+        &nats,
+    )
+    .await
+    {
+        Err(e) => {
+            tracing::error!(?e, ?schedule_request.value, "scheduling error");
+            return;
+        }
+        Ok(schedule_response) => schedule_response,
     };
+
+    tracing::info!(?response, "responding to schedule request");
 
     let Ok(_) = schedule_request.respond(&response).await else {
         tracing::warn!(res = ?response, "schedule response failed to send");
@@ -171,26 +300,67 @@ async fn dispatch_schedule_request(
 }
 
 async fn dispatch_lock_request(
-    state: StateHandle,
+    mut state: StateHandle,
     lock_request: MessageWithResponseHandle<FetchBackendForLock>,
+    nats: TypedNats,
 ) {
-    let mut response: FetchBackendForLockResponse = FetchBackendForLockResponse::NoBackendForLock;
-    if let Ok(backend) = backend_of_lock(
-        &state,
-        &lock_request.value.cluster,
-        &lock_request.value.lock,
-    ) {
-        if let Ok(schedule_response) = schedule_response_for_existing_backend(
-            &state,
-            lock_request.value.cluster.clone(),
-            backend,
-        ) {
-            response = schedule_response.try_into().expect(
-                "already checked that backend exists, \
-                so schedule_response should be convertible to FetchBackendForLockResponse",
+    let lock_name = &lock_request.value.lock;
+    let cluster_name = &lock_request.value.cluster;
+    let lock_state = state
+        .state()
+        .cluster(cluster_name)
+        .expect("cluster should exist")
+        .locks
+        .get(lock_name)
+        .expect("lock should exist")
+        .clone();
+
+    let response = match lock_state {
+        LockState::Assigned { backend } => {
+            let schedule_response = schedule_response_for_existing_backend(
+                &state,
+                lock_request.value.cluster.clone(),
+                backend,
             );
+
+            if let Ok(schedule_response) = schedule_response {
+                schedule_response.try_into().expect(
+                    "already checked that backend exists, \
+                     so schedule_response should be convertible to FetchBackendForLockResponse",
+                )
+            } else {
+                FetchBackendForLockResponse::NoBackendForLock
+            }
         }
-    }
+        LockState::Announced { .. } => {
+            let assigned_backend = async {
+                let backend =
+                    wait_for_locked_backend_assignment(&mut state, lock_name, cluster_name, &nats)
+                        .await?;
+                Ok::<BackendId, anyhow::Error>(backend)
+            }
+            .await;
+
+            let schedule_response = assigned_backend.and_then(|assigned_backend| {
+                schedule_response_for_existing_backend(
+                    &state,
+                    lock_request.value.cluster.clone(),
+                    assigned_backend,
+                )
+            });
+
+            if let Ok(schedule_response) = schedule_response {
+                schedule_response.try_into().expect(
+                    "already checked that backend exists, \
+                 so schedule_response should be convertible to FetchBackendForLockResponse",
+                )
+            } else {
+                FetchBackendForLockResponse::NoBackendForLock
+            }
+        }
+        LockState::Unlocked => FetchBackendForLockResponse::NoBackendForLock,
+    };
+
     let Ok(_) = lock_request.respond(&response).await else {
         tracing::warn!(res = ?response, "lock response failed to send");
         return;
@@ -223,6 +393,7 @@ pub async fn run_scheduler(nats: TypedNats, state: StateHandle) -> NeverResult {
                 tokio::spawn(dispatch_lock_request(
                     state.clone(),
                     backend_for_lock_req.clone(),
+                    nats.clone(),
                 ));
             },
             else => break

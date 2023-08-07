@@ -187,6 +187,17 @@ async fn main() -> Result<()> {
                     ClusterStateMessage::AcmeMessage(acme) => {
                         format!("ACME TXT entry: {}", acme.value.to_string().bright_blue())
                     }
+                    ClusterStateMessage::LockMessage(lock) => {
+                        let lock_name = format!("{}", lock.lock);
+                        let uid = format!("{:x}", lock.uid);
+                        let lock_message = format!("{:?}", lock.message);
+                        format!(
+                            "Lock: {} (uid: {}) {}",
+                            lock_name.bright_cyan(),
+                            uid.bright_yellow(),
+                            lock_message.bright_magenta()
+                        )
+                    }
                     ClusterStateMessage::DroneMessage(drone) => {
                         let DroneMessage { drone, message } = drone;
 
@@ -230,17 +241,26 @@ async fn main() -> Result<()> {
                                     timestamp.to_string().bright_yellow()
                                 )
                             }
-                            BackendMessageType::Assignment { drone, lock, .. } => {
+                            BackendMessageType::Assignment {
+                                drone,
+                                lock_assignment,
+                                ..
+                            } => {
                                 let mut text = format!(
                                     "is assigned to drone {}",
                                     drone.to_string().bright_yellow()
                                 );
-                                if let Some(lock) = lock {
+
+                                if let Some(lock) = lock_assignment {
+                                    let lock_name = format!("{}", lock.lock);
+                                    let uid = format!("{:x}", lock.uid);
                                     text.push_str(&format!(
-                                        " with lock {}",
-                                        lock.to_string().bright_yellow()
+                                        " with lock {} (uid: {})",
+                                        lock_name.bright_cyan(),
+                                        uid.bright_yellow()
                                     ));
                                 }
+
                                 text
                             }
                         };
@@ -353,7 +373,7 @@ async fn main() -> Result<()> {
                         volume_mounts: Vec::new(),
                     },
                     require_bearer_token: false,
-                    lock,
+                    lock: lock.map(|lock| lock.try_into().unwrap()),
                 })
                 .await?;
 

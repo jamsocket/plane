@@ -1,7 +1,7 @@
 use super::agent::{BackendState, DroneState};
 use crate::{
     nats::{JetStreamable, NoReply, SubscribeSubject, TypedMessage},
-    types::{BackendId, ClusterName, DroneId},
+    types::{AsSubjectComponent, BackendId, ClusterName, DroneId, ResourceLock},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -44,9 +44,23 @@ impl WorldStateMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ClusterStateMessage {
+    LockMessage(ClusterLockMessage),
     DroneMessage(DroneMessage),
     BackendMessage(BackendMessage),
     AcmeMessage(AcmeDnsRecord),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ClusterLockMessage {
+    pub lock: ResourceLock,
+    pub uid: u64,
+    pub message: ClusterLockMessageType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ClusterLockMessageType {
+    Announce,
+    Revoke,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -93,11 +107,17 @@ pub struct BackendMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BackendLockAssignment {
+    pub lock: ResourceLock,
+    pub uid: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BackendMessageType {
     Assignment {
         drone: DroneId,
-        lock: Option<String>,
         bearer_token: Option<String>,
+        lock_assignment: Option<BackendLockAssignment>,
     },
     State {
         state: BackendState,
@@ -115,6 +135,17 @@ impl WorldStateMessage {
     pub fn subscribe_subject() -> SubscribeSubject<WorldStateMessage> {
         SubscribeSubject::new("state.>".into())
     }
+
+    pub fn assignment_with_lock_subscribe_subject(
+        cluster: &ClusterName,
+        lock: &ResourceLock,
+    ) -> SubscribeSubject<WorldStateMessage> {
+        SubscribeSubject::<WorldStateMessage>::new(format!(
+            "state.cluster.{}.backend.*.assignment.lock.{}",
+            cluster.as_subject_component(),
+            lock.as_subject_component()
+        ))
+    }
 }
 
 impl TypedMessage for WorldStateMessage {
@@ -122,8 +153,20 @@ impl TypedMessage for WorldStateMessage {
 
     fn subject(&self) -> String {
         match &self {
-            WorldStateMessage::Heartbeat { .. } => "heartbeat".into(),
+            WorldStateMessage::Heartbeat { .. } => "state.heartbeat".into(),
             WorldStateMessage::ClusterMessage { message, cluster } => match message {
+                ClusterStateMessage::LockMessage(message) => match message.message {
+                    ClusterLockMessageType::Announce => format!(
+                        "state.cluster.{}.lock.{}.announce",
+                        cluster.as_subject_component(),
+                        message.lock
+                    ),
+                    ClusterLockMessageType::Revoke => format!(
+                        "state.cluster.{}.lock.{}.revoke",
+                        cluster.as_subject_component(),
+                        message.lock
+                    ),
+                },
                 ClusterStateMessage::DroneMessage(message) => match message.message {
                     DroneMessageType::Metadata { .. } => format!(
                         "state.cluster.{}.drone.{}.meta",
@@ -143,10 +186,19 @@ impl TypedMessage for WorldStateMessage {
                     ),
                 },
                 ClusterStateMessage::BackendMessage(message) => match message.message {
+                    BackendMessageType::Assignment {
+                        lock_assignment: Some(BackendLockAssignment { ref lock, .. }),
+                        ..
+                    } => format!(
+                        "state.cluster.{}.backend.{}.assignment.lock.{}",
+                        cluster.subject_name(),
+                        message.backend,
+                        lock.as_subject_component()
+                    ),
                     BackendMessageType::Assignment { .. } => format!(
                         "state.cluster.{}.backend.{}.assignment",
-                        cluster.subject_name(),
-                        message.backend
+                        cluster.as_subject_component(),
+                        message.backend.as_subject_component(),
                     ),
                     BackendMessageType::State { state, .. } => format!(
                         "state.cluster.{}.backend.{}.state.{}",

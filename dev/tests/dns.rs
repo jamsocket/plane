@@ -1,4 +1,5 @@
 use anyhow::Result;
+use chrono::Utc;
 use integration_test::integration_test;
 use plane_controller::{dns::serve_dns, plan::DnsPlan};
 use plane_core::{
@@ -18,7 +19,6 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
     str::Utf8Error,
 };
-use time::OffsetDateTime;
 use trust_dns_resolver::{
     config::{NameServerConfig, Protocol, ResolverConfig, ResolverOpts},
     error::{ResolveError, ResolveErrorKind},
@@ -122,7 +122,7 @@ async fn dns_txt_record() {
             }),
         },
         1,
-        OffsetDateTime::now_utc(),
+        Utc::now(),
     );
     let dns = DnsServer::new(state).unwrap();
     let result = dns.txt_record("_acme-challenge.plane.test").await.unwrap();
@@ -140,7 +140,7 @@ async fn dns_multi_txt_record() {
             }),
         },
         1,
-        OffsetDateTime::now_utc(),
+        Utc::now(),
     );
     state.apply(
         WorldStateMessage::ClusterMessage {
@@ -150,7 +150,7 @@ async fn dns_multi_txt_record() {
             }),
         },
         2,
-        OffsetDateTime::now_utc(),
+        Utc::now(),
     );
     let dns = DnsServer::new(state).unwrap();
 
@@ -175,7 +175,7 @@ async fn dns_a_record() {
             }),
         },
         1,
-        OffsetDateTime::now_utc(),
+        Utc::now(),
     );
     state.apply(
         WorldStateMessage::ClusterMessage {
@@ -183,14 +183,14 @@ async fn dns_a_record() {
             message: ClusterStateMessage::BackendMessage(BackendMessage {
                 backend: BackendId::new("louie".to_string()),
                 message: BackendMessageType::Assignment {
+                    lock_assignment: None,
                     drone: drone_id.clone(),
-                    lock: None,
                     bearer_token: None,
                 },
             }),
         },
         2,
-        OffsetDateTime::now_utc(),
+        Utc::now(),
     );
 
     let dns = DnsServer::new(state).unwrap();

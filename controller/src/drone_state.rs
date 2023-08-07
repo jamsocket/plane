@@ -246,9 +246,9 @@ mod test {
         let time = Utc::now();
         let msg = DroneStateUpdate::BackendStateMessage(UpdateBackendStateMessage {
             cluster: ClusterName::new("plane.test"),
-            drone: drone.clone(),
+            drone,
             backend: backend.clone(),
-            time: time,
+            time,
             state: BackendState::Starting,
         });
 
@@ -257,7 +257,7 @@ mod test {
         let expected = vec![WorldStateMessage::ClusterMessage {
             cluster: ClusterName::new("plane.test"),
             message: ClusterStateMessage::BackendMessage(BackendMessage {
-                backend: backend.clone(),
+                backend,
                 message: BackendMessageType::State {
                     state: BackendState::Starting,
                     timestamp: time,

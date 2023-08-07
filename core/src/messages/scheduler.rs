@@ -1,7 +1,7 @@
 use super::agent::{DockerExecutableConfig, SpawnRequest};
 use crate::{
     nats::{SubscribeSubject, TypedMessage},
-    types::{BackendId, ClusterName, DroneId},
+    types::{BackendId, ClusterName, DroneId, ResourceLock},
 };
 use plane_core_nats_macros::TypedMessage;
 use rand::{distributions::Alphanumeric, Rng};
@@ -33,7 +33,7 @@ pub struct ScheduleRequest {
     pub require_bearer_token: bool,
 
     /// An optional lock to be held by the spawned backend.
-    pub lock: Option<String>,
+    pub lock: Option<ResourceLock>,
 }
 
 impl ScheduleRequest {
@@ -139,7 +139,7 @@ impl TryFrom<ScheduleResponse> for FetchBackendForLockResponse {
 )]
 pub struct FetchBackendForLock {
     pub cluster: ClusterName,
-    pub lock: String,
+    pub lock: ResourceLock,
 }
 
 impl FetchBackendForLock {

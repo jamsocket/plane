@@ -58,7 +58,7 @@ async fn txt_record_from_drone() {
         let result = fixture
             .nats
             .request(&SetAcmeDnsRecord {
-                cluster: ClusterName::new("plane.test".into()),
+                cluster: ClusterName::new("plane.test"),
                 value: "test123".into(),
             })
             .await
@@ -67,9 +67,7 @@ async fn txt_record_from_drone() {
         assert!(result);
 
         let state = fixture.state.state();
-        let cluster = state
-            .cluster(&ClusterName::new("plane.test".into()))
-            .unwrap();
+        let cluster = state.cluster(&ClusterName::new("plane.test")).unwrap();
         assert_eq!(cluster.txt_records.len(), 1);
         assert_eq!(cluster.txt_records.back().unwrap(), "test123");
 
@@ -82,7 +80,7 @@ async fn txt_record_from_drone() {
         let result = fixture
             .nats
             .request(&SetAcmeDnsRecord {
-                cluster: ClusterName::new("plane.test".into()),
+                cluster: ClusterName::new("plane.test"),
                 value: "test456".into(),
             })
             .await
@@ -91,9 +89,7 @@ async fn txt_record_from_drone() {
         assert!(result);
 
         let state = fixture.state.state();
-        let cluster = state
-            .cluster(&ClusterName::new("plane.test".into()))
-            .unwrap();
+        let cluster = state.cluster(&ClusterName::new("plane.test")).unwrap();
         assert_eq!(cluster.txt_records.len(), 2);
         assert_eq!(cluster.txt_records.back().unwrap(), "test456");
     }
@@ -106,7 +102,7 @@ async fn txt_records_different_clusters() {
     let result = fixture
         .nats
         .request(&SetAcmeDnsRecord {
-            cluster: ClusterName::new("plane.test".into()),
+            cluster: ClusterName::new("plane.test"),
             value: "test123".into(),
         })
         .await
@@ -115,7 +111,7 @@ async fn txt_records_different_clusters() {
     let result = fixture
         .nats
         .request(&SetAcmeDnsRecord {
-            cluster: ClusterName::new("abc.test".into()),
+            cluster: ClusterName::new("abc.test"),
             value: "test456".into(),
         })
         .await
@@ -124,15 +120,13 @@ async fn txt_records_different_clusters() {
     let state = fixture.state.state();
 
     {
-        let cluster = state
-            .cluster(&ClusterName::new("plane.test".into()))
-            .unwrap();
+        let cluster = state.cluster(&ClusterName::new("plane.test")).unwrap();
         assert_eq!(cluster.txt_records.len(), 1);
         assert_eq!(cluster.txt_records.back().unwrap(), "test123");
     }
 
     {
-        let cluster = state.cluster(&ClusterName::new("abc.test".into())).unwrap();
+        let cluster = state.cluster(&ClusterName::new("abc.test")).unwrap();
         assert_eq!(cluster.txt_records.len(), 1);
         assert_eq!(cluster.txt_records.back().unwrap(), "test456");
     }
@@ -148,7 +142,7 @@ async fn status_lifecycle() {
     tracing::info!("Initializing test fixture.");
     let fixture = StateTestFixture::new().await;
     let ip: IpAddr = Ipv4Addr::new(12, 12, 12, 12).into();
-    let cluster = ClusterName::new("plane.test".into());
+    let cluster = ClusterName::new("plane.test");
     let drone = DroneId::new_random();
     let backend = BackendId::new_random();
 
@@ -188,8 +182,8 @@ async fn status_lifecycle() {
                 backend: backend.clone(),
                 message: BackendMessageType::Assignment {
                     drone: drone.clone(),
-                    lock: None,
                     bearer_token: None,
+                    lock_assignment: None,
                 },
             }),
         },
@@ -332,7 +326,7 @@ async fn status_lifecycle() {
 #[integration_test]
 async fn repeated_backend_state_not_overwritten() {
     let fixture = StateTestFixture::new().await;
-    let cluster = ClusterName::new("plane.test".into());
+    let cluster = ClusterName::new("plane.test");
     let backend = BackendId::new_random();
 
     // Update the state of the backend to "starting".
