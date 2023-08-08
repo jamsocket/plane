@@ -124,7 +124,9 @@ fn parse_and_verify_message<T: TypedMessage>(message: &Message) -> Result<T> {
     let value: T = serde_json::from_slice(&message.payload)?;
     let expected_subject = value.subject();
     if expected_subject != message.subject {
-        if expected_subject.starts_with("state.cluster.") && expected_subject.ends_with(".assignment") {
+        if expected_subject.starts_with("state.cluster.")
+            && expected_subject.ends_with(".assignment")
+        {
             // Temporarily ignore due to subject renaming.
         } else {
             return Err(anyhow!(
@@ -132,7 +134,7 @@ fn parse_and_verify_message<T: TypedMessage>(message: &Message) -> Result<T> {
                 message.subject,
                 value.subject()
             ));
-        }        
+        }
     }
 
     Ok(value)
