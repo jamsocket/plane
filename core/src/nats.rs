@@ -100,7 +100,7 @@ where
     pub fn new(subject: String) -> SubscribeSubject<M> {
         SubscribeSubject {
             subject,
-            _ph_m: PhantomData::default(),
+            _ph_m: PhantomData,
         }
     }
 }
@@ -197,7 +197,7 @@ where
         TypedSubscription {
             subscription,
             nc,
-            _ph_t: PhantomData::default(),
+            _ph_t: PhantomData,
         }
     }
 
@@ -368,7 +368,7 @@ impl TypedNats {
 
         Ok(DelayedReply {
             subscription,
-            _ph: PhantomData::default(),
+            _ph: PhantomData,
         })
     }
 
@@ -403,7 +403,7 @@ impl TypedNats {
         Ok(JetstreamSubscription {
             stream,
             has_pending,
-            _ph: PhantomData::default(),
+            _ph: PhantomData,
         })
     }
 
