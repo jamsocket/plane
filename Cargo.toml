@@ -5,6 +5,7 @@ members = [
     "controller",
     "core",
     "core/nats-macros",
+    "core/gen-schema-map",
     "dev",
     "dev/integration-test",
     "drone",
