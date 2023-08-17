@@ -1,23 +1,32 @@
 use crate::config::HttpOptions;
 use anyhow::Result;
+use async_stream::stream;
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    headers::Host,
+    http::{header, Method, StatusCode},
+    response::{sse::Event, Sse},
     routing::{get, post},
-    Json, Router,
+    BoxError, Json, Router, TypedHeader,
 };
+use chrono::{DateTime, Utc};
+use futures::{Stream, TryStreamExt};
 use plane_core::{
     messages::{
-        agent::{DockerExecutableConfig, DockerPullPolicy, ResourceLimits},
+        agent::{
+            BackendState, BackendStateMessage, DockerExecutableConfig, DockerPullPolicy,
+            ResourceLimits,
+        },
         scheduler::{ScheduleRequest, ScheduleResponse},
     },
     nats::TypedNats,
-    types::{ClusterName, ResourceLock},
+    types::{BackendId, ClusterName, ResourceLock},
     Never,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use tower_http::cors::{Any, CorsLayer};
 
 trait LogError<T> {
     fn log_error(self, status_code: StatusCode) -> Result<T, StatusCode>;
@@ -84,7 +93,8 @@ impl HttpSpawnRequest {
 struct HttpSpawnResponse {
     url: String,
     name: String,
-    ready_url: String,
+    // TODO: implement ready URL for jamsocket compatibility?
+    // ready_url: String,
     status_url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     bearer_token: Option<String>,
@@ -97,6 +107,7 @@ async fn handle_index() -> &'static str {
 
 async fn handle_spawn(
     State(server_state): State<Arc<ServerState>>,
+    TypedHeader(host): TypedHeader<Host>,
     Path(service): Path<String>,
     Json(request): Json<HttpSpawnRequest>,
 ) -> Result<Json<HttpSpawnResponse>, StatusCode> {
@@ -128,8 +139,7 @@ async fn handle_spawn(
                 server_state.cluster.to_string(),
             ),
             name: backend_id.to_string(),
-            ready_url: format!("__todo"),
-            status_url: format!("__todo"),
+            status_url: format!("http://{}/backend/{}/status", host, backend_id.to_string()),
             bearer_token,
             spawned,
         },
@@ -145,6 +155,84 @@ struct ServerState {
     pub cluster: ClusterName,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApiBackendStateMessage {
+    /// The new state.
+    pub state: BackendState,
+
+    /// The backend id.
+    pub backend: BackendId,
+
+    /// The time the state change was observed.
+    pub time: DateTime<Utc>,
+}
+
+fn convert_msg<T: Serialize>(msg: &T) -> Result<Event, BoxError> {
+    Event::default().json_data(msg).map_err(|e| e.into())
+}
+
+async fn status_stream(
+    Path((backend_name,)): Path<(String,)>,
+    State(server_state): State<Arc<ServerState>>,
+) -> Result<Sse<impl Stream<Item = Result<Event, BoxError>>>, StatusCode> {
+    let mut events = server_state
+        .nats
+        .subscribe_jetstream_subject(BackendStateMessage::subscribe_subject(&BackendId::new(
+            backend_name,
+        )))
+        .await
+        .log_error(StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut prev_state = None;
+
+    let dedup_messages = stream! {
+        while let Some((msg, _)) = events.next().await {
+            if Some(msg.state) != prev_state {
+                let msg = ApiBackendStateMessage {
+                    state: msg.state,
+                    backend: msg.backend,
+                    time: msg.time,
+                };
+
+                yield convert_msg(&msg);
+                prev_state = Some(msg.state);
+            };
+        };
+    };
+
+    let sse_events = dedup_messages.into_stream();
+
+    Ok(Sse::new(sse_events))
+}
+
+async fn status(
+    Path((backend_name,)): Path<(String,)>,
+    State(server_state): State<Arc<ServerState>>,
+) -> Result<Json<ApiBackendStateMessage>, StatusCode> {
+    let mut events = server_state
+        .nats
+        .subscribe_jetstream_subject(BackendStateMessage::subscribe_subject(&BackendId::new(
+            backend_name,
+        )))
+        .await
+        .log_error(StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    while let Some((msg, meta)) = events.next().await {
+        if meta.pending > 0 {
+            continue;
+        }
+
+        let msg = ApiBackendStateMessage {
+            state: msg.state,
+            backend: msg.backend,
+            time: msg.time,
+        };
+
+        return Ok(Json(msg));
+    }
+
+    Err(StatusCode::NOT_FOUND)
+}
+
 pub async fn serve(options: HttpOptions, nats: TypedNats) -> Result<Never> {
     let addr = SocketAddr::new(options.bind_ip, options.port);
 
@@ -154,9 +242,22 @@ pub async fn serve(options: HttpOptions, nats: TypedNats) -> Result<Never> {
         cluster: options.cluster,
     });
 
+    let cors_public = CorsLayer::new()
+        .allow_methods(vec![Method::GET, Method::POST])
+        .allow_headers(vec![header::CONTENT_TYPE])
+        .allow_origin(Any);
+
     let app = Router::new()
         .route("/", get(handle_index))
         .route("/service/:service/spawn", post(handle_spawn))
+        .route(
+            "/backend/:backend_id/status",
+            get(status).layer(cors_public.clone()),
+        )
+        .route(
+            "/backend/:backend_id/status/stream",
+            get(status_stream).layer(cors_public),
+        )
         .with_state(server_state);
 
     axum::Server::bind(&addr)
