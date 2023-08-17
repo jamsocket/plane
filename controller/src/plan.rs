@@ -1,4 +1,7 @@
-use crate::{config::{ControllerConfig, HttpOptions}, dns::rname_format::format_rname};
+use crate::{
+    config::{ControllerConfig, HttpOptions},
+    dns::rname_format::format_rname,
+};
 use anyhow::{Context, Result};
 use plane_core::{
     nats::TypedNats,
@@ -73,7 +76,7 @@ impl ControllerPlan {
             None
         };
 
-         let http_plan = config.http;
+        let http_plan = config.http;
 
         Ok(ControllerPlan {
             nats,

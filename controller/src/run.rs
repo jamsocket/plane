@@ -107,7 +107,7 @@ async fn controller_main() -> Result<()> {
         Supervisor::new("heartbeat", move || heartbeat(nats.clone()))
     };
 
-     let _http_supervisor = if let Some(http_options) = http_plan {
+    let _http_supervisor = if let Some(http_options) = http_plan {
         let nats = nats.clone();
         let http_options = http_options.clone();
         Some(Supervisor::new("http", move || {

@@ -1,6 +1,9 @@
 use plane_core::{nats_connection::NatsConnectionSpec, types::ClusterName};
 use serde::{Deserialize, Serialize};
-use std::{net::{IpAddr, Ipv4Addr}, collections::HashMap};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr},
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct SchedulerOptions {}
