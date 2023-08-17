@@ -24,6 +24,7 @@ use scheduler::Scheduler;
 mod config;
 pub mod dns;
 pub mod drone_state;
+pub mod http_server;
 pub mod plan;
 pub mod run;
 mod scheduler;

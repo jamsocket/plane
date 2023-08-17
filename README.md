@@ -65,3 +65,14 @@ Then, you can use the CLI with `./dev-cli.sh`. For example, you can spawn a hell
 And then access it with:
 
     ./dev-curl.sh [URL returned after spawn]
+
+## Spawning over HTTP
+
+The Plane controller can also optionally start an HTTP server that supports a subset of the NATS API for spawning.
+
+    curl \
+      -X POST \
+      -H "Content-Type: application/json" \
+      -d '{}' \
+      -D - \
+      localhost:9090/service/hello-world/spawn

@@ -1,4 +1,4 @@
-use crate::{config::ControllerConfig, dns::rname_format::format_rname};
+use crate::{config::{ControllerConfig, HttpOptions}, dns::rname_format::format_rname};
 use anyhow::{Context, Result};
 use plane_core::{
     nats::TypedNats,
@@ -23,6 +23,7 @@ pub struct ControllerPlan {
     pub scheduler_plan: Option<SchedulerPlan>,
     pub dns_plan: Option<DnsPlan>,
     pub state: StateHandle,
+    pub http_plan: Option<HttpOptions>,
 }
 
 impl ControllerPlan {
@@ -72,11 +73,14 @@ impl ControllerPlan {
             None
         };
 
+         let http_plan = config.http;
+
         Ok(ControllerPlan {
             nats,
             scheduler_plan,
             dns_plan,
             state,
+            http_plan,
         })
     }
 }

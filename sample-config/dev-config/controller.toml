@@ -7,3 +7,7 @@ hosts = ["127.0.0.1"]
 port = 5354
 soa_email = "test@example.com"
 domain_name = "ns1.example.com."
+
+[http]
+cluster = "plane.test"
+services.hello-world = "ghcr.io/drifting-in-space/demo-image-hello-world:sha-3b58532"
