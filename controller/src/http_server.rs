@@ -28,6 +28,8 @@ use serde_json::Value;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::cors::{Any, CorsLayer};
 
+const DEFAULT_GRACE_PERIOD_SECONDS: u64 = 60;
+
 trait LogError<T> {
     fn log_error(self, status_code: StatusCode) -> Result<T, StatusCode>;
 }
@@ -58,12 +60,12 @@ struct HttpSpawnRequest {
 }
 
 impl HttpSpawnRequest {
-    pub fn into_spawn_request(
+    pub fn as_spawn_request(
         &self,
         cluster: ClusterName,
         image: String,
     ) -> Result<ScheduleRequest> {
-        let max_idle_secs = Duration::from_secs(self.grace_period_seconds.unwrap_or_else(|| 600));
+        let max_idle_secs = Duration::from_secs(self.grace_period_seconds.unwrap_or(DEFAULT_GRACE_PERIOD_SECONDS));
 
         let lock: Option<ResourceLock> = self.lock.clone().map(|l| l.try_into()).transpose()?;
 
@@ -114,10 +116,10 @@ async fn handle_spawn(
     let service = server_state
         .services
         .get(&service)
-        .ok_or_else(|| StatusCode::NOT_FOUND)?;
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     let request = request
-        .into_spawn_request(server_state.cluster.clone(), service.clone())
+        .as_spawn_request(server_state.cluster.clone(), service.clone())
         .log_error(StatusCode::BAD_REQUEST)?;
 
     let response = server_state
@@ -135,11 +137,11 @@ async fn handle_spawn(
         } => HttpSpawnResponse {
             url: format!(
                 "http://{}.{}",
-                backend_id.to_string(),
-                server_state.cluster.to_string(),
+                backend_id,
+                server_state.cluster,
             ),
             name: backend_id.to_string(),
-            status_url: format!("http://{}/backend/{}/status", host, backend_id.to_string()),
+            status_url: format!("http://{}/backend/{}/status", host, backend_id),
             bearer_token,
             spawned,
         },
