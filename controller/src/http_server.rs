@@ -60,12 +60,11 @@ struct HttpSpawnRequest {
 }
 
 impl HttpSpawnRequest {
-    pub fn as_spawn_request(
-        &self,
-        cluster: ClusterName,
-        image: String,
-    ) -> Result<ScheduleRequest> {
-        let max_idle_secs = Duration::from_secs(self.grace_period_seconds.unwrap_or(DEFAULT_GRACE_PERIOD_SECONDS));
+    pub fn as_spawn_request(&self, cluster: ClusterName, image: String) -> Result<ScheduleRequest> {
+        let max_idle_secs = Duration::from_secs(
+            self.grace_period_seconds
+                .unwrap_or(DEFAULT_GRACE_PERIOD_SECONDS),
+        );
 
         let lock: Option<ResourceLock> = self.lock.clone().map(|l| l.try_into()).transpose()?;
 
@@ -135,11 +134,7 @@ async fn handle_spawn(
             spawned,
             ..
         } => HttpSpawnResponse {
-            url: format!(
-                "http://{}.{}",
-                backend_id,
-                server_state.cluster,
-            ),
+            url: format!("http://{}.{}", backend_id, server_state.cluster,),
             name: backend_id.to_string(),
             status_url: format!("http://{}/backend/{}/status", host, backend_id),
             bearer_token,
