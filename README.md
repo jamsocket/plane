@@ -65,3 +65,28 @@ Then, you can use the CLI with `./dev-cli.sh`. For example, you can spawn a hell
 And then access it with:
 
     ./dev-curl.sh [URL returned after spawn]
+
+## Spawning over HTTP
+
+The Plane controller can also optionally start an HTTP server that supports a subset of the NATS API for spawning.
+
+This is intended for development; in production we recommend using the NATS API.
+
+To enable the HTTP server, add an `[http]` block to the controller config. The block requires a `cluster` argument, which specifies the cluster that spawn requests should be spawned to. It also requires a `services` table, which defines a mapping from “service” names to the image to spawn for that service.
+
+```toml
+[http]
+cluster = "plane.test"
+services.hello-world = "ghcr.io/drifting-in-space/demo-image-hello-world:sha-3b58532"
+```
+
+By default, the controller HTTP server runs on port 9090. You can send a spawn request over HTTP like this:
+
+```bash
+curl \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  -D - \
+  localhost:9090/service/hello-world/spawn
+```

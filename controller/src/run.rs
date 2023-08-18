@@ -62,6 +62,7 @@ async fn controller_main() -> Result<()> {
         dns_plan,
         scheduler_plan,
         state,
+        http_plan,
     } = plan;
 
     tracing_handle.attach_nats(nats.clone())?;
@@ -104,6 +105,16 @@ async fn controller_main() -> Result<()> {
     let _heartbeat_supervisor = {
         let nats = nats.clone();
         Supervisor::new("heartbeat", move || heartbeat(nats.clone()))
+    };
+
+    let _http_supervisor = if let Some(http_options) = http_plan {
+        let nats = nats.clone();
+        let http_options = http_options;
+        Some(Supervisor::new("http", move || {
+            crate::http_server::serve(http_options.clone(), nats.clone())
+        }))
+    } else {
+        None
     };
 
     wait_for_interrupt().await
