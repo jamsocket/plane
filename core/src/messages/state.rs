@@ -80,7 +80,13 @@ pub struct DroneMeta {
 
 impl DroneMeta {
     pub fn git_hash_short(&self) -> Option<String> {
-        self.git_hash.as_ref().map(|hash| hash[..7].to_string())
+        self.git_hash.as_ref().map(|hash| {
+            if hash.len() >= 7 {
+                hash[..7].to_string()
+            } else {
+                hash.to_string()
+            }
+        })
     }
 }
 
