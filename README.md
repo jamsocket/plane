@@ -66,6 +66,11 @@ And then access it with:
 
     ./dev-curl.sh [URL returned after spawn]
 
+## Docker containers
+
+**Note that the GitHub-hosted Docker containers (hosted from `ghcr.io`) are for historic use only.** Packages have moved to the [`plane` organization](https://hub.docker.com/u/plane) on Docker Hub.
+
+
 ## Spawning over HTTP
 
 The Plane controller can also optionally start an HTTP server that supports a subset of the NATS API for spawning.
