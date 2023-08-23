@@ -58,7 +58,7 @@ cargo install --path=cli
 If you don't, or just want a temporary way to try out Plane, you can create a temporary alias that uses a pre-built Docker image of the cli:
 
 ```bash
-alias plane-cli="docker run --init --network plane ghcr.io/drifting-in-space/plane-cli --nats=nats://nats"
+alias plane-cli="docker run --init --network plane plane/plane-cli --nats=nats://nats"
 ```
 
 Whichever approach you choose, the below commands should work.
