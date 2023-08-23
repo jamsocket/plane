@@ -165,12 +165,12 @@ impl TypedMessage for WorldStateMessage {
                     ClusterLockMessageType::Announce => format!(
                         "state.cluster.{}.lock.{}.announce",
                         cluster.as_subject_component(),
-                        message.lock
+                        message.lock.as_subject_component()
                     ),
                     ClusterLockMessageType::Revoke => format!(
                         "state.cluster.{}.lock.{}.revoke",
                         cluster.as_subject_component(),
-                        message.lock
+                        message.lock.as_subject_component()
                     ),
                 },
                 ClusterStateMessage::DroneMessage(message) => match message.message {
@@ -198,7 +198,7 @@ impl TypedMessage for WorldStateMessage {
                     } => format!(
                         "state.cluster.{}.backend.{}.assignment.lock.{}",
                         cluster.subject_name(),
-                        message.backend,
+                        message.backend.as_subject_component(),
                         lock.as_subject_component()
                     ),
                     BackendMessageType::Assignment { .. } => format!(
@@ -209,7 +209,7 @@ impl TypedMessage for WorldStateMessage {
                     BackendMessageType::State { state, .. } => format!(
                         "state.cluster.{}.backend.{}.state.{}",
                         cluster.subject_name(),
-                        message.backend,
+                        message.backend.as_subject_component(),
                         state
                     ),
                 },
