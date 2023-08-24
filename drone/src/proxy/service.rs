@@ -302,7 +302,16 @@ impl ProxyService {
     }
 
     async fn handle(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
-        let subdomain = self.backend_from_request(&req)?;
+        let subdomain = match self.backend_from_request(&req) {
+            Ok(subdomain) => subdomain,
+            Err(error) => {
+                tracing::error!(?error, "Error getting backend from request.");
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .header(hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+                    .body(Body::empty())?);
+            }
+        };
 
         tracing::info!(ip=%self.remote_ip, url=%req.uri(), "Proxy Request");
         let route = self.db.get_proxy_route(&subdomain).await?.or_else(|| {
