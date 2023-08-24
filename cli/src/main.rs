@@ -178,7 +178,7 @@ async fn main() -> Result<()> {
                     break;
                 }
 
-                let WorldStateMessage::ClusterMessage {cluster, message} = message else {
+                let WorldStateMessage::ClusterMessage { cluster, message } = message else {
                     // ignore heartbeats
                     continue;
                 };
