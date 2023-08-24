@@ -261,7 +261,7 @@ impl ProxyService {
 
         if path.starts_with("/_plane_backend=") {
             let backend = path.strip_prefix("/_plane_backend=").unwrap();
-            let (backend, new_path) = backend.split_once('/').unwrap_or_else(|| (backend, ""));
+            let (backend, new_path) = backend.split_once('/').unwrap_or((backend, ""));
             path = new_path;
             return Ok(backend.to_string());
         }
