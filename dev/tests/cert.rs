@@ -32,7 +32,9 @@ impl DummyDnsHandler {
                 .await?;
             spawn_timeout(10_000, "Should get ACME DNS request.", async move {
                 let message = dns_sub.next().await.unwrap();
-                let DroneStateUpdate::AcmeMessage(acme_message) = &message.value else {panic!()};
+                let DroneStateUpdate::AcmeMessage(acme_message) = &message.value else {
+                    panic!()
+                };
                 assert_eq!(expect_domain, acme_message.cluster);
                 message.respond(&Some(Value::Bool(true))).await?;
                 Ok(())

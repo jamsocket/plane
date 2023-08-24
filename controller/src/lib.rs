@@ -99,12 +99,23 @@ async fn wait_for_locked_backend_assignment(
     state.wait_for_seq(seq).await;
 
     let WorldStateMessage::ClusterMessage {
-        message : ClusterStateMessage::BackendMessage(
-            BackendMessage {
+        message:
+            ClusterStateMessage::BackendMessage(BackendMessage {
                 backend,
-                message: BackendMessageType::Assignment {
-                    lock_assignment: Some(_),..}, ..}), .. } = msg.0
-    else { return Err(anyhow!("Non-assignment message received on assignment subject")) };
+                message:
+                    BackendMessageType::Assignment {
+                        lock_assignment: Some(_),
+                        ..
+                    },
+                ..
+            }),
+        ..
+    } = msg.0
+    else {
+        return Err(anyhow!(
+            "Non-assignment message received on assignment subject"
+        ));
+    };
 
     Ok(backend)
 }
