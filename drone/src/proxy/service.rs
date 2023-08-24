@@ -256,84 +256,93 @@ impl ProxyService {
         }
     }
 
-    async fn handle(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
+    fn backend_from_request(&self, req: &Request<Body>) -> Result<String> {
+        let mut path = req.uri().path();
+
+        if path.starts_with("/_plane_backend=") {
+            let backend = path.strip_prefix("/_plane_backend=").unwrap();
+            let (backend, new_path) = backend.split_once('/').unwrap_or_else(|| (backend, ""));
+            path = new_path;
+            return Ok(backend.to_string());
+        }
+
         if let Some(host) = req.headers().get(http::header::HOST) {
             let host = std::str::from_utf8(host.as_bytes())?;
-            // If the host includes a port, strip it.
-            let host = host.split_once(':').map(|(host, _)| host).unwrap_or(host);
+            let host = host.rsplit_once(':').map(|(host, _)| host).unwrap_or(host);
+            let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) else {
+                return Err(anyhow!("Host does not end with cluster domain."));
+            };
+            return Ok(subdomain.to_owned());
+        }
 
-            tracing::info!(ip=%self.remote_ip, url=%req.uri(), "Proxy Request");
+        Err(anyhow!("No backend found in host or URL path."))
+    }
 
-            if let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) {
-                let subdomain = subdomain.to_string();
+    fn handle_plane_auth(&self, req: Request<Body>) -> anyhow::Result<Response<Body>> {
+        let params: PlaneAuthParams =
+            serde_html_form::from_str(req.uri().query().unwrap_or_default())?;
 
-                let route = self.db.get_proxy_route(&subdomain).await?.or_else(|| {
-                    self.passthrough.map(|d| ProxyRoute {
-                        address: d.to_string(),
-                        bearer_token: None,
-                    })
-                });
+        if let Some(redirect) = params.redirect.as_deref() {
+            if !redirect.starts_with('/') {
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body("Redirect must be relative and start with a slash.".into())
+                    .unwrap());
+            }
+        }
 
-                if req.uri().path() == "/_plane_auth" {
-                    let params: PlaneAuthParams =
-                        serde_html_form::from_str(req.uri().query().unwrap_or_default())?;
+        Ok(Response::builder()
+            .status(StatusCode::FOUND)
+            .header("Location", params.redirect.as_deref().unwrap_or("/"))
+            .header(
+                "Set-Cookie",
+                format!("{}={}", PLANE_AUTH_COOKIE, params.token),
+            )
+            .body(Body::empty())?)
+    }
 
-                    if let Some(redirect) = params.redirect.as_deref() {
-                        if !redirect.starts_with('/') {
-                            return Ok(Response::builder()
-                                .status(StatusCode::BAD_REQUEST)
-                                .body("Redirect must be relative and start with a slash.".into())
-                                .unwrap());
-                        }
-                    }
+    async fn handle(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
+        let subdomain = self.backend_from_request(&req)?;
 
-                    return Ok(Response::builder()
-                        .status(StatusCode::FOUND)
-                        .header("Location", params.redirect.as_deref().unwrap_or("/"))
-                        .header(
-                            "Set-Cookie",
-                            format!("{}={}", PLANE_AUTH_COOKIE, params.token),
-                        )
-                        .body(Body::empty())?);
+        tracing::info!(ip=%self.remote_ip, url=%req.uri(), "Proxy Request");
+        let route = self.db.get_proxy_route(&subdomain).await?.or_else(|| {
+            self.passthrough.map(|d| ProxyRoute {
+                address: d.to_string(),
+                bearer_token: None,
+            })
+        });
 
-                    return Ok(Response::builder()
-                        .status(StatusCode::BAD_REQUEST)
-                        .body("Missing token.".into())?);
-                }
+        if req.uri().path() == "/_plane_auth" {
+            return self.handle_plane_auth(req);
+        }
 
-                if let Some(proxy_route) = route {
-                    self.connection_tracker.track_request(&subdomain);
-                    *req.uri_mut() = Self::rewrite_uri(&proxy_route.address, req.uri())?;
+        if let Some(proxy_route) = route {
+            self.connection_tracker.track_request(&subdomain);
+            *req.uri_mut() = Self::rewrite_uri(&proxy_route.address, req.uri())?;
 
-                    if let Some(token) = proxy_route.bearer_token {
-                        if let Some(response) = check_auth(&req, &token)? {
-                            return Ok(response);
-                        }
-                    }
-
-                    if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
-                        if connection
-                            .to_str()
-                            .unwrap_or_default()
-                            .to_lowercase()
-                            .contains(UPGRADE)
-                        {
-                            return self.handle_upgrade(req, &subdomain).await;
-                        }
-                    }
-
-                    let result = self
-                        .client
-                        .request(req)
-                        .await
-                        .context("Error handling client request.")?;
-                    return Ok(result);
+            if let Some(token) = proxy_route.bearer_token {
+                if let Some(response) = check_auth(&req, &token)? {
+                    return Ok(response);
                 }
             }
 
-            tracing::warn!(?host, "Unrecognized host.");
-        } else {
-            tracing::warn!("No host header present on request.");
+            if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
+                if connection
+                    .to_str()
+                    .unwrap_or_default()
+                    .to_lowercase()
+                    .contains(UPGRADE)
+                {
+                    return self.handle_upgrade(req, &subdomain).await;
+                }
+            }
+
+            let result = self
+                .client
+                .request(req)
+                .await
+                .context("Error handling client request.")?;
+            return Ok(result);
         }
 
         Ok(Response::builder()
