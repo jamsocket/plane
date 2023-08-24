@@ -72,9 +72,13 @@ impl MockAgent {
         let cluster_clone = cluster.clone();
         let drone_connected = wait_for_predicate(state.clone(), move |ws| {
             tracing::info!(?ws, "current ws");
-            let Some(cluster) = ws.cluster(&cluster_clone) else { return false };
+            let Some(cluster) = ws.cluster(&cluster_clone) else {
+                return false;
+            };
             tracing::info!(?cluster, "cluster");
-            let Some(drone) = cluster.drone(&drone_copy) else { return false };
+            let Some(drone) = cluster.drone(&drone_copy) else {
+                return false;
+            };
             drone.meta.is_some()
         });
 
@@ -179,11 +183,17 @@ impl MockAgent {
 async fn drone_ready_notify(state: StateHandle, drone: DroneId, cluster: ClusterName) {
     wait_for_predicate(state, move |ws| {
         tracing::info!(?ws, "current ws");
-        let Some(cluster) = ws.cluster(&cluster) else { return false };
+        let Some(cluster) = ws.cluster(&cluster) else {
+            return false;
+        };
         tracing::info!(?cluster, "cluster");
-        let Some(drone) = cluster.drone(&drone) else { return false };
+        let Some(drone) = cluster.drone(&drone) else {
+            return false;
+        };
         tracing::info!(?drone, "drone");
-        let Some(drone_state) = drone.state() else { return false };
+        let Some(drone_state) = drone.state() else {
+            return false;
+        };
         tracing::info!(?drone_state, "drone state");
         drone_state == DroneState::Ready && drone.last_seen.is_some()
     })
@@ -193,11 +203,17 @@ async fn drone_ready_notify(state: StateHandle, drone: DroneId, cluster: Cluster
 async fn drone_not_ready_notify(state: StateHandle, drone: DroneId, cluster: ClusterName) {
     wait_for_predicate(state, move |ws| {
         tracing::info!(?ws, "current ws");
-        let Some(cluster) = ws.cluster(&cluster) else { return false };
+        let Some(cluster) = ws.cluster(&cluster) else {
+            return false;
+        };
         tracing::info!(?cluster, "cluster");
-        let Some(drone) = cluster.drone(&drone) else { return false };
+        let Some(drone) = cluster.drone(&drone) else {
+            return false;
+        };
         tracing::info!(?drone, "drone");
-        let Some(drone_state) = drone.state() else { return false };
+        let Some(drone_state) = drone.state() else {
+            return false;
+        };
         tracing::info!(?drone_state, "drone state");
         drone_state != DroneState::Ready && drone.last_seen.is_some()
     })
@@ -490,14 +506,28 @@ async fn schedule_request_lock() {
         .await
         .unwrap();
 
-    let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, .. } = r1 else {panic!()};
+    let ScheduleResponse::Scheduled {
+        drone: drone1,
+        backend_id: backend1,
+        ..
+    } = r1
+    else {
+        panic!()
+    };
 
     let r2 = mock_agent
         .schedule_drone(false, Some(foobar))
         .await
         .unwrap();
 
-    let ScheduleResponse::Scheduled { drone: drone2, backend_id: backend2, .. } = r2 else {panic!()};
+    let ScheduleResponse::Scheduled {
+        drone: drone2,
+        backend_id: backend2,
+        ..
+    } = r2
+    else {
+        panic!()
+    };
 
     assert_eq!(drone1, drone2);
     assert_eq!(backend1, backend2);
@@ -606,15 +636,28 @@ async fn fetch_locked_backend() {
         .await
         .unwrap();
 
-    let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, .. } = r1 else {panic!()};
+    let ScheduleResponse::Scheduled {
+        drone: drone1,
+        backend_id: backend1,
+        ..
+    } = r1
+    else {
+        panic!()
+    };
 
     let r2 = mock_agent
         .fetch_locked(ClusterName::new("plane.test"), foobar)
         .await
         .unwrap();
 
-    let FetchBackendForLockResponse::Scheduled { drone: drone2, backend_id: backend2, ..} = r2
-        else {panic!()};
+    let FetchBackendForLockResponse::Scheduled {
+        drone: drone2,
+        backend_id: backend2,
+        ..
+    } = r2
+    else {
+        panic!()
+    };
 
     assert_eq!(drone1, drone2);
     assert_eq!(backend1, backend2);
@@ -654,12 +697,28 @@ async fn schedule_request_lock_with_bearer_token() {
         .await
         .unwrap();
 
-    let ScheduleResponse::Scheduled { drone: drone1, backend_id: backend1, bearer_token: bearer_token1, .. } = r1 else {panic!()};
+    let ScheduleResponse::Scheduled {
+        drone: drone1,
+        backend_id: backend1,
+        bearer_token: bearer_token1,
+        ..
+    } = r1
+    else {
+        panic!()
+    };
     assert!(bearer_token1.is_some());
 
     let r2 = mock_agent.schedule_drone(true, Some(foobar)).await.unwrap();
 
-    let ScheduleResponse::Scheduled { drone: drone2, backend_id: backend2, bearer_token: bearer_token2, .. } = r2 else {panic!()};
+    let ScheduleResponse::Scheduled {
+        drone: drone2,
+        backend_id: backend2,
+        bearer_token: bearer_token2,
+        ..
+    } = r2
+    else {
+        panic!()
+    };
 
     assert_eq!(drone1, drone2);
     assert_eq!(backend1, backend2);
