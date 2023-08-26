@@ -3,7 +3,7 @@ use super::tls::TlsStream;
 use super::PLANE_AUTH_COOKIE;
 use crate::database::{DroneDatabase, ProxyRoute};
 use anyhow::{anyhow, Context, Result};
-use http::uri::{Authority, Scheme};
+use http::uri::{Authority, PathAndQuery, Scheme};
 use http::Uri;
 use hyper::client::HttpConnector;
 use hyper::server::conn::AddrStream;
@@ -184,6 +184,9 @@ impl ProxyService {
         let mut parts = uri.clone().into_parts();
         parts.authority = Some(Authority::from_str(authority)?);
         parts.scheme = Some(Scheme::HTTP);
+        parts.path_and_query = parts
+            .path_and_query
+            .or(Some(PathAndQuery::from_static("/")));
         let uri = Uri::from_parts(parts).context("Error rewriting proxy URL.")?;
 
         Ok(uri)
@@ -262,13 +265,26 @@ impl ProxyService {
         }
     }
 
-    fn backend_from_request(&self, req: &Request<Body>) -> Result<String> {
-        let mut path = req.uri().path();
+    fn backend_from_request(&self, req: &mut Request<Body>) -> Result<String> {
+        let mut uri = req.uri_mut();
+        let path = uri.path().to_string();
 
         if self.allow_path_routing {
             if let Some(rest) = path.strip_prefix("/_plane_backend=") {
                 let (backend, new_path) = rest.split_once('/').unwrap_or((rest, ""));
-                path = new_path;
+
+                // Replace path with a version that strips the /_plane_backend=... prefix.
+                let mut parts = uri.clone().into_parts();
+
+                let p = http::uri::PathAndQuery::from_str(new_path).unwrap();
+                println!("a {:?}", p);
+
+                parts.path_and_query = Some(
+                    http::uri::PathAndQuery::from_str(new_path)
+                        .context("Error parsing path and query.")?,
+                );
+                *uri = Uri::from_parts(parts).context("Error rewriting proxy URL.")?;
+
                 return Ok(backend.to_string());
             }
         }
@@ -309,7 +325,7 @@ impl ProxyService {
     }
 
     async fn handle(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
-        let subdomain = match self.backend_from_request(&req) {
+        let subdomain = match self.backend_from_request(&mut req) {
             Ok(subdomain) => subdomain,
             Err(error) => {
                 tracing::error!(?error, "Error getting backend from request.");
