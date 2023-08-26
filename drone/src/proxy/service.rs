@@ -50,6 +50,7 @@ pub struct MakeProxyService {
     cluster: String,
     connection_tracker: ConnectionTracker,
     passthrough: Option<SocketAddr>,
+    allow_path_routing: bool,
 }
 
 impl MakeProxyService {
@@ -58,6 +59,7 @@ impl MakeProxyService {
         cluster: String,
         connection_tracker: ConnectionTracker,
         passthrough: Option<SocketAddr>,
+        allow_path_routing: bool,
     ) -> Self {
         MakeProxyService {
             db,
@@ -65,6 +67,7 @@ impl MakeProxyService {
             cluster,
             connection_tracker,
             passthrough,
+            allow_path_routing,
         }
     }
 }
@@ -90,6 +93,7 @@ impl<'a> Service<&'a AddrStream> for MakeProxyService {
             connection_tracker: self.connection_tracker.clone(),
             remote_ip,
             passthrough: self.passthrough,
+            allow_path_routing: self.allow_path_routing,
         }))
     }
 }
@@ -115,6 +119,7 @@ impl<'a> Service<&'a TlsStream> for MakeProxyService {
             connection_tracker: self.connection_tracker.clone(),
             remote_ip,
             passthrough: self.passthrough,
+            allow_path_routing: self.allow_path_routing,
         }))
     }
 }
@@ -127,6 +132,7 @@ pub struct ProxyService {
     connection_tracker: ConnectionTracker,
     remote_ip: IpAddr,
     passthrough: Option<SocketAddr>,
+    allow_path_routing: bool,
 }
 
 fn check_auth<T>(req: &Request<T>, expected_token: &str) -> Result<Option<Response<Body>>> {
@@ -259,11 +265,12 @@ impl ProxyService {
     fn backend_from_request(&self, req: &Request<Body>) -> Result<String> {
         let mut path = req.uri().path();
 
-        if path.starts_with("/_plane_backend=") {
-            let backend = path.strip_prefix("/_plane_backend=").unwrap();
-            let (backend, new_path) = backend.split_once('/').unwrap_or((backend, ""));
-            path = new_path;
-            return Ok(backend.to_string());
+        if self.allow_path_routing {
+            if let Some(rest) = path.strip_prefix("/_plane_backend=") {
+                let (backend, new_path) = rest.split_once('/').unwrap_or((rest, ""));
+                path = new_path;
+                return Ok(backend.to_string());
+            }
         }
 
         if let Some(host) = req.headers().get(http::header::HOST) {

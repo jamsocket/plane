@@ -65,6 +65,7 @@ impl DronePlan {
                 bind_port,
                 key_pair,
                 passthrough: proxy_config.passthrough,
+                allow_path_routing: proxy_config.allow_path_routing,
             })
         } else {
             None
