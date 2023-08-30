@@ -54,6 +54,8 @@ enum Command {
     },
     Drain {
         cluster: String,
+
+        #[arg(required = true)]
         drone: Vec<String>,
 
         /// Cancel draining and allow a drone to accept backends again.
@@ -440,19 +442,30 @@ async fn main() -> Result<()> {
             cancel,
         } => {
             let drain = !cancel;
-            for drone in drone {
+            for ref drone in drone {
                 nats.request(&DrainDrone {
                     cluster: ClusterName::new(&cluster),
-                    drone: DroneId::new(drone),
+                    drone: DroneId::new(drone.clone()),
                     drain,
                 })
-                .await?;
-            }
-
-            if drain {
-                println!("{}", "Draining started on drone.".bright_green());
-            } else {
-                println!("{}", "Draining cancelled on drone.".bright_green());
+                .await
+                .map_or_else(
+                    |e| {
+                        println!("{} {}", "Draining failed on drone: ".bright_red(), drone);
+                        println!("Error: {}", e.to_string().bright_red())
+                    },
+                    |_| {
+                        if drain {
+                            println!("{} {}", "Draining started on drone: ".bright_green(), drone);
+                        } else {
+                            println!(
+                                "{} {}",
+                                "Draining cancelled on drone: ".bright_green(),
+                                drone
+                            );
+                        }
+                    },
+                );
             }
         }
     }
