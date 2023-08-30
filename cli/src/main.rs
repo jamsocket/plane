@@ -443,18 +443,15 @@ async fn main() -> Result<()> {
         } => {
             let drain = !cancel;
             for ref drone in drone {
-                nats.request(&DrainDrone {
-                    cluster: ClusterName::new(&cluster),
-                    drone: DroneId::new(drone.clone()),
-                    drain,
-                })
-                .await
-                .map_or_else(
-                    |e| {
-                        println!("{} {}", "Draining failed on drone: ".bright_red(), drone);
-                        println!("Error: {}", e.to_string().bright_red())
-                    },
-                    |_| {
+                match nats
+                    .request(&DrainDrone {
+                        cluster: ClusterName::new(&cluster),
+                        drone: DroneId::new(drone.clone()),
+                        drain,
+                    })
+                    .await
+                {
+                    Ok(_) => {
                         if drain {
                             println!("{} {}", "Draining started on drone: ".bright_green(), drone);
                         } else {
@@ -464,8 +461,12 @@ async fn main() -> Result<()> {
                                 drone
                             );
                         }
-                    },
-                );
+                    }
+                    Err(e) => {
+                        println!("{} {}", "Draining failed on drone: ".bright_red(), drone);
+                        println!("Error: {}", e.to_string().bright_red())
+                    }
+                }
             }
         }
     }
