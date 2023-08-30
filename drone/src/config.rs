@@ -62,6 +62,9 @@ pub struct ProxyOptions {
     #[serde(default = "default_http_port")]
     pub http_port: u16,
     pub passthrough: Option<SocketAddr>,
+
+    #[serde(default)]
+    pub allow_path_routing: bool,
 }
 
 fn default_http_port() -> u16 {

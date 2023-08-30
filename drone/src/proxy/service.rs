@@ -3,7 +3,7 @@ use super::tls::TlsStream;
 use super::PLANE_AUTH_COOKIE;
 use crate::database::{DroneDatabase, ProxyRoute};
 use anyhow::{anyhow, Context, Result};
-use http::uri::{Authority, Scheme};
+use http::uri::{Authority, PathAndQuery, Scheme};
 use http::Uri;
 use hyper::client::HttpConnector;
 use hyper::server::conn::AddrStream;
@@ -50,6 +50,7 @@ pub struct MakeProxyService {
     cluster: String,
     connection_tracker: ConnectionTracker,
     passthrough: Option<SocketAddr>,
+    allow_path_routing: bool,
 }
 
 impl MakeProxyService {
@@ -58,6 +59,7 @@ impl MakeProxyService {
         cluster: String,
         connection_tracker: ConnectionTracker,
         passthrough: Option<SocketAddr>,
+        allow_path_routing: bool,
     ) -> Self {
         MakeProxyService {
             db,
@@ -65,6 +67,7 @@ impl MakeProxyService {
             cluster,
             connection_tracker,
             passthrough,
+            allow_path_routing,
         }
     }
 }
@@ -90,6 +93,7 @@ impl<'a> Service<&'a AddrStream> for MakeProxyService {
             connection_tracker: self.connection_tracker.clone(),
             remote_ip,
             passthrough: self.passthrough,
+            allow_path_routing: self.allow_path_routing,
         }))
     }
 }
@@ -115,6 +119,7 @@ impl<'a> Service<&'a TlsStream> for MakeProxyService {
             connection_tracker: self.connection_tracker.clone(),
             remote_ip,
             passthrough: self.passthrough,
+            allow_path_routing: self.allow_path_routing,
         }))
     }
 }
@@ -127,6 +132,7 @@ pub struct ProxyService {
     connection_tracker: ConnectionTracker,
     remote_ip: IpAddr,
     passthrough: Option<SocketAddr>,
+    allow_path_routing: bool,
 }
 
 fn check_auth<T>(req: &Request<T>, expected_token: &str) -> Result<Option<Response<Body>>> {
@@ -178,6 +184,9 @@ impl ProxyService {
         let mut parts = uri.clone().into_parts();
         parts.authority = Some(Authority::from_str(authority)?);
         parts.scheme = Some(Scheme::HTTP);
+        parts.path_and_query = parts
+            .path_and_query
+            .or(Some(PathAndQuery::from_static("/")));
         let uri = Uri::from_parts(parts).context("Error rewriting proxy URL.")?;
 
         Ok(uri)
@@ -256,84 +265,116 @@ impl ProxyService {
         }
     }
 
-    async fn handle(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
+    fn backend_from_request(&self, req: &mut Request<Body>) -> Result<String> {
+        let mut uri = req.uri_mut();
+        let path = uri.path().to_string();
+
+        if self.allow_path_routing {
+            if let Some(rest) = path.strip_prefix("/_plane_backend=") {
+                let (backend, new_path) = rest.split_once('/').unwrap_or((rest, ""));
+
+                // Replace path with a version that strips the /_plane_backend=... prefix.
+                let mut parts = uri.clone().into_parts();
+
+                let p = http::uri::PathAndQuery::from_str(new_path).unwrap();
+                println!("a {:?}", p);
+
+                parts.path_and_query = Some(
+                    http::uri::PathAndQuery::from_str(new_path)
+                        .context("Error parsing path and query.")?,
+                );
+                *uri = Uri::from_parts(parts).context("Error rewriting proxy URL.")?;
+
+                return Ok(backend.to_string());
+            }
+        }
+
         if let Some(host) = req.headers().get(http::header::HOST) {
             let host = std::str::from_utf8(host.as_bytes())?;
-            // If the host includes a port, strip it.
-            let host = host.split_once(':').map(|(host, _)| host).unwrap_or(host);
+            let host = host.rsplit_once(':').map(|(host, _)| host).unwrap_or(host);
+            let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) else {
+                return Err(anyhow!("Host does not end with cluster domain."));
+            };
+            return Ok(subdomain.to_owned());
+        }
 
-            tracing::info!(ip=%self.remote_ip, url=%req.uri(), "Proxy Request");
+        Err(anyhow!("No backend found in host or URL path."))
+    }
 
-            if let Some(subdomain) = host.strip_suffix(&format!(".{}", self.cluster)) {
-                let subdomain = subdomain.to_string();
+    fn handle_plane_auth(&self, req: Request<Body>) -> anyhow::Result<Response<Body>> {
+        let params: PlaneAuthParams =
+            serde_html_form::from_str(req.uri().query().unwrap_or_default())?;
 
-                let route = self.db.get_proxy_route(&subdomain).await?.or_else(|| {
-                    self.passthrough.map(|d| ProxyRoute {
-                        address: d.to_string(),
-                        bearer_token: None,
-                    })
-                });
+        if let Some(redirect) = params.redirect.as_deref() {
+            if !redirect.starts_with('/') {
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body("Redirect must be relative and start with a slash.".into())
+                    .unwrap());
+            }
+        }
 
-                if req.uri().path() == "/_plane_auth" {
-                    let params: PlaneAuthParams =
-                        serde_html_form::from_str(req.uri().query().unwrap_or_default())?;
+        Ok(Response::builder()
+            .status(StatusCode::FOUND)
+            .header("Location", params.redirect.as_deref().unwrap_or("/"))
+            .header(
+                "Set-Cookie",
+                format!("{}={}", PLANE_AUTH_COOKIE, params.token),
+            )
+            .body(Body::empty())?)
+    }
 
-                    if let Some(redirect) = params.redirect.as_deref() {
-                        if !redirect.starts_with('/') {
-                            return Ok(Response::builder()
-                                .status(StatusCode::BAD_REQUEST)
-                                .body("Redirect must be relative and start with a slash.".into())
-                                .unwrap());
-                        }
-                    }
+    async fn handle(self, mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
+        let subdomain = match self.backend_from_request(&mut req) {
+            Ok(subdomain) => subdomain,
+            Err(error) => {
+                tracing::error!(?error, "Error getting backend from request.");
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .header(hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+                    .body(Body::empty())?);
+            }
+        };
 
-                    return Ok(Response::builder()
-                        .status(StatusCode::FOUND)
-                        .header("Location", params.redirect.as_deref().unwrap_or("/"))
-                        .header(
-                            "Set-Cookie",
-                            format!("{}={}", PLANE_AUTH_COOKIE, params.token),
-                        )
-                        .body(Body::empty())?);
+        tracing::info!(ip=%self.remote_ip, url=%req.uri(), "Proxy Request");
+        let route = self.db.get_proxy_route(&subdomain).await?.or_else(|| {
+            self.passthrough.map(|d| ProxyRoute {
+                address: d.to_string(),
+                bearer_token: None,
+            })
+        });
 
-                    return Ok(Response::builder()
-                        .status(StatusCode::BAD_REQUEST)
-                        .body("Missing token.".into())?);
-                }
+        if req.uri().path() == "/_plane_auth" {
+            return self.handle_plane_auth(req);
+        }
 
-                if let Some(proxy_route) = route {
-                    self.connection_tracker.track_request(&subdomain);
-                    *req.uri_mut() = Self::rewrite_uri(&proxy_route.address, req.uri())?;
+        if let Some(proxy_route) = route {
+            self.connection_tracker.track_request(&subdomain);
+            *req.uri_mut() = Self::rewrite_uri(&proxy_route.address, req.uri())?;
 
-                    if let Some(token) = proxy_route.bearer_token {
-                        if let Some(response) = check_auth(&req, &token)? {
-                            return Ok(response);
-                        }
-                    }
-
-                    if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
-                        if connection
-                            .to_str()
-                            .unwrap_or_default()
-                            .to_lowercase()
-                            .contains(UPGRADE)
-                        {
-                            return self.handle_upgrade(req, &subdomain).await;
-                        }
-                    }
-
-                    let result = self
-                        .client
-                        .request(req)
-                        .await
-                        .context("Error handling client request.")?;
-                    return Ok(result);
+            if let Some(token) = proxy_route.bearer_token {
+                if let Some(response) = check_auth(&req, &token)? {
+                    return Ok(response);
                 }
             }
 
-            tracing::warn!(?host, "Unrecognized host.");
-        } else {
-            tracing::warn!("No host header present on request.");
+            if let Some(connection) = req.headers().get(hyper::http::header::CONNECTION) {
+                if connection
+                    .to_str()
+                    .unwrap_or_default()
+                    .to_lowercase()
+                    .contains(UPGRADE)
+                {
+                    return self.handle_upgrade(req, &subdomain).await;
+                }
+            }
+
+            let result = self
+                .client
+                .request(req)
+                .await
+                .context("Error handling client request.")?;
+            return Ok(result);
         }
 
         Ok(Response::builder()

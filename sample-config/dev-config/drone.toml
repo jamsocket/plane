@@ -10,6 +10,7 @@ ip = "127.0.0.1"
 bind_ip = "127.0.0.1"
 http_port = "8080"
 https_port = "4333"
+allow_path_routing = true
 
 [cert]
 key_path = "sample-config/auth/site-key.pem"

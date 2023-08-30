@@ -78,6 +78,7 @@ impl Proxy {
             key_pair: Some(certs.path_pair.clone()),
             cluster_domain: CLUSTER.into(),
             passthrough,
+            allow_path_routing: false,
         };
         let guard = expect_to_stay_alive(plane_drone::proxy::serve(options));
 
