@@ -267,7 +267,7 @@ impl ProxyService {
 
     fn backend_from_request(&self, req: &mut Request<Body>) -> Result<String> {
         let mut uri = req.uri_mut();
-        let path = uri.path().to_string();
+        let path = uri.path_and_query().map(|p| p.to_string()).unwrap_or_default();
 
         if self.allow_path_routing {
             if let Some(rest) = path.strip_prefix("/_plane_backend=") {
