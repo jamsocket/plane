@@ -272,15 +272,15 @@ impl ProxyService {
         if self.allow_path_routing {
             if let Some(rest) = path.strip_prefix("/_plane_backend=") {
                 let (backend, new_path) = rest.split_once('/').unwrap_or((rest, ""));
+                let new_path = format!("/{}", new_path);
 
                 // Replace path with a version that strips the /_plane_backend=... prefix.
                 let mut parts = uri.clone().into_parts();
 
-                let p = http::uri::PathAndQuery::from_str(new_path).unwrap();
-                println!("a {:?}", p);
+                let p = http::uri::PathAndQuery::from_str(&new_path).unwrap();
 
                 parts.path_and_query = Some(
-                    http::uri::PathAndQuery::from_str(new_path)
+                    http::uri::PathAndQuery::from_str(&new_path)
                         .context("Error parsing path and query.")?,
                 );
                 *uri = Uri::from_parts(parts).context("Error rewriting proxy URL.")?;
