@@ -289,6 +289,11 @@ impl ProxyService {
                 *uri = Uri::from_parts(parts).context("Error rewriting proxy URL.")?;
 
                 return Ok(backend.to_string());
+            } else {
+                tracing::warn!(
+                    ?path,
+                    "allow_path_routing is set but path does not have /_plane_backend= as prefix",
+                )
             }
         }
 
