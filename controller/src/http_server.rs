@@ -69,7 +69,7 @@ impl HttpSpawnRequest {
         let lock: Option<ResourceLock> = self.lock.clone().map(|l| l.try_into()).transpose()?;
 
         let mut env = self.env.clone();
-        env.insert("PORT".to_string(), "8080".to_string());
+        env.insert("PORT".to_string(), self.port.unwrap_or(8080).to_string());
 
         let executable = DockerExecutableConfig {
             image,
