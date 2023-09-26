@@ -31,7 +31,8 @@ pub struct ControllerPlan {
 
 impl ControllerPlan {
     pub async fn from_controller_config(config: ControllerConfig) -> Result<Self> {
-        let nats = config.nats.connect_with_retry("controller.inbox").await?;
+        let mut nats = config.nats.connect_with_retry("controller.inbox").await?;
+        nats.log_stream_size_limit_bytes = config.log_stream_size_limit_bytes;
         nats.initialize_jetstreams().await?;
         let state = start_state_loop(nats.clone()).await?;
 

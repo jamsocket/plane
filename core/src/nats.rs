@@ -262,6 +262,7 @@ impl<T> NatsResultExt<T> for std::result::Result<T, async_nats::Error> {
 pub struct TypedNats {
     nc: Client,
     pub jetstream: jetstream::Context,
+    pub log_stream_size_limit_bytes: Option<i64>,
 }
 
 pub struct DelayedReply<T: DeserializeOwned> {
@@ -343,11 +344,15 @@ impl TypedNats {
     pub async fn new(nc: Client) -> Result<Self> {
         let jetstream = async_nats::jetstream::new(nc.clone());
 
-        Ok(TypedNats { nc, jetstream })
+        Ok(TypedNats {
+            nc,
+            jetstream,
+            log_stream_size_limit_bytes: None,
+        })
     }
 
     pub async fn initialize_jetstreams(&self) -> Result<()> {
-        initialize_jetstreams(&self.jetstream).await
+        initialize_jetstreams(&self.jetstream, self.log_stream_size_limit_bytes).await
     }
 
     /// Send a request that expects a reply, but return as soon as the request

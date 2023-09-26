@@ -62,4 +62,6 @@ pub struct ControllerConfig {
     pub dns: Option<DnsOptions>,
 
     pub http: Option<HttpOptions>,
+
+    pub log_stream_size_limit_bytes: Option<i64>,
 }
