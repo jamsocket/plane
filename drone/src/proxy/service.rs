@@ -290,10 +290,7 @@ impl ProxyService {
 
                 return Ok(backend.to_string());
             } else {
-                tracing::warn!(
-                    ?path,
-                    "allow_path_routing is set but path does not have /_plane_backend= as prefix",
-                )
+                return Err(anyhow!("allow_path_routing is set but path ({}) does not have /_plane_backend= as prefix", path));
             }
         }
 

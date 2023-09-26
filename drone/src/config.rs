@@ -63,6 +63,8 @@ pub struct ProxyOptions {
     pub http_port: u16,
     pub passthrough: Option<SocketAddr>,
 
+    /// path routing and hostname routing are mutually exclusive.
+    /// the _plane_backend prefix MUST be supplied if this option is true
     #[serde(default)]
     pub allow_path_routing: bool,
 }
