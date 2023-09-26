@@ -58,6 +58,55 @@ impl ClusterDnsServer {
     }
 
     async fn do_lookup(&self, request: &Request) -> Result<Vec<Record>> {
+        match request.query().query_type() {
+            RecordType::SOA => {
+                let name = request.query().name();
+                let soa_email = self
+                    .soa_email
+                    .as_ref()
+                    .or_dns_error(ResponseCode::ServFail, || {
+                        "SOA record email not set in config.".to_string()
+                    })?;
+
+                let authority_domain_name = self
+                    .domain_name
+                    .as_ref()
+                    .or_dns_error(ResponseCode::ServFail, || {
+                        "domain name of dns server not set in config.".to_string()
+                    })?;
+
+                let rdata = RData::SOA(SOA::new(
+                    authority_domain_name.clone(),
+                    soa_email.clone(),
+                    1,
+                    7200,
+                    7200,
+                    7200,
+                    7200,
+                ));
+                let ttl = 60;
+                let record = Record::from_rdata(name.clone().into(), ttl, rdata);
+
+                return Ok(vec![record])
+            }
+            RecordType::NS => {
+                let name = request.query().name();
+                let authority_domain_name = self
+                    .domain_name
+                    .as_ref()
+                    .or_dns_error(ResponseCode::ServFail, || {
+                        "domain name of dns server not set in config.".to_string()
+                    })?;
+
+                let rdata = RData::NS(authority_domain_name.clone());
+                let ttl = 60;
+                let record = Record::from_rdata(name.clone().into(), ttl, rdata);
+
+                return Ok(vec![record])
+            }
+            _ => {}
+        }
+
         let name = request.query().name().to_string();
         let (backend_id, cluster_name) = name
             .strip_suffix('.')
@@ -113,36 +162,6 @@ impl ClusterDnsServer {
                 tracing::info!(?responses, ?cluster_name, %backend_id, "Returning A records.");
 
                 Ok(responses)
-            }
-            RecordType::SOA => {
-                let name = request.query().name();
-                let soa_email = self
-                    .soa_email
-                    .as_ref()
-                    .or_dns_error(ResponseCode::ServFail, || {
-                        "SOA record email not set in config.".to_string()
-                    })?;
-
-                let authority_domain_name = self
-                    .domain_name
-                    .as_ref()
-                    .or_dns_error(ResponseCode::ServFail, || {
-                        "domain name of dns server not set in config.".to_string()
-                    })?;
-
-                let rdata = RData::SOA(SOA::new(
-                    authority_domain_name.clone(),
-                    soa_email.clone(),
-                    1,
-                    7200,
-                    7200,
-                    7200,
-                    7200,
-                ));
-                let ttl = 60;
-                let record = Record::from_rdata(name.clone().into(), ttl, rdata);
-
-                Ok(vec![record])
             }
             RecordType::CAA | RecordType::AAAA => Ok(vec![]), // Not supported but don't report.
             request => {
