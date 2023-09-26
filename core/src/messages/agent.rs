@@ -108,6 +108,7 @@ impl JetStreamable for DroneLogMessage {
         async_nats::jetstream::stream::Config {
             name: Self::stream_name().into(),
             subjects: vec!["backend.*.log".into()],
+            max_bytes: 50e9 as i64,
             max_messages_per_subject: 500,
             ..async_nats::jetstream::stream::Config::default()
         }
