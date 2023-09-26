@@ -87,7 +87,7 @@ impl ClusterDnsServer {
                 let ttl = 60;
                 let record = Record::from_rdata(name.clone().into(), ttl, rdata);
 
-                return Ok(vec![record])
+                return Ok(vec![record]);
             }
             RecordType::NS => {
                 let name = request.query().name();
@@ -102,7 +102,7 @@ impl ClusterDnsServer {
                 let ttl = 60;
                 let record = Record::from_rdata(name.clone().into(), ttl, rdata);
 
-                return Ok(vec![record])
+                return Ok(vec![record]);
             }
             _ => {}
         }
