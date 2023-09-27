@@ -118,6 +118,7 @@ impl JetStreamable for DroneLogMessage {
 #[typed_message(subject = "cluster.#cluster.backend.#backend_id.stats")]
 pub struct BackendStatsMessage {
     pub cluster: ClusterName,
+    pub drone_id: Option<DroneId>,
     pub backend_id: BackendId,
     /// Memory used by backend in bytes
     pub mem_used: u64,
@@ -139,6 +140,7 @@ impl BackendStatsMessage {
     #[cfg(feature = "bollard")]
     pub fn from_stats_messages(
         backend_id: &BackendId,
+        drone_id: &DroneId,
         cluster: &ClusterName,
         prev_stats_message: &Stats,
         cur_stats_message: &Stats,
@@ -183,6 +185,7 @@ impl BackendStatsMessage {
 
         Ok(BackendStatsMessage {
             backend_id: backend_id.clone(),
+            drone_id: Some(drone_id.clone()),
             cluster: cluster.clone(),
             mem_used,
             mem_available,
@@ -358,7 +361,7 @@ pub struct ResourceLimits {
     /// Proportion of period used by container
     pub cpu_period_percent: Option<u8>,
 
-    /// Total cpu time allocated to container    
+    /// Total cpu time allocated to container
     #[serde_as(as = "Option<DurationSeconds>")]
     pub cpu_time_limit: Option<Duration>,
 
