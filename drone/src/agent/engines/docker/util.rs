@@ -3,7 +3,10 @@ use bollard::container::Stats;
 use bollard::service::{ContainerInspectResponse, EventMessage};
 use futures::Stream;
 use plane_core::types::ClusterName;
-use plane_core::{messages::agent::BackendStatsMessage, types::BackendId};
+use plane_core::{
+    messages::agent::BackendStatsMessage,
+    types::{BackendId, DroneId},
+};
 use std::{net::IpAddr, pin::Pin, task::Poll};
 
 pub trait MinuteExt {
@@ -164,15 +167,22 @@ pub struct StatsStream<T: Stream<Item = Stats> + Unpin> {
     stream: T,
     last: Option<Stats>,
     backend_id: BackendId,
+    drone_id: DroneId,
     cluster: ClusterName,
 }
 
 impl<T: Stream<Item = Stats> + Unpin> StatsStream<T> {
-    pub fn new(backend_id: BackendId, cluster: ClusterName, stream: T) -> StatsStream<T> {
+    pub fn new(
+        backend_id: BackendId,
+        drone_id: DroneId,
+        cluster: ClusterName,
+        stream: T,
+    ) -> StatsStream<T> {
         StatsStream {
             stream,
             last: None,
             backend_id,
+            drone_id,
             cluster,
         }
     }
@@ -195,6 +205,7 @@ impl<T: Stream<Item = Stats> + Unpin> Stream for StatsStream<T> {
                     if let Some(last) = &self.last {
                         match BackendStatsMessage::from_stats_messages(
                             &self.backend_id,
+                            &self.drone_id,
                             &self.cluster,
                             last,
                             &stat,

@@ -242,6 +242,7 @@ impl<E: Engine> Executor<E> {
                 notify.notified().await;
                 let bm = BackendMonitor::new(
                     &spawn_request.backend_id,
+                    &spawn_request.drone_id,
                     &s.cluster,
                     s.ip,
                     s.engine.as_ref(),
