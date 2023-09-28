@@ -8,7 +8,7 @@ use plane_core::{
         dns::{DnsRecordType, SetDnsRecord},
     },
     nats::TypedNats,
-    types::{BackendId, ClusterName},
+    types::{BackendId, ClusterName, DroneId},
 };
 use std::{net::IpAddr, time::Duration};
 use tokio::{
@@ -38,6 +38,7 @@ pub struct BackendMonitor {
 impl BackendMonitor {
     pub fn new<E: Engine>(
         backend_id: &BackendId,
+        drone_id: &DroneId,
         cluster: &ClusterName,
         ip: IpAddr,
         engine: &E,
@@ -45,7 +46,7 @@ impl BackendMonitor {
     ) -> Self {
         let (meta_tx, meta_rx) = tokio::sync::mpsc::channel(16);
         let log_loop = Self::log_loop(backend_id, engine, nc, ReceiverStream::new(meta_rx));
-        let stats_loop = Self::stats_loop(backend_id, cluster, engine, nc);
+        let stats_loop = Self::stats_loop(backend_id, drone_id, cluster, engine, nc);
         let dns_loop = Self::dns_loop(backend_id, ip, nc, cluster);
 
         BackendMonitor {
@@ -120,11 +121,12 @@ impl BackendMonitor {
 
     fn stats_loop<E: Engine>(
         backend_id: &BackendId,
+        drone_id: &DroneId,
         cluster: &ClusterName,
         engine: &E,
         nc: &TypedNats,
     ) -> JoinHandle<()> {
-        let mut stream = Box::pin(engine.stats_stream(backend_id, cluster));
+        let mut stream = Box::pin(engine.stats_stream(backend_id, drone_id, cluster));
         let nc = nc.clone();
         let backend_id = backend_id.clone();
 
