@@ -15,12 +15,11 @@ run remotely. You can think of Plane backends as an extension of your client-sid
 
 To follow this getting started guide, you'll need the following:
 
+- Linux
 - Docker
 - Plane [source code](https://github.com/drifting-in-space/plane)
 
-Running Plane requires **Docker**. For Linux, installation instructions for popular distributions are [available here](https://docs.docker.com/engine/).
-
-For Mac and Windows users, the easiest way to get Docker is through [**Docker Desktop**](https://docs.docker.com/desktop/).
+Running Plane requires **Docker** on **Linux**. Installation instructions for popular distributions are [available here](https://docs.docker.com/engine/).
 
 You'll also need a clone of the Plane repo to follow along. You can obtain one with git:
 
@@ -86,8 +85,20 @@ Backend ID: 4dea4037-3d2d-4e12-95f9-a2864d9ba8dd
 ```
 
 The URL is the URL that the container will be accessible on. Note that plane.test is not a real domain,
-so you won't be able to access it in a real browser. The Firefox bundled with Plane is specially configured
-to use Plane's DNS server, so that `*.plane.test` domains work in it.
+so you won't be able to access it in a real browser. Instead, the Drone in our Docker Compose configuration
+is configured to use a debug utility called “path routing”. Instead of using the URL provided, you can
+construct a URL using the backend ID provided (make sure you use the **backend ID** and not the **drone ID**
+-- they are both UUIDs.)
+
+```bash
+BACKEND_ID=4dea4037-3d2d-4e12-95f9-a2864d9ba8dd # replace this with the backend ID returned above
+
+# print a URL that you can open in your browser
+echo "http://localhost:8080/_plane_backend=$BACKEND_ID/"
+
+# make a curl request to the backend
+curl -D - "http://localhost:8080/_plane_backend=$BACKEND_ID/"
+```
 
 The Drone is a unique ID associated with the machine which the backend was scheduled to. In this local
 test cluster, we are only running one “Drone”, since we are running everything on the same machine.
@@ -105,23 +116,3 @@ plane-cli status
 
 This will stream status changes from all backends. You can also pass the backend ID (returned in the last
 step) as an additional argument to stream only status updates about a specific backend.
-
-### Opening the app
-
-Open the included Firefox instance by visiting [http://localhost:3000](http://localhost:3000) in your regular browser.
-
-We want to visit the URL that `plane-cli spawn` returned, but because the embedded Firefox browser runs in a containerized window system, we can't paste it the usual way. Instead, copy the URL from the `plane-cli spawn` output as you normally would, but then in the browser look for a black circle on the left edge of the screen. Clicking it will reveal a text box. Paste the URL into that text box, and then click the black circle again to close it.
-
-Now, the URL will be on the clipboard within the container. Right click on the URL bar and click “Paste and Go”.
-
-If everything worked, you should see a page loaded from the container you spawned.
-
-### Inspecting the DNS records
-
-Once the backend is ready, Plane’s DNS server will serve a route for it. To list DNS records being served by plane, run:
-
-```bash
-plane-cli list-dns
-```
-
-The result should be 1 DNS record, corresponding to the backend you spawned.
