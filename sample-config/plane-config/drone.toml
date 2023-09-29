@@ -66,7 +66,9 @@ connection = { socket = "/var/run/docker.sock" }
 [proxy]
 # IP to listen for connections on.
 bind_ip = "0.0.0.0"
+http_port = 8080
+allow_path_routing = true
 
-[cert]
-key_path = "/etc/plane/auth/site-key.pem"
-cert_path = "/etc/plane/auth/site-cert.pem"
+# [cert]
+# key_path = "/etc/plane/auth/site-key.pem"
+# cert_path = "/etc/plane/auth/site-cert.pem"

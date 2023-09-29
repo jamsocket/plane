@@ -1,1 +1,57 @@
-plane.yml
+version: "3.9"
+services:
+  drone:
+    container_name: plane-drone
+    image: plane/drone:latest
+    build:
+      dockerfile: ./drone/Dockerfile
+      context: ../..
+    volumes:
+      - ../plane-config/drone.toml:/etc/plane/drone.toml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      /etc/plane/drone.toml
+    ports:
+      - "8080:8080"
+    networks:
+      - plane
+
+  controller:
+    container_name: plane-controller
+    image: plane/controller:latest
+    build:
+      dockerfile: ./controller/Dockerfile
+      context: ../..
+    volumes:
+      - ../plane-config/controller.toml:/etc/plane/controller.toml:ro
+    command:
+      /etc/plane/controller.toml
+    networks:
+      plane:
+        ipv4_address: 172.16.238.11
+
+  nats:
+    container_name: plane-nats
+    image: nats:latest
+    command:
+      "--jetstream ${NATS_FLAGS:-}"
+    ports:
+      - "127.0.0.1:4222:4222"
+    networks:
+      - plane
+
+  ip-api:
+    container_name: plane-ip-api
+    image: ghcr.io/drifting-in-space/ip-api:latest
+    networks:
+      - plane
+
+networks:
+  plane:
+    name: plane
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.238.0/24
+          gateway: 172.16.238.1
