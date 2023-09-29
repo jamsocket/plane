@@ -297,6 +297,7 @@ impl ProxyService {
         if let Some(host) = req.headers().get(http::header::HOST) {
             let host = std::str::from_utf8(host.as_bytes())?;
             let host_trimmed = host.rsplit_once(':').map(|(host, _)| host).unwrap_or(host);
+            let host_trimmed = host_trimmed.to_lowercase();
             let Some(subdomain) = host_trimmed.strip_suffix(&format!(".{}", self.cluster)) else {
                 tracing::error!(%host, %path, "Unable to parse backend from Host header.");
                 return Err(anyhow!("Host does not end with cluster domain."));
