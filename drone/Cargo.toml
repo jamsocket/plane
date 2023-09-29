@@ -1,6 +1,6 @@
 [package]
 name = "plane-drone"
-version = "0.3.23"
+version = "0.3.24"
 edition = "2021"
 authors = ["Paul Butler <paul@driftingin.space>"]
 homepage = "https://plane.dev"

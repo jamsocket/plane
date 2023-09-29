@@ -1859,7 +1859,7 @@ checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
 
 [[package]]
 name = "plane-cli"
-version = "0.3.23"
+version = "0.3.24"
 dependencies = [
  "anyhow",
  "async-nats",
@@ -1875,7 +1875,7 @@ dependencies = [
 
 [[package]]
 name = "plane-controller"
-version = "0.3.23"
+version = "0.3.24"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -1897,7 +1897,7 @@ dependencies = [
 
 [[package]]
 name = "plane-core"
-version = "0.3.23"
+version = "0.3.24"
 dependencies = [
  "anyhow",
  "async-nats",
@@ -1923,7 +1923,7 @@ dependencies = [
 
 [[package]]
 name = "plane-core-nats-macros"
-version = "0.3.23"
+version = "0.3.24"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1933,7 +1933,7 @@ dependencies = [
 
 [[package]]
 name = "plane-dev"
-version = "0.3.23"
+version = "0.3.24"
 dependencies = [
  "anyhow",
  "async-nats",
@@ -1967,7 +1967,7 @@ dependencies = [
 
 [[package]]
 name = "plane-drone"
-version = "0.3.23"
+version = "0.3.24"
 dependencies = [
  "acme2-eab",
  "anyhow",
@@ -1999,7 +1999,7 @@ dependencies = [
 
 [[package]]
 name = "plane-metrics"
-version = "0.3.23"
+version = "0.3.24"
 dependencies = [
  "async-nats",
  "clap",
