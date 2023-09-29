@@ -60,7 +60,7 @@ To develop locally, use the `./dev-*.sh` scripts in the root of this repo, in th
 
 Then, you can use the CLI with `./dev-cli.sh`. For example, you can spawn a hello-world image like this:
 
-    ./dev-cli.sh spawn plane.test ghcr.io/drifting-in-space/demo-image-hello-world:sha-3b58532
+    ./dev-cli.sh spawn plane.test ghcr.io/drifting-in-space/demo-image-hello-world:sha-2ccc18e
 
 And then access it with:
 

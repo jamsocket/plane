@@ -267,25 +267,30 @@ impl ProxyService {
 
     fn backend_from_request(&self, req: &mut Request<Body>) -> Result<String> {
         let mut uri = req.uri_mut();
-        let path = uri.path().to_string();
+        let path = uri
+            .path_and_query()
+            .map(|p| p.to_string())
+            .unwrap_or_default();
 
         if self.allow_path_routing {
             if let Some(rest) = path.strip_prefix("/_plane_backend=") {
                 let (backend, new_path) = rest.split_once('/').unwrap_or((rest, ""));
+                let new_path = format!("/{}", new_path);
 
                 // Replace path with a version that strips the /_plane_backend=... prefix.
                 let mut parts = uri.clone().into_parts();
 
-                let p = http::uri::PathAndQuery::from_str(new_path).unwrap();
-                println!("a {:?}", p);
+                let p = http::uri::PathAndQuery::from_str(&new_path).unwrap();
 
                 parts.path_and_query = Some(
-                    http::uri::PathAndQuery::from_str(new_path)
+                    http::uri::PathAndQuery::from_str(&new_path)
                         .context("Error parsing path and query.")?,
                 );
                 *uri = Uri::from_parts(parts).context("Error rewriting proxy URL.")?;
 
                 return Ok(backend.to_string());
+            } else {
+                return Err(anyhow!("allow_path_routing is set but path ({}) does not have /_plane_backend= as prefix", path));
             }
         }
 

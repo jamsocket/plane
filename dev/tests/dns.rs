@@ -101,6 +101,12 @@ impl DnsServer {
 
         Ok(result.into_iter().collect())
     }
+
+    async fn ns_record(&self, domain: &str) -> std::result::Result<Vec<Name>, ResolveError> {
+        let result = self.resolver.ns_lookup(domain).await?;
+
+        Ok(result.into_iter().collect())
+    }
 }
 
 #[integration_test]
@@ -213,4 +219,14 @@ async fn dns_soa_record() {
     let result = result.first().unwrap();
     assert_eq!("admin.plane.test.", &result.rname().to_ascii());
     assert_eq!("ns1.plane.test.", &result.mname().to_ascii());
+}
+
+#[integration_test]
+async fn dns_ns_record() {
+    let dns = DnsServer::new(WorldState::default()).unwrap();
+
+    let result = dns.ns_record("plane.test").await.unwrap();
+
+    assert_eq!(1, result.len());
+    assert_eq!("ns1.plane.test.", &result.first().unwrap().to_ascii());
 }

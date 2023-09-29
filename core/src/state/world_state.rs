@@ -170,6 +170,10 @@ impl WorldState {
         self.logical_time
     }
 
+    pub fn clock_time(&self) -> DateTime<Utc> {
+        self.clock_time
+    }
+
     fn get_listener(&mut self, sequence: u64) -> Receiver<()> {
         let listener = SequenceListener::new(sequence);
         let recv = listener.sender.subscribe();
