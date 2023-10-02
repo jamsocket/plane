@@ -299,7 +299,7 @@ impl ProxyService {
             let host_trimmed = host.rsplit_once(':').map(|(host, _)| host).unwrap_or(host);
             let host_trimmed = host_trimmed.to_lowercase();
             let Some(subdomain) = host_trimmed.strip_suffix(&format!(".{}", self.cluster)) else {
-                tracing::error!(%host, %path, "Unable to parse backend from Host header.");
+                tracing::warn!(%host, %path, "Unable to parse backend from Host header.");
                 return Err(anyhow!("Host does not end with cluster domain."));
             };
             return Ok(subdomain.to_owned());
@@ -335,7 +335,7 @@ impl ProxyService {
         let subdomain = match self.backend_from_request(&mut req) {
             Ok(subdomain) => subdomain,
             Err(error) => {
-                tracing::error!(?error, "Error getting backend from request.");
+                tracing::warn!(?error, "Error getting backend from request.");
                 return Ok(Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .header(hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
