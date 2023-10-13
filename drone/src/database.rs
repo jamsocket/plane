@@ -34,7 +34,7 @@ pub struct ProxyRoute {
     pub bearer_token: Option<String>,
 }
 
-const SQLITE_DB_LOCKED_ERR_CODE: u64 = 6;
+const SQLITE_DB_LOCKED_ERR_CODE: u64 = 5;
 
 // logs in cases where issues have been attributed to resource
 // starvation on drone
