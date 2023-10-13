@@ -336,11 +336,18 @@ impl<E: Engine> Executor<E> {
                             }
                             self.update_backend_state(spawn_request, state).await;
                         }
-                        _ => tracing::error!(
+                        _ => {
+                            tracing::error!(
                             ?error,
                             ?state,
-                            "Error unhandled (no change in backend state)"
-                        ),
+                            "Error unhandled (putting backend into failed state"
+                            );
+
+                            // leads to .step() running with failed.
+                            state = BackendState::Failed;
+                            self.update_backend_state(spawn_request, state).await;
+                            continue;
+                        },
                     }
                     break;
                 }
