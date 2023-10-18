@@ -34,6 +34,25 @@ pub struct ProxyRoute {
     pub bearer_token: Option<String>,
 }
 
+const SQLITE_DB_LOCKED_ERR_CODE: u64 = 5;
+
+// logs in cases where issues have been attributed to resource
+// starvation on drone
+fn augment_db_error(err: sqlx::Error) -> sqlx::Error {
+    match err {
+        sqlx::Error::Database(ref e)
+            if e.code().unwrap() == SQLITE_DB_LOCKED_ERR_CODE.to_string() =>
+        {
+            tracing::error!("Database is Locked, may indicate that drone process needs more CPU!");
+        }
+        sqlx::Error::PoolTimedOut => {
+            tracing::error!("SQLite Connection Pool timed out, indicates that the drone process needs more CPU!");
+        }
+        _ => {}
+    };
+    err
+}
+
 #[allow(unused)]
 impl DroneDatabase {
     pub async fn new(db_path: &Path) -> Result<DroneDatabase> {
@@ -63,7 +82,8 @@ impl DroneDatabase {
             spec,
         )
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(augment_db_error)?;
 
         Ok(())
     }
@@ -76,7 +96,8 @@ impl DroneDatabase {
             "
         )
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        .map_err(augment_db_error)?;
         Ok(result.c)
     }
 
@@ -88,7 +109,8 @@ impl DroneDatabase {
             "
         )
         .fetch_all(&self.pool)
-        .await?
+        .await
+        .map_err(augment_db_error)?
         .iter()
         .map(|d| {
             Ok(Backend {
@@ -118,7 +140,8 @@ impl DroneDatabase {
             backend_id,
         )
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(augment_db_error)?;
 
         Ok(())
     }
@@ -162,7 +185,8 @@ impl DroneDatabase {
             bearer_token,
         )
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(augment_db_error)?;
 
         Ok(())
     }
@@ -178,7 +202,8 @@ impl DroneDatabase {
                 subdomain
             )
             .execute(&self.pool)
-            .await?;
+            .await
+            .map_err(augment_db_error)?;
         }
 
         Ok(())
@@ -196,7 +221,8 @@ impl DroneDatabase {
             backend_id
         )
         .fetch_one(&self.pool)
-        .await?
+        .await
+        .map_err(augment_db_error)?
         .last_active;
 
         Ok(Utc.timestamp_opt(time, 0).single().expect(
