@@ -67,6 +67,15 @@ connection = { socket = "/var/run/docker.sock" }
 # IP to listen for connections on.
 bind_ip = "0.0.0.0"
 http_port = 8080
+
+# Enable path-based routing, where the proxy detects the backend name
+# from the path instead of the hostname. This is useful when running
+# locally for development, because you don't have to set up a DNS
+# server.
+#
+# To access the backend abc123, instead of the usual url
+# http://abc123.plane.test/some-path/, use the URL
+# http://localhost:8080/_plane_backend=abc123/some-path/.
 allow_path_routing = true
 
 # [cert]
