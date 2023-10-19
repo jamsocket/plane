@@ -36,7 +36,6 @@ use std::{net::SocketAddr, pin::Pin};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
 /// The port in the container which is exposed.
-const DEFAULT_CONTAINER_PORT: u16 = 8080;
 const DOCKER_TIMEOUT_SECONDS: u64 = 30;
 /// Interval between reporting stats of a running backend.
 /// NOTE: the minimum possible interval is 1 second.
@@ -172,11 +171,12 @@ impl DockerInterface {
         name: &str,
         executable_config: &DockerExecutableConfig,
     ) -> Result<()> {
-        let env: Vec<String> = executable_config
-            .env
-            .iter()
-            .map(|(k, v)| format!("{}={}", k, v))
-            .collect();
+        let mut env = executable_config.env.clone();
+
+        env.entry("PORT".to_string())
+            .or_insert_with(|| executable_config.port().to_string());
+
+        let env: Vec<String> = env.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
 
         let device_requests = if self.gpu {
             Some(vec![DeviceRequest {
@@ -379,13 +379,7 @@ impl Engine for DockerInterface {
 
         if running {
             let ip = get_ip_of_container(&container)?;
-            let addr = SocketAddr::new(
-                ip,
-                spawn_request
-                    .executable
-                    .port
-                    .unwrap_or(DEFAULT_CONTAINER_PORT),
-            );
+            let addr = SocketAddr::new(ip, spawn_request.executable.port());
 
             Ok(EngineBackendStatus::Running { addr })
         } else {

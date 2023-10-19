@@ -20,6 +20,8 @@ use std::{
     time::Duration,
 };
 
+const DEFAULT_CONTAINER_PORT: u16 = 8080;
+
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, Debug)]
 pub enum DockerCredentials {
     UsernamePassword { username: String, password: String },
@@ -318,6 +320,12 @@ pub struct DockerExecutableConfig {
     /// Schema: https://pkg.go.dev/github.com/docker/docker@v20.10.22+incompatible/api/types/mount#Mount
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub volume_mounts: Vec<Value>,
+}
+
+impl DockerExecutableConfig {
+    pub fn port(&self) -> u16 {
+        self.port.unwrap_or(DEFAULT_CONTAINER_PORT)
+    }
 }
 
 #[serde_as]
