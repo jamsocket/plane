@@ -528,7 +528,7 @@ impl TypedNats {
                 fut
             },
             retries,
-            Duration::ZERO,
+            interval,
         )
         .await?;
 
