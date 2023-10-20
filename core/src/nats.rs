@@ -4,6 +4,7 @@
 
 use crate::logging::LogError;
 use crate::messages::initialize_jetstreams;
+use crate::retry::do_with_retry;
 use anyhow::{anyhow, Context, Result};
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::push::Messages;
@@ -506,6 +507,31 @@ impl TypedNats {
             .timeout(Some(timeout));
         let fut = self.nc.send_request(value.subject(), request);
         let result = fut.await.unwrap();
+        let value: T::Response = serde_json::from_slice(&result.payload)?;
+        Ok(value)
+    }
+
+    pub async fn request_with_retries<T: TypedMessage>(
+        &self,
+        value: &T,
+        retries: u16,
+        interval: Duration,
+    ) -> Result<T::Response> {
+        let bytes = &Bytes::from(serde_json::to_vec(value)?);
+
+        let result = do_with_retry(
+            || {
+                let req = async_nats::Request::new()
+                    .payload(bytes.clone())
+                    .timeout(Some(interval));
+                let fut = self.nc.send_request(value.subject(), req);
+                fut
+            },
+            retries,
+            interval,
+        )
+        .await?;
+
         let value: T::Response = serde_json::from_slice(&result.payload)?;
         Ok(value)
     }

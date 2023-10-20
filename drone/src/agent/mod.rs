@@ -200,7 +200,8 @@ pub async fn run_agent(agent_opts: AgentOptions) -> Result<AgentSupervisors> {
         git_hash: GIT_HASH.map(|s| s.to_string()),
     };
 
-    nats.request(&request).await?;
+    nats.request_with_retries(&request, 10, Duration::from_secs(5))
+        .await?;
 
     let executor = Executor::new(docker, db.clone(), nats.clone(), ip, cluster.clone());
 
