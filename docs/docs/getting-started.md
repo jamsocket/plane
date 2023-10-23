@@ -11,6 +11,12 @@ Plane is a server orchestrator that allows you to spin up many ephemeral instanc
 In contrast to traditional web servers, which are shared between multiple users, these containers can act more like a background process that happens to
 run remotely. You can think of Plane backends as an extension of your client-side app that happens to run on the server.
 
+:::info
+
+Note that Plane currently only works on Linux, due to differences in how Docker handles networking on other systems.
+
+:::
+
 ## Prerequisites
 
 To follow this getting started guide, you'll need the following:
