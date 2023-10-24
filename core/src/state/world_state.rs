@@ -227,18 +227,26 @@ pub struct ClusterState {
 
 impl ClusterState {
     fn revoke_lock(&mut self, lock: ResourceLock, lock_uid: u64) {
-        match self.locks.entry(lock) {
+        match self.locks.entry(lock.clone()) {
             Entry::Vacant(entry) => {
                 let lock = entry.key();
                 tracing::info!(?lock, "requested revocation of nonexistent lock");
             }
-            Entry::Occupied(entry) => {
-                if matches!(
-                    entry.get(),
-                    LockState::Announced { uid } if *uid == lock_uid
-                ) {
-                    let (lock, _) = entry.remove_entry();
-                    tracing::info!(?lock, "announced lock revoked");
+            Entry::Occupied(mut entry) => {
+                let e = entry.get_mut();
+                match e {
+                    LockState::Announced { uid } if *uid == lock_uid => {
+                        tracing::info!(?lock, "announced lock revoked");
+                        *e = LockState::Revoked;
+                    }
+                    LockState::Announced { uid } => tracing::info!(
+                        ?lock,
+                        ?uid,
+                        ?lock_uid,
+                        "uid does not match lock_uid, announced lock not revoked"
+                    ),
+                    LockState::Revoked => tracing::info!(?lock, "lock has already been revoked"),
+                    e => tracing::info!(?lock, ?e, "lock is not in revokable state"),
                 }
             }
         }
