@@ -100,6 +100,8 @@ pub enum LockState {
     Unlocked,
     Announced { uid: u64 },
     Assigned { backend: BackendId },
+	Removed,
+	Revoked
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

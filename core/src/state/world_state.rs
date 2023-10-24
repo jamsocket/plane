@@ -272,6 +272,7 @@ impl ClusterState {
             }
             ClusterStateMessage::BackendMessage(message) => {
                 let backend = self.backends.entry(message.backend.clone()).or_default();
+				let backend_id = message.backend;
 
                 // If the message is a lock assignment, we want to record it.
                 if let BackendMessageType::Assignment {
@@ -299,17 +300,20 @@ impl ClusterState {
                         }
                         Entry::Occupied(mut v) => {
                             *v.get_mut() = LockState::Assigned {
-                                backend: message.backend,
+                                backend: backend_id.clone(),
                             }
                         }
                     }
                 }
 
-                // If the backend is terminal, remove locks from map
+                // If the backend is terminal, mark lock as removed
                 if let BackendMessageType::State { state, .. } = message.message {
                     if state.terminal() && backend.lock.is_some() {
                         let lock = backend.lock.as_ref().unwrap();
-                        self.locks.remove(lock);
+						let Some(lock) = self.locks.get_mut(lock) else {
+							panic!("lock: {lock} in backend: {backend_id}"); 
+						};
+						*lock = LockState::Removed;
                     }
                 }
 
