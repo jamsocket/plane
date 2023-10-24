@@ -256,10 +256,9 @@ async fn process_response(
                         backend,
                     ))
                 }
-                LockState::Unlocked => {
+                e @ LockState::Unlocked | e @ LockState::Removed | e @ LockState::Revoked => {
                     return Err(anyhow!(
-                        "lock {} just announced, hence should not be unlocked",
-                        lock_name
+                        "lock {lock_name} just announced, hence should not be {e:?}"
                     ))
                 }
             }
@@ -370,7 +369,9 @@ async fn dispatch_lock_request(
                 FetchBackendForLockResponse::NoBackendForLock
             }
         }
-        LockState::Unlocked => FetchBackendForLockResponse::NoBackendForLock,
+        LockState::Unlocked | LockState::Revoked | LockState::Removed => {
+            FetchBackendForLockResponse::NoBackendForLock
+        }
     };
 
     let Ok(_) = lock_request.respond(&response).await else {
