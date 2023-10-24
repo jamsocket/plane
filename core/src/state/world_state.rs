@@ -272,7 +272,7 @@ impl ClusterState {
             }
             ClusterStateMessage::BackendMessage(message) => {
                 let backend = self.backends.entry(message.backend.clone()).or_default();
-				let backend_id = message.backend;
+                let backend_id = message.backend;
 
                 // If the message is a lock assignment, we want to record it.
                 if let BackendMessageType::Assignment {
@@ -285,11 +285,6 @@ impl ClusterState {
                 } = message.message
                 {
                     match self.locks.entry(lock.clone()) {
-                        Entry::Vacant(_) => {
-                            tracing::error!(?lock, "lock must be announced before assignment");
-                            //bail out, and don't apply message to backend
-                            return;
-                        }
                         Entry::Occupied(v)
                             if matches!(
                                 *v.get(), LockState::Announced { uid } if assigned_uid != uid
@@ -298,10 +293,19 @@ impl ClusterState {
                             tracing::error!(?lock, "lock must have same uid to assign");
                             return;
                         }
-                        Entry::Occupied(mut v) => {
+                        Entry::Occupied(mut v)
+                            if matches!(
+                                *v.get(), LockState::Announced { uid } if assigned_uid == uid
+                            ) =>
+                        {
                             *v.get_mut() = LockState::Assigned {
                                 backend: backend_id.clone(),
                             }
+                        }
+                        _ => {
+                            tracing::error!(?lock, "lock must be announced before assignment");
+                            //bail out, and don't apply message to backend
+                            return;
                         }
                     }
                 }
@@ -310,10 +314,15 @@ impl ClusterState {
                 if let BackendMessageType::State { state, .. } = message.message {
                     if state.terminal() && backend.lock.is_some() {
                         let lock = backend.lock.as_ref().unwrap();
-						let Some(lock) = self.locks.get_mut(lock) else {
-							panic!("lock: {lock} in backend: {backend_id}"); 
-						};
-						*lock = LockState::Removed;
+                        let Some(lock) = self.locks.get_mut(lock) else {
+                            tracing::error!(
+                                ?lock,
+                                ?backend_id,
+                                "lock in backend state but not in cluster state!"
+                            );
+                            return;
+                        };
+                        *lock = LockState::Removed;
                     }
                 }
 
