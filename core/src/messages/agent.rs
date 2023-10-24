@@ -11,7 +11,7 @@ use plane_core_nats_macros::{self, TypedMessage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::serde_as;
-use serde_with::DurationSeconds;
+use serde_with::{DurationMicroSeconds, DurationSeconds};
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
@@ -363,13 +363,13 @@ pub struct SpawnRequest {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct ResourceLimits {
     /// Period of cpu time, serializes as microseconds
-    #[serde_as(as = "Option<DurationSeconds>")]
+    #[serde_as(as = "Option<DurationMicroSeconds>")]
     pub cpu_period: Option<Duration>,
 
     /// Proportion of period used by container
     pub cpu_period_percent: Option<u8>,
 
-    /// Total cpu time allocated to container
+    /// Total cpu time allocated to container, serializes as seconds
     #[serde_as(as = "Option<DurationSeconds>")]
     pub cpu_time_limit: Option<Duration>,
 
