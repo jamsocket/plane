@@ -518,7 +518,7 @@ impl BackendState {
 /// **DEPRECATED** for drone-side use by UpdateBackendStateMessage.
 /// Drones will send an UpdateBackendStateMessage and the controller
 /// will publish a BackendStateMessage.
-#[derive(Serialize, Deserialize, Debug, PartialEq, TypedMessage)]
+#[derive(Serialize, Clone, Deserialize, Debug, PartialEq, TypedMessage)]
 #[typed_message(subject = "backend.#backend.status")]
 pub struct BackendStateMessage {
     /// The cluster the backend belongs to.
