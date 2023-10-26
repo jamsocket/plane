@@ -103,7 +103,7 @@ impl DroneLogMessage {
 
 impl JetStreamable for DroneLogMessage {
     fn stream_name() -> &'static str {
-        "backend_log"
+        "backend_logs"
     }
 
     fn config() -> async_nats::jetstream::stream::Config {
