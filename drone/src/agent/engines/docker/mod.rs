@@ -25,7 +25,7 @@ use bollard::{
 };
 use plane_core::{
     messages::agent::{
-        BackendStatsMessage, DockerExecutableConfig, DockerPullPolicy, DroneLogMessage,
+        BackendLogMessage, BackendStatsMessage, DockerExecutableConfig, DockerPullPolicy,
         SpawnRequest,
     },
     timing::Timer,
@@ -403,13 +403,13 @@ impl Engine for DockerInterface {
     fn log_stream(
         &self,
         backend: &BackendId,
-    ) -> Pin<Box<dyn Stream<Item = DroneLogMessage> + Send>> {
+    ) -> Pin<Box<dyn Stream<Item = BackendLogMessage> + Send>> {
         let stream = self.get_logs(&backend.to_resource_name());
         let backend = backend.clone();
         let stream = stream.filter_map(move |v| {
             v.ok()
                 .as_ref()
-                .and_then(|d| DroneLogMessage::from_log_message(&backend, d))
+                .and_then(|d| BackendLogMessage::from_log_message(&backend, d))
         });
         Box::pin(stream)
     }

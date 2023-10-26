@@ -58,25 +58,25 @@ pub enum DroneLogMessageKind {
 
 #[derive(Serialize, Deserialize, Debug, TypedMessage)]
 #[typed_message(subject = "backend.#backend_id.log")]
-pub struct DroneLogMessage {
+pub struct BackendLogMessage {
     pub backend_id: BackendId,
     pub kind: DroneLogMessageKind,
     pub text: String,
 }
 
-impl DroneLogMessage {
+impl BackendLogMessage {
     #[cfg(feature = "bollard")]
     pub fn from_log_message(
         backend_id: &BackendId,
         log_message: &LogOutput,
-    ) -> Option<DroneLogMessage> {
+    ) -> Option<BackendLogMessage> {
         match log_message {
-            bollard::container::LogOutput::StdErr { message } => Some(DroneLogMessage {
+            bollard::container::LogOutput::StdErr { message } => Some(BackendLogMessage {
                 backend_id: backend_id.clone(),
                 kind: DroneLogMessageKind::Stderr,
                 text: std::str::from_utf8(message).ok()?.to_string(),
             }),
-            bollard::container::LogOutput::StdOut { message } => Some(DroneLogMessage {
+            bollard::container::LogOutput::StdOut { message } => Some(BackendLogMessage {
                 backend_id: backend_id.clone(),
                 kind: DroneLogMessageKind::Stdout,
                 text: std::str::from_utf8(message).ok()?.to_string(),
@@ -101,7 +101,7 @@ impl DroneLogMessage {
     }
 }
 
-impl JetStreamable for DroneLogMessage {
+impl JetStreamable for BackendLogMessage {
     fn stream_name() -> &'static str {
         "backend_logs"
     }
