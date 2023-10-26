@@ -29,10 +29,10 @@ async fn add_jetstream_stream<T: JetStreamable>(
 pub async fn initialize_jetstreams(
     jetstream: &async_nats::jetstream::Context,
 ) -> anyhow::Result<()> {
-    add_jetstream_stream::<state::WorldStateMessage>(jetstream).await?;
-    add_jetstream_stream::<agent::DroneLogMessage>(jetstream).await?;
-    add_jetstream_stream::<agent::BackendStateMessage>(jetstream).await?;
-    add_jetstream_stream::<dns::SetDnsRecord>(jetstream).await?;
+    let _ = add_jetstream_stream::<state::WorldStateMessage>(jetstream).await;
+    let _ = add_jetstream_stream::<agent::DroneLogMessage>(jetstream).await;
+    let _ = add_jetstream_stream::<agent::BackendStateMessage>(jetstream).await;
+    let _ = add_jetstream_stream::<dns::SetDnsRecord>(jetstream).await;
 
     Ok(())
 }
