@@ -94,6 +94,9 @@ enum Command {
 
         #[arg(required = true)]
         backends: Vec<String>,
+
+        #[clap(short, long, default_value = "false")]
+        force: bool,
     },
 }
 
@@ -476,10 +479,45 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Command::MarkBackendLost { cluster, backends } => {
+        Command::MarkBackendLost {
+            cluster,
+            backends,
+            force,
+        } => {
+            let stdin = std::io::stdin();
+            let state = get_world_state(nats.clone()).await?;
             let cluster = ClusterName::new(&cluster);
+            let cluster_state = state
+                .cluster(&cluster)
+                .ok_or_else(|| anyhow::anyhow!("{cluster} cluster does not exist"))?;
             for backend in backends {
                 let backend = BackendId::new(backend);
+                let Some(backend_state) = cluster_state.backend(&backend) else {
+                    println!("{} no such backend!", backend.id());
+                    continue;
+                };
+                println!("{backend_state:?}");
+                if backend_state
+                    .state()
+                    .map_or(false, |state| state.terminal())
+                {
+                    println!(
+                        "backend state {} is a terminal state!",
+                        backend_state.state().unwrap()
+                    );
+                }
+                if let Some(ref lock) = backend_state.lock {
+                    println!("NOTE: backend holds the following lock: {lock}!");
+                }
+                if !force {
+                    println!("are you sure you want to mark this backend as lost?");
+                    println!("(type y and end line to continue, any other input will skip marking this backend as lost)");
+                    let mut confirmation = String::new();
+                    stdin.read_line(&mut confirmation)?;
+                    if confirmation != "y" {
+                        continue;
+                    }
+                }
                 let lost_state_message =
                     BackendStateMessage::new(BackendState::Lost, cluster.clone(), backend);
 
