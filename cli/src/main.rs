@@ -89,7 +89,7 @@ enum Command {
         dry_run: bool,
     },
     /// marks backend(s) as lost.
-    Abandon {
+    MarkBackendLost {
         cluster: String,
 
         #[arg(required = true)]
@@ -476,7 +476,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Command::Abandon { cluster, backends } => {
+        Command::MarkBackendLost { cluster, backends } => {
             let cluster = ClusterName::new(&cluster);
             for backend in backends {
                 let backend = BackendId::new(backend);
