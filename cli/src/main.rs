@@ -88,6 +88,13 @@ enum Command {
         #[clap(long, default_value = "false")]
         dry_run: bool,
     },
+    /// marks backend(s) as lost.
+    Abandon {
+        cluster: String,
+
+        #[arg(required = true)]
+        backends: Vec<String>,
+    },
 }
 
 #[tokio::main]
@@ -467,6 +474,16 @@ async fn main() -> Result<()> {
                         println!("Error: {}", e.to_string().bright_red())
                     }
                 }
+            }
+        }
+        Command::Abandon { cluster, backends } => {
+            let cluster = ClusterName::new(&cluster);
+            for backend in backends {
+                let backend = BackendId::new(backend);
+                let lost_state_message =
+                    BackendStateMessage::new(BackendState::Lost, cluster.clone(), backend);
+
+                nats.publish_jetstream(&lost_state_message).await?;
             }
         }
     }
