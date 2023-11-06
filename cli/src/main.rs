@@ -498,21 +498,30 @@ async fn main() -> Result<()> {
                         "backend state {} is a terminal state!",
                         backend_state.state().unwrap()
                     );
+                    println!(
+                        "A backend may not have multiple terminal states (this is an invariant)"
+                    );
+                    println!("Therefore, skipping marking backend {backend} as lost");
+                    continue;
                 }
                 if let Some(ref lock) = backend_state.lock {
                     println!("NOTE: backend holds the following lock: {lock}!");
                 }
-                println!("are you sure you want to mark this backend as lost?");
+                println!("are you sure you want to mark this backend: {backend} as lost?");
                 println!("(type y and end line to continue, any other input will skip marking this backend as lost)");
+
                 let mut confirmation = String::new();
                 stdin.read_line(&mut confirmation)?;
                 if confirmation != "y" {
+                    println!("skipping backend: {backend}, not marking as lost");
                     continue;
                 }
+
                 let lost_state_message =
-                    BackendStateMessage::new(BackendState::Lost, cluster.clone(), backend);
+                    BackendStateMessage::new(BackendState::Lost, cluster.clone(), backend.clone());
 
                 nats.publish_jetstream(&lost_state_message).await?;
+                println!("marking backend: {backend} as lost");
             }
         }
     }
