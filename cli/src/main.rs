@@ -94,9 +94,6 @@ enum Command {
 
         #[arg(required = true)]
         backends: Vec<String>,
-
-        #[clap(short, long, default_value = "false")]
-        force: bool,
     },
 }
 
@@ -479,11 +476,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Command::MarkBackendLost {
-            cluster,
-            backends,
-            force,
-        } => {
+        Command::MarkBackendLost { cluster, backends } => {
             let stdin = std::io::stdin();
             let state = get_world_state(nats.clone()).await?;
             let cluster = ClusterName::new(&cluster);
@@ -509,14 +502,12 @@ async fn main() -> Result<()> {
                 if let Some(ref lock) = backend_state.lock {
                     println!("NOTE: backend holds the following lock: {lock}!");
                 }
-                if !force {
-                    println!("are you sure you want to mark this backend as lost?");
-                    println!("(type y and end line to continue, any other input will skip marking this backend as lost)");
-                    let mut confirmation = String::new();
-                    stdin.read_line(&mut confirmation)?;
-                    if confirmation != "y" {
-                        continue;
-                    }
+                println!("are you sure you want to mark this backend as lost?");
+                println!("(type y and end line to continue, any other input will skip marking this backend as lost)");
+                let mut confirmation = String::new();
+                stdin.read_line(&mut confirmation)?;
+                if confirmation != "y" {
+                    continue;
                 }
                 let lost_state_message =
                     BackendStateMessage::new(BackendState::Lost, cluster.clone(), backend);
