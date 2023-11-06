@@ -88,6 +88,13 @@ enum Command {
         #[clap(long, default_value = "false")]
         dry_run: bool,
     },
+    /// marks backend(s) as lost.
+    MarkBackendLost {
+        cluster: String,
+
+        #[arg(required = true)]
+        backends: Vec<String>,
+    },
 }
 
 #[tokio::main]
@@ -467,6 +474,54 @@ async fn main() -> Result<()> {
                         println!("Error: {}", e.to_string().bright_red())
                     }
                 }
+            }
+        }
+        Command::MarkBackendLost { cluster, backends } => {
+            let stdin = std::io::stdin();
+            let state = get_world_state(nats.clone()).await?;
+            let cluster = ClusterName::new(&cluster);
+            let cluster_state = state
+                .cluster(&cluster)
+                .ok_or_else(|| anyhow::anyhow!("{cluster} cluster does not exist"))?;
+            for backend in backends {
+                let backend = BackendId::new(backend);
+                let Some(backend_state) = cluster_state.backend(&backend) else {
+                    println!("{} no such backend!", backend.id());
+                    continue;
+                };
+                println!("{backend_state:?}");
+                if backend_state
+                    .state()
+                    .map_or(false, |state| state.terminal())
+                {
+                    println!(
+                        "backend state {} is a terminal state!",
+                        backend_state.state().unwrap()
+                    );
+                    println!(
+                        "A backend may not have multiple terminal states (this is an invariant)"
+                    );
+                    println!("Therefore, skipping marking backend {backend} as lost");
+                    continue;
+                }
+                if let Some(ref lock) = backend_state.lock {
+                    println!("NOTE: backend holds the following lock: {lock}!");
+                }
+                println!("are you sure you want to mark this backend: {backend} as lost?");
+                println!("(type y and end line to continue, any other input will skip marking this backend as lost)");
+
+                let mut confirmation = String::new();
+                stdin.read_line(&mut confirmation)?;
+                if confirmation != "y" {
+                    println!("skipping backend: {backend}, not marking as lost");
+                    continue;
+                }
+
+                let lost_state_message =
+                    BackendStateMessage::new(BackendState::Lost, cluster.clone(), backend.clone());
+
+                nats.publish_jetstream(&lost_state_message).await?;
+                println!("marking backend: {backend} as lost");
             }
         }
     }
