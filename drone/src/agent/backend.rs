@@ -2,7 +2,7 @@ use crate::agent::engine::Engine;
 use futures::Future;
 use plane_core::{
     logging::LogError,
-    messages::agent::DroneLogMessage,
+    messages::agent::BackendLogMessage,
     messages::{
         agent::DroneLogMessageKind,
         dns::{DnsRecordType, SetDnsRecord},
@@ -32,7 +32,7 @@ pub struct BackendMonitor {
     _stats_loop: AbortOnDrop<()>,
     _dns_loop: AbortOnDrop<Result<(), anyhow::Error>>,
     _backend_id: BackendId,
-    meta_log_tx: Sender<DroneLogMessage>,
+    meta_log_tx: Sender<BackendLogMessage>,
 }
 
 impl BackendMonitor {
@@ -62,8 +62,8 @@ impl BackendMonitor {
         &mut self,
         text: String,
         kind: DroneLogMessageKind,
-    ) -> impl Future<Output = Result<(), SendError<DroneLogMessage>>> + '_ {
-        self.meta_log_tx.send(DroneLogMessage {
+    ) -> impl Future<Output = Result<(), SendError<BackendLogMessage>>> + '_ {
+        self.meta_log_tx.send(BackendLogMessage {
             backend_id: self._backend_id.clone(),
             kind,
             text,
@@ -100,7 +100,7 @@ impl BackendMonitor {
         backend_id: &BackendId,
         engine: &E,
         nc: &TypedNats,
-        meta_log_rx: ReceiverStream<DroneLogMessage>,
+        meta_log_rx: ReceiverStream<BackendLogMessage>,
     ) -> JoinHandle<()> {
         let mut stream = engine.log_stream(backend_id).merge(meta_log_rx);
         let nc = nc.clone();

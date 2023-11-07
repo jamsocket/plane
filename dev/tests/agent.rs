@@ -4,8 +4,8 @@ use plane_controller::{drone_state::monitor_drone_state, run::update_backend_sta
 use plane_core::{
     messages::{
         agent::{
-            BackendState, BackendStatsMessage, DroneLogMessage, DroneLogMessageKind, SpawnRequest,
-            TerminationRequest,
+            BackendLogMessage, BackendState, BackendStatsMessage, DroneLogMessageKind,
+            SpawnRequest, TerminationRequest,
         },
         drone_state::{DroneStatusMessage, UpdateBackendStateMessage},
         scheduler::DrainDrone,
@@ -308,7 +308,7 @@ async fn invalid_container_fails() {
     let (ctx, mut sub) = do_spawn_request(&mut req).await;
     let log_subscription = ctx
         .nats_connection
-        .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
+        .subscribe(BackendLogMessage::subscribe_subject(&req.backend_id))
         .await
         .unwrap()
         .timeout(Duration::from_secs(10));
@@ -354,7 +354,7 @@ async fn check_that_logs_work() {
     let (ctx, mut status_sub) = do_spawn_request(&mut req).await;
     let mut log_subscription = Box::pin(
         ctx.nats_connection
-            .subscribe(DroneLogMessage::subscribe_subject(&req.backend_id))
+            .subscribe(BackendLogMessage::subscribe_subject(&req.backend_id))
             .await
             .unwrap()
             .timeout(Duration::from_secs(10)),

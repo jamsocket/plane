@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::Stream;
 use plane_core::{
-    messages::agent::{BackendStatsMessage, DroneLogMessage, SpawnRequest},
+    messages::agent::{BackendLogMessage, BackendStatsMessage, SpawnRequest},
     types::{BackendId, ClusterName, DroneId},
 };
 use std::{net::SocketAddr, pin::Pin};
@@ -46,7 +46,7 @@ pub trait Engine: Send + Sync + 'static {
     fn log_stream(
         &self,
         backend: &BackendId,
-    ) -> Pin<Box<dyn Stream<Item = DroneLogMessage> + Send>>;
+    ) -> Pin<Box<dyn Stream<Item = BackendLogMessage> + Send>>;
 
     fn stats_stream(
         &self,

@@ -1,4 +1,4 @@
-use crate::nats::JetStreamable;
+use crate::{nats::JetStreamable, util::LogAndIgnoreError};
 use anyhow::anyhow;
 pub mod agent;
 pub mod cert;
@@ -29,10 +29,18 @@ async fn add_jetstream_stream<T: JetStreamable>(
 pub async fn initialize_jetstreams(
     jetstream: &async_nats::jetstream::Context,
 ) -> anyhow::Result<()> {
-    let _ = add_jetstream_stream::<state::WorldStateMessage>(jetstream).await;
-    let _ = add_jetstream_stream::<agent::DroneLogMessage>(jetstream).await;
-    let _ = add_jetstream_stream::<agent::BackendStateMessage>(jetstream).await;
-    let _ = add_jetstream_stream::<dns::SetDnsRecord>(jetstream).await;
+    add_jetstream_stream::<state::WorldStateMessage>(jetstream)
+        .await
+        .log_and_ignore_error();
+    add_jetstream_stream::<agent::BackendLogMessage>(jetstream)
+        .await
+        .log_and_ignore_error();
+    add_jetstream_stream::<agent::BackendStateMessage>(jetstream)
+        .await
+        .log_and_ignore_error();
+    add_jetstream_stream::<dns::SetDnsRecord>(jetstream)
+        .await
+        .log_and_ignore_error();
 
     Ok(())
 }
