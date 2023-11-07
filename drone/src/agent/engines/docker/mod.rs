@@ -94,7 +94,9 @@ impl DockerInterface {
     fn get_stats(&self, backend_id: &BackendId) -> impl Stream<Item = Stats> {
         let options = StatsOptions {
             stream: false,
-            one_shot: true,
+            // one_shot is set to false until https://github.com/fussybeaver/bollard/pull/347
+            // has landed.
+            one_shot: false,
         };
 
         let ticker = IntervalStream::new({
