@@ -31,6 +31,17 @@ const NATS_WRONG_LAST_SEQUENCE_CODE: &str = "10071";
 /// consumer state is minimal and we make efficient use of consumers.
 const INACTIVE_THRESHOLD_SECONDS: u64 = 60 * 60 * 12; // 12 hours
 
+#[derive(Debug, Clone)]
+pub struct QueueGroup(String);
+impl QueueGroup {
+    pub fn new(group: &str) -> Self {
+        QueueGroup(group.to_string())
+    }
+    pub fn to_string(&self) -> String {
+        self.0.clone()
+    }
+}
+
 /// Unconstructable type, used as a [TypedMessage::Response] to indicate that
 /// no response is allowed.
 #[derive(Serialize, Deserialize)]
@@ -214,6 +225,11 @@ where
         }
 
         None
+    }
+
+    pub async fn unsubscribe(&mut self) -> Result<()> {
+        self.subscription.unsubscribe().await?;
+        Ok(())
     }
 }
 
@@ -542,6 +558,22 @@ impl TypedNats {
     {
         tracing::info!(stream=%subject.subject, "Subscribing to NATS stream.");
         let subscription = self.nc.subscribe(subject.subject).await?;
+        Ok(TypedSubscription::new(subscription, self.nc.clone()))
+    }
+
+    pub async fn queue_subscribe<T>(
+        &self,
+        subject: SubscribeSubject<T>,
+        queue_group: &QueueGroup,
+    ) -> Result<TypedSubscription<T>>
+    where
+        T: TypedMessage,
+    {
+        tracing::info!(stream=%subject.subject, queue_group=%queue_group.to_string(), "Subscribing to NATS queue group.");
+        let subscription = self
+            .nc
+            .queue_subscribe(subject.subject, queue_group.to_string())
+            .await?;
         Ok(TypedSubscription::new(subscription, self.nc.clone()))
     }
 }
