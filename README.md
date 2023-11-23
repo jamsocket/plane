@@ -68,8 +68,7 @@ And then access it with:
 
 ## Docker containers
 
-**Note that the GitHub-hosted Docker containers (hosted from `ghcr.io`) are for historic use only.** Packages have moved to the [`plane` organization](https://hub.docker.com/u/plane) on Docker Hub.
-
+Packages can be found at [`plane` organization](https://hub.docker.com/u/plane) on Docker Hub.
 
 ## Spawning over HTTP
 
