@@ -406,6 +406,7 @@ impl TypedNats {
                 filter_subject: subject,
                 deliver_subject,
                 inactive_threshold: Duration::from_secs(INACTIVE_THRESHOLD_SECONDS),
+                num_replicas: 2,
                 max_ack_pending: 1, // NOTE: If you remove this or change the value,
                 // the resultant stream is no longer guaranteed to be in order, and call sites
                 // that rely on ordered messages will break, nondeterministically
