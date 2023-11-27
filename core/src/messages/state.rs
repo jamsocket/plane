@@ -231,6 +231,7 @@ impl JetStreamable for WorldStateMessage {
             name: Self::stream_name().to_string(),
             subjects: vec!["state.>".to_string()],
             max_messages_per_subject: 1,
+            num_replicas: 2,
             ..Default::default()
         }
     }
