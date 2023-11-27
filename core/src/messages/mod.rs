@@ -13,21 +13,19 @@ async fn add_jetstream_stream<T: JetStreamable>(
 ) -> anyhow::Result<()> {
     let config = T::config();
     tracing::debug!(name = config.name, "Getting or creating jetstream stream.");
-    let result = jetstream
-        .get_or_create_stream(config)
-        .await;
+    let result = jetstream.get_or_create_stream(config).await;
 
     let stream = if let Err(e) = result {
-        if e.to_string().contains("replicas > 1 not supported in non-clustered mode") {
+        if e.to_string()
+            .contains("replicas > 1 not supported in non-clustered mode")
+        {
             let config = async_nats::jetstream::stream::Config {
                 num_replicas: 1,
                 ..T::config()
             };
 
-            let result = jetstream
-                .get_or_create_stream(config)
-                .await;
-            
+            let result = jetstream.get_or_create_stream(config).await;
+
             result.map_err(|e| anyhow!("Error: {e:?}"))?
         } else {
             return Err(anyhow!("Error: {e:?}"));
@@ -47,7 +45,6 @@ async fn add_jetstream_stream<T: JetStreamable>(
 
 pub async fn initialize_jetstreams(
     jetstream: &async_nats::jetstream::Context,
-
 ) -> anyhow::Result<()> {
     add_jetstream_stream::<state::WorldStateMessage>(jetstream)
         .await
