@@ -19,6 +19,9 @@ async fn add_jetstream_stream<T: JetStreamable>(
         if e.to_string()
             .contains("replicas > 1 not supported in non-clustered mode")
         {
+            // If we are running in non-clustered mode (e.g. in dev or testing),
+            // we can't use replicas, so we overwrite the config to disable them.
+
             let config = async_nats::jetstream::stream::Config {
                 num_replicas: 1,
                 ..T::config()
