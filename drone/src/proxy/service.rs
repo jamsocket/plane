@@ -246,6 +246,9 @@ impl ProxyService {
                             Err(error) if error.kind() == ErrorKind::TimedOut => {
                                 tracing::info!(?duration, "Upgraded connection timed out.");
                             }
+                            Err(error) if error.kind() == ErrorKind::ConnectionReset => {
+                                tracing::info!(?duration, "Connection reset by peer.");
+                            }
                             Err(error) => {
                                 tracing::error!(
                                     ?duration,
