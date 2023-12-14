@@ -9,7 +9,7 @@ use plane2::{
     dns::run_dns_with_listener,
     drone::Drone,
     names::{AcmeDnsServerName, ControllerName, DroneName, Name},
-    types::ClusterId,
+    types::ClusterName,
     util::random_string,
 };
 use std::{
@@ -29,7 +29,7 @@ pub struct TestEnvironment {
     drop_futures: Arc<Mutex<Vec<Arc<dyn AsyncDrop>>>>,
     log_subscription: Arc<Mutex<Option<LogSubscription>>>,
     pub run_name: String,
-    pub cluster: ClusterId,
+    pub cluster: ClusterName,
 }
 
 #[allow(dead_code)]
@@ -45,7 +45,7 @@ impl TestEnvironment {
             drop_futures: Arc::default(),
             scratch_dir,
             log_subscription: Arc::new(Mutex::new(Some(log_subscription))),
-            cluster: ClusterId::from(TEST_CLUSTER.to_string()),
+            cluster: ClusterName::from(TEST_CLUSTER.to_string()),
             run_name,
         }
     }
@@ -94,7 +94,7 @@ impl TestEnvironment {
 
     pub async fn drone(&mut self, controller: &ControllerServer) -> Drone {
         let client = controller.client();
-        let connector = client.drone_connection(&ClusterId::from(TEST_CLUSTER.to_string()));
+        let connector = client.drone_connection(&ClusterName::from(TEST_CLUSTER.to_string()));
         let docker = Docker::connect_with_local_defaults().unwrap();
         let db_path = self.scratch_dir.join("drone.db");
         Drone::run(

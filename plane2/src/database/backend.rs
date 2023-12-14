@@ -2,7 +2,9 @@ use super::{subscribe::emit_with_key, util::MapSqlxError, PlaneDatabase};
 use crate::{
     names::{BackendActionName, BackendName},
     protocol::{BackendAction, RouteInfo},
-    types::{BackendStatus, BearerToken, ClusterId, NodeId, SecretToken, TimestampedBackendStatus},
+    types::{
+        BackendStatus, BearerToken, ClusterName, NodeId, SecretToken, TimestampedBackendStatus,
+    },
 };
 use chrono::{DateTime, Utc};
 use futures_util::Stream;
@@ -107,7 +109,7 @@ impl<'a> BackendDatabase<'a> {
 
     pub async fn backend(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> sqlx::Result<Option<BackendRow>> {
         let result = sqlx::query!(

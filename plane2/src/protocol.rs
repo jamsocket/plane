@@ -3,8 +3,8 @@ use crate::{
     names::{BackendActionName, BackendName},
     typed_socket::ChannelMessage,
     types::{
-        BackendStatus, BearerToken, ClusterId, ExecutorConfig, KeyConfig, NodeStatus, SecretToken,
-        TerminationKind,
+        BackendStatus, BearerToken, ClusterName, ExecutorConfig, KeyConfig, NodeStatus,
+        SecretToken, TerminationKind,
     },
 };
 use chrono::{DateTime, Utc};
@@ -158,7 +158,7 @@ impl ChannelMessage for MessageToProxy {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum MessageFromDns {
-    TxtRecordRequest { cluster: ClusterId },
+    TxtRecordRequest { cluster: ClusterName },
 }
 
 impl ChannelMessage for MessageFromDns {
@@ -168,7 +168,7 @@ impl ChannelMessage for MessageFromDns {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum MessageToDns {
     TxtRecordResponse {
-        cluster: ClusterId,
+        cluster: ClusterName,
         txt_value: Option<String>,
     },
 }

@@ -53,21 +53,21 @@ impl BackendKeyId {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
-pub struct ClusterId(String);
+pub struct ClusterName(String);
 
-impl ClusterId {
+impl ClusterName {
     pub fn is_https(&self) -> bool {
         self.0 != "localhost" && !self.0.starts_with("localhost:")
     }
 }
 
-impl Display for ClusterId {
+impl Display for ClusterName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.0)
     }
 }
 
-impl From<String> for ClusterId {
+impl From<String> for ClusterName {
     fn from(s: String) -> Self {
         Self(s)
     }
@@ -361,15 +361,15 @@ pub struct ConnectResponse {
 impl ConnectResponse {
     pub fn new(
         backend_id: BackendName,
-        cluster_id: &ClusterId,
+        cluster: &ClusterName,
         spawned: bool,
         token: BearerToken,
         secret_token: SecretToken,
     ) -> Self {
-        let url = if cluster_id.is_https() {
-            format!("https://{}/{}/", cluster_id, token)
+        let url = if cluster.is_https() {
+            format!("https://{}/{}/", cluster, token)
         } else {
-            format!("http://{}/{}/", cluster_id, token)
+            format!("http://{}/{}/", cluster, token)
         };
 
         Self {

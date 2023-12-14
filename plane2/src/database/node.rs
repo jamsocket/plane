@@ -5,7 +5,7 @@ use super::{
 use crate::{
     heartbeat_consts::HEARTBEAT_INTERVAL_SECONDS,
     names::{AnyNodeName, ControllerName, NodeName},
-    types::{ClusterId, NodeId, NodeKind, NodeStatus},
+    types::{ClusterName, NodeId, NodeKind, NodeStatus},
     PlaneVersionInfo,
 };
 use anyhow::Result;
@@ -36,7 +36,7 @@ impl<'a> NodeDatabase<'a> {
 
     pub async fn get_id(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         name: &impl NodeName,
     ) -> sqlx::Result<Option<NodeId>> {
         let result = query!(
@@ -56,7 +56,7 @@ impl<'a> NodeDatabase<'a> {
 
     pub async fn register(
         &self,
-        cluster: Option<&ClusterId>,
+        cluster: Option<&ClusterName>,
         name: &AnyNodeName,
         kind: NodeKind,
         controller: &ControllerName,
@@ -154,7 +154,7 @@ impl<'a> NodeDatabase<'a> {
         for row in record {
             result.push(NodeRow {
                 id: NodeId::from(row.id),
-                cluster: row.cluster.map(ClusterId::from),
+                cluster: row.cluster.map(ClusterName::from),
                 kind: NodeKind::try_from(row.kind).map_sqlx_error()?,
                 controller: row
                     .controller
@@ -180,7 +180,7 @@ impl<'a> NodeDatabase<'a> {
 
 pub struct NodeRow {
     pub id: NodeId,
-    pub cluster: Option<ClusterId>,
+    pub cluster: Option<ClusterName>,
     pub kind: NodeKind,
     pub controller: Option<ControllerName>,
     pub name: AnyNodeName,
