@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update acme_txt_entries set\n                txt_value = $3\n            where cluster = $1\n            and leased_by = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ee5d7ec907c90485d65ee5f4eaa0ea44cbcc11b5cf96e794ec2d8c7d279b3288"
+}

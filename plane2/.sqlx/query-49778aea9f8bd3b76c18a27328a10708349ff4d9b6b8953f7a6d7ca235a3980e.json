@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        with message_insert as (\n            insert into event (kind, key, created_at, data)\n            values ($1, $2, now(), $3)\n            returning id\n        )\n        select pg_notify(\n            $4,\n            json_build_object(\n                'payload', $3::jsonb,\n                'timestamp', now(),\n                'id', id,\n                'kind', $1,\n                'key', $2\n            )::text\n        ) from message_insert\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pg_notify",
+        "type_info": "Void"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "49778aea9f8bd3b76c18a27328a10708349ff4d9b6b8953f7a6d7ca235a3980e"
+}

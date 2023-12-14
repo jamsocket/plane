@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            delete from acme_txt_entries\n            where cluster = $1\n            and leased_by = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "58153ab68f47440bf4711dbafeca22b23a64d9db46b41a8cbd50c5ba463a27fa"
+}

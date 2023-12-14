@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into \"backend_action\" (\"id\", \"action\", \"drone_id\")\n        values ($1, $2, $3)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Jsonb",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8c92294fa62ea84ab62fb29fa3eeec6db6c2657a4b991401fc3a45fb604d113f"
+}

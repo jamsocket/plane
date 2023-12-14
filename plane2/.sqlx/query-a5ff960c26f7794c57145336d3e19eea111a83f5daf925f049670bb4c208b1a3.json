@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update backend_key\n            set last_renewed = now()\n            where id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a5ff960c26f7794c57145336d3e19eea111a83f5daf925f049670bb4c208b1a3"
+}

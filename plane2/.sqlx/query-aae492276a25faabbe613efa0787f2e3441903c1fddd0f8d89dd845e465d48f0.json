@@ -1,0 +1,74 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select\n                id,\n                kind,\n                cluster,\n                controller,\n                name,\n                plane_version,\n                plane_hash,\n                last_heartbeat,\n                last_status,\n                now() as \"as_of!\"\n            from node\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "cluster",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "controller",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "plane_version",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "plane_hash",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "last_heartbeat",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "last_status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "as_of!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "aae492276a25faabbe613efa0787f2e3441903c1fddd0f8d89dd845e465d48f0"
+}

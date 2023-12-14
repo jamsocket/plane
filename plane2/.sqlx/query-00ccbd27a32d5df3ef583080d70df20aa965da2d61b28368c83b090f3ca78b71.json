@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into acme_txt_entries (cluster, leased_at, leased_by)\n            values ($1, now(), $2)\n            on conflict (cluster)\n            do update set\n                leased_at = now(),\n                leased_by = $2\n            where (acme_txt_entries.leased_at + interval '1 minute') < now()\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "00ccbd27a32d5df3ef583080d70df20aa965da2d61b28368c83b090f3ca78b71"
+}

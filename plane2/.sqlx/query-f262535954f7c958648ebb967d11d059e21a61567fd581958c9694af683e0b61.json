@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select\n                id,\n                cluster,\n                last_status,\n                last_status_time,\n                drone_id,\n                expiration_time,\n                allowed_idle_seconds,\n                last_keepalive,\n                now() as \"as_of!\"\n            from backend\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "cluster",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "last_status_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "drone_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "expiration_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "allowed_idle_seconds",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "last_keepalive",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "as_of!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "f262535954f7c958648ebb967d11d059e21a61567fd581958c9694af683e0b61"
+}

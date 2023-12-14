@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into token (token, backend_id, username, auth, secret_token, expiration_time)\n        values ($1, $2, $3, $4, $5, now() + $6)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Jsonb",
+        "Varchar",
+        "Interval"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5f08a319db5dcd91c2f843e67f4c4ba7877980220cc1ab3321aff30cd8f12fd8"
+}

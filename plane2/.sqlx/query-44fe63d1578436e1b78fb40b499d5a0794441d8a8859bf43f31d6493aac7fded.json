@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select\n                id as backend_id,\n                expiration_time,\n                allowed_idle_seconds,\n                last_keepalive,\n                now() as \"as_of!\"\n            from backend\n            where\n                drone_id = $1\n                and last_status != $2\n                and (\n                    now() - last_keepalive > make_interval(secs => allowed_idle_seconds)\n                    or now() > expiration_time\n                )\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "backend_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "expiration_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "allowed_idle_seconds",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "last_keepalive",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "as_of!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "44fe63d1578436e1b78fb40b499d5a0794441d8a8859bf43f31d6493aac7fded"
+}

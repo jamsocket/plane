@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select \"action\"\n            from \"backend_action\"\n            where \"drone_id\" = $1\n            and acked_at is null\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "action",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8cc35e2bdaf99210ef1d34e8bee5932057bfecb7a10cf86cd57f1ed0c5de94e5"
+}

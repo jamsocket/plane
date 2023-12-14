@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update backend\n            set\n                last_keepalive = now()\n            where id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c6ec316a814bac95629bb4af740898e538a03f4378f262c8849392ff57b9e22a"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into drone (id, draining)\n            values ($1, false)\n            on conflict do nothing\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "568e450231c5da9519c72a26028cf5619e3d7ad113e2523227bc6b77e6601024"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            delete from backend_key\n            where id = $1\n            and last_renewed - now() > $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Interval"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "830a71ab901bb9be618449d951e6d35a3aeea63a2b3fe0dc43b8cf05c7faa19e"
+}

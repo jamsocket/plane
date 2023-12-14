@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select\n                id,\n                is_online,\n                plane_version,\n                plane_hash,\n                first_seen,\n                last_heartbeat,\n                now() as \"as_of!\"\n            from controller\n            where is_online = true\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_online",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "plane_version",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "plane_hash",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "first_seen",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_heartbeat",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "as_of!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "bb2f37574b40799f7b2601c8e453af4a464409d19bcacc6005cb2790355ea4b1"
+}

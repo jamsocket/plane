@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update \"backend_action\"\n            set acked_at = now()\n            where \"id\" = $1\n            and \"drone_id\" = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d598efe21ec70805ebd3f90db7d0a17aa8dfb4436a7fe9806a8daf3f1180bdca"
+}

@@ -1,0 +1,55 @@
+version: "3.9"
+services:
+  controller:
+    container_name: plane-controller
+    image: plane/plane-preview:latest
+    build:
+      dockerfile: docker/Dockerfile
+      context: ../
+    command:
+      "controller --db postgres://postgres@postgres"
+    networks:
+      - plane-dev
+    ports:
+      - "8080:8080"
+
+  drone:
+    container_name: plane-drone
+    image: plane/plane-preview:latest
+    build:
+      dockerfile: docker/Dockerfile
+      context: ../
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      "drone --controller-url ws://plane-controller:8080 --cluster 'localhost:9090'"
+    networks:
+      - plane-dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  proxy:
+    container_name: plane-proxy
+    image: plane/plane-preview:latest
+    build:
+      dockerfile: docker/Dockerfile
+      context: ../
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      "proxy --controller-url ws://plane-controller:8080 --cluster 'localhost:9090'"
+    networks:
+      - plane-dev
+    ports:
+      - "9090:9090"
+
+  postgres:
+    container_name: plane-postgres
+    image: postgres:16
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    networks:
+      - plane-dev
+
+networks:
+  plane-dev:

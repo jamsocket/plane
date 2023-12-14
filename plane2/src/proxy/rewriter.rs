@@ -1,0 +1,210 @@
+use super::RemoteMeta;
+use crate::{protocol::RouteInfo, types::BearerToken};
+use hyper::{
+    http::{request, uri},
+    Body, HeaderMap, Request, Uri,
+};
+use reqwest::header::HeaderValue;
+use std::{borrow::BorrowMut, net::SocketAddr, str::FromStr};
+use tungstenite::http::uri::PathAndQuery;
+
+const VERIFIED_HEADER_PREFIX: &str = "x-verified-";
+const USERNAME_HEADER: &str = "x-verified-username";
+const AUTH_SECRET_HEADER: &str = "x-verified-secret";
+const AUTH_USER_DATA_HEADER: &str = "x-verified-user-data";
+const PATH_PREFIX_HEADER: &str = "x-verified-path";
+const X_FORWARDED_FOR_HEADER: &str = "x-forwarded-for";
+const X_FORWARDED_PROTO_HEADER: &str = "x-forwarded-proto";
+
+pub struct RequestRewriter {
+    parts: request::Parts,
+    uri_parts: uri::Parts,
+    body: Body,
+    bearer_token: BearerToken,
+    prefix_uri: Uri,
+    remote_meta: RemoteMeta,
+}
+
+impl RequestRewriter {
+    pub fn new(request: Request<Body>, remote_meta: RemoteMeta) -> Option<Self> {
+        let (parts, body) = request.into_parts();
+
+        let mut uri_parts = parts.uri.clone().into_parts();
+        uri_parts.scheme = Some("http".parse().expect("Scheme is valid."));
+
+        let bearer_token = extract_bearer_token(&mut uri_parts)?;
+
+        let mut prefix_uri_parts = parts.uri.clone().into_parts();
+        prefix_uri_parts.path_and_query =
+            Some(PathAndQuery::from_str(&format!("/{}/", bearer_token)).expect("Path is valid."));
+        let prefix_uri = Uri::from_parts(prefix_uri_parts).expect("URI parts are valid.");
+
+        Some(Self {
+            parts,
+            uri_parts,
+            body,
+            bearer_token,
+            prefix_uri,
+            remote_meta,
+        })
+    }
+
+    pub fn set_authority(&mut self, addr: SocketAddr) {
+        self.uri_parts.authority = Some(
+            addr.to_string()
+                .parse()
+                .expect("SocketAddr is a valid authority."),
+        );
+    }
+
+    pub fn bearer_token(&self) -> &BearerToken {
+        &self.bearer_token
+    }
+
+    fn into_parts(self) -> (request::Parts, Body, Uri, RemoteMeta) {
+        let Self {
+            mut parts,
+            uri_parts,
+            body,
+            prefix_uri,
+            remote_meta,
+            ..
+        } = self;
+
+        let uri = Uri::from_parts(uri_parts).expect("URI parts are valid.");
+        parts.uri = uri;
+
+        (parts, body, prefix_uri, remote_meta)
+    }
+
+    pub fn into_request(self, route_info: &RouteInfo) -> Request<Body> {
+        let (mut parts, body, prefix_uri, remote_meta) = self.into_parts();
+
+        let headers = parts.headers.borrow_mut();
+        set_headers_from_route_info(headers, route_info, &prefix_uri, remote_meta);
+
+        Request::from_parts(parts, body)
+    }
+
+    pub fn into_request_pair(self, route_info: &RouteInfo) -> (Request<Body>, Request<Body>) {
+        let (parts, body, prefix_uri, remote_meta) = self.into_parts();
+        let req2 = clone_request_with_empty_body(&parts, route_info, &prefix_uri, remote_meta);
+        let req1 = Request::from_parts(parts, body);
+
+        (req1, req2)
+    }
+
+    pub fn should_upgrade(&self) -> bool {
+        let Some(conn_header) = self.parts.headers.get("connection") else {
+            return false;
+        };
+
+        let Ok(conn_header) = conn_header.to_str() else {
+            return false;
+        };
+        conn_header.to_lowercase() == "upgrade"
+    }
+}
+
+fn clone_request_with_empty_body(
+    parts: &request::Parts,
+    route_info: &RouteInfo,
+    prefix_uri: &Uri,
+    remote_meta: RemoteMeta,
+) -> request::Request<Body> {
+    let mut builder = request::Builder::new()
+        .method(parts.method.clone())
+        .uri(parts.uri.clone());
+
+    let headers = builder
+        .headers_mut()
+        .expect("Can always call headers_mut() on a new builder.");
+
+    headers.extend(parts.headers.clone());
+    set_headers_from_route_info(headers, route_info, prefix_uri, remote_meta);
+
+    builder
+        .body(Body::empty())
+        .expect("Request is always valid.")
+}
+
+fn extract_bearer_token(parts: &mut uri::Parts) -> Option<BearerToken> {
+    let Some(path_and_query) = parts.path_and_query.clone() else {
+        panic!("No path and query");
+    };
+
+    let (token, path) = path_and_query.path().strip_prefix('/')?.split_once('/')?;
+    let token = BearerToken::from(token.to_string());
+
+    parts.path_and_query = Some(
+        PathAndQuery::from_str(
+            format!("/{}{}", path, path_and_query.query().unwrap_or_default()).as_str(),
+        )
+        .expect("Path and query is valid."),
+    );
+
+    Some(token)
+}
+
+fn set_headers_from_route_info(
+    headers: &mut HeaderMap,
+    route_info: &RouteInfo,
+    prefix_uri: &Uri,
+    remote_meta: RemoteMeta,
+) {
+    let mut headers_to_remove = Vec::new();
+    for header_name in headers.keys() {
+        if header_name.as_str().starts_with(VERIFIED_HEADER_PREFIX) {
+            headers_to_remove.push(header_name.clone());
+        }
+    }
+
+    for header_name in headers_to_remove {
+        headers.remove(header_name);
+    }
+
+    if let Some(user) = &route_info.user {
+        headers.insert(
+            USERNAME_HEADER,
+            HeaderValue::from_str(user.as_str()).expect("User is valid."),
+        );
+    }
+
+    let forwards = if let Some(forwards) = headers.get(X_FORWARDED_FOR_HEADER) {
+        let forwards = forwards.to_str().unwrap_or("").to_string();
+        format!("{}, {}", forwards, remote_meta.ip)
+    } else {
+        remote_meta.ip.to_string()
+    };
+
+    headers.insert(
+        X_FORWARDED_FOR_HEADER,
+        HeaderValue::from_str(forwards.as_str()).expect("Forwards are valid."),
+    );
+
+    if headers.get(X_FORWARDED_PROTO_HEADER).is_none() {
+        headers.insert(
+            "x-forwarded-proto",
+            HeaderValue::from_static(remote_meta.protocol.as_str()),
+        );
+    }
+
+    headers.insert(
+        AUTH_SECRET_HEADER,
+        HeaderValue::from_str(&route_info.secret_token.to_string()).expect("Secret is valid."),
+    );
+
+    headers.insert(
+        AUTH_USER_DATA_HEADER,
+        HeaderValue::from_str(
+            &serde_json::to_string(&route_info.user_data)
+                .expect("JSON value should always serialize."),
+        )
+        .expect("User data is valid"),
+    );
+
+    headers.insert(
+        PATH_PREFIX_HEADER,
+        HeaderValue::from_str(&prefix_uri.to_string()).expect("Path is valid."),
+    );
+}

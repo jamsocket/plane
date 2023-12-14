@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select\n                backend_id,\n                username,\n                auth,\n                last_status,\n                cluster_address,\n                secret_token\n            from token\n            left join backend\n            on backend.id = token.backend_id\n            where token = $1\n            limit 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "backend_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "username",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "auth",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "last_status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "cluster_address",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "secret_token",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "3227bec624c110e5f86a942977fca2ae1289066ca00568606a244dbde98330fd"
+}

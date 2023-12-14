@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into controller (id, is_online, plane_version, plane_hash, last_heartbeat, ip)\n            values ($1, $2, $3, $4, now(), inet_client_addr())\n            on conflict (id) do update\n            set\n                is_online = $2,\n                plane_version = $3,\n                plane_hash = $4,\n                last_heartbeat = now(),\n                ip = inet_client_addr()\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Bool",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "be24e9a4a9c4146ff1c9cc46e4d1d03d30c0f160926850a4b4dbfe6ac67039ac"
+}

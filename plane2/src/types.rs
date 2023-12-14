@@ -1,0 +1,416 @@
+use crate::{
+    names::{BackendName, Name},
+    util::random_prefixed_string,
+};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use std::{collections::HashMap, fmt::Display, net::SocketAddr};
+
+pub trait OrRandom<T> {
+    fn or_random(self) -> T;
+}
+
+impl<T: Name> OrRandom<T> for Option<T> {
+    fn or_random(self) -> T {
+        self.unwrap_or_else(T::new_random)
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
+pub struct NodeId(i32);
+
+impl From<i32> for NodeId {
+    fn from(i: i32) -> Self {
+        Self(i)
+    }
+}
+
+impl NodeId {
+    pub fn as_i32(&self) -> i32 {
+        self.0
+    }
+}
+
+impl Display for NodeId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_i32())
+    }
+}
+
+pub struct BackendKeyId(i32);
+
+impl From<i32> for BackendKeyId {
+    fn from(i: i32) -> Self {
+        Self(i)
+    }
+}
+
+impl BackendKeyId {
+    pub fn as_i32(&self) -> i32 {
+        self.0
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
+pub struct ClusterId(String);
+
+impl ClusterId {
+    pub fn is_https(&self) -> bool {
+        self.0 != "localhost" && !self.0.starts_with("localhost:")
+    }
+}
+
+impl Display for ClusterId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
+impl From<String> for ClusterId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+pub enum NodeStatus {
+    /// Starting and doing some pre-processing; not ready.
+    Starting,
+
+    /// Ready.
+    Available,
+
+    /// Terminated.
+    Terminated,
+}
+
+impl NodeStatus {
+    pub fn is_active(&self) -> bool {
+        match self {
+            NodeStatus::Starting | NodeStatus::Available => true,
+            NodeStatus::Terminated => false,
+        }
+    }
+}
+
+impl TryFrom<String> for NodeStatus {
+    type Error = serde_json::Error;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        serde_json::from_value(Value::String(s))
+    }
+}
+
+impl Display for NodeStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let result = serde_json::to_value(self);
+        match result {
+            Ok(Value::String(v)) => write!(f, "{}", v),
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd)]
+pub enum BackendStatus {
+    /// The backend has been scheduled to a drone, but has not yet been acknowledged.
+    /// This status is only assigned by the controller; the drone will never assign it by definition.
+    Scheduled,
+
+    /// The backend has been assigned to a drone, which is now responsible for loading its image.
+    Loading,
+
+    /// Telling Docker to start the container.
+    Starting,
+
+    /// Wait for the backend to be ready to accept connections.
+    Waiting,
+
+    /// The backend is listening for connections.
+    Ready,
+
+    /// The backend has been sent a SIGTERM, either because we sent it or the user did,
+    /// and we are waiting for it to exit.
+    /// Proxies should stop sending traffic to it, but we should not yet release the key.
+    Terminating,
+
+    /// The backend has exited or been swept.
+    Terminated,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+pub enum TerminationKind {
+    Soft,
+    Hard,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct BackendState {
+    pub status: BackendStatus,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address: Option<SocketAddr>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub termination: Option<TerminationKind>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
+}
+
+impl BackendState {
+    pub fn to_loading(&self) -> BackendState {
+        BackendState {
+            status: BackendStatus::Loading,
+            ..self.clone()
+        }
+    }
+
+    pub fn to_starting(&self) -> BackendState {
+        BackendState {
+            status: BackendStatus::Starting,
+            ..self.clone()
+        }
+    }
+
+    pub fn to_waiting(&self, address: SocketAddr) -> BackendState {
+        BackendState {
+            status: BackendStatus::Waiting,
+            address: Some(address),
+            ..self.clone()
+        }
+    }
+
+    pub fn to_ready(&self) -> BackendState {
+        BackendState {
+            status: BackendStatus::Ready,
+            ..self.clone()
+        }
+    }
+
+    pub fn terminating(termination: TerminationKind) -> BackendState {
+        BackendState {
+            status: BackendStatus::Terminating,
+            termination: Some(termination),
+            address: None,
+            exit_code: None,
+        }
+    }
+
+    pub fn terminated(exit_code: Option<i32>) -> BackendState {
+        BackendState {
+            status: BackendStatus::Terminated,
+            exit_code,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for BackendState {
+    fn default() -> Self {
+        Self {
+            status: BackendStatus::Scheduled,
+            address: None,
+            termination: None,
+            exit_code: None,
+        }
+    }
+}
+
+impl TryFrom<String> for BackendStatus {
+    type Error = serde_json::Error;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        serde_json::from_value(Value::String(s))
+    }
+}
+
+impl Display for BackendStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let result = serde_json::to_value(self);
+        match result {
+            Ok(Value::String(v)) => write!(f, "{}", v),
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub enum PullPolicy {
+    #[default]
+    IfNotPresent,
+    Always,
+    Never,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ExecutorConfig {
+    pub image: String,
+    pub pull_policy: PullPolicy,
+
+    pub env: HashMap<String, String>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct SpawnConfig {
+    /// Config to use to spawn the backend process.
+    pub executable: ExecutorConfig,
+
+    /// If provided, the maximum amount of time the backend will be allowed to
+    /// stay alive. Time counts from when the backend is scheduled.
+    pub lifetime_limit_seconds: Option<i32>,
+
+    /// If provided, the maximum amount of time the backend will be allowed to
+    /// stay alive with no inbound connections to it.
+    pub max_idle_seconds: Option<i32>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct KeyConfig {
+    /// If provided, and a running backend was created with the same key,
+    /// cluster, namespace, and tag, we will connect to that backend instead
+    /// of creating a new one.
+    pub name: String,
+
+    /// Namespace of the key. If not specified, the default namespace (empty string)
+    /// is used. Namespaces are scoped to a cluster, so two namespaces of the same name
+    /// on different clusters are distinct.
+    #[serde(default)]
+    pub namespace: String,
+
+    /// If we request a connection to a key and the backend for that key
+    /// is running, we will only connect to it if the tag matches the tag
+    /// of the connection request that created it.
+    #[serde(default)]
+    pub tag: String,
+}
+
+impl KeyConfig {
+    pub fn new_random() -> Self {
+        Self {
+            name: random_prefixed_string("lk"),
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct ConnectRequest {
+    /// Config to use if we need to create a new backend to connect to.
+    pub spawn_config: Option<SpawnConfig>,
+
+    /// Configuration for the key to use.
+    #[serde(default)]
+    pub key: Option<KeyConfig>,
+
+    /// Username or other identifier to associate with the generated connection URL.
+    /// Passed to the backend through the X-Plane-User header.
+    pub user: Option<String>,
+
+    /// Arbitrary JSON object to pass along with each request to the backend.
+    /// Passed to the backend through the X-Plane-Auth header.
+    #[serde(default)]
+    pub auth: Map<String, Value>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+pub struct BearerToken(String);
+
+impl From<String> for BearerToken {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl Display for BearerToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct SecretToken(String);
+
+impl From<String> for SecretToken {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl Display for SecretToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ConnectResponse {
+    pub backend_id: BackendName,
+
+    /// Whether the backend is a new one spawned due to the request.
+    pub spawned: bool,
+
+    pub token: BearerToken,
+
+    pub url: String,
+
+    pub secret_token: SecretToken,
+}
+
+impl ConnectResponse {
+    pub fn new(
+        backend_id: BackendName,
+        cluster_id: &ClusterId,
+        spawned: bool,
+        token: BearerToken,
+        secret_token: SecretToken,
+    ) -> Self {
+        let url = if cluster_id.is_https() {
+            format!("https://{}/{}/", cluster_id, token)
+        } else {
+            format!("http://{}/{}/", cluster_id, token)
+        };
+
+        Self {
+            backend_id,
+            spawned,
+            token,
+            url,
+            secret_token,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+pub enum NodeKind {
+    Proxy,
+    Drone,
+    AcmeDnsServer,
+}
+
+impl Display for NodeKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let result = serde_json::to_value(self);
+        match result {
+            Ok(Value::String(v)) => write!(f, "{}", v),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl TryFrom<String> for NodeKind {
+    type Error = serde_json::Error;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        serde_json::from_value(Value::String(s))
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct TimestampedBackendStatus {
+    pub status: BackendStatus,
+
+    #[serde(with = "chrono::serde::ts_milliseconds")]
+    pub time: DateTime<Utc>,
+}
