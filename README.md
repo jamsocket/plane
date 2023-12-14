@@ -1,3 +1,5 @@
+**Note**: Plane has undergone a complete rewrite! See [plane2-preview](https://github.com/drifting-in-space/plane/tree/plane2-preview) for the new version. This branch will become the main branch in early Q1 2024.
+
 <img src="resources/plane-logo-blue.svg" style="width: 100%" />
 
 [![Tests](https://github.com/drifting-in-space/plane/actions/workflows/tests.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/tests.yml)
