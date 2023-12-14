@@ -1,3 +1,5 @@
+**Note:** This branch is an in-progress rewrite of Plane! Please poke around, but don’t use it in production yet, and don’t be surprised if documentation is missing or inconsistent.
+
 <div style="postion: relative; width: 337px; height: 110px;">
     <a href="https://plane.dev#gh-light-mode-only" style="position: absolute;">
         <img src="./resources/plane-logo-light.svg" alt="Plane logo" />
