@@ -1867,6 +1867,7 @@ dependencies = [
  "clap",
  "colored",
  "plane-core",
+ "serde_json",
  "time 0.3.23",
  "tokio",
  "tracing",

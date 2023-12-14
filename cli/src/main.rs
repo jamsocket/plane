@@ -48,6 +48,10 @@ enum Command {
         /// instead of spawning a new one.
         #[clap(long)]
         lock: Option<String>,
+
+        /// JSON string, will be parsed.
+        #[clap(long)]
+        resource_limits: Option<String>,
     },
     Status {
         backend: Option<String>,
@@ -353,7 +357,10 @@ async fn main() -> Result<()> {
             port,
             env,
             lock,
+            resource_limits,
         } => {
+            let resource_limits: Option<ResourceLimits> =
+                resource_limits.map(|lim| serde_json::from_str(&lim).unwrap());
             let env: Result<HashMap<String, String>> = env
                 .iter()
                 .map(|d| {
@@ -376,7 +383,7 @@ async fn main() -> Result<()> {
                         image,
                         env,
                         credentials: None,
-                        resource_limits: ResourceLimits::default(),
+                        resource_limits: resource_limits.unwrap_or(ResourceLimits::default()),
                         pull_policy: Default::default(),
                         port,
                         volume_mounts: Vec::new(),
