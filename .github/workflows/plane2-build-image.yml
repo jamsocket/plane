@@ -7,7 +7,7 @@ on:
     paths-ignore: [ "/docs" ]
 
   pull_request:
-    branches: [ "main" ]
+    branches: [ "plane2-preview" ]
     paths:
     # Unless the Dockerfile itself has changed, testing whether a build passes
     # on a PR doesn’t tell us much that faster CI/CD workflows don’t already.
