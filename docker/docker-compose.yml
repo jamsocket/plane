@@ -50,6 +50,8 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
     networks:
       - plane-dev
+    ports:
+      - "5432:5432"
 
 networks:
   plane-dev:
