@@ -1,6 +1,6 @@
 on:
   pull_request:
-    branches: [ "*" ]
+    branches: [ "main" ]
     paths-ignore: [ "/docs" ]
 
 name: Clippy check

@@ -1,3 +1,5 @@
+name: Run Clippy (plane2-preview)
+
 on:
   pull_request:
     branches: [ "plane2-preview" ]
