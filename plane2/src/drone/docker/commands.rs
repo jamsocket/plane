@@ -108,6 +108,7 @@ pub async fn run_container(
     backend_id: &BackendName,
     container_id: &ContainerId,
     exec_config: ExecutorConfig,
+    runtime: &Option<String>,
 ) -> Result<()> {
     let options = bollard::container::CreateContainerOptions {
         name: container_id.to_string(),
@@ -134,6 +135,7 @@ pub async fn run_container(
         ),
         host_config: Some(HostConfig {
             port_bindings: Some(create_port_bindings()),
+            runtime: runtime.clone(),
             ..Default::default()
         }),
         ..Default::default()

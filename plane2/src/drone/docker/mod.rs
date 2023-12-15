@@ -17,6 +17,7 @@ const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 #[derive(Clone)]
 pub struct PlaneDocker {
     docker: Docker,
+    runtime: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -31,8 +32,8 @@ pub struct SpawnResult {
 }
 
 impl PlaneDocker {
-    pub async fn new(docker: Docker) -> Result<Self> {
-        Ok(Self { docker })
+    pub async fn new(docker: Docker, runtime: Option<String>) -> Result<Self> {
+        Ok(Self { docker, runtime })
     }
 
     pub async fn pull(&self, image: &str, force: bool) -> Result<()> {
@@ -105,7 +106,14 @@ impl PlaneDocker {
         container_id: &ContainerId,
         executable: ExecutorConfig,
     ) -> Result<SpawnResult> {
-        run_container(&self.docker, backend_id, container_id, executable).await?;
+        run_container(
+            &self.docker,
+            backend_id,
+            container_id,
+            executable,
+            &self.runtime,
+        )
+        .await?;
         let port = get_port(&self.docker, container_id).await?;
 
         Ok(SpawnResult {
