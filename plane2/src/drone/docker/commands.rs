@@ -2,7 +2,7 @@ use super::types::ContainerId;
 use crate::{names::BackendName, types::ExecutorConfig};
 use anyhow::Result;
 use bollard::{
-    service::{HostConfig, PortBinding},
+    service::{HostConfig, PortBinding, ResourcesUlimits},
     Docker,
 };
 use futures_util::StreamExt;
@@ -136,6 +136,32 @@ pub async fn run_container(
         host_config: Some(HostConfig {
             port_bindings: Some(create_port_bindings()),
             runtime: runtime.clone(),
+            memory: exec_config.resource_limits.memory_limit_bytes,
+            cpu_period: exec_config
+                .resource_limits
+                .cpu_period
+                .as_ref()
+                .map(|cpu_period| std::time::Duration::from(cpu_period).as_micros() as i64),
+            cpu_quota: exec_config
+                .resource_limits
+                .cpu_quota()
+                .map(|cpu_quota| cpu_quota.as_micros() as i64),
+            ulimits: exec_config
+                .resource_limits
+                .cpu_time_limit
+                .map(|cpu_time_limit| {
+                    let mins = (cpu_time_limit.as_secs_f64() / 60.0).floor() as i64;
+                    vec![ResourcesUlimits {
+                        name: Some("cpu".to_string()),
+                        soft: Some(mins),
+                        hard: Some(mins),
+                    }]
+                }),
+            storage_opt: exec_config.resource_limits.disk_limit_bytes.map(|lim| {
+                let mut hm = HashMap::new();
+                hm.insert("size".to_string(), lim.to_string());
+                hm
+            }),
             ..Default::default()
         }),
         ..Default::default()
