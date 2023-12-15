@@ -45,7 +45,7 @@ impl TestEnvironment {
             drop_futures: Arc::default(),
             scratch_dir,
             log_subscription: Arc::new(Mutex::new(Some(log_subscription))),
-            cluster: ClusterName::from(TEST_CLUSTER.to_string()),
+            cluster: TEST_CLUSTER.parse().unwrap(),
             run_name,
         }
     }
@@ -94,7 +94,7 @@ impl TestEnvironment {
 
     pub async fn drone(&mut self, controller: &ControllerServer) -> Drone {
         let client = controller.client();
-        let connector = client.drone_connection(&ClusterName::from(TEST_CLUSTER.to_string()));
+        let connector = client.drone_connection(&TEST_CLUSTER.parse().unwrap());
         let docker = Docker::connect_with_local_defaults().unwrap();
         let db_path = self.scratch_dir.join("drone.db");
         Drone::run(
