@@ -9,7 +9,6 @@ use plane2::{
         SpawnConfig,
     },
 };
-use std::collections::HashMap;
 use url::Url;
 
 fn show_error(error: &PlaneClientError) {
@@ -110,11 +109,7 @@ async fn inner_main(opts: Opts) -> Result<(), PlaneClientError> {
             key,
             wait,
         } => {
-            let executor_config = ExecutorConfig {
-                image,
-                env: HashMap::default(),
-                pull_policy: PullPolicy::default(),
-            };
+            let executor_config = ExecutorConfig::from_image_with_defaults(image);
             let spawn_config = SpawnConfig {
                 executable: executor_config.clone(),
                 lifetime_limit_seconds: None,

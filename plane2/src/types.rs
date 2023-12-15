@@ -256,7 +256,7 @@ impl ResourceLimits {
         let Some(pc) = self.cpu_period_percent else {
             return None;
         };
-        let cpu_period = self.cpu_period.unwrap_or_default();
+        let cpu_period = self.cpu_period.clone().unwrap_or_default();
 
         let quota = cpu_period.0.mul_f64((pc as f64) / 100.0);
         Some(quota)
@@ -267,11 +267,19 @@ impl ResourceLimits {
 pub struct ExecutorConfig {
     pub image: String,
     pub pull_policy: PullPolicy,
-
     pub env: HashMap<String, String>,
-
-    #[serde(default = "ResourceLimits::default")]
     pub resource_limits: ResourceLimits,
+}
+
+impl ExecutorConfig {
+    pub fn from_image_with_defaults<T: Into<String>>(image: T) -> Self {
+        Self {
+            image: image.into(),
+            pull_policy: PullPolicy::default(),
+            env: HashMap::default(),
+            resource_limits: ResourceLimits::default(),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
