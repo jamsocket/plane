@@ -2,6 +2,7 @@ name: Rustfmt
 
 on:
   pull_request:
+    branches: [ "main" ]
 
 jobs:
   check_format:

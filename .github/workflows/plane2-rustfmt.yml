@@ -1,4 +1,4 @@
-name: Check Rust formatting
+name: Check Rust formatting (plane2-preview)
 
 on:
   pull_request:
