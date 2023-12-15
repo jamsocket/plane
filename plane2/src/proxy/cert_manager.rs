@@ -212,7 +212,7 @@ pub async fn do_refresh(
 
     tracing::info!("Cert manager accepted cert lease request.");
 
-    let result = get_certificate(&cluster, &acme_config, request_sender, response_receiver).await;
+    let result = get_certificate(cluster, acme_config, request_sender, response_receiver).await;
 
     match result {
         Ok(cert_pair) => {
