@@ -2,7 +2,7 @@ use crate::{
     database::PlaneDatabase,
     names::{AnyNodeName, ControllerName},
     typed_socket::Handshake,
-    types::{ClusterId, NodeId},
+    types::{ClusterName, NodeId},
 };
 use std::net::IpAddr;
 
@@ -36,7 +36,7 @@ impl Controller {
     pub async fn register_node(
         &self,
         handshake: Handshake,
-        cluster_id: Option<&ClusterId>,
+        cluster: Option<&ClusterName>,
         ip: IpAddr,
     ) -> Result<NodeHandle, sqlx::Error> {
         let name = AnyNodeName::try_from(handshake.name).map_err(|_| {
@@ -48,7 +48,7 @@ impl Controller {
         let node_id = self
             .db
             .node()
-            .register(cluster_id, &name, kind, &self.id, &plane_version, ip)
+            .register(cluster, &name, kind, &self.id, &plane_version, ip)
             .await?;
 
         Ok(NodeHandle {

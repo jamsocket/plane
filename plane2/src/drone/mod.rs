@@ -7,7 +7,7 @@ use crate::{
     protocol::{MessageFromDrone, MessageToDrone},
     signals::wait_for_shutdown_signal,
     typed_socket::{client::TypedSocketConnector, FullDuplexChannel},
-    types::ClusterId,
+    types::ClusterName,
     util::get_internal_host_ip,
 };
 use anyhow::Result;
@@ -137,7 +137,7 @@ pub async fn run_drone(
     client: PlaneClient,
     docker: Docker,
     id: DroneName,
-    cluster: ClusterId,
+    cluster: ClusterName,
     ip: IpAddr,
     db_path: Option<&Path>,
     docker_runtime: Option<String>,

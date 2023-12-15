@@ -1,7 +1,7 @@
 use super::{cert_pair::CertificatePair, AcmeConfig};
 use crate::{
     protocol::{CertManagerRequest, CertManagerResponse},
-    types::ClusterId,
+    types::ClusterName,
 };
 use acme2_eab::{
     gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
@@ -56,7 +56,7 @@ impl ResolvesServerCert for CertWatcher {
 }
 
 pub struct CertManager {
-    cluster: ClusterId,
+    cluster: ClusterName,
     send_cert: Arc<Sender<Option<Arc<CertifiedKey>>>>,
     refresh_loop: Option<tokio::task::JoinHandle<()>>,
     current_cert: Arc<RwLock<Option<CertificatePair>>>,
@@ -67,7 +67,7 @@ pub struct CertManager {
 
 impl CertManager {
     pub fn new(
-        cluster: ClusterId,
+        cluster: ClusterName,
         send_cert: Sender<Option<Arc<CertifiedKey>>>,
         cert_path: Option<&Path>,
         acme_config: Option<AcmeConfig>,
@@ -142,7 +142,7 @@ impl CertManager {
 }
 
 pub fn watcher_manager_pair(
-    cluster: ClusterId,
+    cluster: ClusterName,
     path: Option<&Path>,
     acme_config: Option<AcmeConfig>,
 ) -> Result<(CertWatcher, CertManager)> {
@@ -155,7 +155,7 @@ pub fn watcher_manager_pair(
 }
 
 pub async fn do_refresh(
-    cluster: &ClusterId,
+    cluster: &ClusterName,
     acme_config: &AcmeConfig,
     send_cert: &Arc<Sender<Option<Arc<CertifiedKey>>>>,
     request_sender: &(impl Fn(CertManagerRequest) + Send + Sync + 'static),
@@ -235,7 +235,7 @@ pub async fn do_refresh(
 }
 
 pub async fn refresh_loop(
-    cluster: ClusterId,
+    cluster: ClusterName,
     acme_config: AcmeConfig,
     send_cert: Arc<Sender<Option<Arc<CertifiedKey>>>>,
     request_sender: impl Fn(CertManagerRequest) + Send + Sync + 'static,
@@ -262,7 +262,7 @@ pub async fn refresh_loop(
 }
 
 pub async fn get_certificate(
-    cluster: &ClusterId,
+    cluster: &ClusterName,
     acme_config: &AcmeConfig,
     request_sender: &(impl Fn(CertManagerRequest) + Send + Sync + 'static),
     response_receiver: &mut broadcast::Receiver<CertManagerResponse>,

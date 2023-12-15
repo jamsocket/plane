@@ -1,7 +1,7 @@
 use super::error::err_to_response;
 use super::Controller;
 use crate::database::connect::ConnectError;
-use crate::types::{ClusterId, ConnectRequest, ConnectResponse};
+use crate::types::{ClusterName, ConnectRequest, ConnectResponse};
 use axum::{
     extract::{Path, State},
     response::Response,
@@ -55,7 +55,7 @@ fn connect_error_to_response(connect_error: &ConnectError) -> Response {
 }
 
 pub async fn handle_connect(
-    Path(cluster): Path<ClusterId>,
+    Path(cluster): Path<ClusterName>,
     State(controller): State<Controller>,
     Json(request): Json<ConnectRequest>,
 ) -> Result<Json<ConnectResponse>, Response> {

@@ -8,7 +8,7 @@ use plane2::drone::run_drone;
 use plane2::init_tracing::init_tracing;
 use plane2::names::{AcmeDnsServerName, ControllerName, DroneName, Name, ProxyName};
 use plane2::proxy::{run_proxy, AcmeConfig, ServerPortConfig};
-use plane2::types::{ClusterId, OrRandom};
+use plane2::types::{ClusterName, OrRandom};
 use std::net::IpAddr;
 use std::path::PathBuf;
 use url::Url;
@@ -43,7 +43,7 @@ enum Command {
         controller_url: Url,
 
         #[clap(long)]
-        cluster: ClusterId,
+        cluster: ClusterName,
 
         /// IP address for this drone that proxies can connect to.
         #[clap(long, default_value = "127.0.0.1")]
@@ -64,7 +64,7 @@ enum Command {
         controller_url: Url,
 
         #[clap(long)]
-        cluster: ClusterId,
+        cluster: ClusterName,
 
         #[clap(long)]
         https: bool,

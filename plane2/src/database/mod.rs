@@ -9,7 +9,7 @@ use self::{
     node::NodeDatabase,
     subscribe::{EventSubscriptionManager, Notification, NotificationPayload, Subscription},
 };
-use crate::types::{ClusterId, ConnectRequest, ConnectResponse};
+use crate::types::{ClusterName, ConnectRequest, ConnectResponse};
 use serde_json::Value;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::sync::{Arc, OnceLock};
@@ -81,7 +81,7 @@ impl PlaneDatabase {
 
     pub async fn connect(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         request: &ConnectRequest,
     ) -> Result<ConnectResponse, ConnectError> {
         connect::connect(&self.pool, cluster, request).await

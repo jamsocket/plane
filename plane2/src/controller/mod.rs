@@ -125,17 +125,17 @@ impl ControllerServer {
 
         let heartbeat_handle = HeartbeatSender::start(db.clone(), id.clone()).await?;
 
-        let app = Router::new()
+        // Routes that relate to controlling the system (spawning and terminating drones)
+        // or that otherwise expose non-public system information.
+        //
+        // These routes should not be exposed on the open internet without an authorization
+        // barrier (such as a reverse proxy) in front.
+        let control_routes = Router::new()
             .route("/status", get(status))
             .route("/c/:cluster/drone-socket", get(handle_drone_socket))
             .route("/c/:cluster/proxy-socket", get(handle_proxy_socket))
             .route("/dns-socket", get(handle_dns_socket))
             .route("/c/:cluster/connect", post(handle_connect))
-            .route("/c/:cluster/b/:backend/status", get(handle_backend_status))
-            .route(
-                "/c/:cluster/b/:backend/status-stream",
-                get(handle_backend_status_stream),
-            )
             .route("/c/:cluster/d/:drone/drain", post(handle_drain))
             .route(
                 "/c/:cluster/b/:backend/soft-terminate",
@@ -144,7 +144,21 @@ impl ControllerServer {
             .route(
                 "/c/:cluster/b/:backend/hard-terminate",
                 post(terminate::handle_hard_terminate),
-            )
+            );
+
+        // Routes that are may be accessed directly from end-user code. These are placed
+        // under the /pub/ top-level route to make it easier to expose only these routes,
+        // using a reverse proxy configuration.
+        let public_routes = Router::new()
+            .route("/c/:cluster/b/:backend/status", get(handle_backend_status))
+            .route(
+                "/c/:cluster/b/:backend/status-stream",
+                get(handle_backend_status_stream),
+            );
+
+        let app = Router::new()
+            .nest("/pub", public_routes)
+            .nest("/ctrl", control_routes)
             .layer(trace_layer)
             .with_state(controller);
 
