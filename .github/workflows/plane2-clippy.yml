@@ -4,7 +4,6 @@ on:
   pull_request:
     branches: [ "plane2-preview" ]
 
-name: Clippy check
 jobs:
   check-rust-clippy:
     runs-on: ubuntu-latest
