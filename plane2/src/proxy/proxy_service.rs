@@ -32,6 +32,12 @@ pub struct ProxyState {
     connected: AtomicBool,
 }
 
+impl Default for ProxyState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProxyState {
     pub fn new() -> Self {
         Self {

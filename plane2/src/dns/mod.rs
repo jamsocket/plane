@@ -157,7 +157,9 @@ impl AcmeDnsServer {
 
 impl Drop for AcmeDnsServer {
     fn drop(&mut self) {
-        self.loop_handle.take().map(|handle| handle.abort());
+        if let Some(handle) = self.loop_handle.take() {
+            handle.abort()
+        }
     }
 }
 

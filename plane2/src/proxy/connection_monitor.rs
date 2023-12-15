@@ -85,6 +85,7 @@ pub struct ConnectionMonitorHandle {
     handle: JoinHandle<()>,
 }
 
+#[allow(clippy::new_without_default)]
 impl ConnectionMonitorHandle {
     pub fn new() -> Self {
         let monitor: Arc<Mutex<ConnectionMonitor>> = Arc::default();

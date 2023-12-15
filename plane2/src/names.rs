@@ -94,6 +94,12 @@ pub struct NameParser<T: Name> {
     _marker: std::marker::PhantomData<T>,
 }
 
+impl<T: Name> Default for NameParser<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Name> NameParser<T> {
     pub fn new() -> Self {
         Self {
