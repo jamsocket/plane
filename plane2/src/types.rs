@@ -72,7 +72,6 @@ impl FromStr for ClusterName {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim();
         let mut parts = s.splitn(2, ':');
         let host = parts.next().ok_or("missing hostname or ip")?;
         let port = parts.next();
