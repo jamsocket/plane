@@ -103,6 +103,7 @@ impl TestEnvironment {
             docker,
             Ipv4Addr::LOCALHOST.into(),
             Some(&db_path),
+            None,
         )
         .await
         .unwrap()
