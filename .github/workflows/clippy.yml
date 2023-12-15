@@ -1,6 +1,6 @@
 on:
   pull_request:
-    branches: [ "*" ]
+    branches: [ "plane2-preview" ]
 
 name: Clippy check
 jobs:
