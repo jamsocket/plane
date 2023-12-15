@@ -67,7 +67,7 @@ impl PlaneClient {
     }
 
     pub async fn status(&self) -> Result<(), PlaneClientError> {
-        let url = self.base_url.join("/status")?;
+        let url = self.base_url.join("/ctrl/status")?;
 
         let response = self.client.get(url).send().await?;
         get_response::<Value>(response).await?;
@@ -77,7 +77,7 @@ impl PlaneClient {
     pub fn drone_connection(&self, cluster: &ClusterId) -> TypedSocketConnector<MessageFromDrone> {
         let mut url = self
             .base_url
-            .join(&format!("/c/{}/drone-socket", cluster))
+            .join(&format!("/ctrl/c/{}/drone-socket", cluster))
             .expect("url is always valid");
         http_to_ws_url(&mut url);
         TypedSocketConnector::new(url)
@@ -86,7 +86,7 @@ impl PlaneClient {
     pub fn proxy_connection(&self, cluster: &ClusterId) -> TypedSocketConnector<MessageFromProxy> {
         let mut url = self
             .base_url
-            .join(&format!("/c/{}/proxy-socket", cluster))
+            .join(&format!("/ctrl/c/{}/proxy-socket", cluster))
             .expect("url is always valid");
         http_to_ws_url(&mut url);
         TypedSocketConnector::new(url)
@@ -95,7 +95,7 @@ impl PlaneClient {
     pub fn dns_connection(&self) -> TypedSocketConnector<MessageFromDns> {
         let mut url = self
             .base_url
-            .join("/dns-socket")
+            .join("/ctrl/dns-socket")
             .expect("url is always valid");
         http_to_ws_url(&mut url);
         TypedSocketConnector::new(url)
@@ -106,7 +106,9 @@ impl PlaneClient {
         cluster: &ClusterId,
         connect_request: &ConnectRequest,
     ) -> Result<ConnectResponse, PlaneClientError> {
-        let url = self.base_url.join(&format!("/c/{}/connect", cluster))?;
+        let url = self
+            .base_url
+            .join(&format!("/ctrl/c/{}/connect", cluster))?;
 
         let respose = self.client.post(url).json(connect_request).send().await?;
         let connect_response: ConnectResponse = get_response(respose).await?;
@@ -120,7 +122,7 @@ impl PlaneClient {
     ) -> Result<(), PlaneClientError> {
         let url = self
             .base_url
-            .join(&format!("/c/{}/d/{}/drain", cluster, drone))?;
+            .join(&format!("/ctrl/c/{}/d/{}/drain", cluster, drone))?;
 
         let response = self.client.post(url).send().await?;
         get_response::<Value>(response).await?;
@@ -132,9 +134,10 @@ impl PlaneClient {
         cluster: &ClusterId,
         backend_id: &BackendName,
     ) -> Result<(), PlaneClientError> {
-        let url = self
-            .base_url
-            .join(&format!("/c/{}/b/{}/soft-terminate", cluster, backend_id))?;
+        let url = self.base_url.join(&format!(
+            "/ctrl/c/{}/b/{}/soft-terminate",
+            cluster, backend_id
+        ))?;
 
         let response = self.client.post(url).send().await?;
         get_response::<Value>(response).await?;
@@ -146,9 +149,10 @@ impl PlaneClient {
         cluster: &ClusterId,
         backend_id: &BackendName,
     ) -> Result<(), PlaneClientError> {
-        let url = self
-            .base_url
-            .join(&format!("/c/{}/b/{}/hard-terminate", cluster, backend_id))?;
+        let url = self.base_url.join(&format!(
+            "/ctrl/c/{}/b/{}/hard-terminate",
+            cluster, backend_id
+        ))?;
 
         let response = self.client.post(url).send().await?;
         get_response::<Value>(response).await?;
@@ -162,7 +166,7 @@ impl PlaneClient {
     ) -> Result<TimestampedBackendStatus, PlaneClientError> {
         let url = self
             .base_url
-            .join(&format!("/c/{}/b/{}/status", cluster, backend_id))?;
+            .join(&format!("/pub/c/{}/b/{}/status", cluster, backend_id))?;
 
         let response = self.client.get(url).send().await?;
         let status: TimestampedBackendStatus = get_response(response).await?;
@@ -174,9 +178,10 @@ impl PlaneClient {
         cluster: &ClusterId,
         backend_id: &BackendName,
     ) -> Result<sse::SseStream<TimestampedBackendStatus>, PlaneClientError> {
-        let url = self
-            .base_url
-            .join(&format!("/c/{}/b/{}/status-stream", cluster, backend_id))?;
+        let url = self.base_url.join(&format!(
+            "/pub/c/{}/b/{}/status-stream",
+            cluster, backend_id
+        ))?;
 
         let stream = sse::sse_request(url, self.client.clone()).await?;
         Ok(stream)
