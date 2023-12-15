@@ -57,7 +57,8 @@ pub struct ClusterName(String);
 
 impl ClusterName {
     pub fn is_https(&self) -> bool {
-        self.0 != "localhost" && !self.0.starts_with("localhost:")
+        let port = self.0.split_once(':').map(|x| x.1);
+        port.is_none() || port == Some("443")
     }
 }
 
