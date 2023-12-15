@@ -3,7 +3,7 @@ use crate::names::ProxyName;
 use crate::proxy::cert_manager::watcher_manager_pair;
 use crate::proxy::proxy_service::ProxyMakeService;
 use crate::proxy::shutdown_signal::ShutdownSignal;
-use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterId};
+use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
 use std::net::IpAddr;
 use std::path::Path;
@@ -57,7 +57,7 @@ pub struct AcmeConfig {
 pub async fn run_proxy(
     name: ProxyName,
     client: PlaneClient,
-    cluster: ClusterId,
+    cluster: ClusterName,
     cert_path: Option<&Path>,
     port_config: ServerPortConfig,
     acme_config: Option<AcmeConfig>,

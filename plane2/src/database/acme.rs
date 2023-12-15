@@ -1,4 +1,4 @@
-use crate::types::{ClusterId, NodeId};
+use crate::types::{ClusterName, NodeId};
 use sqlx::query;
 use sqlx::PgPool;
 
@@ -13,7 +13,7 @@ impl<'a> AcmeDatabase<'a> {
 
     pub async fn lease_cluster_dns(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         proxy: NodeId,
     ) -> sqlx::Result<bool> {
         let result = query!(
@@ -37,7 +37,7 @@ impl<'a> AcmeDatabase<'a> {
 
     pub async fn set_cluster_dns(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         proxy: NodeId,
         txt_value: &str,
     ) -> sqlx::Result<bool> {
@@ -60,7 +60,7 @@ impl<'a> AcmeDatabase<'a> {
 
     pub async fn txt_record_for_cluster(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
     ) -> sqlx::Result<Option<String>> {
         let result = query!(
             r#"
@@ -78,7 +78,7 @@ impl<'a> AcmeDatabase<'a> {
 
     pub async fn release_cluster_lease(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         proxy: NodeId,
     ) -> sqlx::Result<()> {
         query!(

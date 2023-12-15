@@ -3,7 +3,7 @@ use crate::{
     names::{BackendName, DroneName},
     protocol::{MessageFromDns, MessageFromDrone, MessageFromProxy},
     typed_socket::client::TypedSocketConnector,
-    types::{ClusterId, ConnectRequest, ConnectResponse, TimestampedBackendStatus},
+    types::{ClusterName, ConnectRequest, ConnectResponse, TimestampedBackendStatus},
 };
 use reqwest::{Response, StatusCode};
 use serde::de::DeserializeOwned;
@@ -74,7 +74,10 @@ impl PlaneClient {
         Ok(())
     }
 
-    pub fn drone_connection(&self, cluster: &ClusterId) -> TypedSocketConnector<MessageFromDrone> {
+    pub fn drone_connection(
+        &self,
+        cluster: &ClusterName,
+    ) -> TypedSocketConnector<MessageFromDrone> {
         let mut url = self
             .base_url
             .join(&format!("/ctrl/c/{}/drone-socket", cluster))
@@ -83,7 +86,10 @@ impl PlaneClient {
         TypedSocketConnector::new(url)
     }
 
-    pub fn proxy_connection(&self, cluster: &ClusterId) -> TypedSocketConnector<MessageFromProxy> {
+    pub fn proxy_connection(
+        &self,
+        cluster: &ClusterName,
+    ) -> TypedSocketConnector<MessageFromProxy> {
         let mut url = self
             .base_url
             .join(&format!("/ctrl/c/{}/proxy-socket", cluster))
@@ -103,7 +109,7 @@ impl PlaneClient {
 
     pub async fn connect(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         connect_request: &ConnectRequest,
     ) -> Result<ConnectResponse, PlaneClientError> {
         let url = self
@@ -117,7 +123,7 @@ impl PlaneClient {
 
     pub async fn drain(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         drone: &DroneName,
     ) -> Result<(), PlaneClientError> {
         let url = self
@@ -131,7 +137,7 @@ impl PlaneClient {
 
     pub async fn soft_terminate(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Result<(), PlaneClientError> {
         let url = self.base_url.join(&format!(
@@ -146,7 +152,7 @@ impl PlaneClient {
 
     pub async fn hard_terminate(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Result<(), PlaneClientError> {
         let url = self.base_url.join(&format!(
@@ -161,7 +167,7 @@ impl PlaneClient {
 
     pub async fn backend_status(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Result<TimestampedBackendStatus, PlaneClientError> {
         let url = self
@@ -175,7 +181,7 @@ impl PlaneClient {
 
     pub async fn backend_status_stream(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Result<sse::SseStream<TimestampedBackendStatus>, PlaneClientError> {
         let url = self.base_url.join(&format!(

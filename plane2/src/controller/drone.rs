@@ -1,13 +1,15 @@
 use super::Controller;
 use crate::{
+    controller::error::IntoApiError,
     database::{backend::BackendActionMessage, subscribe::Subscription, PlaneDatabase},
     protocol::{BackendAction, MessageFromDrone, MessageToDrone},
     typed_socket::{server::TypedWebsocketServer, FullDuplexChannel},
-    types::{ClusterId, NodeId, TerminationKind},
+    types::{ClusterName, NodeId, TerminationKind},
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},
-    response::IntoResponse,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use std::net::{IpAddr, SocketAddr};
 
@@ -99,7 +101,7 @@ pub async fn sweep_loop(db: PlaneDatabase, drone_id: NodeId) {
 }
 
 pub async fn drone_socket_inner(
-    cluster_id: ClusterId,
+    cluster: ClusterName,
     ws: WebSocket,
     controller: Controller,
     ip: IpAddr,
@@ -109,7 +111,7 @@ pub async fn drone_socket_inner(
 
     let handshake = socket.remote_handshake().clone();
     let node_guard = controller
-        .register_node(handshake, Some(&cluster_id), ip)
+        .register_node(handshake, Some(&cluster), ip)
         .await?;
     let drone_id = node_guard.id;
 
@@ -167,13 +169,8 @@ pub async fn drone_socket_inner(
     Ok(())
 }
 
-pub async fn drone_socket(
-    cluster_id: ClusterId,
-    ws: WebSocket,
-    controller: Controller,
-    ip: IpAddr,
-) {
-    if let Err(err) = drone_socket_inner(cluster_id, ws, controller, ip).await {
+pub async fn drone_socket(cluster: ClusterName, ws: WebSocket, controller: Controller, ip: IpAddr) {
+    if let Err(err) = drone_socket_inner(cluster, ws, controller, ip).await {
         tracing::error!(?err, "Drone socket error");
     }
 }
@@ -183,8 +180,11 @@ pub async fn handle_drone_socket(
     State(controller): State<Controller>,
     connect_info: ConnectInfo<SocketAddr>,
     ws: WebSocketUpgrade,
-) -> impl IntoResponse {
-    let cluster = ClusterId::from(cluster);
+) -> Result<impl IntoResponse, Response> {
+    let cluster: ClusterName = cluster
+        .parse()
+        .ok()
+        .or_status(StatusCode::BAD_REQUEST, "Invalid cluster name")?;
     let ip = connect_info.0.ip();
-    ws.on_upgrade(move |socket| drone_socket(cluster, socket, controller, ip))
+    Ok(ws.on_upgrade(move |socket| drone_socket(cluster, socket, controller, ip)))
 }

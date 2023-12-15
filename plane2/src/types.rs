@@ -5,7 +5,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::{collections::HashMap, fmt::Display, net::SocketAddr};
+use std::{collections::HashMap, fmt::Display, net::SocketAddr, str::FromStr};
 
 pub trait OrRandom<T> {
     fn or_random(self) -> T;
@@ -53,23 +53,35 @@ impl BackendKeyId {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
-pub struct ClusterId(String);
+pub struct ClusterName(String);
 
-impl ClusterId {
+impl ClusterName {
     pub fn is_https(&self) -> bool {
-        self.0 != "localhost" && !self.0.starts_with("localhost:")
+        let port = self.0.split_once(':').map(|x| x.1);
+        port.is_none() || port == Some("443")
     }
 }
 
-impl Display for ClusterId {
+impl Display for ClusterName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.0)
     }
 }
 
-impl From<String> for ClusterId {
-    fn from(s: String) -> Self {
-        Self(s)
+impl FromStr for ClusterName {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.splitn(2, ':');
+        let host = parts.next().ok_or("missing hostname or ip")?;
+        let port = parts.next();
+
+        url::Host::parse(host).map_err(|_| "invalid hostname or ip")?;
+        if let Some(port) = port {
+            port.parse::<u16>().map_err(|_| "invalid port")?;
+        }
+
+        Ok(Self(s.to_string()))
     }
 }
 
@@ -361,15 +373,15 @@ pub struct ConnectResponse {
 impl ConnectResponse {
     pub fn new(
         backend_id: BackendName,
-        cluster_id: &ClusterId,
+        cluster: &ClusterName,
         spawned: bool,
         token: BearerToken,
         secret_token: SecretToken,
     ) -> Self {
-        let url = if cluster_id.is_https() {
-            format!("https://{}/{}/", cluster_id, token)
+        let url = if cluster.is_https() {
+            format!("https://{}/{}/", cluster, token)
         } else {
-            format!("http://{}/{}/", cluster_id, token)
+            format!("http://{}/{}/", cluster, token)
         };
 
         Self {

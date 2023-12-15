@@ -6,8 +6,8 @@ use crate::{
     names::{BackendName, Name},
     protocol::BackendAction,
     types::{
-        BackendStatus, BearerToken, ClusterId, ConnectRequest, ConnectResponse, KeyConfig, NodeId,
-        SecretToken, SpawnConfig,
+        BackendStatus, BearerToken, ClusterName, ConnectRequest, ConnectResponse, KeyConfig,
+        NodeId, SecretToken, SpawnConfig,
     },
     util::random_token,
 };
@@ -70,7 +70,7 @@ async fn create_backend_with_lock(
     pool: &PgPool,
     lock: &KeyConfig,
     spawn_config: &SpawnConfig,
-    cluster: &ClusterId,
+    cluster: &ClusterName,
     drone: NodeId,
 ) -> Result<Option<BackendName>> {
     let backend_id = BackendName::new_random();
@@ -160,12 +160,12 @@ async fn create_token(
 
 async fn attempt_connect(
     pool: &PgPool,
-    cluster_id: &ClusterId,
+    cluster: &ClusterName,
     request: &ConnectRequest,
 ) -> Result<ConnectResponse> {
     let lock = if let Some(lock) = &request.key {
         // Request includes a lock, so we need to check if it is held.
-        let lock_result = KeysDatabase::new(pool).check_key(cluster_id, lock).await?;
+        let lock_result = KeysDatabase::new(pool).check_key(cluster, lock).await?;
 
         if let Some(lock_result) = lock_result {
             // Lock is held. Check if we can connect to existing backend.
@@ -190,7 +190,7 @@ async fn attempt_connect(
                     .await?;
 
                     let connect_response =
-                        ConnectResponse::new(backend_id, cluster_id, false, token, secret_token);
+                        ConnectResponse::new(backend_id, cluster, false, token, secret_token);
 
                     return Ok(connect_response);
                 }
@@ -224,12 +224,12 @@ async fn attempt_connect(
     };
 
     let drone = DroneDatabase::new(pool)
-        .pick_drone_for_spawn(cluster_id)
+        .pick_drone_for_spawn(cluster)
         .await?
         .ok_or(ConnectError::NoDroneAvailable)?;
 
     let Some(backend_id) =
-        create_backend_with_lock(pool, &lock, spawn_config, cluster_id, drone).await?
+        create_backend_with_lock(pool, &lock, spawn_config, cluster, drone).await?
     else {
         return Err(ConnectError::FailedToAcquireLock);
     };
@@ -243,14 +243,14 @@ async fn attempt_connect(
     )
     .await?;
 
-    let connect_response = ConnectResponse::new(backend_id, cluster_id, true, token, secret_token);
+    let connect_response = ConnectResponse::new(backend_id, cluster, true, token, secret_token);
 
     Ok(connect_response)
 }
 
 pub async fn connect(
     pool: &PgPool,
-    cluster: &ClusterId,
+    cluster: &ClusterName,
     request: &ConnectRequest,
 ) -> Result<ConnectResponse> {
     let mut attempt = 1;

@@ -3,7 +3,7 @@ use colored::{self, Colorize};
 use plane2::{
     database::{connect, node::NodeRow},
     names::DroneName,
-    types::{ClusterId, NodeStatus},
+    types::{ClusterName, NodeStatus},
     util::format_duration,
 };
 
@@ -24,12 +24,12 @@ enum Command {
         all: bool,
 
         #[clap(long)]
-        cluster: Option<ClusterId>,
+        cluster: Option<ClusterName>,
     },
     ListBackends,
     TerminationCandidates {
         #[clap(long)]
-        cluster: ClusterId,
+        cluster: ClusterName,
 
         #[clap(long)]
         drone: DroneName,
