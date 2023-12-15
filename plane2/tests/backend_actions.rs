@@ -6,10 +6,10 @@ use plane2::{
     names::{DroneName, Name},
     protocol::{BackendAction, MessageFromDrone, MessageToDrone},
     typed_socket::FullDuplexChannel,
-    types::{ConnectRequest, ConnectResponse, ExecutorConfig, PullPolicy, SpawnConfig},
+    types::{ConnectRequest, ConnectResponse, ExecutorConfig, NodeStatus, SpawnConfig},
 };
 use plane_test_macro::plane_test;
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 mod common;
 
@@ -17,11 +17,7 @@ mod common;
 fn connect_request() -> ConnectRequest {
     ConnectRequest {
         spawn_config: Some(SpawnConfig {
-            executable: ExecutorConfig {
-                image: "alpine".to_string(),
-                pull_policy: PullPolicy::IfNotPresent,
-                env: HashMap::default(),
-            },
+            executable: ExecutorConfig::from_image_with_defaults("alpine"),
             lifetime_limit_seconds: None,
             max_idle_seconds: None,
         }),
