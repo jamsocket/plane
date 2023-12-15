@@ -1,5 +1,6 @@
 use super::Controller;
 use crate::{
+    controller::error::IntoApiError,
     database::{backend::BackendActionMessage, subscribe::Subscription, PlaneDatabase},
     protocol::{BackendAction, MessageFromDrone, MessageToDrone},
     typed_socket::{server::TypedWebsocketServer, FullDuplexChannel},
@@ -7,7 +8,8 @@ use crate::{
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},
-    response::IntoResponse,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use std::net::{IpAddr, SocketAddr};
 
@@ -178,8 +180,11 @@ pub async fn handle_drone_socket(
     State(controller): State<Controller>,
     connect_info: ConnectInfo<SocketAddr>,
     ws: WebSocketUpgrade,
-) -> impl IntoResponse {
-    let cluster = ClusterName::from(cluster);
+) -> Result<impl IntoResponse, Response> {
+    let cluster: ClusterName = cluster
+        .parse()
+        .ok()
+        .or_status(StatusCode::BAD_REQUEST, "Invalid cluster name")?;
     let ip = connect_info.0.ip();
-    ws.on_upgrade(move |socket| drone_socket(cluster, socket, controller, ip))
+    Ok(ws.on_upgrade(move |socket| drone_socket(cluster, socket, controller, ip)))
 }

@@ -154,7 +154,14 @@ impl<'a> NodeDatabase<'a> {
         for row in record {
             result.push(NodeRow {
                 id: NodeId::from(row.id),
-                cluster: row.cluster.map(ClusterName::from),
+                cluster: row
+                    .cluster
+                    .map(|s| {
+                        s.parse().map_err(|_| {
+                            sqlx::Error::Decode("Failed to decode cluster name.".into())
+                        })
+                    })
+                    .transpose()?,
                 kind: NodeKind::try_from(row.kind).map_sqlx_error()?,
                 controller: row
                     .controller

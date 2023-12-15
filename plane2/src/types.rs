@@ -5,7 +5,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::{collections::HashMap, fmt::Display, net::SocketAddr};
+use std::{collections::HashMap, fmt::Display, net::SocketAddr, str::FromStr};
 
 pub trait OrRandom<T> {
     fn or_random(self) -> T;
@@ -67,9 +67,21 @@ impl Display for ClusterName {
     }
 }
 
-impl From<String> for ClusterName {
-    fn from(s: String) -> Self {
-        Self(s)
+impl FromStr for ClusterName {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim();
+        let mut parts = s.splitn(2, ':');
+        let host = parts.next().ok_or("missing hostname or ip")?;
+        let port = parts.next();
+
+        url::Host::parse(host).map_err(|_| "invalid hostname or ip")?;
+        if let Some(port) = port {
+            port.parse::<u16>().map_err(|_| "invalid port")?;
+        }
+
+        Ok(Self(s.to_string()))
     }
 }
 

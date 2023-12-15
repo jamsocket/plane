@@ -123,7 +123,10 @@ impl AcmeDnsServer {
                     });
                 };
 
-                let cluster = ClusterName::from(name.to_string());
+                let cluster: ClusterName =
+                    name.parse().or_dns_error(ResponseCode::ServFail, || {
+                        format!("No TXT record found for {}", name)
+                    })?;
                 let result = self
                     .request(cluster)
                     .await
