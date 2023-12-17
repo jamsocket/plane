@@ -135,7 +135,7 @@ impl<'a> NodeDatabase<'a> {
                 kind as "kind!",
                 cluster,
                 (case when
-                    controller.last_heartbeat > now() - interval '30 seconds'
+                    controller.is_online and controller.last_heartbeat > now() - interval '30 seconds'
                     then controller.id
                     else null end
                 ) as controller,

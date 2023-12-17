@@ -77,12 +77,16 @@ impl<'a> DroneDatabase<'a> {
                 drone.id
             from node
             left join drone
-            on node.id = drone.id
+                on node.id = drone.id
+            left join controller
+                on node.controller = controller.id
             where
                 drone.ready = true
                 and controller is not null
                 and cluster = $1
-                and now() - last_heartbeat < $2
+                and now() - drone.last_heartbeat < $2
+                and now() - controller.last_heartbeat < $2
+                and controller.is_online = true
                 and draining = false
             order by (
                 select

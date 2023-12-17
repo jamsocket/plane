@@ -15,7 +15,7 @@
 use std::time::Duration;
 
 /// How often the drone should emit a heartbeat.
-pub const HEARTBEAT_INTERVAL_SECONDS: i64 = 30;
+pub const HEARTBEAT_INTERVAL_SECONDS: i64 = 5;
 
 /// If we have not heard from a drone in this many seconds,
 /// we will consider it unhealthy. This means that we will
