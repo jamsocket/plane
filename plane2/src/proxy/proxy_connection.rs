@@ -4,7 +4,7 @@ use crate::{
     names::ProxyName,
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest},
     typed_socket::FullDuplexChannel,
-    types::ClusterId,
+    types::ClusterName,
 };
 use std::sync::Arc;
 use tokio::task::JoinHandle;
@@ -18,7 +18,7 @@ impl ProxyConnection {
     pub fn new(
         name: ProxyName,
         client: PlaneClient,
-        cluster: ClusterId,
+        cluster: ClusterName,
         mut cert_manager: CertManager,
     ) -> Self {
         let state = Arc::new(ProxyState::new());

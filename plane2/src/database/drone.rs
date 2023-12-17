@@ -1,6 +1,6 @@
 use crate::{
     heartbeat_consts::UNHEALTHY_SECONDS,
-    types::{ClusterId, NodeId},
+    types::{ClusterName, NodeId},
 };
 use sqlx::{postgres::types::PgInterval, query, PgPool};
 use std::time::Duration;
@@ -49,7 +49,10 @@ impl<'a> DroneDatabase<'a> {
     }
 
     /// TODO: simple algorithm until we collect more metrics.
-    pub async fn pick_drone_for_spawn(&self, cluster: &ClusterId) -> sqlx::Result<Option<NodeId>> {
+    pub async fn pick_drone_for_spawn(
+        &self,
+        cluster: &ClusterName,
+    ) -> sqlx::Result<Option<NodeId>> {
         let result = query!(
             r#"
             select

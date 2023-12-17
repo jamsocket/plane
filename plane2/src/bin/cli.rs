@@ -5,7 +5,7 @@ use plane2::{
     init_tracing::init_tracing,
     names::{BackendName, DroneName},
     types::{
-        BackendStatus, ClusterId, ConnectRequest, ExecutorConfig, KeyConfig, PullPolicy,
+        BackendStatus, ClusterName, ConnectRequest, ExecutorConfig, KeyConfig, PullPolicy,
         SpawnConfig,
     },
 };
@@ -67,7 +67,7 @@ struct Opts {
 enum Command {
     Connect {
         #[clap(long)]
-        cluster: ClusterId,
+        cluster: ClusterName,
 
         #[clap(long)]
         image: String,
@@ -80,7 +80,7 @@ enum Command {
     },
     Terminate {
         #[clap(long)]
-        cluster: ClusterId,
+        cluster: ClusterName,
 
         #[clap(long)]
         backend: BackendName,
@@ -93,7 +93,7 @@ enum Command {
     },
     Drain {
         #[clap(long)]
-        cluster: ClusterId,
+        cluster: ClusterName,
 
         #[clap(long)]
         drone: DroneName,

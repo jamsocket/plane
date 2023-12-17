@@ -1,20 +1,22 @@
 use super::Controller;
 use crate::{
+    controller::error::IntoApiError,
     protocol::{
         CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy,
         RouteInfoRequest, RouteInfoResponse,
     },
     typed_socket::{server::TypedWebsocketServer, FullDuplexChannel},
-    types::{ClusterId, NodeStatus},
+    types::{ClusterName, NodeStatus},
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},
-    response::IntoResponse,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use std::net::{IpAddr, SocketAddr};
 
 pub async fn proxy_socket_inner(
-    cluster_id: ClusterId,
+    cluster: ClusterName,
     ws: WebSocket,
     controller: Controller,
     ip: IpAddr,
@@ -24,7 +26,7 @@ pub async fn proxy_socket_inner(
 
     let handshake = socket.remote_handshake().clone();
     let node_guard = controller
-        .register_node(handshake, Some(&cluster_id), ip)
+        .register_node(handshake, Some(&cluster), ip)
         .await?;
 
     // TODO: this is a fake heartbeat until we decide how the proxy heartbeat should work.
@@ -66,7 +68,7 @@ pub async fn proxy_socket_inner(
                         let accepted = match controller
                             .db
                             .acme()
-                            .lease_cluster_dns(&cluster_id, node_guard.id)
+                            .lease_cluster_dns(&cluster, node_guard.id)
                             .await
                         {
                             Ok(result) => result,
@@ -82,7 +84,7 @@ pub async fn proxy_socket_inner(
                         let accepted = match controller
                             .db
                             .acme()
-                            .set_cluster_dns(&cluster_id, node_guard.id, &txt_value)
+                            .set_cluster_dns(&cluster, node_guard.id, &txt_value)
                             .await
                         {
                             Ok(result) => result,
@@ -98,7 +100,7 @@ pub async fn proxy_socket_inner(
                         controller
                             .db
                             .acme()
-                            .release_cluster_lease(&cluster_id, node_guard.id)
+                            .release_cluster_lease(&cluster, node_guard.id)
                             .await?;
                         continue;
                     }
@@ -123,13 +125,8 @@ pub async fn proxy_socket_inner(
     Ok(())
 }
 
-pub async fn proxy_socket(
-    cluster_id: ClusterId,
-    ws: WebSocket,
-    controller: Controller,
-    ip: IpAddr,
-) {
-    if let Err(err) = proxy_socket_inner(cluster_id, ws, controller, ip).await {
+pub async fn proxy_socket(cluster: ClusterName, ws: WebSocket, controller: Controller, ip: IpAddr) {
+    if let Err(err) = proxy_socket_inner(cluster, ws, controller, ip).await {
         tracing::error!(?err, "Error handling proxy socket");
     }
 }
@@ -139,8 +136,11 @@ pub async fn handle_proxy_socket(
     State(controller): State<Controller>,
     connect_info: ConnectInfo<SocketAddr>,
     ws: WebSocketUpgrade,
-) -> impl IntoResponse {
-    let cluster = ClusterId::from(cluster);
+) -> Result<impl IntoResponse, Response> {
+    let cluster: ClusterName = cluster
+        .parse()
+        .ok()
+        .or_status(StatusCode::BAD_REQUEST, "Invalid cluster name")?;
     let ip = connect_info.ip();
-    ws.on_upgrade(move |socket| proxy_socket(cluster, socket, controller, ip))
+    Ok(ws.on_upgrade(move |socket| proxy_socket(cluster, socket, controller, ip)))
 }

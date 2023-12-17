@@ -1,7 +1,7 @@
 use crate::{
     heartbeat_consts::{ASSUME_LOST_SECONDS, UNHEALTHY_SECONDS},
     names::BackendName,
-    types::{BackendKeyId, ClusterId, KeyConfig},
+    types::{BackendKeyId, ClusterName, KeyConfig},
 };
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, PgPool};
@@ -52,7 +52,7 @@ impl<'a> KeysDatabase<'a> {
 
     pub async fn check_key(
         &self,
-        cluster: &ClusterId,
+        cluster: &ClusterName,
         key: &KeyConfig,
     ) -> Result<Option<BackendKeyResult>, sqlx::Error> {
         let lock_result = sqlx::query!(

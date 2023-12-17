@@ -64,7 +64,7 @@ fn pg_dump_container_config(port: u16) -> Config<String> {
 }
 
 async fn attempt_to_connect(connection_string: &str) -> Result<PlaneDatabase> {
-    for _ in 0..3 {
+    for _ in 0..30 {
         match connect_and_migrate(&connection_string).await {
             Ok(db) => return Ok(db),
             Err(e) => {

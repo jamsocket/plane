@@ -6,7 +6,7 @@ use crate::{
     protocol::{MessageFromDns, MessageToDns},
     signals::wait_for_shutdown_signal,
     typed_socket::{client::TypedSocketConnector, FullDuplexChannel},
-    types::ClusterId,
+    types::ClusterName,
 };
 use dashmap::DashMap;
 use std::{net::Ipv4Addr, sync::Arc};
@@ -33,13 +33,13 @@ const TCP_TIMEOUT_SECONDS: u64 = 10;
 struct AcmeDnsServer {
     loop_handle: Option<JoinHandle<()>>,
     send: Sender<MessageFromDns>,
-    request_map: Arc<DashMap<ClusterId, Sender<Option<String>>>>,
+    request_map: Arc<DashMap<ClusterName, Sender<Option<String>>>>,
 }
 
 impl AcmeDnsServer {
     fn new(name: AcmeDnsServerName, mut client: TypedSocketConnector<MessageFromDns>) -> Self {
         let (send, mut recv) = broadcast::channel::<MessageFromDns>(1);
-        let request_map: Arc<DashMap<ClusterId, Sender<Option<String>>>> = Arc::default();
+        let request_map: Arc<DashMap<ClusterName, Sender<Option<String>>>> = Arc::default();
 
         let loop_handle = {
             let request_map = request_map.clone();
@@ -92,7 +92,7 @@ impl AcmeDnsServer {
         }
     }
 
-    async fn request(&self, cluster: ClusterId) -> anyhow::Result<Option<String>> {
+    async fn request(&self, cluster: ClusterName) -> anyhow::Result<Option<String>> {
         let mut receiver = match self.request_map.entry(cluster.clone()) {
             dashmap::mapref::entry::Entry::Occupied(entry) => entry.get().subscribe(),
             dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
@@ -123,7 +123,10 @@ impl AcmeDnsServer {
                     });
                 };
 
-                let cluster = ClusterId::from(name.to_string());
+                let cluster: ClusterName =
+                    name.parse().or_dns_error(ResponseCode::ServFail, || {
+                        format!("No TXT record found for {}", name)
+                    })?;
                 let result = self
                     .request(cluster)
                     .await
@@ -157,7 +160,9 @@ impl AcmeDnsServer {
 
 impl Drop for AcmeDnsServer {
     fn drop(&mut self) {
-        self.loop_handle.take().map(|handle| handle.abort());
+        if let Some(handle) = self.loop_handle.take() {
+            handle.abort()
+        }
     }
 }
 

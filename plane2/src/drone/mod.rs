@@ -7,7 +7,7 @@ use crate::{
     protocol::{MessageFromDrone, MessageToDrone},
     signals::wait_for_shutdown_signal,
     typed_socket::{client::TypedSocketConnector, FullDuplexChannel},
-    types::ClusterId,
+    types::ClusterName,
     util::get_internal_host_ip,
 };
 use anyhow::Result;
@@ -102,9 +102,10 @@ impl Drone {
         docker: Docker,
         ip: IpAddr,
         db_path: Option<&Path>,
+        docker_runtime: Option<String>,
     ) -> Result<Self> {
         // Wait until we have loaded initial state from Docker to begin.
-        let docker = PlaneDocker::new(docker).await?;
+        let docker = PlaneDocker::new(docker, docker_runtime).await?;
 
         let sqlite_connection = if let Some(db_path) = db_path {
             if !db_path.exists() {
@@ -136,9 +137,10 @@ pub async fn run_drone(
     client: PlaneClient,
     docker: Docker,
     id: DroneName,
-    cluster: ClusterId,
+    cluster: ClusterName,
     ip: IpAddr,
     db_path: Option<&Path>,
+    docker_runtime: Option<String>,
 ) -> Result<()> {
     let connection = client.drone_connection(&cluster);
 
@@ -150,7 +152,7 @@ pub async fn run_drone(
         ip
     };
 
-    let drone = Drone::run(&id, connection, docker, ip, db_path).await?;
+    let drone = Drone::run(&id, connection, docker, ip, db_path, docker_runtime).await?;
 
     tracing::info!("Drone started.");
     wait_for_shutdown_signal().await;

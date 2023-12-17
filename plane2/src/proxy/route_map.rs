@@ -20,6 +20,12 @@ pub struct RouteMap {
     pub listeners: Mutex<HashMap<BearerToken, Sender<()>>>,
 }
 
+impl Default for RouteMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RouteMap {
     pub fn new() -> Self {
         Self {

@@ -1,7 +1,7 @@
 use super::{core::Controller, error::IntoApiError};
 use crate::{
     names::BackendName,
-    types::{BackendStatus, ClusterId, TimestampedBackendStatus},
+    types::{BackendStatus, ClusterName, TimestampedBackendStatus},
 };
 use axum::{
     extract::{Path, State},
@@ -17,13 +17,13 @@ use std::convert::Infallible;
 
 async fn backend_status(
     controller: &Controller,
-    cluster_id: &ClusterId,
+    cluster: &ClusterName,
     backend_id: &BackendName,
 ) -> Result<TimestampedBackendStatus, Response> {
     let backend = controller
         .db
         .backend()
-        .backend(cluster_id, backend_id)
+        .backend(cluster, backend_id)
         .await
         .or_internal_error("Database error")?
         .or_not_found("Backend does not exist")?;
@@ -37,15 +37,15 @@ async fn backend_status(
 }
 
 pub async fn handle_backend_status(
-    Path((cluster_id, backend_id)): Path<(ClusterId, BackendName)>,
+    Path((cluster, backend_id)): Path<(ClusterName, BackendName)>,
     State(controller): State<Controller>,
 ) -> Result<Json<TimestampedBackendStatus>, Response> {
-    let status = backend_status(&controller, &cluster_id, &backend_id).await?;
+    let status = backend_status(&controller, &cluster, &backend_id).await?;
     Ok(Json(status))
 }
 
 pub async fn handle_backend_status_stream(
-    Path((_cluster_id, backend_id)): Path<(ClusterId, BackendName)>, // TODO: check cluster id
+    Path((_cluster, backend_id)): Path<(ClusterName, BackendName)>, // TODO: check cluster id
     State(controller): State<Controller>,
     headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, Response> {
