@@ -85,45 +85,6 @@ impl FromStr for ClusterName {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
-pub enum NodeStatus {
-    /// Starting and doing some pre-processing; not ready.
-    Starting,
-
-    /// Ready.
-    Available,
-
-    /// Terminated.
-    Terminated,
-}
-
-impl NodeStatus {
-    pub fn is_active(&self) -> bool {
-        match self {
-            NodeStatus::Starting | NodeStatus::Available => true,
-            NodeStatus::Terminated => false,
-        }
-    }
-}
-
-impl TryFrom<String> for NodeStatus {
-    type Error = serde_json::Error;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        serde_json::from_value(Value::String(s))
-    }
-}
-
-impl Display for NodeStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let result = serde_json::to_value(self);
-        match result {
-            Ok(Value::String(v)) => write!(f, "{}", v),
-            _ => unreachable!(),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd)]
 pub enum BackendStatus {
     /// The backend has been scheduled to a drone, but has not yet been acknowledged.

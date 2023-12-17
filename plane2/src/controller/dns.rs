@@ -2,7 +2,6 @@ use super::Controller;
 use crate::{
     protocol::{MessageFromDns, MessageToDns},
     typed_socket::{server::TypedWebsocketServer, FullDuplexChannel},
-    types::NodeStatus,
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, State, WebSocketUpgrade},
@@ -19,14 +18,7 @@ pub async fn dns_socket_inner(
         TypedWebsocketServer::<MessageToDns>::new(ws, controller.id.to_string()).await?;
 
     let handshake = socket.remote_handshake().clone();
-    let node_guard = controller.register_node(handshake, None, ip).await?;
-
-    // TODO: this is a fake heartbeat until we decide how the proxy heartbeat should work.
-    controller
-        .db
-        .node()
-        .heartbeat(node_guard.id, NodeStatus::Available)
-        .await?;
+    let _node_guard = controller.register_node(handshake, None, ip).await?;
 
     loop {
         let message_from_dns_result = socket.recv().await;

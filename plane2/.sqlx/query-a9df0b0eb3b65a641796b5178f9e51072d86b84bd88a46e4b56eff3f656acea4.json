@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into node (cluster, name, controller, plane_version, plane_hash, kind, ip)\n            values ($1, $2, $3, $4, $5, $6, $7)\n            on conflict (cluster, name) do update set\n                controller = $3,\n                plane_version = $4,\n                plane_hash = $5,\n                ip = $7\n            returning id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Inet"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a9df0b0eb3b65a641796b5178f9e51072d86b84bd88a46e4b56eff3f656acea4"
+}

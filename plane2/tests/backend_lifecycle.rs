@@ -1,7 +1,7 @@
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
 use plane2::{
-    database::{node::NodeHeartbeatNotification, subscribe::Subscription},
+    database::{node::NodeConnectionStatusChangeNotification, subscribe::Subscription},
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
     typed_socket::FullDuplexChannel,
@@ -18,7 +18,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
     let db = env.db().await;
     let controller = env.controller().await;
 
-    let mut drone_listener: Subscription<NodeHeartbeatNotification> = db.subscribe();
+    let mut drone_listener: Subscription<NodeConnectionStatusChangeNotification> = db.subscribe();
     let client = controller.client();
 
     let _drone = env.drone(&controller).await;

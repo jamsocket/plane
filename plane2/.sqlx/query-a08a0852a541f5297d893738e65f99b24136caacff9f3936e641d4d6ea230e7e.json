@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select\n                drone.id\n            from node\n            left join drone\n            on node.id = drone.id\n            where\n                drone.ready = true\n                and controller is not null\n                and cluster = $1\n                and now() - last_heartbeat < $2\n                and draining = false\n            order by (\n                select\n                    count(*)\n                from backend\n                where drone_id = node.id\n                and last_status != 'Terminated'\n            ) asc, random()\n            limit 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Interval"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a08a0852a541f5297d893738e65f99b24136caacff9f3936e641d4d6ea230e7e"
+}

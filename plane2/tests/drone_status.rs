@@ -1,5 +1,5 @@
 use common::test_env::TestEnvironment;
-use plane2::database::{node::NodeHeartbeatNotification, subscribe::Subscription};
+use plane2::database::{node::NodeConnectionStatusChangeNotification, subscribe::Subscription};
 use plane_test_macro::plane_test;
 
 mod common;
@@ -10,7 +10,7 @@ async fn controller_registers_drone(env: TestEnvironment) {
     let controller = env.controller().await;
     let _drone = env.drone(&controller).await;
 
-    let mut listener: Subscription<NodeHeartbeatNotification> = db.subscribe();
+    let mut listener: Subscription<NodeConnectionStatusChangeNotification> = db.subscribe();
 
     let drone_status = listener.next().await.unwrap();
 

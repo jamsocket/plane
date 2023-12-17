@@ -14,14 +14,16 @@ impl<'a> DroneDatabase<'a> {
         Self { pool }
     }
 
-    pub async fn register_drone(&self, id: NodeId) -> sqlx::Result<()> {
+    pub async fn register_drone(&self, id: NodeId, ready: bool) -> sqlx::Result<()> {
         query!(
             r#"
-            insert into drone (id, draining)
-            values ($1, false)
-            on conflict do nothing
+            insert into drone (id, draining, ready)
+            values ($1, false, $2)
+            on conflict (id) do update set
+                ready = $2
             "#,
             id.as_i32(),
+            ready,
         )
         .execute(self.pool)
         .await?;
@@ -48,6 +50,22 @@ impl<'a> DroneDatabase<'a> {
         }
     }
 
+    pub async fn heartbeat(&self, id: NodeId, local_time_epoch_millis: u64) -> sqlx::Result<()> {
+        query!(
+            r#"
+            update drone
+            set last_heartbeat = now(), last_local_epoch_millis = $2
+            where id = $1
+            "#,
+            id.as_i32(),
+            local_time_epoch_millis as i64,
+        )
+        .execute(self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     /// TODO: simple algorithm until we collect more metrics.
     pub async fn pick_drone_for_spawn(
         &self,
@@ -61,7 +79,7 @@ impl<'a> DroneDatabase<'a> {
             left join drone
             on node.id = drone.id
             where
-                last_status = 'Available'
+                drone.ready = true
                 and controller is not null
                 and cluster = $1
                 and now() - last_heartbeat < $2

@@ -3,8 +3,8 @@ use crate::{
     names::{BackendActionName, BackendName},
     typed_socket::ChannelMessage,
     types::{
-        BackendStatus, BearerToken, ClusterName, ExecutorConfig, KeyConfig, NodeStatus,
-        SecretToken, TerminationKind,
+        BackendStatus, BearerToken, ClusterName, ExecutorConfig, KeyConfig, SecretToken,
+        TerminationKind,
     },
 };
 use chrono::{DateTime, Utc};
@@ -54,7 +54,7 @@ impl From<BackendEventId> for i64 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageFromDrone {
-    Heartbeat { status: NodeStatus },
+    Heartbeat { local_time_epoch_millis: u64 },
     BackendEvent(BackendStateMessage),
     AckAction { action_id: BackendActionName },
 }

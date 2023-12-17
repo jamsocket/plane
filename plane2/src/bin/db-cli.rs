@@ -1,11 +1,6 @@
 use clap::{Parser, Subcommand};
 use colored::{self, Colorize};
-use plane2::{
-    database::{connect, node::NodeRow},
-    names::DroneName,
-    types::{ClusterName, NodeStatus},
-    util::format_duration,
-};
+use plane2::{database::connect, names::DroneName, types::ClusterName};
 
 #[derive(Parser)]
 struct Opts {
@@ -34,15 +29,6 @@ enum Command {
         #[clap(long)]
         drone: DroneName,
     },
-}
-
-fn describe_drone_status(drone: &NodeRow) -> String {
-    let age_string = format_duration(drone.status_age());
-    match drone.last_status {
-        NodeStatus::Available => format!("{} {} ago", "Available".green(), age_string.white()),
-        NodeStatus::Terminated => format!("{} {} ago", "Terminated".black(), age_string.white()),
-        NodeStatus::Starting => format!("{} {} ago", "Starting".yellow(), age_string.white()),
-    }
 }
 
 async fn main_inner(opts: Opts) -> anyhow::Result<()> {
@@ -79,7 +65,7 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
 
                 if drone.active() {
                     println!(
-                        "{} to {} {} {} Plane={}@{} {}",
+                        "{} to {} {} {} Plane={}@{}",
                         "Connected".green(),
                         drone
                             .controller
@@ -95,11 +81,10 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                         drone.name.to_string().green(),
                         drone.plane_version.yellow(),
                         drone.plane_hash.yellow(),
-                        describe_drone_status(&drone),
                     );
                 } else if all {
                     println!(
-                        "{} {} {} Plane={}@{} (was: {})",
+                        "{} {} {} Plane={}@{}",
                         "Disconnected".yellow(),
                         drone
                             .cluster
@@ -109,7 +94,6 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                         drone.name.to_string().green(),
                         drone.plane_version.yellow(),
                         drone.plane_hash.yellow(),
-                        describe_drone_status(&drone),
                     );
                 }
             }
