@@ -63,29 +63,20 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                     continue;
                 }
 
-                if drone.active() {
-                    println!(
-                        "{} to {} {} {} Plane={}@{}",
+                let connected_string = if drone.active() {
+                    format!(
+                        "{} to {}",
                         "Connected".green(),
-                        drone
-                            .controller
-                            .as_ref()
-                            .map(|d| d.to_string())
-                            .unwrap_or_default()
-                            .green(),
-                        drone
-                            .cluster
-                            .as_ref()
-                            .map(|d| d.to_string().purple())
-                            .unwrap_or_default(),
-                        drone.name.to_string().green(),
-                        drone.plane_version.yellow(),
-                        drone.plane_hash.yellow(),
-                    );
-                } else if all {
+                        drone.controller.as_ref().unwrap().to_string().purple()
+                    )
+                } else {
+                    "Disconnected".yellow().to_string()
+                };
+
+                if drone.active() || all {
                     println!(
                         "{} {} {} Plane={}@{}",
-                        "Disconnected".yellow(),
+                        connected_string,
                         drone
                             .cluster
                             .as_ref()

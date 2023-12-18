@@ -125,6 +125,8 @@ impl<'a> NodeDatabase<'a> {
         .execute(&mut *txn)
         .await?;
 
+        txn.commit().await?;
+
         Ok(())
     }
 
