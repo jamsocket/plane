@@ -150,11 +150,11 @@ pub async fn run_container(
                 .resource_limits
                 .cpu_time_limit
                 .map(|cpu_time_limit| {
-                    let mins = (cpu_time_limit.as_secs_f64() / 60.0).floor() as i64;
+					let secs : i64 = cpu_time_limit.as_secs().try_into().unwrap_or(i64::MAX);
                     vec![ResourcesUlimits {
                         name: Some("cpu".to_string()),
-                        soft: Some(mins),
-                        hard: Some(mins),
+                        soft: Some(secs),
+                        hard: Some(secs),
                     }]
                 }),
             storage_opt: exec_config.resource_limits.disk_limit_bytes.map(|lim| {
