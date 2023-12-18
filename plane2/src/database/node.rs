@@ -108,7 +108,7 @@ impl<'a> NodeDatabase<'a> {
         emit(
             &mut *txn,
             &NodeConnectionStatusChangeNotification {
-                node_id: NodeId::from(0),
+                node_id,
                 connected: false,
             },
         )
