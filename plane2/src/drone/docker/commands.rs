@@ -1,5 +1,8 @@
 use super::types::ContainerId;
-use crate::{names::BackendName, types::ExecutorConfig};
+use crate::{
+    names::BackendName,
+    types::{DockerCpuPeriod, ExecutorConfig},
+};
 use anyhow::Result;
 use bollard::{
     service::{HostConfig, PortBinding, ResourcesUlimits},
@@ -150,7 +153,13 @@ pub async fn run_container(
                 .resource_limits
                 .cpu_time_limit
                 .map(|cpu_time_limit| {
-					let secs : i64 = cpu_time_limit.as_secs().try_into().unwrap_or(i64::MAX);
+                    let Ok(secs) = cpu_time_limit.as_secs().try_into() else {
+                        tracing::warn!(
+                            "unable to convert cpu_time_limit: {:?} to i64 for use in ulimit",
+                            cpu_time_limit
+                        );
+                        return vec![];
+                    };
                     vec![ResourcesUlimits {
                         name: Some("cpu".to_string()),
                         soft: Some(secs),
