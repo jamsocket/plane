@@ -1,4 +1,5 @@
 use crate::{
+    client::PlaneClient,
     database::{
         backend_key::{BackendKeyHealth, KeysDatabase},
         drone::DroneDatabase,
@@ -162,6 +163,7 @@ async fn attempt_connect(
     pool: &PgPool,
     cluster: &ClusterName,
     request: &ConnectRequest,
+    client: &PlaneClient,
 ) -> Result<ConnectResponse> {
     let lock = if let Some(lock) = &request.key {
         // Request includes a lock, so we need to check if it is held.
@@ -189,8 +191,14 @@ async fn attempt_connect(
                     )
                     .await?;
 
-                    let connect_response =
-                        ConnectResponse::new(backend_id, cluster, false, token, secret_token);
+                    let connect_response = ConnectResponse::new(
+                        backend_id,
+                        cluster,
+                        false,
+                        token,
+                        secret_token,
+                        client,
+                    );
 
                     return Ok(connect_response);
                 }
@@ -243,7 +251,8 @@ async fn attempt_connect(
     )
     .await?;
 
-    let connect_response = ConnectResponse::new(backend_id, cluster, true, token, secret_token);
+    let connect_response =
+        ConnectResponse::new(backend_id, cluster, true, token, secret_token, client);
 
     Ok(connect_response)
 }
@@ -252,10 +261,11 @@ pub async fn connect(
     pool: &PgPool,
     cluster: &ClusterName,
     request: &ConnectRequest,
+    client: &PlaneClient,
 ) -> Result<ConnectResponse> {
     let mut attempt = 1;
     loop {
-        match attempt_connect(pool, cluster, request).await {
+        match attempt_connect(pool, cluster, request, client).await {
             Ok(response) => return Ok(response),
             Err(error) => {
                 if !error.retryable() || attempt >= 3 {

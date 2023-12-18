@@ -138,6 +138,7 @@ async fn inner_main(opts: Opts) -> Result<(), PlaneClientError> {
             );
 
             println!("URL: {}", response.url.bright_white());
+            println!("Status URL: {}", response.status_url.bright_white());
 
             if wait {
                 let mut stream = client
