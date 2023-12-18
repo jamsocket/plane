@@ -198,6 +198,6 @@ pub struct NodeRow {
 
 impl NodeRow {
     pub fn active(&self) -> bool {
-        !self.controller.is_none()
+        self.controller.is_some()
     }
 }
