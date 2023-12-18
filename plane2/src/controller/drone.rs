@@ -20,8 +20,14 @@ pub async fn handle_message_from_drone(
     sender: &mut TypedWebsocketServer<MessageToDrone>,
 ) -> anyhow::Result<()> {
     match msg {
-        MessageFromDrone::Heartbeat { status } => {
-            controller.db.node().heartbeat(drone_id, status).await?;
+        MessageFromDrone::Heartbeat {
+            local_time_epoch_millis,
+        } => {
+            controller
+                .db
+                .drone()
+                .heartbeat(drone_id, local_time_epoch_millis)
+                .await?;
         }
         MessageFromDrone::BackendEvent(backend_event) => {
             tracing::info!(
@@ -61,7 +67,6 @@ pub async fn handle_message_from_drone(
 pub async fn sweep_loop(db: PlaneDatabase, drone_id: NodeId) {
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        tracing::info!("Sweeping for expired backends");
 
         let candidates = match db.backend().termination_candidates(drone_id).await {
             Ok(candidates) => candidates,
@@ -70,8 +75,6 @@ pub async fn sweep_loop(db: PlaneDatabase, drone_id: NodeId) {
                 continue;
             }
         };
-
-        tracing::info!(?candidates, "Termination candidates");
 
         for candidate in candidates {
             tracing::info!(
@@ -117,7 +120,7 @@ pub async fn drone_socket_inner(
 
     let sweep_loop_handle = tokio::spawn(sweep_loop(controller.db.clone(), drone_id));
 
-    controller.db.drone().register_drone(drone_id).await?;
+    controller.db.drone().register_drone(drone_id, true).await?;
 
     let mut backend_actions: Subscription<BackendActionMessage> =
         controller.db.subscribe_with_key(&drone_id.to_string());

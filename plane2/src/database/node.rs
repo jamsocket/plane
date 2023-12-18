@@ -2,30 +2,30 @@ use super::{
     subscribe::{emit, NotificationPayload},
     util::MapSqlxError,
 };
+use crate::heartbeat_consts::UNHEALTHY_SECONDS;
 use crate::{
-    heartbeat_consts::HEARTBEAT_INTERVAL_SECONDS,
     names::{AnyNodeName, ControllerName, NodeName},
-    types::{ClusterName, NodeId, NodeKind, NodeStatus},
+    types::{ClusterName, NodeId, NodeKind},
     PlaneVersionInfo,
 };
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{query, types::ipnetwork::IpNetwork, PgPool};
-use std::net::IpAddr;
+use sqlx::{postgres::types::PgInterval, query, types::ipnetwork::IpNetwork, PgPool};
+use std::{net::IpAddr, time::Duration};
 
 pub struct NodeDatabase<'a> {
     pool: &'a PgPool,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct NodeHeartbeatNotification {
+pub struct NodeConnectionStatusChangeNotification {
     pub node_id: NodeId,
+    pub connected: bool,
 }
 
-impl NotificationPayload for NodeHeartbeatNotification {
+impl NotificationPayload for NodeConnectionStatusChangeNotification {
     fn kind() -> &'static str {
-        "node_heartbeat"
+        "node_connection"
     }
 }
 
@@ -63,49 +63,64 @@ impl<'a> NodeDatabase<'a> {
         version: &PlaneVersionInfo,
         ip: IpAddr,
     ) -> sqlx::Result<NodeId> {
+        let mut txn = self.pool.begin().await?;
+
         let ip: IpNetwork = ip.into();
         let result = query!(
             r#"
-            insert into node (cluster, name, last_status, controller, plane_version, plane_hash, last_heartbeat, kind, ip)
-            values ($1, $2, $3, $4, $5, $6, now(), $7, $8)
+            insert into node (cluster, name, controller, plane_version, plane_hash, kind, ip)
+            values ($1, $2, $3, $4, $5, $6, $7)
             on conflict (cluster, name) do update set
-                last_status = $3,
-                controller = $4,
-                plane_version = $5,
-                plane_hash = $6,
-                ip = $8
+                controller = $3,
+                plane_version = $4,
+                plane_hash = $5,
+                ip = $7
             returning id
             "#,
             cluster.map(|c| c.to_string()),
             name.to_string(),
-            NodeStatus::Starting.to_string(),
             controller.to_string(),
             version.version,
             version.git_hash,
             kind.to_string(),
             ip,
         )
-        .fetch_one(self.pool)
+        .fetch_one(&mut *txn)
         .await?;
+
+        emit(
+            &mut *txn,
+            &NodeConnectionStatusChangeNotification {
+                node_id: NodeId::from(result.id),
+                connected: true,
+            },
+        )
+        .await?;
+
+        txn.commit().await?;
 
         Ok(NodeId::from(result.id))
     }
 
-    pub async fn heartbeat(&self, node_id: NodeId, node_status: NodeStatus) -> Result<()> {
+    pub async fn mark_offline(&self, node_id: NodeId) -> Result<()> {
         let mut txn = self.pool.begin().await?;
 
-        emit(&mut *txn, &NodeHeartbeatNotification { node_id }).await?;
+        emit(
+            &mut *txn,
+            &NodeConnectionStatusChangeNotification {
+                node_id,
+                connected: false,
+            },
+        )
+        .await?;
 
         query!(
             r#"
             update node
-            set
-                last_heartbeat = now(),
-                last_status = $2
+            set controller = null
             where id = $1
             "#,
             node_id.as_i32(),
-            node_status.to_string(),
         )
         .execute(&mut *txn)
         .await?;
@@ -115,37 +130,26 @@ impl<'a> NodeDatabase<'a> {
         Ok(())
     }
 
-    pub async fn mark_offline(&self, node_id: NodeId) -> Result<()> {
-        query!(
-            r#"
-            update node
-            set controller = null
-            where id = $1
-            "#,
-            node_id.as_i32(),
-        )
-        .execute(self.pool)
-        .await?;
-
-        Ok(())
-    }
-
     pub async fn list(&self) -> sqlx::Result<Vec<NodeRow>> {
         let record = query!(
             r#"
             select
-                id,
-                kind,
+                node.id as "id!",
+                kind as "kind!",
                 cluster,
-                controller,
-                name,
-                plane_version,
-                plane_hash,
-                last_heartbeat,
-                last_status,
-                now() as "as_of!"
+                (case when
+                    controller.is_online and controller.last_heartbeat - now() < $1
+                    then controller.id
+                    else null end
+                ) as controller,
+                name as "name!",
+                node.plane_version as "plane_version!",
+                node.plane_hash as "plane_hash!"
             from node
-            "#
+            left join controller on controller.id = node.controller
+            "#,
+            PgInterval::try_from(Duration::from_secs(UNHEALTHY_SECONDS as _))
+                .expect("valid interval")
         )
         .fetch_all(self.pool)
         .await?;
@@ -175,9 +179,6 @@ impl<'a> NodeDatabase<'a> {
                     .map_err(|_| sqlx::Error::Decode("Failed to decode node name.".into()))?,
                 plane_version: row.plane_version,
                 plane_hash: row.plane_hash,
-                last_heartbeat: row.last_heartbeat,
-                last_status: NodeStatus::try_from(row.last_status).map_sqlx_error()?,
-                as_of: row.as_of,
             });
         }
 
@@ -193,26 +194,10 @@ pub struct NodeRow {
     pub name: AnyNodeName,
     pub plane_version: String,
     pub plane_hash: String,
-    pub last_heartbeat: DateTime<Utc>,
-    pub last_status: NodeStatus,
-    as_of: DateTime<Utc>,
 }
 
 impl NodeRow {
-    /// The duration since the heartbeat, as of the time of the query.
-    pub fn status_age(&self) -> chrono::Duration {
-        self.as_of - self.last_heartbeat
-    }
-
     pub fn active(&self) -> bool {
-        if self.controller.is_none() {
-            return false;
-        }
-
-        if self.status_age().num_seconds() > HEARTBEAT_INTERVAL_SECONDS {
-            return false;
-        }
-
-        self.last_status.is_active()
+        self.controller.is_some()
     }
 }

@@ -6,7 +6,7 @@ use crate::{
         RouteInfoRequest, RouteInfoResponse,
     },
     typed_socket::{server::TypedWebsocketServer, FullDuplexChannel},
-    types::{ClusterName, NodeStatus},
+    types::ClusterName,
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},
@@ -27,13 +27,6 @@ pub async fn proxy_socket_inner(
     let handshake = socket.remote_handshake().clone();
     let node_guard = controller
         .register_node(handshake, Some(&cluster), ip)
-        .await?;
-
-    // TODO: this is a fake heartbeat until we decide how the proxy heartbeat should work.
-    controller
-        .db
-        .node()
-        .heartbeat(node_guard.id, NodeStatus::Available)
         .await?;
 
     loop {

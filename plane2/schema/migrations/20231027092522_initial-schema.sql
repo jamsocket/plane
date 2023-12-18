@@ -13,8 +13,6 @@ create table node (
     kind varchar(255) not null,
     name varchar(255) not null,
     cluster varchar(255),
-    last_heartbeat timestamptz not null,
-    last_status varchar(20) not null,
     plane_version varchar(255) not null,
     plane_hash varchar(255) not null,
     controller varchar(255) references controller(id),
@@ -26,8 +24,6 @@ create unique index idx_cluster_name on node(cluster, name);
 comment on column node.name is 'A string name provided by the node, unique within a cluster.';
 comment on column node.kind is 'A string representing the kind of node this is (serialized types::NodeKind).';
 comment on column node.cluster is 'The cluster the node is registered with.';
-comment on column node.last_heartbeat is 'The time the last status was received from the node.';
-comment on column node.last_status is 'The last status received from the node (corresponds to types::NodeStatus).';
 comment on column node.plane_version is 'The version of the plane running on the node.';
 comment on column node.plane_hash is 'The git hash of the plane version running on the node.';
 comment on column node.controller is 'The controller the node is registered with (null if the node is offline).';
@@ -35,11 +31,17 @@ comment on column node.ip is 'The last-seen IP of the node relative to the contr
 
 create table drone (
     id serial primary key references node(id),
-    draining boolean not null default false
+    ready boolean not null,
+    draining boolean not null default false,
+    last_heartbeat timestamptz,
+    last_local_epoch_millis bigint
 );
 
 comment on column drone.id is 'The unique id of the drone (shared with the node associated with this drone).';
+comment on column drone.ready is 'Whether the drone is ready to accept backends.';
 comment on column drone.draining is 'Whether the drone is draining. If true, this drone will not be considered by the scheduler.';
+comment on column drone.last_heartbeat is 'The last time local_epoch_millis was received from the drone.';
+comment on column drone.last_local_epoch_millis is 'The last reported milliseconds since epoch from the drone, used to assign initial key leases when spawning.';
 
 create table backend (
     id varchar(255) primary key,

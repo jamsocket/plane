@@ -2,13 +2,11 @@ use common::test_env::TestEnvironment;
 use hyper::StatusCode;
 use plane2::{
     client::PlaneClientError,
-    database::{
-        backend::BackendActionMessage, node::NodeHeartbeatNotification, subscribe::Subscription,
-    },
+    database::backend::BackendActionMessage,
     names::{DroneName, Name},
     protocol::{BackendAction, MessageFromDrone, MessageToDrone},
     typed_socket::FullDuplexChannel,
-    types::{ConnectRequest, ConnectResponse, ExecutorConfig, NodeStatus, PullPolicy, SpawnConfig},
+    types::{ConnectRequest, ConnectResponse, ExecutorConfig, PullPolicy, SpawnConfig},
 };
 use plane_test_macro::plane_test;
 use std::{collections::HashMap, time::Duration};
@@ -53,7 +51,6 @@ async fn no_drone_available(env: TestEnvironment) {
 /// Tests that a connect succeeds when a drone is available.
 #[plane_test]
 async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
-    let db = env.db().await;
     let drone_id = DroneName::new_random();
     let controller = env.controller().await;
 
@@ -65,18 +62,16 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
             .await
             .unwrap();
 
-        let mut sub: Subscription<NodeHeartbeatNotification> = db.subscribe();
-
         tracing::info!("Sending initial heartbeat message (mocking the drone).");
         drone_connection
             .send(&MessageFromDrone::Heartbeat {
-                status: NodeStatus::Available,
+                local_time_epoch_millis: 0, // Doesn't matter for this test.
             })
             .await
             .unwrap();
 
-        // Wait for the heartbeat message to propagate.
-        sub.next().await.unwrap();
+        // Wait for the drone to be registered.
+        tokio::time::sleep(Duration::from_millis(150)).await;
 
         tracing::info!("Issuing the connect request.");
         let client = controller.client();

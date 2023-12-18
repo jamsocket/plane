@@ -253,7 +253,10 @@ ALTER TABLE public.controller OWNER TO postgres;
 
 CREATE TABLE public.drone (
     id integer NOT NULL,
-    draining boolean DEFAULT false NOT NULL
+    ready boolean NOT NULL,
+    draining boolean DEFAULT false NOT NULL,
+    last_heartbeat timestamp with time zone,
+    last_local_epoch_millis bigint
 );
 
 
@@ -267,10 +270,31 @@ COMMENT ON COLUMN public.drone.id IS 'The unique id of the drone (shared with th
 
 
 --
+-- Name: COLUMN drone.ready; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.drone.ready IS 'Whether the drone is ready to accept backends.';
+
+
+--
 -- Name: COLUMN drone.draining; Type: COMMENT; Schema: public; Owner: postgres
 --
 
 COMMENT ON COLUMN public.drone.draining IS 'Whether the drone is draining. If true, this drone will not be considered by the scheduler.';
+
+
+--
+-- Name: COLUMN drone.last_heartbeat; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.drone.last_heartbeat IS 'The last time local_epoch_millis was received from the drone.';
+
+
+--
+-- Name: COLUMN drone.last_local_epoch_millis; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.drone.last_local_epoch_millis IS 'The last reported milliseconds since epoch from the drone, used to assign initial key leases when spawning.';
 
 
 --
@@ -341,8 +365,6 @@ CREATE TABLE public.node (
     kind character varying(255) NOT NULL,
     name character varying(255) NOT NULL,
     cluster character varying(255),
-    last_heartbeat timestamp with time zone NOT NULL,
-    last_status character varying(20) NOT NULL,
     plane_version character varying(255) NOT NULL,
     plane_hash character varying(255) NOT NULL,
     controller character varying(255),
@@ -371,20 +393,6 @@ COMMENT ON COLUMN public.node.name IS 'A string name provided by the node, uniqu
 --
 
 COMMENT ON COLUMN public.node.cluster IS 'The cluster the node is registered with.';
-
-
---
--- Name: COLUMN node.last_heartbeat; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.node.last_heartbeat IS 'The time the last status was received from the node.';
-
-
---
--- Name: COLUMN node.last_status; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.node.last_status IS 'The last status received from the node (corresponds to types::NodeStatus).';
 
 
 --
