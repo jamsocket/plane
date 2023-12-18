@@ -4,10 +4,7 @@ use plane2::{
     client::{PlaneClient, PlaneClientError},
     init_tracing::init_tracing,
     names::{BackendName, DroneName},
-    types::{
-        BackendStatus, ClusterName, ConnectRequest, ExecutorConfig, KeyConfig, PullPolicy,
-        SpawnConfig,
-    },
+    types::{BackendStatus, ClusterName, ConnectRequest, ExecutorConfig, KeyConfig, SpawnConfig},
 };
 use url::Url;
 
