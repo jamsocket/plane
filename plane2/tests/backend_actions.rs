@@ -6,7 +6,7 @@ use plane2::{
     names::{DroneName, Name},
     protocol::{BackendAction, MessageFromDrone, MessageToDrone},
     typed_socket::FullDuplexChannel,
-    types::{ConnectRequest, ConnectResponse, ExecutorConfig, NodeStatus, SpawnConfig},
+    types::{ConnectRequest, ConnectResponse, ExecutorConfig, SpawnConfig},
 };
 use plane_test_macro::plane_test;
 use std::time::Duration;
