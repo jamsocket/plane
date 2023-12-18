@@ -2,6 +2,7 @@ use super::{
     subscribe::{emit, NotificationPayload},
     util::MapSqlxError,
 };
+use crate::heartbeat_consts::UNHEALTHY_SECONDS;
 use crate::{
     names::{AnyNodeName, ControllerName, NodeName},
     types::{ClusterName, NodeId, NodeKind},
@@ -9,8 +10,8 @@ use crate::{
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, types::ipnetwork::IpNetwork, PgPool};
-use std::net::IpAddr;
+use sqlx::{postgres::types::PgInterval, query, types::ipnetwork::IpNetwork, PgPool};
+use std::{net::IpAddr, time::Duration};
 
 pub struct NodeDatabase<'a> {
     pool: &'a PgPool,
@@ -135,7 +136,7 @@ impl<'a> NodeDatabase<'a> {
                 kind as "kind!",
                 cluster,
                 (case when
-                    controller.is_online and controller.last_heartbeat > now() - interval '30 seconds'
+                    controller.is_online and controller.last_heartbeat - now() < $1
                     then controller.id
                     else null end
                 ) as controller,
@@ -144,7 +145,9 @@ impl<'a> NodeDatabase<'a> {
                 node.plane_hash as "plane_hash!"
             from node
             left join controller on controller.id = node.controller
-            "#
+            "#,
+            PgInterval::try_from(Duration::from_secs(UNHEALTHY_SECONDS as _))
+                .expect("valid interval")
         )
         .fetch_all(self.pool)
         .await?;

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            select\n                node.id as \"id!\",\n                kind as \"kind!\",\n                cluster,\n                (case when\n                    controller.is_online and controller.last_heartbeat > now() - interval '30 seconds'\n                    then controller.id\n                    else null end\n                ) as controller,\n                name as \"name!\",\n                node.plane_version as \"plane_version!\",\n                node.plane_hash as \"plane_hash!\"\n            from node\n            left join controller on controller.id = node.controller\n            ",
+  "query": "\n            select\n                node.id as \"id!\",\n                kind as \"kind!\",\n                cluster,\n                (case when\n                    controller.is_online and controller.last_heartbeat - now() < $1\n                    then controller.id\n                    else null end\n                ) as controller,\n                name as \"name!\",\n                node.plane_version as \"plane_version!\",\n                node.plane_hash as \"plane_hash!\"\n            from node\n            left join controller on controller.id = node.controller\n            ",
   "describe": {
     "columns": [
       {
@@ -40,7 +40,9 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Interval"
+      ]
     },
     "nullable": [
       true,
@@ -52,5 +54,5 @@
       true
     ]
   },
-  "hash": "eeb279884671e345992d44a651c43ac782ecead2f11b7916636712cab754958b"
+  "hash": "a7d1642a1a5ace2ab2b87a20d33c28c23b9c20c1974430e3adc06feb23fd4a3f"
 }
