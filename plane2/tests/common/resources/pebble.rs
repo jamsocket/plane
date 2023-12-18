@@ -126,6 +126,10 @@ impl Pebble {
         let config = Config {
             image: Some(PEBBLE_IMAGE.to_string()),
             cmd: Some(vec!["/etc/pebble/start.sh".to_string()]),
+            env: Some(vec![
+                // https://github.com/letsencrypt/pebble?tab=readme-ov-file#testing-at-full-speed
+                "PEBBLE_VA_NOSLEEP=1".to_string(),
+            ]),
             host_config: Some(bollard::service::HostConfig {
                 binds: Some(vec![format!(
                     "{}:/etc/pebble",
