@@ -1,7 +1,6 @@
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
 use plane2::{
-    database::{node::NodeConnectionStatusChangeNotification, subscribe::Subscription},
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
     typed_socket::FullDuplexChannel,
@@ -17,14 +16,11 @@ mod common;
 async fn backend_lifecycle(env: TestEnvironment) {
     let db = env.db().await;
     let controller = env.controller().await;
-
-    let mut drone_listener: Subscription<NodeConnectionStatusChangeNotification> = db.subscribe();
     let client = controller.client();
-
     let _drone = env.drone(&controller).await;
 
-    tracing::info!("Waiting for drone to register...");
-    drone_listener.next().await.unwrap();
+    // Wait for the drone to register. TODO: this seems long.
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     tracing::info!("Requesting backend.");
     let connect_request = ConnectRequest {
