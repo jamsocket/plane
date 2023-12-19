@@ -110,10 +110,10 @@ impl BackendManager {
                 let docker = self.docker.clone();
                 StepStatusResult::future_status(async move {
                     let image = &executor_config.image;
-                    let credentials: Option<&DockerCredentials> =
-                        executor_config.credentials.as_ref();
+                    let credentials: Option<DockerCredentials> =
+                        executor_config.credentials.map(|creds| creds.into());
                     tracing::info!(?image, "pulling...");
-                    if let Err(err) = docker.pull(image, credentials, force_pull).await {
+                    if let Err(err) = docker.pull(image, credentials.as_ref(), force_pull).await {
                         tracing::error!(?err, "failed to pull image");
                         BackendState::terminated(None)
                     } else {
