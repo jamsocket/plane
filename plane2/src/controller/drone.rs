@@ -3,7 +3,7 @@ use crate::{
     controller::error::IntoApiError,
     database::{backend::BackendActionMessage, subscribe::Subscription, PlaneDatabase},
     protocol::{BackendAction, MessageFromDrone, MessageToDrone},
-    typed_socket::{server::TypedWebsocketServer, FullDuplexChannel},
+    typed_socket::{server::new_server, TypedSocket},
     types::{ClusterName, NodeId, TerminationKind},
 };
 use axum::{
@@ -17,7 +17,7 @@ pub async fn handle_message_from_drone(
     msg: MessageFromDrone,
     drone_id: NodeId,
     controller: &Controller,
-    sender: &mut TypedWebsocketServer<MessageToDrone>,
+    sender: &mut TypedSocket<MessageToDrone>,
 ) -> anyhow::Result<()> {
     match msg {
         MessageFromDrone::Heartbeat {
@@ -109,10 +109,9 @@ pub async fn drone_socket_inner(
     controller: Controller,
     ip: IpAddr,
 ) -> anyhow::Result<()> {
-    let mut socket =
-        TypedWebsocketServer::<MessageToDrone>::new(ws, controller.id.to_string()).await?;
+    let mut socket = new_server(ws, controller.id.to_string()).await?;
 
-    let handshake = socket.remote_handshake().clone();
+    let handshake = socket.remote_handshake.clone();
     let node_guard = controller
         .register_node(handshake, Some(&cluster), ip)
         .await?;

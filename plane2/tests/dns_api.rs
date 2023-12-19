@@ -5,7 +5,6 @@ use plane2::{
         CertManagerRequest, CertManagerResponse, MessageFromDns, MessageFromProxy, MessageToDns,
         MessageToProxy,
     },
-    typed_socket::FullDuplexChannel,
 };
 use plane_test_macro::plane_test;
 

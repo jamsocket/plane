@@ -1,6 +1,6 @@
 use crate::{
     heartbeat_consts::HEARTBEAT_INTERVAL, protocol::MessageFromDrone,
-    typed_socket::client::TypedSocketSender,
+    typed_socket::TypedSocketSender,
 };
 use std::time::SystemTime;
 use tokio::task::JoinHandle;

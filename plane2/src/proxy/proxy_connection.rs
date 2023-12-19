@@ -3,7 +3,6 @@ use crate::{
     client::PlaneClient,
     names::ProxyName,
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest},
-    typed_socket::FullDuplexChannel,
     types::ClusterName,
 };
 use std::sync::Arc;

@@ -5,7 +5,7 @@ use crate::{
     names::AcmeDnsServerName,
     protocol::{MessageFromDns, MessageToDns},
     signals::wait_for_shutdown_signal,
-    typed_socket::{client::TypedSocketConnector, FullDuplexChannel},
+    typed_socket::client::TypedSocketConnector,
     types::ClusterName,
 };
 use dashmap::DashMap;

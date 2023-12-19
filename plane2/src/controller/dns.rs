@@ -1,7 +1,7 @@
 use super::Controller;
 use crate::{
     protocol::{MessageFromDns, MessageToDns},
-    typed_socket::{server::TypedWebsocketServer, FullDuplexChannel},
+    typed_socket::server::new_server,
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, State, WebSocketUpgrade},
@@ -14,10 +14,9 @@ pub async fn dns_socket_inner(
     controller: Controller,
     ip: IpAddr,
 ) -> anyhow::Result<()> {
-    let mut socket =
-        TypedWebsocketServer::<MessageToDns>::new(ws, controller.id.to_string()).await?;
+    let mut socket = new_server(ws, controller.id.to_string()).await?;
 
-    let handshake = socket.remote_handshake().clone();
+    let handshake = socket.remote_handshake.clone();
     let _node_guard = controller.register_node(handshake, None, ip).await?;
 
     loop {

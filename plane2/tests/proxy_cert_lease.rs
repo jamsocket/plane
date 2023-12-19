@@ -2,7 +2,6 @@ use common::test_env::TestEnvironment;
 use plane2::{
     names::{Name, ProxyName},
     protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
-    typed_socket::FullDuplexChannel,
 };
 use plane_test_macro::plane_test;
 

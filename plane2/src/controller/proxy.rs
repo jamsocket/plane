@@ -5,7 +5,7 @@ use crate::{
         CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy,
         RouteInfoRequest, RouteInfoResponse,
     },
-    typed_socket::{server::TypedWebsocketServer, FullDuplexChannel},
+    typed_socket::server::new_server,
     types::ClusterName,
 };
 use axum::{
@@ -21,10 +21,9 @@ pub async fn proxy_socket_inner(
     controller: Controller,
     ip: IpAddr,
 ) -> anyhow::Result<()> {
-    let mut socket =
-        TypedWebsocketServer::<MessageToProxy>::new(ws, controller.id.to_string()).await?;
+    let mut socket = new_server(ws, controller.id.to_string()).await?;
 
-    let handshake = socket.remote_handshake().clone();
+    let handshake = socket.remote_handshake.clone();
     let node_guard = controller
         .register_node(handshake, Some(&cluster), ip)
         .await?;

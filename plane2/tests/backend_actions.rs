@@ -5,7 +5,6 @@ use plane2::{
     database::backend::BackendActionMessage,
     names::{DroneName, Name},
     protocol::{BackendAction, MessageFromDrone, MessageToDrone},
-    typed_socket::FullDuplexChannel,
     types::{ConnectRequest, ConnectResponse, ExecutorConfig, PullPolicy, SpawnConfig},
 };
 use plane_test_macro::plane_test;
@@ -140,7 +139,7 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
     }
 
     // We don't currently have a way to make sure the ack has been processed.
-    tokio::time::sleep(Duration::from_millis(50)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
 
     {
         // The message should not be repeated now.
