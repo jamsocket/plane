@@ -1,8 +1,5 @@
 use super::types::ContainerId;
-use crate::{
-    names::BackendName,
-    types::{DockerCpuPeriod, ExecutorConfig},
-};
+use crate::{names::BackendName, types::ExecutorConfig};
 use anyhow::Result;
 use bollard::{
     service::{HostConfig, PortBinding, ResourcesUlimits},
