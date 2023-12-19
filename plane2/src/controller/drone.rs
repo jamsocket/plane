@@ -3,7 +3,7 @@ use crate::{
     controller::error::IntoApiError,
     database::{backend::BackendActionMessage, subscribe::Subscription, PlaneDatabase},
     protocol::{BackendAction, MessageFromDrone, MessageToDrone},
-    typed_socket::{server::TypedWebsocketServer, FullDuplexChannel},
+    typed_socket::{server::new_server, TypedSocket},
     types::{ClusterName, NodeId, TerminationKind},
 };
 use axum::{
@@ -17,7 +17,7 @@ pub async fn handle_message_from_drone(
     msg: MessageFromDrone,
     drone_id: NodeId,
     controller: &Controller,
-    sender: &mut TypedWebsocketServer<MessageToDrone>,
+    sender: &mut TypedSocket<MessageToDrone>,
 ) -> anyhow::Result<()> {
     match msg {
         MessageFromDrone::Heartbeat {
@@ -47,7 +47,7 @@ pub async fn handle_message_from_drone(
                 .await?;
 
             sender
-                .send(&MessageToDrone::AckEvent {
+                .send(MessageToDrone::AckEvent {
                     event_id: backend_event.event_id,
                 })
                 .await?;
@@ -109,10 +109,9 @@ pub async fn drone_socket_inner(
     controller: Controller,
     ip: IpAddr,
 ) -> anyhow::Result<()> {
-    let mut socket =
-        TypedWebsocketServer::<MessageToDrone>::new(ws, controller.id.to_string()).await?;
+    let mut socket = new_server(ws, controller.id.to_string()).await?;
 
-    let handshake = socket.remote_handshake().clone();
+    let handshake = socket.remote_handshake.clone();
     let node_guard = controller
         .register_node(handshake, Some(&cluster), ip)
         .await?;
@@ -132,7 +131,7 @@ pub async fn drone_socket_inner(
         .await?
     {
         let message = MessageToDrone::Action(pending_action);
-        socket.send(&message).await?;
+        socket.send(message).await?;
     }
 
     loop {
@@ -141,7 +140,7 @@ pub async fn drone_socket_inner(
                 match backend_action_result {
                     Some(backend_action) => {
                         let message = MessageToDrone::Action(backend_action.payload);
-                        if let Err(err) = socket.send(&message).await {
+                        if let Err(err) = socket.send(message).await {
                             tracing::error!(?err, "Error sending backend action to drone");
                         }
                     }

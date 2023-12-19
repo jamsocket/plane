@@ -5,7 +5,6 @@ use plane2::{
     database::backend::BackendActionMessage,
     names::{DroneName, Name},
     protocol::{BackendAction, MessageFromDrone, MessageToDrone},
-    typed_socket::FullDuplexChannel,
     types::{ConnectRequest, ConnectResponse, ExecutorConfig, SpawnConfig},
 };
 use plane_test_macro::plane_test;
@@ -60,7 +59,7 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
 
         tracing::info!("Sending initial heartbeat message (mocking the drone).");
         drone_connection
-            .send(&MessageFromDrone::Heartbeat {
+            .send(MessageFromDrone::Heartbeat {
                 local_time_epoch_millis: 0, // Doesn't matter for this test.
             })
             .await
@@ -125,7 +124,7 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
         };
 
         drone_connection
-            .send(&MessageFromDrone::AckAction { action_id })
+            .send(MessageFromDrone::AckAction { action_id })
             .await
             .unwrap();
 

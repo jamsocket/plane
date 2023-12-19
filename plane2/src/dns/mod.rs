@@ -5,7 +5,7 @@ use crate::{
     names::AcmeDnsServerName,
     protocol::{MessageFromDns, MessageToDns},
     signals::wait_for_shutdown_signal,
-    typed_socket::{client::TypedSocketConnector, FullDuplexChannel},
+    typed_socket::client::TypedSocketConnector,
     types::ClusterName,
 };
 use dashmap::DashMap;
@@ -70,7 +70,7 @@ impl AcmeDnsServer {
                             outbound = recv.recv() => {
                                 match outbound {
                                     Ok(message) => {
-                                        if let Err(err) = socket.send(&message).await {
+                                        if let Err(err) = socket.send(message).await {
                                             tracing::warn!(?err, "Error sending message to DNS server.");
                                         }
                                     }

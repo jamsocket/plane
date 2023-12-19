@@ -2,7 +2,6 @@ use common::test_env::TestEnvironment;
 use plane2::{
     names::{Name, ProxyName},
     protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
-    typed_socket::FullDuplexChannel,
 };
 use plane_test_macro::plane_test;
 
@@ -19,7 +18,7 @@ async fn request_dns_lease(env: TestEnvironment) {
         .unwrap();
 
     client
-        .send(&MessageFromProxy::CertManagerRequest(
+        .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::CertLeaseRequest,
         ))
         .await
@@ -45,7 +44,7 @@ async fn request_dns_lease_fails_when_held(env: TestEnvironment) {
         .unwrap();
 
     client1
-        .send(&MessageFromProxy::CertManagerRequest(
+        .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::CertLeaseRequest,
         ))
         .await
@@ -66,7 +65,7 @@ async fn request_dns_lease_fails_when_held(env: TestEnvironment) {
         .unwrap();
 
     client2
-        .send(&MessageFromProxy::CertManagerRequest(
+        .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::CertLeaseRequest,
         ))
         .await
@@ -80,7 +79,7 @@ async fn request_dns_lease_fails_when_held(env: TestEnvironment) {
     };
 
     client1
-        .send(&MessageFromProxy::CertManagerRequest(
+        .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::ReleaseCertLease,
         ))
         .await
@@ -90,7 +89,7 @@ async fn request_dns_lease_fails_when_held(env: TestEnvironment) {
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     client2
-        .send(&MessageFromProxy::CertManagerRequest(
+        .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::CertLeaseRequest,
         ))
         .await

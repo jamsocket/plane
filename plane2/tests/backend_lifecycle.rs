@@ -3,10 +3,8 @@ use common::test_env::TestEnvironment;
 use plane2::{
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
-    typed_socket::FullDuplexChannel,
-    types::{
-        BackendStatus, ConnectRequest, ExecutorConfig, PullPolicy, ResourceLimits, SpawnConfig,
-    },
+    types::ResourceLimits,
+    types::{BackendStatus, ConnectRequest, ExecutorConfig, PullPolicy, SpawnConfig},
 };
 use plane_test_macro::plane_test;
 use serde_json::Map;
@@ -137,7 +135,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
     tracing::info!("Connected as proxy. Requesting route info.");
 
     proxy
-        .send(&MessageFromProxy::RouteInfoRequest(RouteInfoRequest {
+        .send(MessageFromProxy::RouteInfoRequest(RouteInfoRequest {
             token: response.token.clone(),
         }))
         .await
@@ -169,7 +167,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
 
     tracing::info!("Sending keepalive.");
     proxy
-        .send(&MessageFromProxy::KeepAlive(response.backend_id.clone()))
+        .send(MessageFromProxy::KeepAlive(response.backend_id.clone()))
         .await
         .unwrap();
 

@@ -115,10 +115,7 @@ async fn run(opts: Opts) -> Result<()> {
 
             let controller_url = match controller_url {
                 Some(url) => url,
-                None => {
-                    let url = Url::parse(&format!("http://{}:{}", host, port))?;
-                    url
-                }
+                None => Url::parse(&format!("http://{}:{}", host, port))?,
             };
 
             tracing::info!(%name, "Starting controller. Attempting to connect to database...");
