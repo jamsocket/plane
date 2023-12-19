@@ -2,8 +2,8 @@ use super::types::ContainerId;
 use crate::{names::BackendName, types::ExecutorConfig};
 use anyhow::Result;
 use bollard::{
-    service::{HostConfig, PortBinding, ResourcesUlimits},
     auth::DockerCredentials,
+    service::{HostConfig, PortBinding, ResourcesUlimits},
     Docker,
 };
 use futures_util::StreamExt;
