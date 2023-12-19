@@ -49,6 +49,9 @@ pub struct BackendManager {
     /// It is always dropped (and aborted) when the state changes.
     handle: Mutex<Option<GuardHandle>>,
 
+	/// handle for task that collects metrics and sends them to the controller.
+	metrics_handle: Option<GuardHandle>,
+
     /// The ID of the backend this manager is responsible for.
     backend_id: BackendName,
 
@@ -81,6 +84,7 @@ impl BackendManager {
 
         let manager = Arc::new(Self {
             handle: Mutex::new(None),
+			metrics_handle: None,
             backend_id,
             docker,
             executor_config,
