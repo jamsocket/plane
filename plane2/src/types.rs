@@ -1,22 +1,8 @@
-use crate::{
-    client::PlaneClient,
-    names::{BackendName, Name},
-    util::random_prefixed_string,
-};
+use crate::{client::PlaneClient, names::BackendName, util::random_prefixed_string};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{collections::HashMap, fmt::Display, net::SocketAddr, str::FromStr};
-
-pub trait OrRandom<T> {
-    fn or_random(self) -> T;
-}
-
-impl<T: Name> OrRandom<T> for Option<T> {
-    fn or_random(self) -> T {
-        self.unwrap_or_else(T::new_random)
-    }
-}
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
 pub struct NodeId(i32);

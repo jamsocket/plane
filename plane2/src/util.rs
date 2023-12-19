@@ -1,17 +1,26 @@
 use chrono::Duration;
 use futures_util::Future;
-use rand::Rng;
+use rand::{
+    distributions::{Distribution, Uniform},
+    Rng,
+};
 use std::{
     net::{IpAddr, ToSocketAddrs},
     time::SystemTime,
 };
 use tokio::task::JoinHandle;
 
+const ALLOWED_CHARS: &str = "abcdefghijklmnopqrstuvwxyz0123456789";
+
 pub fn random_string() -> String {
-    rand::thread_rng()
-        .sample_iter(rand::distributions::Alphanumeric)
-        .take(14)
-        .map(char::from)
+    let range = Uniform::new(0, ALLOWED_CHARS.len());
+
+    let mut rng = rand::thread_rng();
+
+    range
+        .sample_iter(&mut rng)
+        .take(16)
+        .map(|i| ALLOWED_CHARS.chars().nth(i).unwrap())
         .collect()
 }
 
