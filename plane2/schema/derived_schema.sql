@@ -368,7 +368,9 @@ CREATE TABLE public.node (
     plane_version character varying(255) NOT NULL,
     plane_hash character varying(255) NOT NULL,
     controller character varying(255),
-    ip inet NOT NULL
+    ip inet NOT NULL,
+    last_ping_time timestamp with time zone,
+    last_ping_latency_ms integer
 );
 
 

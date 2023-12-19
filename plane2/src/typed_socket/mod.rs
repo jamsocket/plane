@@ -5,6 +5,7 @@ use std::fmt::Debug;
 
 pub mod client;
 pub mod server;
+mod ping;
 
 pub trait ChannelMessage: Send + Sync + 'static + DeserializeOwned + Serialize + Debug {
     type Reply: ChannelMessage<Reply = Self>;

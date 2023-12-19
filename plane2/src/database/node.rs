@@ -184,6 +184,23 @@ impl<'a> NodeDatabase<'a> {
 
         Ok(result)
     }
+
+    pub async fn update_ping(&self, node_id: &NodeId, elapsed: Duration) -> sqlx::Result<()> {
+        query!(
+            r#"
+            update node
+            set last_ping_latency_ms = $2,
+            last_ping_time = now()
+            where id = $1
+            "#,
+            node_id.as_i32(),
+            elapsed.as_millis() as i64,
+        )
+        .execute(self.pool)
+        .await?;
+
+        Ok(())
+    }
 }
 
 pub struct NodeRow {

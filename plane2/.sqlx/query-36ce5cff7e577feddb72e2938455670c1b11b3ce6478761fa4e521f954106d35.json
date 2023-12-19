@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update node\n            set last_ping_latency_ms = $2,\n            last_ping_time = now()\n            where id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "36ce5cff7e577feddb72e2938455670c1b11b3ce6478761fa4e521f954106d35"
+}

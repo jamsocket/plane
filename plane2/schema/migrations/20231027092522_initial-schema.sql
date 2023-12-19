@@ -16,7 +16,9 @@ create table node (
     plane_version varchar(255) not null,
     plane_hash varchar(255) not null,
     controller varchar(255) references controller(id),
-    ip inet not null
+    ip inet not null,
+    last_ping_time timestamptz,
+    last_ping_latency_ms int
 );
 
 create unique index idx_cluster_name on node(cluster, name);

@@ -1,4 +1,6 @@
-use super::{ChannelMessage, FullDuplexChannel, Handshake};
+use std::{sync::Arc, thread::JoinHandle};
+
+use super::{ChannelMessage, FullDuplexChannel, Handshake, ping::PingSender};
 use crate::plane_version_info;
 use anyhow::{anyhow, Context, Result};
 use axum::extract::ws::{Message, WebSocket};
@@ -6,7 +8,13 @@ use axum::extract::ws::{Message, WebSocket};
 pub struct TypedWebsocketServer<T: ChannelMessage> {
     socket: WebSocket,
     handshake: Handshake,
+    ping_sender: Arc<PingSender>,
+    ping_loop_handle: JoinHandle<()>,
     _phantom: std::marker::PhantomData<T>,
+}
+
+pub async fn ping_loop() {
+
 }
 
 impl<T: ChannelMessage> TypedWebsocketServer<T> {
@@ -41,9 +49,12 @@ impl<T: ChannelMessage> TypedWebsocketServer<T> {
 
         handshake.check_compat(&client_handshake);
 
+        let ping_sender = Arc::new(PingSender::new());
+
         Ok(Self {
             socket: ws,
             handshake: client_handshake,
+            ping_sender,
             _phantom: std::marker::PhantomData,
         })
     }
@@ -91,7 +102,7 @@ impl<T: ChannelMessage> FullDuplexChannel<T> for TypedWebsocketServer<T> {
             }
         }
 
-        tracing::warn!("Connection closed11.");
+        tracing::warn!("Connection closed.");
 
         None
     }
