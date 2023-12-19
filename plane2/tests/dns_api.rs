@@ -29,7 +29,7 @@ async fn dns_api(env: TestEnvironment) {
         .unwrap();
 
     proxy_client
-        .send(&MessageFromProxy::CertManagerRequest(
+        .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::CertLeaseRequest,
         ))
         .await
@@ -43,7 +43,7 @@ async fn dns_api(env: TestEnvironment) {
     };
 
     proxy_client
-        .send(&MessageFromProxy::CertManagerRequest(
+        .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::SetTxtRecord {
                 txt_value: "foobaz".to_string(),
             },
@@ -59,7 +59,7 @@ async fn dns_api(env: TestEnvironment) {
     };
 
     dns_client
-        .send(&MessageFromDns::TxtRecordRequest {
+        .send(MessageFromDns::TxtRecordRequest {
             cluster: env.cluster.clone(),
         })
         .await

@@ -47,7 +47,7 @@ pub async fn handle_message_from_drone(
                 .await?;
 
             sender
-                .send(&MessageToDrone::AckEvent {
+                .send(MessageToDrone::AckEvent {
                     event_id: backend_event.event_id,
                 })
                 .await?;
@@ -132,7 +132,7 @@ pub async fn drone_socket_inner(
         .await?
     {
         let message = MessageToDrone::Action(pending_action);
-        socket.send(&message).await?;
+        socket.send(message).await?;
     }
 
     loop {
@@ -141,7 +141,7 @@ pub async fn drone_socket_inner(
                 match backend_action_result {
                     Some(backend_action) => {
                         let message = MessageToDrone::Action(backend_action.payload);
-                        if let Err(err) = socket.send(&message).await {
+                        if let Err(err) = socket.send(message).await {
                             tracing::error!(?err, "Error sending backend action to drone");
                         }
                     }

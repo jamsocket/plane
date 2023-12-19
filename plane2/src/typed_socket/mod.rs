@@ -12,7 +12,7 @@ pub trait ChannelMessage: Send + Sync + 'static + DeserializeOwned + Serialize +
 
 #[async_trait::async_trait]
 pub trait FullDuplexChannel<T: ChannelMessage> {
-    async fn send(&mut self, message: &T) -> anyhow::Result<()>;
+    async fn send(&mut self, message: T) -> anyhow::Result<()>;
 
     async fn recv(&mut self) -> Option<T::Reply>;
 }

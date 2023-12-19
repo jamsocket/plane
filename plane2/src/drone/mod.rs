@@ -72,10 +72,7 @@ pub async fn drone_loop(
                         continue;
                     }
 
-                    if let Err(err) = socket
-                        .send(&MessageFromDrone::AckAction { action_id })
-                        .await
-                    {
+                    if let Err(err) = socket.send(MessageFromDrone::AckAction { action_id }).await {
                         tracing::error!(?err, "Error sending ack.");
                         continue;
                     }

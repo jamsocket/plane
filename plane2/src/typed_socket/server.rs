@@ -89,7 +89,7 @@ impl<T: ChannelMessage> TypedWebsocketServer<T> {
 
 #[async_trait::async_trait]
 impl<T: ChannelMessage> FullDuplexChannel<T> for TypedWebsocketServer<T> {
-    async fn send(&mut self, message: &T) -> Result<()> {
+    async fn send(&mut self, message: T) -> Result<()> {
         let message = serde_json::to_string(&message)?;
         self.outgoing_message_sender
             .send(Message::Text(message))

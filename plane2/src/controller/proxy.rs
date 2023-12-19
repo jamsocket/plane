@@ -44,7 +44,7 @@ pub async fn proxy_socket_inner(
 
                 let response = RouteInfoResponse { token, route_info };
                 if let Err(err) = socket
-                    .send(&MessageToProxy::RouteInfoResponse(response))
+                    .send(MessageToProxy::RouteInfoResponse(response))
                     .await
                 {
                     tracing::error!(?err, "Error sending route info response to proxy.");
@@ -102,7 +102,7 @@ pub async fn proxy_socket_inner(
                 tracing::info!(?response, "Sending cert manager response");
 
                 if let Err(err) = socket
-                    .send(&MessageToProxy::CertManagerResponse(response))
+                    .send(MessageToProxy::CertManagerResponse(response))
                     .await
                 {
                     tracing::error!(?err, "Error sending cert manager response to proxy.");

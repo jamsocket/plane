@@ -118,25 +118,24 @@ fn auth_url_to_request(url: &Url) -> Result<hyper::Request<()>> {
     Ok(request.body(())?)
 }
 
-enum SocketAction {
-    Send(String),
+enum SocketAction<T> {
+    Send(T),
     Close,
 }
 
 pub struct TypedSocket<T: ChannelMessage> {
-    send: Sender<SocketAction>,
+    send: Sender<SocketAction<T>>,
     recv: Receiver<T::Reply>,
     handle: Option<JoinHandle<()>>,
 }
 
 pub struct TypedSocketSender<T: ChannelMessage> {
-    send: Sender<SocketAction>,
+    send: Sender<SocketAction<T>>,
     _phantom: PhantomData<T>,
 }
 
 impl<T: ChannelMessage> TypedSocketSender<T> {
     pub fn send(&self, message: T) -> Result<()> {
-        let message = serde_json::to_string(&message)?;
         self.send.try_send(SocketAction::Send(message))?;
         Ok(())
     }
@@ -146,7 +145,7 @@ impl<T: ChannelMessage> TypedSocket<T> {
     fn new(mut socket: Socket) -> Self {
         let (send_to_client, recv_to_client) = tokio::sync::mpsc::channel::<T::Reply>(100);
         let (send_from_client, mut recv_from_client) =
-            tokio::sync::mpsc::channel::<SocketAction>(100);
+            tokio::sync::mpsc::channel::<SocketAction<T>>(100);
 
         let handle = tokio::spawn(async move {
             loop {
@@ -158,6 +157,7 @@ impl<T: ChannelMessage> TypedSocket<T> {
                                 break;
                             }
                             Some(SocketAction::Send(message)) => {
+                                let message = serde_json::to_string(&message).unwrap();
                                 if let Err(err) = socket.send(Message::Text(message)).await {
                                     tracing::error!(?err, "Failed to send message on websocket.");
                                 }
@@ -225,8 +225,7 @@ impl<T: ChannelMessage> TypedSocket<T> {
 
 #[async_trait::async_trait]
 impl<T: ChannelMessage> FullDuplexChannel<T> for TypedSocket<T> {
-    async fn send(&mut self, message: &T) -> Result<()> {
-        let message = serde_json::to_string(&message)?;
+    async fn send(&mut self, message: T) -> Result<()> {
         Ok(self.send.try_send(SocketAction::Send(message))?)
     }
 
