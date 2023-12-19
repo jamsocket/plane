@@ -3,6 +3,7 @@ use common::test_env::TestEnvironment;
 use plane2::{
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
+    types::ResourceLimits,
     types::{BackendStatus, ConnectRequest, ExecutorConfig, PullPolicy, SpawnConfig},
 };
 use plane_test_macro::plane_test;
@@ -28,6 +29,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: PullPolicy::IfNotPresent,
                 env: HashMap::default(),
+                resource_limits: ResourceLimits::default(),
             },
             lifetime_limit_seconds: None,
             max_idle_seconds: None,

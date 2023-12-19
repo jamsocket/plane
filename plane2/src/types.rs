@@ -1,22 +1,8 @@
-use crate::{
-    client::PlaneClient,
-    names::{BackendName, Name},
-    util::random_prefixed_string,
-};
+use crate::{client::PlaneClient, names::BackendName, util::random_prefixed_string};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{collections::HashMap, fmt::Display, net::SocketAddr, str::FromStr};
-
-pub trait OrRandom<T> {
-    fn or_random(self) -> T;
-}
-
-impl<T: Name> OrRandom<T> for Option<T> {
-    fn or_random(self) -> T {
-        self.unwrap_or_else(T::new_random)
-    }
-}
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
 pub struct NodeId(i32);
@@ -218,12 +204,68 @@ pub enum PullPolicy {
     Never,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct DockerCpuPeriod(std::time::Duration);
+
+impl Default for DockerCpuPeriod {
+    fn default() -> Self {
+        Self(std::time::Duration::from_millis(100))
+    }
+}
+
+impl From<&DockerCpuPeriod> for std::time::Duration {
+    fn from(value: &DockerCpuPeriod) -> Self {
+        value.0
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
+pub struct ResourceLimits {
+    /// Period of cpu time
+    pub cpu_period: Option<DockerCpuPeriod>,
+
+    /// Proportion of period used by container
+    pub cpu_period_percent: Option<u8>,
+
+    /// Total cpu time allocated to container
+    pub cpu_time_limit: Option<std::time::Duration>,
+
+    /// Maximum amount of memory container can use (in bytes)
+    pub memory_limit_bytes: Option<i64>,
+
+    /// Maximum disk space container can use (in bytes)
+    pub disk_limit_bytes: Option<i64>,
+}
+
+impl ResourceLimits {
+    pub fn cpu_quota(&self) -> Option<std::time::Duration> {
+        let Some(pc) = self.cpu_period_percent else {
+            return None;
+        };
+        let cpu_period = self.cpu_period.clone().unwrap_or_default();
+
+        let quota = cpu_period.0.mul_f64((pc as f64) / 100.0);
+        Some(quota)
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutorConfig {
     pub image: String,
     pub pull_policy: PullPolicy,
-
     pub env: HashMap<String, String>,
+    pub resource_limits: ResourceLimits,
+}
+
+impl ExecutorConfig {
+    pub fn from_image_with_defaults<T: Into<String>>(image: T) -> Self {
+        Self {
+            image: image.into(),
+            pull_policy: PullPolicy::default(),
+            env: HashMap::default(),
+            resource_limits: ResourceLimits::default(),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
