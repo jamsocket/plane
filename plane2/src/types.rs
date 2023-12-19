@@ -1,4 +1,9 @@
-use crate::{client::PlaneClient, names::BackendName, util::random_prefixed_string};
+use crate::{
+    client::PlaneClient,
+    names::{BackendName, Name},
+    util::random_prefixed_string,
+};
+use bollard::auth::DockerCredentials;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -253,6 +258,7 @@ impl ResourceLimits {
 pub struct ExecutorConfig {
     pub image: String,
     pub pull_policy: PullPolicy,
+    pub credentials: Option<DockerCredentials>,
     pub env: HashMap<String, String>,
     pub resource_limits: ResourceLimits,
 }
@@ -264,6 +270,7 @@ impl ExecutorConfig {
             pull_policy: PullPolicy::default(),
             env: HashMap::default(),
             resource_limits: ResourceLimits::default(),
+			credentials: None
         }
     }
 }

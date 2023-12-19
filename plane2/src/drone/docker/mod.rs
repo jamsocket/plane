@@ -4,7 +4,9 @@ use self::{
 };
 use crate::{names::BackendName, types::ExecutorConfig};
 use anyhow::Result;
-use bollard::{errors::Error, service::EventMessage, system::EventsOptions, Docker};
+use bollard::{
+    auth::DockerCredentials, errors::Error, service::EventMessage, system::EventsOptions, Docker,
+};
 use tokio_stream::{Stream, StreamExt};
 
 mod commands;
@@ -36,8 +38,13 @@ impl PlaneDocker {
         Ok(Self { docker, runtime })
     }
 
-    pub async fn pull(&self, image: &str, force: bool) -> Result<()> {
-        commands::pull_image(&self.docker, image, force).await?;
+    pub async fn pull(
+        &self,
+        image: &str,
+        credentials: Option<&DockerCredentials>,
+        force: bool,
+    ) -> Result<()> {
+        commands::pull_image(&self.docker, image, credentials, force).await?;
         Ok(())
     }
 
