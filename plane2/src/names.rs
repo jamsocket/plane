@@ -71,7 +71,7 @@ macro_rules! entity_name {
                 }
 
                 for (i, c) in s.chars().enumerate() {
-                    if !c.is_ascii_alphanumeric() && c != '-' {
+                    if !(c.is_ascii_lowercase() || c.is_ascii_digit()) && c != '-' {
                         return Err(NameError::InvalidCharacter(c, i));
                     }
                 }
@@ -105,6 +105,16 @@ impl<T: Name> NameParser<T> {
         Self {
             _marker: std::marker::PhantomData,
         }
+    }
+}
+
+pub trait OrRandom<T> {
+    fn or_random(self) -> T;
+}
+
+impl<T: Name> OrRandom<T> for Option<T> {
+    fn or_random(self) -> T {
+        self.unwrap_or_else(T::new_random)
     }
 }
 
@@ -232,6 +242,14 @@ mod tests {
         assert_eq!(
             Err(NameError::InvalidCharacter('*', 3)),
             ControllerName::try_from("co-*a".to_string())
+        );
+    }
+
+    #[test]
+    fn test_invalid_uppercase() {
+        assert_eq!(
+            Err(NameError::InvalidCharacter('A', 5)),
+            ControllerName::try_from("co-aaA".to_string())
         );
     }
 
