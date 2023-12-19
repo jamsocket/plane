@@ -4,7 +4,9 @@ use plane2::{
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
     typed_socket::FullDuplexChannel,
-    types::{BackendStatus, ConnectRequest, ExecutorConfig, PullPolicy, SpawnConfig},
+    types::{
+        BackendStatus, ConnectRequest, ExecutorConfig, PullPolicy, ResourceLimits, SpawnConfig,
+    },
 };
 use plane_test_macro::plane_test;
 use serde_json::Map;
@@ -29,6 +31,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: PullPolicy::IfNotPresent,
                 env: HashMap::default(),
+                resource_limits: ResourceLimits::default(),
             },
             lifetime_limit_seconds: None,
             max_idle_seconds: None,
