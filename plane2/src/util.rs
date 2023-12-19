@@ -19,7 +19,7 @@ pub fn random_string() -> String {
 
     range
         .sample_iter(&mut rng)
-        .take(16)
+        .take(14)
         .map(|i| ALLOWED_CHARS.chars().nth(i).unwrap())
         .collect()
 }
