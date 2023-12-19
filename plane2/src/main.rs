@@ -6,9 +6,9 @@ use plane2::database::connect_and_migrate;
 use plane2::dns::run_dns;
 use plane2::drone::run_drone;
 use plane2::init_tracing::init_tracing;
-use plane2::names::{AcmeDnsServerName, ControllerName, DroneName, Name, ProxyName};
+use plane2::names::{AcmeDnsServerName, ControllerName, DroneName, Name, OrRandom, ProxyName};
 use plane2::proxy::{run_proxy, AcmeConfig, ServerPortConfig};
-use plane2::types::{ClusterName, OrRandom};
+use plane2::types::ClusterName;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use url::Url;
@@ -32,8 +32,11 @@ enum Command {
         #[clap(long, default_value = "8080")]
         port: u16,
 
-        #[clap(long, default_value = "0.0.0.0")]
+        #[clap(long, default_value = "127.0.0.1")]
         host: IpAddr,
+
+        #[clap(long)]
+        controller_url: Option<Url>,
     },
     Drone {
         #[clap(long)]
@@ -102,8 +105,18 @@ enum Command {
 
 async fn run(opts: Opts) -> Result<()> {
     match opts.command {
-        Command::Controller { host, port, db } => {
+        Command::Controller {
+            host,
+            port,
+            db,
+            controller_url,
+        } => {
             let name = ControllerName::new_random();
+
+            let controller_url = match controller_url {
+                Some(url) => url,
+                None => Url::parse(&format!("http://{}:{}", host, port))?,
+            };
 
             tracing::info!(%name, "Starting controller. Attempting to connect to database...");
             let db = connect_and_migrate(&db)
@@ -113,7 +126,7 @@ async fn run(opts: Opts) -> Result<()> {
 
             let addr = (host, port).into();
 
-            run_controller(db, addr, name).await?
+            run_controller(db, addr, name, controller_url).await?
         }
         Command::Migrate { db } => {
             let _ = connect_and_migrate(&db).await?;

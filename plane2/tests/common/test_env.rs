@@ -19,6 +19,7 @@ use std::{
 };
 use tracing::subscriber::DefaultGuard;
 use tracing_appender::non_blocking::WorkerGuard;
+use url::Url;
 
 const TEST_CLUSTER: &str = "plane.test";
 
@@ -85,10 +86,17 @@ impl TestEnvironment {
     pub async fn controller(&mut self) -> ControllerServer {
         let db = self.db().await;
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let controller =
-            ControllerServer::run_with_listener(db.clone(), listener, ControllerName::new_random())
-                .await
-                .expect("Unable to construct controller.");
+        let url: Url = format!("http://{}", listener.local_addr().unwrap())
+            .parse()
+            .unwrap();
+        let controller = ControllerServer::run_with_listener(
+            db.clone(),
+            listener,
+            ControllerName::new_random(),
+            url,
+        )
+        .await
+        .expect("Unable to construct controller.");
         controller
     }
 

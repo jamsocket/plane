@@ -4,12 +4,8 @@ use plane2::{
     client::{PlaneClient, PlaneClientError},
     init_tracing::init_tracing,
     names::{BackendName, DroneName},
-    types::{
-        BackendStatus, ClusterName, ConnectRequest, ExecutorConfig, KeyConfig, PullPolicy,
-        SpawnConfig,
-    },
+    types::{BackendStatus, ClusterName, ConnectRequest, ExecutorConfig, KeyConfig, SpawnConfig},
 };
-use std::collections::HashMap;
 use url::Url;
 
 fn show_error(error: &PlaneClientError) {
@@ -110,11 +106,7 @@ async fn inner_main(opts: Opts) -> Result<(), PlaneClientError> {
             key,
             wait,
         } => {
-            let executor_config = ExecutorConfig {
-                image,
-                env: HashMap::default(),
-                pull_policy: PullPolicy::default(),
-            };
+            let executor_config = ExecutorConfig::from_image_with_defaults(image);
             let spawn_config = SpawnConfig {
                 executable: executor_config.clone(),
                 lifetime_limit_seconds: None,
@@ -138,6 +130,7 @@ async fn inner_main(opts: Opts) -> Result<(), PlaneClientError> {
             );
 
             println!("URL: {}", response.url.bright_white());
+            println!("Status URL: {}", response.status_url.bright_white());
 
             if wait {
                 let mut stream = client

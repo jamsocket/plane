@@ -6,7 +6,7 @@ use crate::{
     names::DroneName,
     protocol::{MessageFromDrone, MessageToDrone},
     signals::wait_for_shutdown_signal,
-    typed_socket::{client::TypedSocketConnector, FullDuplexChannel},
+    typed_socket::client::TypedSocketConnector,
     types::ClusterName,
     util::get_internal_host_ip,
 };
@@ -72,10 +72,7 @@ pub async fn drone_loop(
                         continue;
                     }
 
-                    if let Err(err) = socket
-                        .send(&MessageFromDrone::AckAction { action_id })
-                        .await
-                    {
+                    if let Err(err) = socket.send(MessageFromDrone::AckAction { action_id }).await {
                         tracing::error!(?err, "Error sending ack.");
                         continue;
                     }

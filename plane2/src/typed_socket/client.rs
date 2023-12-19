@@ -1,12 +1,10 @@
-use super::{ChannelMessage, FullDuplexChannel, Handshake};
+use super::{ChannelMessage, Handshake, SocketAction, TypedSocket};
 use crate::names::NodeName;
 use crate::{plane_version_info, util::ExponentialBackoff};
 use anyhow::{anyhow, Result};
 use futures_util::{SinkExt, StreamExt};
 use std::marker::PhantomData;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::task::JoinHandle;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tungstenite::handshake::client::generate_key;
 use tungstenite::{error::ProtocolError, Message};
@@ -84,7 +82,7 @@ impl<T: ChannelMessage> TypedSocketConnector<T> {
 
         handshake.check_compat(&remote_handshake);
 
-        Ok(TypedSocket::new(socket))
+        new_client(socket, remote_handshake).await
     }
 }
 
@@ -118,130 +116,73 @@ fn auth_url_to_request(url: &Url) -> Result<hyper::Request<()>> {
     Ok(request.body(())?)
 }
 
-enum SocketAction {
-    Send(String),
-    Close,
-}
+async fn new_client<T: ChannelMessage>(
+    mut socket: Socket,
+    remote_handshake: Handshake,
+) -> Result<TypedSocket<T>> {
+    let (send_to_client, recv_to_client) = tokio::sync::mpsc::channel::<T::Reply>(100);
+    let (send_from_client, mut recv_from_client) =
+        tokio::sync::mpsc::channel::<SocketAction<T>>(100);
 
-pub struct TypedSocket<T: ChannelMessage> {
-    send: Sender<SocketAction>,
-    recv: Receiver<T::Reply>,
-    handle: Option<JoinHandle<()>>,
-}
-
-pub struct TypedSocketSender<T: ChannelMessage> {
-    send: Sender<SocketAction>,
-    _phantom: PhantomData<T>,
-}
-
-impl<T: ChannelMessage> TypedSocketSender<T> {
-    pub fn send(&self, message: T) -> Result<()> {
-        let message = serde_json::to_string(&message)?;
-        self.send.try_send(SocketAction::Send(message))?;
-        Ok(())
-    }
-}
-
-impl<T: ChannelMessage> TypedSocket<T> {
-    fn new(mut socket: Socket) -> Self {
-        let (send_to_client, recv_to_client) = tokio::sync::mpsc::channel::<T::Reply>(100);
-        let (send_from_client, mut recv_from_client) =
-            tokio::sync::mpsc::channel::<SocketAction>(100);
-
-        let handle = tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    message = recv_from_client.recv() => {
-                        match message {
-                            None => {
-                                let _ = socket.send(Message::Close(None)).await;
-                                break;
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                message = recv_from_client.recv() => {
+                    match message {
+                        None => {
+                            let _ = socket.send(Message::Close(None)).await;
+                            break;
+                        }
+                        Some(SocketAction::Send(message)) => {
+                            let message = serde_json::to_string(&message).unwrap();
+                            if let Err(err) = socket.send(Message::Text(message)).await {
+                                tracing::error!(?err, "Failed to send message on websocket.");
                             }
-                            Some(SocketAction::Send(message)) => {
-                                if let Err(err) = socket.send(Message::Text(message)).await {
-                                    tracing::error!(?err, "Failed to send message on websocket.");
-                                }
-                            },
-                            Some(SocketAction::Close) => {
-                                recv_from_client.close();
-                            }
+                        },
+                        Some(SocketAction::Close) => {
+                            recv_from_client.close();
                         }
                     }
-                    v = socket.next() => {
-                        match v {
-                            Some(Ok(Message::Text(msg))) => {
-                                let result = match serde_json::from_str(&msg) {
-                                    Ok(msg) => msg,
-                                    Err(err) => {
-                                        tracing::error!(?err, "Failed to deserialize message.");
-                                        continue;
-                                    }
-                                };
-                                if let Err(e) = send_to_client.send(result).await {
-                                    tracing::error!(%e, "Error sending message.");
+                }
+                v = socket.next() => {
+                    match v {
+                        Some(Ok(Message::Text(msg))) => {
+                            let result = match serde_json::from_str(&msg) {
+                                Ok(msg) => msg,
+                                Err(err) => {
+                                    tracing::error!(?err, "Failed to deserialize message.");
+                                    continue;
                                 }
+                            };
+                            if let Err(e) = send_to_client.send(result).await {
+                                tracing::error!(%e, "Error sending message.");
                             }
-                            Some(Err(tungstenite::Error::Protocol(
-                                ProtocolError::ResetWithoutClosingHandshake,
-                            ))) => {
-                                // This is too common to report (it just means the connection was
-                                // lost instead of gracefully closed).
-                                break;
-                            }
-                            Some(msg) => {
-                                tracing::warn!("Received ignored message: {:?}", msg);
-                            }
-                            None => {
-                                tracing::error!("Connection closed.");
-                                break;
-                            }
+                        }
+                        Some(Err(tungstenite::Error::Protocol(
+                            ProtocolError::ResetWithoutClosingHandshake,
+                        ))) => {
+                            // This is too common to report (it just means the connection was
+                            // lost instead of gracefully closed).
+                            break;
+                        }
+                        Some(msg) => {
+                            tracing::warn!("Received ignored message: {:?}", msg);
+                        }
+                        None => {
+                            tracing::error!("Connection closed.");
+                            break;
                         }
                     }
                 }
             }
-        });
-
-        Self {
-            send: send_from_client,
-            recv: recv_to_client,
-            handle: Some(handle),
         }
-    }
+    });
 
-    pub async fn close(&mut self) {
-        let _ = self.send.try_send(SocketAction::Close);
-        if let Some(handle) = self.handle.take() {
-            let _ = handle.await;
-        }
-    }
-
-    pub fn sender(&self) -> TypedSocketSender<T> {
-        TypedSocketSender {
-            send: self.send.clone(),
-            _phantom: PhantomData,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl<T: ChannelMessage> FullDuplexChannel<T> for TypedSocket<T> {
-    async fn send(&mut self, message: &T) -> Result<()> {
-        let message = serde_json::to_string(&message)?;
-        Ok(self.send.try_send(SocketAction::Send(message))?)
-    }
-
-    async fn recv(&mut self) -> Option<T::Reply> {
-        self.recv.recv().await
-    }
-}
-
-impl<T: ChannelMessage> Drop for TypedSocket<T> {
-    fn drop(&mut self) {
-        if let Some(handle) = self.handle.take() {
-            handle.abort();
-            tracing::warn!("Socked dropped without closing.");
-        }
-    }
+    Ok(TypedSocket {
+        send: send_from_client,
+        recv: recv_to_client,
+        remote_handshake,
+    })
 }
 
 #[cfg(test)]
