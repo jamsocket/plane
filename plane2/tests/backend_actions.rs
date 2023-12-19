@@ -139,7 +139,7 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
     }
 
     // We don't currently have a way to make sure the ack has been processed.
-    tokio::time::sleep(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     {
         // The message should not be repeated now.
