@@ -2,7 +2,10 @@ use super::{ChannelMessage, FullDuplexChannel, Handshake};
 use crate::plane_version_info;
 use anyhow::{anyhow, Context, Result};
 use axum::extract::ws::{Message, WebSocket};
-use tokio::{sync::mpsc::{Receiver, Sender}, task::JoinHandle};
+use tokio::{
+    sync::mpsc::{Receiver, Sender},
+    task::JoinHandle,
+};
 
 pub struct TypedWebsocketServer<T: ChannelMessage> {
     handshake: Handshake,
