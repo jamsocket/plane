@@ -30,6 +30,7 @@ pub enum PlaneClientError {
     PlaneError(ApiError, StatusCode),
 }
 
+#[derive(Clone)]
 pub struct PlaneClient {
     client: reqwest::Client,
     base_url: Url,
@@ -165,18 +166,35 @@ impl PlaneClient {
         Ok(())
     }
 
+    pub fn backend_status_url(&self, cluster: &ClusterName, backend_id: &BackendName) -> Url {
+        self.base_url
+            .join(&format!("/pub/c/{}/b/{}/status", cluster, backend_id))
+            .unwrap()
+    }
+
     pub async fn backend_status(
         &self,
         cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Result<TimestampedBackendStatus, PlaneClientError> {
-        let url = self
-            .base_url
-            .join(&format!("/pub/c/{}/b/{}/status", cluster, backend_id))?;
+        let url = self.backend_status_url(cluster, backend_id);
 
         let response = self.client.get(url).send().await?;
         let status: TimestampedBackendStatus = get_response(response).await?;
         Ok(status)
+    }
+
+    pub fn backend_status_stream_url(
+        &self,
+        cluster: &ClusterName,
+        backend_id: &BackendName,
+    ) -> Url {
+        self.base_url
+            .join(&format!(
+                "/pub/c/{}/b/{}/status-stream",
+                cluster, backend_id
+            ))
+            .unwrap()
     }
 
     pub async fn backend_status_stream(
@@ -184,10 +202,7 @@ impl PlaneClient {
         cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Result<sse::SseStream<TimestampedBackendStatus>, PlaneClientError> {
-        let url = self.base_url.join(&format!(
-            "/pub/c/{}/b/{}/status-stream",
-            cluster, backend_id
-        ))?;
+        let url = self.backend_status_stream_url(cluster, backend_id);
 
         let stream = sse::sse_request(url, self.client.clone()).await?;
         Ok(stream)

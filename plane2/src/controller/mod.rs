@@ -100,23 +100,29 @@ pub struct ControllerServer {
 }
 
 impl ControllerServer {
-    pub async fn run(db: PlaneDatabase, bind_addr: SocketAddr, id: ControllerName) -> Result<Self> {
+    pub async fn run(
+        db: PlaneDatabase,
+        bind_addr: SocketAddr,
+        id: ControllerName,
+        controller_url: Url,
+    ) -> Result<Self> {
         let listener = TcpListener::bind(bind_addr)?;
 
-        Self::run_with_listener(db, listener, id).await
+        Self::run_with_listener(db, listener, id, controller_url).await
     }
 
     pub async fn run_with_listener(
         db: PlaneDatabase,
         listener: TcpListener,
         id: ControllerName,
+        controller_url: Url,
     ) -> Result<Self> {
         let bind_addr = listener.local_addr()?;
 
         let (graceful_terminate_sender, graceful_terminate_receiver) =
             tokio::sync::oneshot::channel::<()>();
 
-        let controller = Controller::new(db.clone(), id.clone()).await;
+        let controller = Controller::new(db.clone(), id.clone(), controller_url).await;
 
         let trace_layer = TraceLayer::new_for_http()
             .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
@@ -226,8 +232,9 @@ pub async fn run_controller(
     db: PlaneDatabase,
     bind_addr: SocketAddr,
     id: ControllerName,
+    controller_url: Url,
 ) -> Result<()> {
-    let mut server = ControllerServer::run(db, bind_addr, id).await?;
+    let mut server = ControllerServer::run(db, bind_addr, id, controller_url).await?;
 
     wait_for_shutdown_signal().await;
 

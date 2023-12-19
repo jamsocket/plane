@@ -61,7 +61,7 @@ pub async fn handle_connect(
 ) -> Result<Json<ConnectResponse>, Response> {
     let response = controller
         .db
-        .connect(&cluster, &request)
+        .connect(&cluster, &request, &controller.client)
         .await
         .map_err(|e| connect_error_to_response(&e))?;
     Ok(Json(response))
