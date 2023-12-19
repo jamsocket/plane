@@ -1,4 +1,5 @@
 use crate::{
+    client::PlaneClient,
     names::{BackendName, Name},
     util::random_prefixed_string,
 };
@@ -329,6 +330,8 @@ pub struct ConnectResponse {
     pub url: String,
 
     pub secret_token: SecretToken,
+
+    pub status_url: String,
 }
 
 impl ConnectResponse {
@@ -338,6 +341,7 @@ impl ConnectResponse {
         spawned: bool,
         token: BearerToken,
         secret_token: SecretToken,
+        client: &PlaneClient,
     ) -> Self {
         let url = if cluster.is_https() {
             format!("https://{}/{}/", cluster, token)
@@ -345,12 +349,15 @@ impl ConnectResponse {
             format!("http://{}/{}/", cluster, token)
         };
 
+        let status_url = client.backend_status_url(cluster, &backend_id).to_string();
+
         Self {
             backend_id,
             spawned,
             token,
             url,
             secret_token,
+            status_url,
         }
     }
 }

@@ -1,4 +1,7 @@
+use url::Url;
+
 use crate::{
+    client::PlaneClient,
     database::PlaneDatabase,
     names::{AnyNodeName, ControllerName},
     typed_socket::Handshake,
@@ -10,6 +13,7 @@ use std::net::IpAddr;
 pub struct Controller {
     pub db: PlaneDatabase,
     pub id: ControllerName,
+    pub client: PlaneClient,
 }
 
 pub struct NodeHandle {
@@ -57,7 +61,9 @@ impl Controller {
         })
     }
 
-    pub async fn new(db: PlaneDatabase, id: ControllerName) -> Self {
-        Self { db, id }
+    pub async fn new(db: PlaneDatabase, id: ControllerName, controller_url: Url) -> Self {
+        let client = PlaneClient::new(controller_url);
+
+        Self { db, id, client }
     }
 }
