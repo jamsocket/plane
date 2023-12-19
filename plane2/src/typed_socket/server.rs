@@ -2,11 +2,34 @@ use super::{ChannelMessage, FullDuplexChannel, Handshake};
 use crate::plane_version_info;
 use anyhow::{anyhow, Context, Result};
 use axum::extract::ws::{Message, WebSocket};
+use tokio::{sync::mpsc::{Receiver, Sender}, task::JoinHandle};
 
 pub struct TypedWebsocketServer<T: ChannelMessage> {
-    socket: WebSocket,
     handshake: Handshake,
+    handle: JoinHandle<()>,
+    outgoing_message_sender: Sender<Message>,
+    incoming_message_receiver: Receiver<Message>,
     _phantom: std::marker::PhantomData<T>,
+}
+
+pub async fn handle_messages(
+    mut messages_to_send: Receiver<Message>,
+    messages_received: Sender<Message>,
+    mut socket: WebSocket,
+) {
+    loop {
+        tokio::select! {
+            Some(msg) = messages_to_send.recv() => {
+                socket.send(msg).await.unwrap();
+            }
+            Some(msg) = socket.recv() => {
+                messages_received.send(msg.unwrap()).await.unwrap();
+            }
+            else => {
+                break;
+            }
+        }
+    }
 }
 
 impl<T: ChannelMessage> TypedWebsocketServer<T> {
@@ -41,8 +64,16 @@ impl<T: ChannelMessage> TypedWebsocketServer<T> {
 
         handshake.check_compat(&client_handshake);
 
+        let (outgoing_message_sender, outgoing_message_receiver) = tokio::sync::mpsc::channel(100);
+        let (incoming_message_sender, incoming_message_receiver) = tokio::sync::mpsc::channel(100);
+        let handle = tokio::spawn(async move {
+            handle_messages(outgoing_message_receiver, incoming_message_sender, ws).await;
+        });
+
         Ok(Self {
-            socket: ws,
+            handle,
+            outgoing_message_sender,
+            incoming_message_receiver,
             handshake: client_handshake,
             _phantom: std::marker::PhantomData,
         })
@@ -57,14 +88,16 @@ impl<T: ChannelMessage> TypedWebsocketServer<T> {
 impl<T: ChannelMessage> FullDuplexChannel<T> for TypedWebsocketServer<T> {
     async fn send(&mut self, message: &T) -> Result<()> {
         let message = serde_json::to_string(&message)?;
-        self.socket.send(Message::Text(message)).await?;
+        self.outgoing_message_sender
+            .send(Message::Text(message))
+            .await?;
         Ok(())
     }
 
     async fn recv(&mut self) -> Option<T::Reply> {
-        while let Some(msg) = self.socket.recv().await {
+        while let Some(msg) = self.incoming_message_receiver.recv().await {
             match msg {
-                Ok(Message::Text(msg)) => {
+                Message::Text(msg) => {
                     let r: T::Reply = match serde_json::from_str(&msg) {
                         Ok(r) => r,
                         Err(e) => {
@@ -78,12 +111,9 @@ impl<T: ChannelMessage> FullDuplexChannel<T> for TypedWebsocketServer<T> {
                     };
                     return Some(r);
                 }
-                Ok(Message::Close(_)) => {
+                Message::Close(_) => {
                     tracing::info!("Connection closed.");
                     return None;
-                }
-                Err(e) if e.to_string().contains("ResetWithoutClosingHandshake") => {
-                    // ignore (too common)
                 }
                 msg => {
                     tracing::warn!("Received ignored message: {:?}", msg);
@@ -99,6 +129,7 @@ impl<T: ChannelMessage> FullDuplexChannel<T> for TypedWebsocketServer<T> {
 
 impl<T: ChannelMessage> Drop for TypedWebsocketServer<T> {
     fn drop(&mut self) {
+        self.handle.abort();
         tracing::info!("Dropping TypedWebsocketServer");
     }
 }
