@@ -12,6 +12,7 @@ use crate::{
 use anyhow::Result;
 use bollard::{auth::DockerCredentials, container::Stats};
 use futures_util::Future;
+use time::Duration;
 use std::error::Error;
 use std::{future::pending, pin::Pin};
 use std::{
@@ -116,6 +117,7 @@ impl BackendManager {
             ip,
         });
 
+		manager.create_metrics_handle();
         manager.set_state(state);
         manager
     }
@@ -155,7 +157,6 @@ impl BackendManager {
                 let docker = self.docker.clone();
                 let executor_config = self.executor_config.clone();
                 let ip = self.ip.clone();
-                self.create_metrics_handle();
 
                 StepStatusResult::future_status(async move {
                     let spawn_result = docker
@@ -251,7 +252,7 @@ impl BackendManager {
     }
 
     #[tracing::instrument]
-    fn create_metrics_handle(self: &Self) {
+    fn create_metrics_handle(self: &Arc<Self>) {
         let Ok(mut handle) = self.metrics_handle.lock() else {
             tracing::error!("Metrics handle lock is poisoned");
             return;
@@ -261,10 +262,14 @@ impl BackendManager {
 
         let docker = self.docker.clone();
         let id = self.container_id.clone();
+		let self_clone = self.clone();
 
         *handle = Some(GuardHandle::new(async move {
-            let metrics = docker.get_metrics(&id).await;
-            tracing::info!(?metrics);
+			while {tokio::time::sleep(tokio::time::Duration::from_secs(1)).await; true} {
+				let metrics = docker.get_metrics(&id).await.unwrap();
+				tracing::info!(?metrics);
+				self_clone.metrics_callback.call(metrics).unwrap();
+			}
         }));
     }
 
