@@ -41,6 +41,17 @@ pub async fn drone_loop(
             // Forward state changes to the socket.
             // This will start by sending any existing unacked events.
             let sender = socket.sender();
+            if let Err(err) = executor.register_metrics_listener(move |message| {
+                let message = MessageFromDrone::BackendMetrics(message);
+                if let Err(e) = sender.send(message) {
+                    tracing::error!(%e, "Error sending message.");
+                }
+            }) {
+                tracing::error!(?err, "Error registering listener.");
+                continue;
+            }
+
+            let sender = socket.sender();
             if let Err(err) = executor.register_listener(move |message| {
                 let message = MessageFromDrone::BackendEvent(message);
                 if let Err(e) = sender.send(message) {
