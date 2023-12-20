@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum BackendAction {
     Spawn {
-        executable: ExecutorConfig,
+        executable: Box<ExecutorConfig>,
         key: KeyConfig,
     },
     Terminate {

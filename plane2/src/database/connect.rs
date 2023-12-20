@@ -78,7 +78,7 @@ async fn create_backend_with_lock(
     let mut txn = pool.begin().await?;
 
     let pending_action = BackendAction::Spawn {
-        executable: spawn_config.executable.clone(),
+        executable: Box::new(spawn_config.executable.clone()),
         key: lock.clone(),
     };
 
