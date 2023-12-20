@@ -1,14 +1,14 @@
 use super::{
     docker::{types::ContainerId, PlaneDocker},
-    wait_backend::wait_for_backend,
+    wait_backend::wait_for_backend, executor::MetricsListener,
 };
 use crate::{
     names::BackendName,
     types::{BackendState, BackendStatus, ExecutorConfig, PullPolicy, TerminationKind},
-    util::{ExponentialBackoff, GuardHandle},
+    util::{ExponentialBackoff, GuardHandle}, protocol::BackendStateMessage,
 };
 use anyhow::Result;
-use bollard::auth::DockerCredentials;
+use bollard::{auth::DockerCredentials, container::Stats};
 use futures_util::Future;
 use std::error::Error;
 use std::{future::pending, pin::Pin};
@@ -38,19 +38,35 @@ impl StepStatusResult {
     }
 }
 
-type StateCallback = Box<dyn Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync>;
+struct Callback<T>(Box<dyn Fn(T) -> Result<(), Box<dyn Error>> + Send + Sync>);
+impl<T> std::fmt::Debug for Callback<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "this is a state callback")
+	}
+}
+impl<T> Callback<T> {
+	fn new(value: impl Fn(T) -> Result<(), Box<dyn Error>> + Send + Sync + 'static) -> Self {
+		Self(Box::new(value))
+	}
+
+	fn call(&self, state: T) -> Result<(), Box<dyn Error>> {
+		self.0(state)
+	}
+}
 
 /// A backend manager is responsible for driving the state of one backend.
 /// Every active backend should have a backend manager.
 /// All container- and image-level commands sent to Docker go through the backend manager.
 /// The backend manager owns the status for the backend it is responsible for.
+
+#[derive(Debug)]
 pub struct BackendManager {
     /// If we are currently running a task, this is the handle to that task.
     /// It is always dropped (and aborted) when the state changes.
     handle: Mutex<Option<GuardHandle>>,
 
-	/// handle for task that collects metrics and sends them to the controller.
-	metrics_handle: Option<GuardHandle>,
+    /// handle for task that collects metrics and sends them to the controller.
+    metrics_handle: Mutex<Option<GuardHandle>>,
 
     /// The ID of the backend this manager is responsible for.
     backend_id: BackendName,
@@ -62,7 +78,10 @@ pub struct BackendManager {
     executor_config: ExecutorConfig,
 
     /// Function to call when the state changes.
-    state_callback: StateCallback,
+    state_callback: Callback<BackendState>,
+
+	/// Function to call when metrics produced.
+	metrics_callback: Callback<Stats>,
 
     /// The ID of the container running the backend.
     container_id: ContainerId,
@@ -77,18 +96,20 @@ impl BackendManager {
         executor_config: ExecutorConfig,
         state: BackendState,
         docker: PlaneDocker,
-        state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
+        state_callback: impl Fn(BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
+        metrics_callback: impl Fn(Stats) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
         ip: IpAddr,
     ) -> Arc<Self> {
         let container_id = ContainerId::from(format!("plane-{}", backend_id));
 
         let manager = Arc::new(Self {
             handle: Mutex::new(None),
-			metrics_handle: None,
+            metrics_handle: Mutex::new(None),
             backend_id,
             docker,
             executor_config,
-            state_callback: Box::new(state_callback),
+            state_callback: Callback::new(state_callback),
+			metrics_callback: Callback::new(metrics_callback),
             container_id,
             ip,
         });
@@ -131,7 +152,8 @@ impl BackendManager {
                 let container_id = self.container_id.clone();
                 let docker = self.docker.clone();
                 let executor_config = self.executor_config.clone();
-                let ip = self.ip;
+                let ip = self.ip.clone();
+                self.create_metrics_handle();
 
                 StepStatusResult::future_status(async move {
                     let spawn_result = docker
@@ -203,7 +225,7 @@ impl BackendManager {
         handle.take();
 
         // Call the callback.
-        if let Err(err) = (self.state_callback)(&status) {
+        if let Err(err) = self.state_callback.call(status.clone()) {
             tracing::error!(?err, "Error calling state callback.");
             return;
         }
@@ -224,6 +246,27 @@ impl BackendManager {
                 }));
             }
         }
+    }
+
+	#[tracing::instrument]
+    fn create_metrics_handle(self: &Self) {
+        let Ok(mut handle) = self
+            .metrics_handle
+            .lock()
+		else {
+			tracing::error!("Metrics handle lock is poisoned");
+			return;
+		};
+        //cancel existing metrics gathering
+        handle.take();
+
+        let docker = self.docker.clone();
+        let id = self.container_id.clone();
+
+        *handle = Some(GuardHandle::new(async move {
+            let metrics = docker.get_metrics(&id).await;
+            tracing::info!(?metrics);
+        }));
     }
 
     pub async fn terminate(self: &Arc<Self>, kind: TerminationKind) -> Result<()> {
