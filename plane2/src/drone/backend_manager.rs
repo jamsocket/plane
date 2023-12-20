@@ -12,13 +12,13 @@ use crate::{
 use anyhow::Result;
 use bollard::{auth::DockerCredentials, container::Stats};
 use futures_util::Future;
-use time::Duration;
 use std::error::Error;
 use std::{future::pending, pin::Pin};
 use std::{
     net::IpAddr,
     sync::{Arc, Mutex},
 };
+use time::Duration;
 
 /// The backend manager uses a state machine internally to manage the state of the backend.
 /// Each time we enter a state, we can do one of three things:
@@ -117,7 +117,7 @@ impl BackendManager {
             ip,
         });
 
-		manager.create_metrics_handle();
+        manager.create_metrics_handle();
         manager.set_state(state);
         manager
     }
@@ -262,14 +262,17 @@ impl BackendManager {
 
         let docker = self.docker.clone();
         let id = self.container_id.clone();
-		let self_clone = self.clone();
+        let self_clone = self.clone();
 
         *handle = Some(GuardHandle::new(async move {
-			while {tokio::time::sleep(tokio::time::Duration::from_secs(1)).await; true} {
-				let metrics = docker.get_metrics(&id).await.unwrap();
-				tracing::info!(?metrics);
-				self_clone.metrics_callback.call(metrics).unwrap();
-			}
+            while {
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                true
+            } {
+                let metrics = docker.get_metrics(&id).await.unwrap();
+                tracing::info!(?metrics);
+                self_clone.metrics_callback.call(metrics).unwrap();
+            }
         }));
     }
 
