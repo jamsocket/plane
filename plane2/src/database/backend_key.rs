@@ -7,6 +7,8 @@ use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, PgPool};
 use std::time::Duration;
 
+pub const KEY_LEASE_EXPIRATION_MS: i64 = 30 * 1_000;
+
 pub struct KeysDatabase<'a> {
     pool: &'a PgPool,
 }

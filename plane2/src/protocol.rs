@@ -16,6 +16,7 @@ pub enum BackendAction {
     Spawn {
         executable: ExecutorConfig,
         key: KeyConfig,
+        key_initial_expires: i64,
     },
     Terminate {
         kind: TerminationKind,

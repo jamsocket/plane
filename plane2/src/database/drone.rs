@@ -2,7 +2,7 @@ use crate::{
     heartbeat_consts::UNHEALTHY_SECONDS,
     types::{ClusterName, NodeId},
 };
-use sqlx::{postgres::types::PgInterval, query, PgPool};
+use sqlx::{postgres::types::PgInterval, query, query_as, PgPool};
 use std::time::Duration;
 
 pub struct DroneDatabase<'a> {
@@ -70,11 +70,13 @@ impl<'a> DroneDatabase<'a> {
     pub async fn pick_drone_for_spawn(
         &self,
         cluster: &ClusterName,
-    ) -> sqlx::Result<Option<NodeId>> {
-        let result = query!(
+    ) -> sqlx::Result<Option<DroneForSpawn>> {
+        let result = query_as!(
+            DroneForSpawn,
             r#"
             select
-                drone.id
+                drone.id,
+                drone.last_local_epoch_millis as "last_local_epoch_millis!"
             from node
             left join drone
                 on node.id = drone.id
@@ -88,6 +90,7 @@ impl<'a> DroneDatabase<'a> {
                 and now() - controller.last_heartbeat < $2
                 and controller.is_online = true
                 and draining = false
+                and last_local_epoch_millis is not null
             order by (
                 select
                     count(*)
@@ -104,6 +107,11 @@ impl<'a> DroneDatabase<'a> {
         .fetch_optional(self.pool)
         .await?;
 
-        Ok(result.map(|r| NodeId::from(r.id)))
+        Ok(result)
     }
+}
+
+pub struct DroneForSpawn {
+    pub id: NodeId,
+    pub last_local_epoch_millis: i64,
 }

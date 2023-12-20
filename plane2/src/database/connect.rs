@@ -1,3 +1,7 @@
+use super::{
+    backend_actions::create_pending_action, backend_key::KEY_LEASE_EXPIRATION_MS,
+    drone::DroneForSpawn,
+};
 use crate::{
     client::PlaneClient,
     database::{
@@ -8,15 +12,13 @@ use crate::{
     protocol::BackendAction,
     types::{
         BackendStatus, BearerToken, ClusterName, ConnectRequest, ConnectResponse, KeyConfig,
-        NodeId, SecretToken, SpawnConfig,
+        SecretToken, SpawnConfig,
     },
     util::random_token,
 };
 use serde_json::{Map, Value};
 use sqlx::{postgres::types::PgInterval, PgPool};
 use std::time::Duration;
-
-use super::backend_actions::create_pending_action;
 
 const TOKEN_LIFETIME_SECONDS: u64 = 3600;
 
@@ -27,23 +29,23 @@ pub enum ConnectError {
     #[error("No active drone available.")]
     NoDroneAvailable,
 
-    #[error("Lock held and tag does not match. {request_tag:?} != {lock_tag:?}")]
-    LockHeld {
+    #[error("Key held and tag does not match. {request_tag:?} != {key_tag:?}")]
+    KeyHeld {
         request_tag: String,
-        lock_tag: String,
+        key_tag: String,
     },
 
-    #[error("The lock is held but unhealthy.")]
-    LockHeldUnhealthy,
+    #[error("The key is held but unhealthy.")]
+    KeyHeldUnhealthy,
 
-    #[error("The lock is unheld and no spawn config was provided.")]
-    LockUnheldNoSpawnConfig,
+    #[error("The key is unheld and no spawn config was provided.")]
+    KeyUnheldNoSpawnConfig,
 
-    #[error("Failed to remove lock.")]
-    FailedToRemoveLock,
+    #[error("Failed to remove key.")]
+    FailedToRemoveKey,
 
-    #[error("Failed to acquire lock.")]
-    FailedToAcquireLock,
+    #[error("Failed to acquire key.")]
+    FailedToAcquireKey,
 
     #[error("SQL error: {0}")]
     Sql(#[from] sqlx::Error),
@@ -60,29 +62,33 @@ impl ConnectError {
     fn retryable(&self) -> bool {
         matches!(
             self,
-            ConnectError::FailedToRemoveLock | ConnectError::FailedToAcquireLock
+            ConnectError::FailedToRemoveKey | ConnectError::FailedToAcquireKey
         )
     }
 }
 
-/// Attempts to create a new backend that owns the given lock. If the lock is already held, returns
-/// Ok(None). If the lock is not held, creates a new backend and returns Ok(Some(backend_id)).
-async fn create_backend_with_lock(
+/// Attempts to create a new backend that owns the given key. If the key is already held, returns
+/// Ok(None). If the key is not held, creates a new backend and returns Ok(Some(backend_id)).
+async fn create_backend_with_key(
     pool: &PgPool,
-    lock: &KeyConfig,
+    key: &KeyConfig,
     spawn_config: &SpawnConfig,
     cluster: &ClusterName,
-    drone: NodeId,
+    drone_for_spawn: &DroneForSpawn,
 ) -> Result<Option<BackendName>> {
     let backend_id = BackendName::new_random();
     let mut txn = pool.begin().await?;
 
     let pending_action = BackendAction::Spawn {
         executable: spawn_config.executable.clone(),
-        key: lock.clone(),
+        key: key.clone(),
+        key_initial_expires: drone_for_spawn.last_local_epoch_millis + KEY_LEASE_EXPIRATION_MS,
     };
 
-    create_pending_action(&mut txn, &backend_id, drone, &pending_action)
+    // Create an action to spawn the backend. If we succeed in acquiring the key,
+    // this will cause the backend to spawn. If we fail to acquire the key, this
+    // will be abandoned.
+    create_pending_action(&mut txn, &backend_id, drone_for_spawn.id, &pending_action)
         .await
         .map_err(|e| ConnectError::Other(e.to_string()))?;
 
@@ -108,7 +114,7 @@ async fn create_backend_with_lock(
         backend_id.to_string(),
         cluster.to_string(),
         BackendStatus::Scheduled.to_string(),
-        drone.as_i32(),
+        drone_for_spawn.id.as_i32(),
         spawn_config
             .lifetime_limit_seconds
             .map(
@@ -116,9 +122,9 @@ async fn create_backend_with_lock(
                     .expect("valid interval")
             ),
         spawn_config.max_idle_seconds,
-        lock.name,
-        lock.namespace,
-        lock.tag,
+        key.name,
+        key.namespace,
+        key.tag,
     )
     .execute(&mut *txn)
     .await?;
@@ -165,21 +171,21 @@ async fn attempt_connect(
     request: &ConnectRequest,
     client: &PlaneClient,
 ) -> Result<ConnectResponse> {
-    let lock = if let Some(lock) = &request.key {
-        // Request includes a lock, so we need to check if it is held.
-        let lock_result = KeysDatabase::new(pool).check_key(cluster, lock).await?;
+    let key = if let Some(key) = &request.key {
+        // Request includes a key, so we need to check if it is held.
+        let key_result = KeysDatabase::new(pool).check_key(cluster, key).await?;
 
-        if let Some(lock_result) = lock_result {
-            // Lock is held. Check if we can connect to existing backend.
+        if let Some(key_result) = key_result {
+            // Key is held. Check if we can connect to existing backend.
 
-            let lock_action = lock_result.key_health();
+            let key_action = key_result.key_health();
 
-            match lock_action {
+            match key_action {
                 BackendKeyHealth::Active(backend_id) => {
-                    if lock_result.tag != lock.tag {
-                        return Err(ConnectError::LockHeld {
-                            request_tag: lock.tag.clone(),
-                            lock_tag: lock_result.tag,
+                    if key_result.tag != key.tag {
+                        return Err(ConnectError::KeyHeld {
+                            request_tag: key.tag.clone(),
+                            key_tag: key_result.tag,
                         });
                     }
 
@@ -203,32 +209,32 @@ async fn attempt_connect(
                     return Ok(connect_response);
                 }
                 BackendKeyHealth::Unhealthy => {
-                    tracing::info!("Lock is unhealthy");
-                    // Lock is unhealthy but cannot be removed; return error.
-                    return Err(ConnectError::LockHeldUnhealthy);
+                    tracing::info!("Key is unhealthy");
+                    // Key is unhealthy but cannot be removed; return error.
+                    return Err(ConnectError::KeyHeldUnhealthy);
                 }
                 BackendKeyHealth::Expired => {
-                    tracing::info!("Lock will be removed");
+                    tracing::info!("Key will be removed");
 
-                    // Lock is expired. Remove it.
-                    let removed = KeysDatabase::new(pool).remove_key(lock_result.id).await?;
+                    // Key is expired. Remove it.
+                    let removed = KeysDatabase::new(pool).remove_key(key_result.id).await?;
                     if !removed {
-                        // Lock was not removed, so it must have been renewed
+                        // Key was not removed, so it must have been renewed
                         // since we checked it. Return error.
-                        return Err(ConnectError::FailedToRemoveLock);
+                        return Err(ConnectError::FailedToRemoveKey);
                     }
                 }
             }
         }
 
-        lock.clone()
+        key.clone()
     } else {
-        // Request does not include a lock, so we create one.
+        // Request does not include a key, so we create one.
         KeyConfig::new_random()
     };
 
     let Some(spawn_config) = &request.spawn_config else {
-        return Err(ConnectError::LockUnheldNoSpawnConfig);
+        return Err(ConnectError::KeyUnheldNoSpawnConfig);
     };
 
     let drone = DroneDatabase::new(pool)
@@ -237,9 +243,9 @@ async fn attempt_connect(
         .ok_or(ConnectError::NoDroneAvailable)?;
 
     let Some(backend_id) =
-        create_backend_with_lock(pool, &lock, spawn_config, cluster, drone).await?
+        create_backend_with_key(pool, &key, spawn_config, cluster, &drone).await?
     else {
-        return Err(ConnectError::FailedToAcquireLock);
+        return Err(ConnectError::FailedToAcquireKey);
     };
     tracing::info!(backend_id = ?backend_id, "Created backend");
 
