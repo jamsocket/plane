@@ -30,6 +30,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
                 pull_policy: PullPolicy::IfNotPresent,
                 env: HashMap::default(),
                 resource_limits: ResourceLimits::default(),
+                credentials: None,
             },
             lifetime_limit_seconds: None,
             max_idle_seconds: None,

@@ -2,6 +2,7 @@ use super::types::ContainerId;
 use crate::{names::BackendName, types::ExecutorConfig};
 use anyhow::Result;
 use bollard::{
+    auth::DockerCredentials,
     service::{HostConfig, PortBinding, ResourcesUlimits},
     Docker,
 };
@@ -11,7 +12,12 @@ use std::{collections::HashMap, time::Duration};
 /// Port inside the container to expose.
 const CONTAINER_PORT: u16 = 8080;
 
-pub async fn pull_image(docker: &Docker, image: &str, force: bool) -> Result<()> {
+pub async fn pull_image(
+    docker: &Docker,
+    image: &str,
+    credentials: Option<&DockerCredentials>,
+    force: bool,
+) -> Result<()> {
     if !force && image_exists(docker, image).await? {
         tracing::info!(?image, "Skipping image that already exists.");
         return Ok(());
@@ -22,7 +28,7 @@ pub async fn pull_image(docker: &Docker, image: &str, force: bool) -> Result<()>
         ..Default::default()
     };
 
-    let mut result = docker.create_image(Some(options), None, None);
+    let mut result = docker.create_image(Some(options), None, credentials.cloned());
     // create_image returns a stream; the image is not fully pulled until the stream is consumed.
     while let Some(next) = result.next().await {
         let info = next?;
