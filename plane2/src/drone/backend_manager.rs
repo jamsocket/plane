@@ -1,11 +1,13 @@
 use super::{
     docker::{types::ContainerId, PlaneDocker},
-    wait_backend::wait_for_backend, executor::MetricsListener,
+    executor::MetricsListener,
+    wait_backend::wait_for_backend,
 };
 use crate::{
     names::BackendName,
+    protocol::BackendStateMessage,
     types::{BackendState, BackendStatus, ExecutorConfig, PullPolicy, TerminationKind},
-    util::{ExponentialBackoff, GuardHandle}, protocol::BackendStateMessage,
+    util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
 use bollard::{auth::DockerCredentials, container::Stats};
@@ -40,18 +42,18 @@ impl StepStatusResult {
 
 struct Callback<T>(Box<dyn Fn(T) -> Result<(), Box<dyn Error>> + Send + Sync>);
 impl<T> std::fmt::Debug for Callback<T> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "this is a state callback")
-	}
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "this is a state callback")
+    }
 }
 impl<T> Callback<T> {
-	fn new(value: impl Fn(T) -> Result<(), Box<dyn Error>> + Send + Sync + 'static) -> Self {
-		Self(Box::new(value))
-	}
+    fn new(value: impl Fn(T) -> Result<(), Box<dyn Error>> + Send + Sync + 'static) -> Self {
+        Self(Box::new(value))
+    }
 
-	fn call(&self, state: T) -> Result<(), Box<dyn Error>> {
-		self.0(state)
-	}
+    fn call(&self, state: T) -> Result<(), Box<dyn Error>> {
+        self.0(state)
+    }
 }
 
 /// A backend manager is responsible for driving the state of one backend.
@@ -80,8 +82,8 @@ pub struct BackendManager {
     /// Function to call when the state changes.
     state_callback: Callback<BackendState>,
 
-	/// Function to call when metrics produced.
-	metrics_callback: Callback<Stats>,
+    /// Function to call when metrics produced.
+    metrics_callback: Callback<Stats>,
 
     /// The ID of the container running the backend.
     container_id: ContainerId,
@@ -109,7 +111,7 @@ impl BackendManager {
             docker,
             executor_config,
             state_callback: Callback::new(state_callback),
-			metrics_callback: Callback::new(metrics_callback),
+            metrics_callback: Callback::new(metrics_callback),
             container_id,
             ip,
         });
@@ -248,15 +250,12 @@ impl BackendManager {
         }
     }
 
-	#[tracing::instrument]
+    #[tracing::instrument]
     fn create_metrics_handle(self: &Self) {
-        let Ok(mut handle) = self
-            .metrics_handle
-            .lock()
-		else {
-			tracing::error!("Metrics handle lock is poisoned");
-			return;
-		};
+        let Ok(mut handle) = self.metrics_handle.lock() else {
+            tracing::error!("Metrics handle lock is poisoned");
+            return;
+        };
         //cancel existing metrics gathering
         handle.take();
 

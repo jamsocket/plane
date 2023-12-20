@@ -39,7 +39,7 @@ pub struct BackendStateMessage {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BackendMetricsMessage {
-	pub backend_id: BackendName,
+    pub backend_id: BackendName,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -61,7 +61,7 @@ impl From<BackendEventId> for i64 {
 pub enum MessageFromDrone {
     Heartbeat { local_time_epoch_millis: u64 },
     BackendEvent(BackendStateMessage),
-	BackendMetrics(BackendMetricsMessage),
+    BackendMetrics(BackendMetricsMessage),
     AckAction { action_id: BackendActionName },
 }
 

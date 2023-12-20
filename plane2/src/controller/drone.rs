@@ -20,9 +20,9 @@ pub async fn handle_message_from_drone(
     sender: &mut TypedSocket<MessageToDrone>,
 ) -> anyhow::Result<()> {
     match msg {
-		MessageFromDrone::BackendMetrics(_) => {
-			todo!()
-		},
+        MessageFromDrone::BackendMetrics(_) => {
+            todo!()
+        }
         MessageFromDrone::Heartbeat {
             local_time_epoch_millis,
         } => {
