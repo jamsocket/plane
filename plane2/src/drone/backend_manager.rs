@@ -10,7 +10,7 @@ use crate::{
 use anyhow::Result;
 use bollard::auth::DockerCredentials;
 use futures_util::Future;
-use std::error::Error;
+
 use std::{future::pending, pin::Pin};
 use std::{
     net::IpAddr,
