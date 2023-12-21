@@ -36,12 +36,12 @@ pub async fn drone_loop(
     loop {
         let mut socket = connection.connect_with_retry(&name).await;
         let _heartbeat_guard =
-            HeartbeatLoop::start(socket.sender(|d| MessageFromDrone::Heartbeat(d)));
+            HeartbeatLoop::start(socket.sender(MessageFromDrone::Heartbeat));
 
         {
             // Forward state changes to the socket.
             // This will start by sending any existing unacked events.
-            let sender = socket.sender(|e| MessageFromDrone::BackendEvent(e));
+            let sender = socket.sender(MessageFromDrone::BackendEvent);
             if let Err(err) = executor.register_listener(move |message| {
                 if let Err(e) = sender.send(message) {
                     tracing::error!(%e, "Error sending message.");
