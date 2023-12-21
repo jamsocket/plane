@@ -5,7 +5,7 @@ use super::{
 use crate::{
     names::BackendName,
     types::{BackendState, BackendStatus, ExecutorConfig, PullPolicy, TerminationKind},
-    util::{ExponentialBackoff, GuardHandle},
+    util::{Callback, ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
 use bollard::auth::DockerCredentials;
@@ -58,14 +58,14 @@ pub struct BackendManager {
     /// The configuration to use when spawning the backend.
     executor_config: ExecutorConfig,
 
-    /// Function to call when the state changes.
-    state_callback: StateCallback,
-
     /// The ID of the container running the backend.
     container_id: ContainerId,
 
     /// IP address of the drone.
     ip: IpAddr,
+
+    /// Function to call when the state changes.
+    state_callback: Callback<BackendState, anyhow::Error>,
 }
 
 impl BackendManager {
@@ -74,7 +74,7 @@ impl BackendManager {
         executor_config: ExecutorConfig,
         state: BackendState,
         docker: PlaneDocker,
-        state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
+        state_callback: impl Fn(BackendState) -> Result<(), anyhow::Error> + Send + Sync + 'static,
         ip: IpAddr,
     ) -> Arc<Self> {
         let container_id = ContainerId::from(format!("plane-{}", backend_id));
@@ -84,7 +84,7 @@ impl BackendManager {
             backend_id,
             docker,
             executor_config,
-            state_callback: Box::new(state_callback),
+            state_callback: Callback::new(state_callback, "this is a state callback"),
             container_id,
             ip,
         });
@@ -199,7 +199,7 @@ impl BackendManager {
         handle.take();
 
         // Call the callback.
-        if let Err(err) = (self.state_callback)(&status) {
+        if let Err(err) = self.state_callback.call(status.clone()) {
             tracing::error!(?err, "Error calling state callback.");
             return;
         }

@@ -87,11 +87,11 @@ impl Executor {
                     let state_store = self.state_store.clone();
                     let backend_id = backend_id.clone();
                     let timestamp = chrono::Utc::now();
-                    move |state: &BackendState| {
+                    move |state: BackendState| {
                         state_store
                             .lock()
                             .expect("State store lock poisoned.")
-                            .register_event(&backend_id, state, timestamp)?;
+                            .register_event(&backend_id, &state, timestamp)?;
 
                         Ok(())
                     }
