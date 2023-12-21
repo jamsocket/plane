@@ -8,6 +8,7 @@ use crate::{
     util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
+use bollard::auth::DockerCredentials;
 use futures_util::Future;
 use std::error::Error;
 use std::{future::pending, pin::Pin};
@@ -105,11 +106,14 @@ impl BackendManager {
                     }
                 };
 
-                let image = self.executor_config.image.clone();
+                let executor_config = self.executor_config.clone();
                 let docker = self.docker.clone();
                 StepStatusResult::future_status(async move {
+                    let image = &executor_config.image;
+                    let credentials: Option<DockerCredentials> =
+                        executor_config.credentials.map(|creds| creds.into());
                     tracing::info!(?image, "pulling...");
-                    if let Err(err) = docker.pull(&image, force_pull).await {
+                    if let Err(err) = docker.pull(image, credentials.as_ref(), force_pull).await {
                         tracing::error!(?err, "failed to pull image");
                         BackendState::terminated(None)
                     } else {

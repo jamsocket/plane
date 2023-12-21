@@ -99,7 +99,7 @@ impl Executor {
 
                 let manager = BackendManager::new(
                     backend_id.clone(),
-                    executable.clone(),
+                    executable.as_ref().clone(),
                     BackendState::default(),
                     self.docker.clone(),
                     callback,

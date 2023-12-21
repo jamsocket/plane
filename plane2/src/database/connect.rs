@@ -83,6 +83,7 @@ async fn create_backend_with_key(
         executable: spawn_config.executable.clone(),
         key: key.clone(),
         key_initial_expires: drone_for_spawn.last_local_epoch_millis + KEY_LEASE_EXPIRATION_MS,
+        executable: Box::new(spawn_config.executable.clone()),
     };
 
     // Create an action to spawn the backend. If we succeed in acquiring the key,
