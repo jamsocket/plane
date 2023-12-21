@@ -53,8 +53,13 @@ impl From<BackendEventId> for i64 {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Heartbeat {
+    pub local_time_epoch_millis: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageFromDrone {
-    Heartbeat { local_time_epoch_millis: u64 },
+    Heartbeat(Heartbeat),
     BackendEvent(BackendStateMessage),
     AckAction { action_id: BackendActionName },
 }

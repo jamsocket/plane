@@ -22,18 +22,18 @@ pub struct TypedSocket<T: ChannelMessage> {
     pub remote_handshake: Handshake,
 }
 
-pub struct TypedSocketSender<T: ChannelMessage> {
-    send: Sender<SocketAction<T>>,
+pub struct TypedSocketSender<A> {
+    inner_send: Box<dyn Fn(SocketAction<A>) -> anyhow::Result<()> + 'static + Send + Sync>,
 }
 
-impl<T: ChannelMessage> TypedSocketSender<T> {
-    pub fn send(&self, message: T) -> anyhow::Result<()> {
-        self.send.try_send(SocketAction::Send(message))?;
+impl<A> TypedSocketSender<A> {
+    pub fn send(&self, message: A) -> anyhow::Result<()> {
+        (self.inner_send)(SocketAction::Send(message))?;
         Ok(())
     }
 
-    pub async fn close(&mut self) -> anyhow::Result<()> {
-        self.send.send(SocketAction::Close).await?;
+    pub fn close(&mut self) -> anyhow::Result<()> {
+        (self.inner_send)(SocketAction::Close)?;
         Ok(())
     }
 }
@@ -48,9 +48,21 @@ impl<T: ChannelMessage> TypedSocket<T> {
         self.recv.recv().await
     }
 
-    pub fn sender(&self) -> TypedSocketSender<T> {
+    pub fn sender<A, F>(&self, transform: F) -> TypedSocketSender<A>
+    where
+        F: (Fn(A) -> T) + 'static + Send + Sync,
+    {
+        let sender = self.send.clone();
+        let inner_send = move |message: SocketAction<A>| {
+            let message = match message {
+                SocketAction::Close => SocketAction::Close,
+                SocketAction::Send(message) => SocketAction::Send(transform(message)),
+            };
+            sender.try_send(message).map_err(|e| anyhow::anyhow!(e))
+        };
+
         TypedSocketSender {
-            send: self.send.clone(),
+            inner_send: Box::new(inner_send),
         }
     }
 
