@@ -138,6 +138,7 @@ impl Default for ExponentialBackoff {
     }
 }
 
+#[derive(Debug)]
 pub struct GuardHandle {
     handle: JoinHandle<()>,
 }
@@ -169,4 +170,31 @@ pub fn get_internal_host_ip() -> Option<IpAddr> {
     }
 
     None
+}
+
+pub struct Callback<T: Send + Sync, E: Send + Sync> {
+    func: Box<dyn Fn(T) -> Result<(), E> + Send + Sync + 'static>,
+    description: &'static str,
+}
+
+impl<T: Send + Sync, E: Send + Sync> std::fmt::Debug for Callback<T, E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.description)
+    }
+}
+
+impl<T: Send + Sync, E: Send + Sync> Callback<T, E> {
+    pub fn new<C: Into<&'static str>>(
+        value: impl Fn(T) -> Result<(), E> + Send + Sync + 'static,
+        description: C,
+    ) -> Self {
+        Self {
+            func: Box::new(value),
+            description: description.into(),
+        }
+    }
+
+    pub fn call(&self, inp: T) -> Result<(), E> {
+        (self.func)(inp)
+    }
 }
