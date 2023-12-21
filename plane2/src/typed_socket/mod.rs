@@ -1,6 +1,7 @@
 use crate::PlaneVersionInfo;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc::error::TrySendError;
 use std::fmt::Debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -23,16 +24,33 @@ pub struct TypedSocket<T: ChannelMessage> {
 }
 
 pub struct TypedSocketSender<A> {
-    inner_send: Box<dyn Fn(SocketAction<A>) -> anyhow::Result<()> + 'static + Send + Sync>,
+    inner_send: Box<dyn Fn(SocketAction<A>) -> Result<(), TypedSocketError> + 'static + Send + Sync>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum TypedSocketError {
+    #[error("Socket closed")]
+    Closed,
+    #[error("Socket disconnected")]
+    Disconnected,
+}
+
+impl<A> From<TrySendError<A>> for TypedSocketError {
+    fn from(e: TrySendError<A>) -> Self {
+        match e {
+            TrySendError::Full(_) => Self::Disconnected,
+            TrySendError::Closed(_) => Self::Closed,
+        }
+    }
 }
 
 impl<A> TypedSocketSender<A> {
-    pub fn send(&self, message: A) -> anyhow::Result<()> {
+    pub fn send(&self, message: A) -> Result<(), TypedSocketError> {
         (self.inner_send)(SocketAction::Send(message))?;
         Ok(())
     }
 
-    pub fn close(&mut self) -> anyhow::Result<()> {
+    pub fn close(&mut self) -> Result<(), TypedSocketError> {
         (self.inner_send)(SocketAction::Close)?;
         Ok(())
     }
@@ -58,7 +76,7 @@ impl<T: ChannelMessage> TypedSocket<T> {
                 SocketAction::Close => SocketAction::Close,
                 SocketAction::Send(message) => SocketAction::Send(transform(message)),
             };
-            sender.try_send(message).map_err(|e| anyhow::anyhow!(e))
+            sender.try_send(message).map_err(|e| e.into())
         };
 
         TypedSocketSender {
