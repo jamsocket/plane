@@ -35,8 +35,7 @@ pub async fn drone_loop(
 ) {
     loop {
         let mut socket = connection.connect_with_retry(&name).await;
-        let _heartbeat_guard =
-            HeartbeatLoop::start(socket.sender(MessageFromDrone::Heartbeat));
+        let _heartbeat_guard = HeartbeatLoop::start(socket.sender(MessageFromDrone::Heartbeat));
 
         {
             // Forward state changes to the socket.
