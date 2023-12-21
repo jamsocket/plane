@@ -1,8 +1,8 @@
 use crate::PlaneVersionInfo;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::error::TrySendError;
 use std::fmt::Debug;
+use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 pub mod client;
@@ -24,7 +24,8 @@ pub struct TypedSocket<T: ChannelMessage> {
 }
 
 pub struct TypedSocketSender<A> {
-    inner_send: Box<dyn Fn(SocketAction<A>) -> Result<(), TypedSocketError> + 'static + Send + Sync>,
+    inner_send:
+        Box<dyn Fn(SocketAction<A>) -> Result<(), TypedSocketError> + 'static + Send + Sync>,
 }
 
 #[derive(Debug, thiserror::Error)]
