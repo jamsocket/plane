@@ -34,14 +34,14 @@ create table drone (
     ready boolean not null,
     draining boolean not null default false,
     last_heartbeat timestamptz,
-    last_local_epoch_millis bigint
+    last_local_time timestamptz
 );
 
 comment on column drone.id is 'The unique id of the drone (shared with the node associated with this drone).';
 comment on column drone.ready is 'Whether the drone is ready to accept backends.';
 comment on column drone.draining is 'Whether the drone is draining. If true, this drone will not be considered by the scheduler.';
 comment on column drone.last_heartbeat is 'The last time local_epoch_millis was received from the drone.';
-comment on column drone.last_local_epoch_millis is 'The last reported milliseconds since epoch from the drone, used to assign initial key leases when spawning.';
+comment on column drone.last_local_time is 'The last reported local timestamp on the drone, used to assign initial key leases when spawning.';
 
 create table backend (
     id varchar(255) primary key,

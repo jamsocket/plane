@@ -12,11 +12,32 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AcquiredKey {
+    /// The key which has been acquired.
+    pub key: KeyConfig,
+
+    /// When the key should be renewed.
+    pub renew_at: DateTime<Utc>,
+
+    /// When the backend should be soft-terminated if the key could not be renewed.
+    pub soft_terminate_at: DateTime<Utc>,
+
+    /// When the backend should be hard-terminated if the key could not be renewed.
+    pub hard_terminate_at: DateTime<Utc>,
+
+    /// A unique key associated with a key for the duration it is acquired. This does not
+    /// change across renewals, but is incremented when the key is released and then acquired.
+    /// This is used internally to track the key during renewals, but can also be exposed to
+    /// backends as a fencing token.
+    /// (https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html).
+    pub token: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum BackendAction {
     Spawn {
         executable: Box<ExecutorConfig>,
-        key: KeyConfig,
-        key_initial_expires: i64,
+        key: AcquiredKey,
     },
     Terminate {
         kind: TerminationKind,
@@ -55,9 +76,18 @@ impl From<BackendEventId> for i64 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageFromDrone {
-    Heartbeat { local_time_epoch_millis: u64 },
+    Heartbeat {
+        local_time: DateTime<Utc>,
+    },
     BackendEvent(BackendStateMessage),
-    AckAction { action_id: BackendActionName },
+    AckAction {
+        action_id: BackendActionName,
+    },
+    RenewKey {
+        key: KeyConfig,
+        token: i64,
+        local_time: DateTime<Utc>,
+    },
 }
 
 impl ChannelMessage for MessageFromDrone {
@@ -70,6 +100,9 @@ pub enum MessageToDrone {
     /// Acknowledge that the container has received and processed a backend event.
     AckEvent {
         event_id: BackendEventId,
+    },
+    RenewKeyResponse {
+        key: AcquiredKey,
     },
 }
 

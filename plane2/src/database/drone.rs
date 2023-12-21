@@ -2,6 +2,7 @@ use crate::{
     heartbeat_consts::UNHEALTHY_SECONDS,
     types::{ClusterName, NodeId},
 };
+use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, query, query_as, PgPool};
 use std::time::Duration;
 
@@ -50,15 +51,15 @@ impl<'a> DroneDatabase<'a> {
         }
     }
 
-    pub async fn heartbeat(&self, id: NodeId, local_time_epoch_millis: u64) -> sqlx::Result<()> {
+    pub async fn heartbeat(&self, id: NodeId, local_time: DateTime<Utc>) -> sqlx::Result<()> {
         query!(
             r#"
             update drone
-            set last_heartbeat = now(), last_local_epoch_millis = $2
+            set last_heartbeat = now(), last_local_time = $2
             where id = $1
             "#,
             id.as_i32(),
-            local_time_epoch_millis as i64,
+            local_time,
         )
         .execute(self.pool)
         .await?;
@@ -76,7 +77,7 @@ impl<'a> DroneDatabase<'a> {
             r#"
             select
                 drone.id,
-                drone.last_local_epoch_millis as "last_local_epoch_millis!"
+                drone.last_local_time as "last_local_time!"
             from node
             left join drone
                 on node.id = drone.id
@@ -90,7 +91,7 @@ impl<'a> DroneDatabase<'a> {
                 and now() - controller.last_heartbeat < $2
                 and controller.is_online = true
                 and draining = false
-                and last_local_epoch_millis is not null
+                and last_local_time is not null
             order by (
                 select
                     count(*)
@@ -113,5 +114,5 @@ impl<'a> DroneDatabase<'a> {
 
 pub struct DroneForSpawn {
     pub id: NodeId,
-    pub last_local_epoch_millis: i64,
+    pub last_local_time: DateTime<Utc>,
 }

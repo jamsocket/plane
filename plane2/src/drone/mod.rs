@@ -83,6 +83,9 @@ pub async fn drone_loop(
                         tracing::error!(?err, "Error acking event.");
                     }
                 }
+                MessageToDrone::RenewKeyResponse { .. } => {
+                    unimplemented!("Renew key response.");
+                }
             }
         }
     }

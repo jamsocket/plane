@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update drone\n            set last_heartbeat = now(), last_local_time = $2\n            where id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "52f9ee107997d3a4d6ecfda2d38315300011b420d0b60ac59c48738077a7aaeb"
+}

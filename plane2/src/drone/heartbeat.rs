@@ -2,7 +2,7 @@ use crate::{
     heartbeat_consts::HEARTBEAT_INTERVAL, protocol::MessageFromDrone,
     typed_socket::TypedSocketSender,
 };
-use std::time::SystemTime;
+use chrono::Utc;
 use tokio::task::JoinHandle;
 
 /// A background task that sends heartbeats to the server.
@@ -14,13 +14,8 @@ impl HeartbeatLoop {
     pub fn start(sender: TypedSocketSender<MessageFromDrone>) -> Self {
         let handle = tokio::spawn(async move {
             loop {
-                let local_time_epoch_millis = SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .expect("system time is before epoch")
-                    .as_millis() as u64;
-                if let Err(err) = sender.send(MessageFromDrone::Heartbeat {
-                    local_time_epoch_millis,
-                }) {
+                let local_time = Utc::now();
+                if let Err(err) = sender.send(MessageFromDrone::Heartbeat { local_time }) {
                     tracing::error!(?err, "failed to send heartbeat");
                 }
 

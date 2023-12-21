@@ -256,7 +256,7 @@ CREATE TABLE public.drone (
     ready boolean NOT NULL,
     draining boolean DEFAULT false NOT NULL,
     last_heartbeat timestamp with time zone,
-    last_local_epoch_millis bigint
+    last_local_time timestamp with time zone
 );
 
 
@@ -291,10 +291,10 @@ COMMENT ON COLUMN public.drone.last_heartbeat IS 'The last time local_epoch_mill
 
 
 --
--- Name: COLUMN drone.last_local_epoch_millis; Type: COMMENT; Schema: public; Owner: postgres
+-- Name: COLUMN drone.last_local_time; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.drone.last_local_epoch_millis IS 'The last reported milliseconds since epoch from the drone, used to assign initial key leases when spawning.';
+COMMENT ON COLUMN public.drone.last_local_time IS 'The last reported local timestamp on the drone, used to assign initial key leases when spawning.';
 
 
 --

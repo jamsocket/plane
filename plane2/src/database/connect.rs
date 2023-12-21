@@ -1,5 +1,6 @@
 use super::{
-    backend_actions::create_pending_action, backend_key::KEY_LEASE_EXPIRATION_MS,
+    backend_actions::create_pending_action,
+    backend_key::{KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER},
     drone::DroneForSpawn,
 };
 use crate::{
@@ -9,7 +10,7 @@ use crate::{
         drone::DroneDatabase,
     },
     names::{BackendName, Name},
-    protocol::BackendAction,
+    protocol::{AcquiredKey, BackendAction},
     types::{
         BackendStatus, BearerToken, ClusterName, ConnectRequest, ConnectResponse, KeyConfig,
         SecretToken, SpawnConfig,
@@ -79,10 +80,17 @@ async fn create_backend_with_key(
     let backend_id = BackendName::new_random();
     let mut txn = pool.begin().await?;
 
+    let acquired_key = AcquiredKey {
+        key: key.clone(),
+        renew_at: drone_for_spawn.last_local_time + KEY_LEASE_RENEW_AFTER,
+        soft_terminate_at: drone_for_spawn.last_local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
+        hard_terminate_at: drone_for_spawn.last_local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
+        token: 0,
+    };
+
     let pending_action = BackendAction::Spawn {
         executable: Box::new(spawn_config.executable.clone()),
-        key: key.clone(),
-        key_initial_expires: drone_for_spawn.last_local_epoch_millis + KEY_LEASE_EXPIRATION_MS,
+        key: acquired_key,
     };
 
     // Create an action to spawn the backend. If we succeed in acquiring the key,

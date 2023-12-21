@@ -20,13 +20,11 @@ pub async fn handle_message_from_drone(
     sender: &mut TypedSocket<MessageToDrone>,
 ) -> anyhow::Result<()> {
     match msg {
-        MessageFromDrone::Heartbeat {
-            local_time_epoch_millis,
-        } => {
+        MessageFromDrone::Heartbeat { local_time } => {
             controller
                 .db
                 .drone()
-                .heartbeat(drone_id, local_time_epoch_millis)
+                .heartbeat(drone_id, local_time)
                 .await?;
         }
         MessageFromDrone::BackendEvent(backend_event) => {
@@ -58,6 +56,9 @@ pub async fn handle_message_from_drone(
                 .backend_actions()
                 .ack_pending_action(&action_id, drone_id)
                 .await?;
+        }
+        MessageFromDrone::RenewKey { .. } => {
+            unimplemented!()
         }
     }
 
