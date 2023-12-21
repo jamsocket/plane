@@ -6,7 +6,7 @@ use super::{
 use crate::{
     client::PlaneClient,
     database::{
-        backend_key::{BackendKeyHealth, KeysDatabase},
+        backend_key::{BackendKeyHealth, KeysDatabase, KEY_LEASE_EXPIRATION},
         drone::DroneDatabase,
     },
     names::{BackendName, Name},
@@ -117,7 +117,7 @@ async fn create_backend_with_key(
             returning id
         )
         insert into backend_key (backend_id, cluster, key_name, namespace, tag, last_renewed)
-        select $1, $2, $7, $8, $9, now() from backend_insert
+        select $1, $2, $7, $8, $9, now() + $10 from backend_insert
         "#,
         backend_id.to_string(),
         cluster.to_string(),
@@ -133,6 +133,7 @@ async fn create_backend_with_key(
         key.name,
         key.namespace,
         key.tag,
+        PgInterval::try_from(KEY_LEASE_EXPIRATION).unwrap(),
     )
     .execute(&mut *txn)
     .await?;
