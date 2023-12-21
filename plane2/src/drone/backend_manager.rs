@@ -10,7 +10,7 @@ use crate::{
 use anyhow::Result;
 use bollard::auth::DockerCredentials;
 use futures_util::Future;
-use std::error::Error;
+use std::{error::Error, fmt::Debug};
 use std::{future::pending, pin::Pin};
 use std::{
     net::IpAddr,
@@ -66,6 +66,15 @@ pub struct BackendManager {
 
     /// IP address of the drone.
     ip: IpAddr,
+}
+
+impl Debug for BackendManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BackendManager")
+            .field("backend_id", &self.backend_id)
+            .field("container_id", &self.container_id)
+            .finish()
+    }
 }
 
 impl BackendManager {
