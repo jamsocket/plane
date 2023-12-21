@@ -38,12 +38,11 @@ impl StepStatusResult {
     }
 }
 
-type StateCallback = Box<dyn Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync>;
-
 /// A backend manager is responsible for driving the state of one backend.
 /// Every active backend should have a backend manager.
 /// All container- and image-level commands sent to Docker go through the backend manager.
 /// The backend manager owns the status for the backend it is responsible for.
+#[derive(Debug)]
 pub struct BackendManager {
     /// If we are currently running a task, this is the handle to that task.
     /// It is always dropped (and aborted) when the state changes.
