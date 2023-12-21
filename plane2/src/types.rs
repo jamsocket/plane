@@ -1,8 +1,4 @@
-use crate::{
-    client::PlaneClient,
-    names::{BackendName, Name},
-    util::random_prefixed_string,
-};
+use crate::{client::PlaneClient, names::BackendName, util::random_prefixed_string};
 use bollard::auth::DockerCredentials;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
