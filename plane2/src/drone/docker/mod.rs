@@ -165,3 +165,40 @@ impl PlaneDocker {
             .map_err(|e| anyhow::anyhow!("{e:?}"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::names::Name;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_metrics() -> anyhow::Result<()> {
+        let docker = bollard::Docker::connect_with_local_defaults()?;
+        let plane_docker = PlaneDocker::new(docker, None).await?;
+
+        //TODO: replace with locally built hello world
+        plane_docker
+            .pull(
+                "ghcr.io/drifting-in-space/demo-image-drop-four",
+                None,
+                false,
+            )
+            .await?;
+
+        let backend_name = BackendName::new_random();
+        let container_id = ContainerId::from(format!("plane-test-{}", backend_name));
+        let executor_config = ExecutorConfig::from_image_with_defaults(
+            "ghcr.io/drifting-in-space/demo-image-drop-four",
+        );
+        plane_docker
+            .spawn_backend(&backend_name, &container_id, executor_config)
+            .await?;
+
+        let metrics = plane_docker.get_metrics(&container_id).await;
+        assert!(metrics.is_ok());
+        //TODO: add checks for required fields for conversion
+
+        Ok(())
+    }
+}
