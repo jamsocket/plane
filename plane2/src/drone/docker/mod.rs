@@ -5,7 +5,8 @@ use self::{
 use crate::{names::BackendName, types::ExecutorConfig};
 use anyhow::Result;
 use bollard::{
-    auth::DockerCredentials, errors::Error, service::EventMessage, system::EventsOptions, Docker,
+    auth::DockerCredentials, container::StatsOptions, errors::Error, service::EventMessage,
+    system::EventsOptions, Docker,
 };
 use tokio_stream::{Stream, StreamExt};
 
@@ -145,5 +146,22 @@ impl PlaneDocker {
         }
 
         Ok(())
+    }
+
+    pub async fn get_metrics(
+        &self,
+        container_id: &ContainerId,
+    ) -> Result<bollard::container::Stats> {
+        let options = StatsOptions {
+            stream: false,
+            one_shot: false,
+        };
+
+        self.docker
+            .stats(&container_id.to_string(), Some(options))
+            .next()
+            .await
+            .ok_or(anyhow::anyhow!("no stats found for {container_id}"))?
+            .map_err(|e| anyhow::anyhow!("{e:?}"))
     }
 }
