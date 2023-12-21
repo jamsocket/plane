@@ -2,7 +2,7 @@ use super::Controller;
 use crate::{
     controller::error::IntoApiError,
     database::{backend::BackendActionMessage, subscribe::Subscription, PlaneDatabase},
-    protocol::{BackendAction, MessageFromDrone, MessageToDrone},
+    protocol::{BackendAction, Heartbeat, MessageFromDrone, MessageToDrone},
     typed_socket::{server::new_server, TypedSocket},
     types::{ClusterName, NodeId, TerminationKind},
 };
@@ -20,7 +20,7 @@ pub async fn handle_message_from_drone(
     sender: &mut TypedSocket<MessageToDrone>,
 ) -> anyhow::Result<()> {
     match msg {
-        MessageFromDrone::Heartbeat { local_time } => {
+        MessageFromDrone::Heartbeat(Heartbeat { local_time }) => {
             controller
                 .db
                 .drone()

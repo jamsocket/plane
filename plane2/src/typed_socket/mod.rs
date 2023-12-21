@@ -2,6 +2,8 @@ use crate::PlaneVersionInfo;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::sync::Arc;
+use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 pub mod client;
@@ -22,18 +24,37 @@ pub struct TypedSocket<T: ChannelMessage> {
     pub remote_handshake: Handshake,
 }
 
-pub struct TypedSocketSender<T: ChannelMessage> {
-    send: Sender<SocketAction<T>>,
+#[derive(Clone)]
+pub struct TypedSocketSender<A> {
+    inner_send:
+        Arc<dyn Fn(SocketAction<A>) -> Result<(), TypedSocketError> + 'static + Send + Sync>,
 }
 
-impl<T: ChannelMessage> TypedSocketSender<T> {
-    pub fn send(&self, message: T) -> anyhow::Result<()> {
-        self.send.try_send(SocketAction::Send(message))?;
+#[derive(Debug, thiserror::Error)]
+pub enum TypedSocketError {
+    #[error("Socket closed")]
+    Closed,
+    #[error("Socket disconnected")]
+    Disconnected,
+}
+
+impl<A> From<TrySendError<A>> for TypedSocketError {
+    fn from(e: TrySendError<A>) -> Self {
+        match e {
+            TrySendError::Full(_) => Self::Disconnected,
+            TrySendError::Closed(_) => Self::Closed,
+        }
+    }
+}
+
+impl<A> TypedSocketSender<A> {
+    pub fn send(&self, message: A) -> Result<(), TypedSocketError> {
+        (self.inner_send)(SocketAction::Send(message))?;
         Ok(())
     }
 
-    pub async fn close(&mut self) -> anyhow::Result<()> {
-        self.send.send(SocketAction::Close).await?;
+    pub fn close(&mut self) -> Result<(), TypedSocketError> {
+        (self.inner_send)(SocketAction::Close)?;
         Ok(())
     }
 }
@@ -48,9 +69,21 @@ impl<T: ChannelMessage> TypedSocket<T> {
         self.recv.recv().await
     }
 
-    pub fn sender(&self) -> TypedSocketSender<T> {
+    pub fn sender<A, F>(&self, transform: F) -> TypedSocketSender<A>
+    where
+        F: (Fn(A) -> T) + 'static + Send + Sync,
+    {
+        let sender = self.send.clone();
+        let inner_send = move |message: SocketAction<A>| {
+            let message = match message {
+                SocketAction::Close => SocketAction::Close,
+                SocketAction::Send(message) => SocketAction::Send(transform(message)),
+            };
+            sender.try_send(message).map_err(|e| e.into())
+        };
+
         TypedSocketSender {
-            send: self.send.clone(),
+            inner_send: Arc::new(inner_send),
         }
     }
 

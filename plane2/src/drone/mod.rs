@@ -1,4 +1,6 @@
-use self::{executor::Executor, heartbeat::HeartbeatLoop, state_store::StateStore, key_manager::KeyManager};
+use self::{
+    executor::Executor, heartbeat::HeartbeatLoop, key_manager::KeyManager, state_store::StateStore,
+};
 use crate::{
     client::PlaneClient,
     database::backend::BackendActionMessage,
@@ -25,9 +27,9 @@ mod backend_manager;
 pub mod docker;
 mod executor;
 mod heartbeat;
+mod key_manager;
 mod state_store;
 mod wait_backend;
-mod key_manager;
 
 pub async fn drone_loop(
     name: DroneName,
@@ -36,15 +38,13 @@ pub async fn drone_loop(
 ) {
     loop {
         let mut socket = connection.connect_with_retry(&name).await;
-        let _heartbeat_guard = HeartbeatLoop::start(socket.sender());
-        let key_manager = KeyManager
+        let _heartbeat_guard = HeartbeatLoop::start(socket.sender(MessageFromDrone::Heartbeat));
 
         {
             // Forward state changes to the socket.
             // This will start by sending any existing unacked events.
-            let sender = socket.sender();
+            let sender = socket.sender(MessageFromDrone::BackendEvent);
             if let Err(err) = executor.register_listener(move |message| {
-                let message = MessageFromDrone::BackendEvent(message);
                 if let Err(e) = sender.send(message) {
                     tracing::error!(%e, "Error sending message.");
                 }

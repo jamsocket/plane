@@ -1,7 +1,8 @@
 use super::state_store::StateStore;
 use crate::{
-    protocol::{AcquiredKey, RenewKeyRequest, MessageFromDrone},
-    types::KeyConfig, typed_socket::TypedSocketSender,
+    protocol::{AcquiredKey, RenewKeyRequest},
+    typed_socket::TypedSocketSender,
+    types::KeyConfig,
 };
 use std::{collections::HashMap, time::SystemTime};
 use tokio::sync::watch::{Receiver, Sender};
@@ -13,10 +14,14 @@ pub struct KeyManager {
     // handles: HashMap<String, JoinHandle<()>>,
     senders: HashMap<KeyConfig, Sender<AcquiredKey>>,
 
-    sender: TypedSocketSender<MessageFromDrone>,
+    sender: TypedSocketSender<RenewKeyRequest>,
 }
 
-async fn renew_key_loop(key: AcquiredKey, mut receiver: Receiver<AcquiredKey>) {
+async fn renew_key_loop(
+    key: AcquiredKey,
+    sender: TypedSocketSender<RenewKeyRequest>,
+    mut receiver: Receiver<AcquiredKey>,
+) {
     loop {
         let Ok(()) = receiver.changed().await else {
             // Sender was dropped because KeyManager::unregister_key was called.
@@ -35,26 +40,31 @@ async fn renew_key_loop(key: AcquiredKey, mut receiver: Receiver<AcquiredKey>) {
             local_time: SystemTime::now(),
         };
 
+        if let Err(err) = sender.send(request) {
+            tracing::error!(%err, "Error sending renew key request.");
+        }
     }
 }
 
 impl KeyManager {
-    pub fn new(
-        state_store: StateStore,
-        sender: TypedSocketSender<MessageFromDrone>,
-    ) -> Self {
+    pub fn new(state_store: StateStore, sender: TypedSocketSender<RenewKeyRequest>) -> Self {
         Self {
-            db,
             state_store,
             senders: HashMap::new(),
             sender,
         }
     }
 
+    pub fn set_sender(&mut self, sender: TypedSocketSender<RenewKeyRequest>) {
+        self.sender = sender;
+        // todo: if a lock renewal was in-flight, it could get dropped. We need to
+        // re-request it after a reconnect.
+    }
+
     pub fn register_key(&mut self, key: AcquiredKey) {
         let (sender, receiver) = tokio::sync::watch::channel(key.clone());
 
-        tokio::spawn(renew_key_loop(key.clone(), receiver));
+        tokio::spawn(renew_key_loop(key.clone(), self.sender.clone(), receiver));
 
         self.senders.insert(key.key, sender);
     }

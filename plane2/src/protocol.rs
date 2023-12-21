@@ -82,14 +82,15 @@ pub struct RenewKeyRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Heartbeat {
+    pub local_time: DateTime<Utc>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageFromDrone {
-    Heartbeat {
-        local_time: DateTime<Utc>,
-    },
+    Heartbeat(Heartbeat),
     BackendEvent(BackendStateMessage),
-    AckAction {
-        action_id: BackendActionName,
-    },
+    AckAction { action_id: BackendActionName },
     RenewKey(RenewKeyRequest),
 }
 
