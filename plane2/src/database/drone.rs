@@ -4,7 +4,7 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, query, query_as, PgPool};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 pub struct DroneDatabase<'a> {
     pool: &'a PgPool,
@@ -114,5 +114,5 @@ impl<'a> DroneDatabase<'a> {
 
 pub struct DroneForSpawn {
     pub id: NodeId,
-    pub last_local_time: DateTime<Utc>,
+    pub last_local_time: SystemTime,
 }

@@ -303,7 +303,7 @@ pub struct SpawnConfig {
     pub max_idle_seconds: Option<i32>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct KeyConfig {
     /// If provided, and a running backend was created with the same key,
     /// cluster, namespace, and tag, we will connect to that backend instead

@@ -1,4 +1,4 @@
-use self::{executor::Executor, heartbeat::HeartbeatLoop, state_store::StateStore};
+use self::{executor::Executor, heartbeat::HeartbeatLoop, state_store::StateStore, key_manager::KeyManager};
 use crate::{
     client::PlaneClient,
     database::backend::BackendActionMessage,
@@ -27,6 +27,7 @@ mod executor;
 mod heartbeat;
 mod state_store;
 mod wait_backend;
+mod key_manager;
 
 pub async fn drone_loop(
     name: DroneName,
@@ -36,6 +37,7 @@ pub async fn drone_loop(
     loop {
         let mut socket = connection.connect_with_retry(&name).await;
         let _heartbeat_guard = HeartbeatLoop::start(socket.sender());
+        let key_manager = KeyManager
 
         {
             // Forward state changes to the socket.

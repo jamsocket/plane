@@ -9,7 +9,7 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::SystemTime};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AcquiredKey {
@@ -17,13 +17,13 @@ pub struct AcquiredKey {
     pub key: KeyConfig,
 
     /// When the key should be renewed.
-    pub renew_at: DateTime<Utc>,
+    pub renew_at: SystemTime,
 
     /// When the backend should be soft-terminated if the key could not be renewed.
-    pub soft_terminate_at: DateTime<Utc>,
+    pub soft_terminate_at: SystemTime,
 
     /// When the backend should be hard-terminated if the key could not be renewed.
-    pub hard_terminate_at: DateTime<Utc>,
+    pub hard_terminate_at: SystemTime,
 
     /// A unique key associated with a key for the duration it is acquired. This does not
     /// change across renewals, but is incremented when the key is released and then acquired.
@@ -75,6 +75,13 @@ impl From<BackendEventId> for i64 {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RenewKeyRequest {
+    pub key: KeyConfig,
+    pub token: i64,
+    pub local_time: SystemTime,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageFromDrone {
     Heartbeat {
         local_time: DateTime<Utc>,
@@ -83,11 +90,7 @@ pub enum MessageFromDrone {
     AckAction {
         action_id: BackendActionName,
     },
-    RenewKey {
-        key: KeyConfig,
-        token: i64,
-        local_time: DateTime<Utc>,
-    },
+    RenewKey(RenewKeyRequest),
 }
 
 impl ChannelMessage for MessageFromDrone {
@@ -101,9 +104,7 @@ pub enum MessageToDrone {
     AckEvent {
         event_id: BackendEventId,
     },
-    RenewKeyResponse {
-        key: AcquiredKey,
-    },
+    RenewKeyResponse(AcquiredKey),
 }
 
 impl ChannelMessage for MessageToDrone {
