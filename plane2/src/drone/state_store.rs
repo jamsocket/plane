@@ -7,11 +7,14 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 
+/// An array of sqlite commands used to initialize the state store.
+/// These must be idempotent, because they are run every time a state store
+/// is initialized.
 const SCHEMA: &[&str] = &[
     r#"
         create table if not exists "backend" (
             "id" text primary key,
-            "status" json not null
+            "state" json not null
         );
     "#,
     r#"
@@ -28,6 +31,8 @@ const SCHEMA: &[&str] = &[
 /// Stores state information about running backends.
 pub struct StateStore {
     db_conn: Connection,
+
+    /// A function that is called when a backend's state changes.
     listener: Option<Box<dyn Fn(BackendStateMessage) + Send + Sync + 'static>>,
 }
 
@@ -43,27 +48,35 @@ impl StateStore {
         })
     }
 
+    /// Make the state store aware of a change to a backend's state.
     pub fn register_event(
-        &self,
+        &mut self,
         backend_id: &BackendName,
         state: &BackendState,
         timestamp: DateTime<Utc>,
     ) -> Result<()> {
-        self.db_conn.execute(
+        let tx = self.db_conn.transaction()?;
+
+        // "Upsert" the current backend state into the table. Per sqlite docs (https://www.sqlite.org/lang_upsert.html):
+        // > Column names in the expressions of a DO UPDATE refer to the original unchanged value of the column,
+        // > before the attempted INSERT. To use the value that would have been inserted had the constraint not
+        // > failed, add the special "excluded." table qualifier to the column name.
+
+        tx.execute(
             r#"
                 insert into "backend" (
                     "id",
-                    "status"
+                    "state"
                 )
                 values (?, ?)
                 on conflict ("id")
                 do update set
-                    "status" = excluded."status"
+                    "state" = excluded."state"
             "#,
             (backend_id.to_string(), serde_json::to_value(state)?),
         )?;
 
-        self.db_conn.execute(
+        tx.execute(
             r#"
                 insert into "event" (
                     "backend_id",
@@ -77,6 +90,8 @@ impl StateStore {
                 timestamp.timestamp_millis(),
             ),
         )?;
+
+        tx.commit()?;
 
         if let Some(listener) = &self.listener {
             let event_id = BackendEventId::from(self.db_conn.last_insert_rowid());
@@ -95,10 +110,10 @@ impl StateStore {
         Ok(())
     }
 
-    pub fn backend_status(&self, backend_id: &BackendName) -> Result<BackendState> {
+    pub fn backend_state(&self, backend_id: &BackendName) -> Result<BackendState> {
         let mut stmt = self.db_conn.prepare(
             r#"
-                select "status"
+                select "state"
                 from "backend"
                 where id = ?
                 limit 1
@@ -114,10 +129,10 @@ impl StateStore {
             )
         })?;
 
-        let status: String = row.get(0)?;
-        let status: BackendState = serde_json::from_str(&status)?;
+        let state: String = row.get(0)?;
+        let state: BackendState = serde_json::from_str(&state)?;
 
-        Ok(status)
+        Ok(state)
     }
 
     fn unacked_events(&self) -> Result<Vec<BackendStateMessage>> {
@@ -163,6 +178,8 @@ impl StateStore {
     where
         F: Fn(BackendStateMessage) + Send + Sync + 'static,
     {
+        // We assume that events that have been sent but not acked are now dropped,
+        // so we replay them here.
         for event in self.unacked_events()? {
             listener(event);
         }
@@ -206,7 +223,7 @@ mod test {
     #[test]
     fn single_event() {
         let conn = Connection::open_in_memory().unwrap();
-        let state_store = StateStore::new(conn).unwrap();
+        let mut state_store = StateStore::new(conn).unwrap();
         let backend_id = BackendName::new_random();
 
         state_store
@@ -217,14 +234,14 @@ mod test {
             )
             .unwrap();
 
-        let result = state_store.backend_status(&backend_id).unwrap();
+        let result = state_store.backend_state(&backend_id).unwrap();
         assert_eq!(result, simple_backend_state(BackendStatus::Ready));
     }
 
     #[test]
     fn two_events() {
         let conn = Connection::open_in_memory().unwrap();
-        let state_store = StateStore::new(conn).unwrap();
+        let mut state_store = StateStore::new(conn).unwrap();
         let backend_id = BackendName::new_random();
 
         {
@@ -236,7 +253,7 @@ mod test {
                 )
                 .unwrap();
 
-            let result = state_store.backend_status(&backend_id).unwrap();
+            let result = state_store.backend_state(&backend_id).unwrap();
             assert_eq!(result, simple_backend_state(BackendStatus::Ready));
         }
 
@@ -249,7 +266,7 @@ mod test {
                 )
                 .unwrap();
 
-            let result = state_store.backend_status(&backend_id).unwrap();
+            let result = state_store.backend_state(&backend_id).unwrap();
             assert_eq!(result, BackendState::terminating(TerminationKind::Hard));
         }
     }
@@ -278,7 +295,7 @@ mod test {
             .unwrap();
 
         {
-            let result = state_store.backend_status(&backend_id).unwrap();
+            let result = state_store.backend_state(&backend_id).unwrap();
             assert_eq!(result, simple_backend_state(BackendStatus::Ready));
 
             let event = recv.try_recv().unwrap();
@@ -295,7 +312,7 @@ mod test {
                 )
                 .unwrap();
 
-            let result = state_store.backend_status(&backend_id).unwrap();
+            let result = state_store.backend_state(&backend_id).unwrap();
             assert_eq!(result, BackendState::terminating(TerminationKind::Hard));
 
             let event = recv.try_recv().unwrap();

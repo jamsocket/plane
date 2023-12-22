@@ -8,6 +8,8 @@ const WAIT_TIMEOUT_MS: u64 = 100;
 const REQUEST_TIMEOUT_MS: u64 = 1_000;
 const HEAD_REQUEST: &[u8] = b"HEAD / HTTP/1.1\r\nHost: localhost\r\n\r\n";
 
+/// Waits until an HTTP request to the given socket address succeeds.
+/// Retries indefinitely.
 pub async fn wait_for_backend(address: SocketAddr) {
     loop {
         let Ok(mut conn) = TcpStream::connect(address).await else {
