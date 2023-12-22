@@ -34,9 +34,16 @@ impl Protocol {
     }
 }
 
+/// Information about the incoming request that is forwarded to the request in
+/// X-Forwarded-* headers.
 #[derive(Debug, Clone, Copy)]
-pub struct RemoteMeta {
+pub struct ForwardableRequestInfo {
+    /// The IP address of the client that made the request.
+    /// Forwarded as X-Forwarded-For.
     ip: IpAddr,
+
+    /// The protocol of the incoming request.
+    /// Forwarded as X-Forwarded-Proto.
     protocol: Protocol,
 }
 
@@ -50,8 +57,8 @@ pub struct ServerPortConfig {
 pub struct AcmeConfig {
     pub endpoint: Url,
     pub mailto_email: String,
-    // EAB stuff.
     pub client: reqwest::Client,
+    // TODO: EAB credentials.
 }
 
 pub async fn run_proxy(

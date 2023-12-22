@@ -134,7 +134,7 @@ async fn new_client<T: ChannelMessage>(
                             break;
                         }
                         Some(SocketAction::Send(message)) => {
-                            let message = serde_json::to_string(&message).unwrap();
+                            let message = serde_json::to_string(&message).expect("Message is always serializable");
                             if let Err(err) = socket.send(Message::Text(message)).await {
                                 tracing::error!(?err, "Failed to send message on websocket.");
                             }
