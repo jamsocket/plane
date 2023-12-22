@@ -20,7 +20,9 @@ pub async fn handle_messages<T: ChannelMessage>(
                         }
                     }
                     SocketAction::Close => {
-                        let _ = socket.close().await;
+                        if let Err(err) = socket.close().await {
+                            tracing::error!(?err, "Failed to close websocket.");
+                        }
                         break;
                     }
                 }
