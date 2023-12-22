@@ -8,6 +8,7 @@ use crate::{
     typed_socket::client::TypedSocketConnector,
     types::ClusterName,
 };
+use anyhow::anyhow;
 use dashmap::DashMap;
 use std::{net::Ipv4Addr, sync::Arc};
 use tokio::{
@@ -232,8 +233,10 @@ pub async fn run_dns(
     name: AcmeDnsServerName,
     client: PlaneClient,
     port: u16,
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+) -> anyhow::Result<()> {
     let ip_port_pair = (Ipv4Addr::UNSPECIFIED, port);
     let listener = TcpListener::bind(ip_port_pair).await?;
-    run_dns_with_listener(name, client, listener).await
+    run_dns_with_listener(name, client, listener)
+        .await
+        .map_err(|err| anyhow!("Error running DNS server {:?}", err))
 }

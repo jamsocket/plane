@@ -18,7 +18,10 @@ pub mod typed_socket;
 pub mod types;
 pub mod util;
 
+/// The version of the plane2 binary from Cargo.toml.
 pub const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The git hash of the plane2 binary (passed from build.rs)
 pub const PLANE_GIT_HASH: &str = env!("GIT_HASH");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
