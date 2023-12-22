@@ -84,6 +84,8 @@ pub struct CertManager {
     refresh_loop: Option<tokio::task::JoinHandle<()>>,
     response_sender: broadcast::Sender<CertManagerResponse>,
     acme_config: Option<AcmeConfig>,
+
+    /// Path to save the certificate to.
     path: Option<PathBuf>,
 }
 
