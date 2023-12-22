@@ -1,83 +1,138 @@
-use super::state_store::StateStore;
+use super::executor::Executor;
 use crate::{
-    protocol::{AcquiredKey, RenewKeyRequest},
+    names::BackendName,
+    protocol::{AcquiredKey, BackendAction, RenewKeyRequest},
     typed_socket::TypedSocketSender,
-    types::KeyConfig,
+    types::TerminationKind,
+    util::GuardHandle,
 };
-use std::{collections::HashMap, time::SystemTime};
-use tokio::sync::watch::{Receiver, Sender};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
+use tokio::time::sleep;
 
 pub struct KeyManager {
-    state_store: StateStore,
+    executor: Arc<Executor>,
 
-    /// Map from a key to the thread that renews that key.
-    // handles: HashMap<String, JoinHandle<()>>,
-    senders: HashMap<KeyConfig, Sender<AcquiredKey>>,
+    /// Map from a backend to the most recently acquired key for that backend,
+    /// along with the handle for the task that is responsible for renewing the key
+    /// and terminating the backend if the key cannot be renewed.
+    handles: HashMap<BackendName, (AcquiredKey, GuardHandle)>,
 
-    sender: TypedSocketSender<RenewKeyRequest>,
+    sender: Option<TypedSocketSender<RenewKeyRequest>>,
 }
 
 async fn renew_key_loop(
     key: AcquiredKey,
-    sender: TypedSocketSender<RenewKeyRequest>,
-    mut receiver: Receiver<AcquiredKey>,
+    sender: Option<TypedSocketSender<RenewKeyRequest>>,
+    executor: Arc<Executor>,
 ) {
     loop {
-        let Ok(()) = receiver.changed().await else {
-            // Sender was dropped because KeyManager::unregister_key was called.
+        let now = SystemTime::now();
+        if now >= key.hard_terminate_at {
+            tracing::warn!("Key {:?} has expired, hard-terminating.", key.key);
+            if let Err(err) = executor
+                .apply_action(
+                    &key.backend,
+                    &BackendAction::Terminate {
+                        kind: TerminationKind::Hard,
+                    },
+                )
+                .await
+            {
+                tracing::error!(%err, "Error hard-terminating backend.");
+                sleep(Duration::from_secs(1)).await;
+                continue;
+            }
             break;
-        };
-        let key = receiver.borrow().clone();
-
-        if let Ok(time_remaining_to_renew) = key.renew_at.duration_since(SystemTime::now()) {
-            // renew_at is in the future, so we need to wait.
-            tokio::time::sleep(time_remaining_to_renew).await;
         }
 
-        let request = RenewKeyRequest {
-            key: key.key.clone(),
-            token: key.token.clone(),
-            local_time: SystemTime::now(),
-        };
+        if now >= key.soft_terminate_at {
+            tracing::warn!("Key {:?} has expired, soft-terminating.", key.key);
+            if let Err(err) = executor
+                .apply_action(
+                    &key.backend,
+                    &BackendAction::Terminate {
+                        kind: TerminationKind::Soft,
+                    },
+                )
+                .await
+            {
+                tracing::error!(%err, "Error soft-terminating backend.");
+                sleep(Duration::from_secs(1)).await;
+                continue;
+            }
 
-        if let Err(err) = sender.send(request) {
-            tracing::error!(%err, "Error sending renew key request.");
+            if let Ok(time_to_sleep) = key.hard_terminate_at.duration_since(now) {
+                sleep(time_to_sleep).await;
+            }
+
+            continue;
+        }
+
+        if now >= key.renew_at {
+            tracing::info!("Renewing key {:?}.", key.key);
+
+            if let Some(ref sender) = sender {
+                let request = RenewKeyRequest {
+                    key: key.key.clone(),
+                    token: key.token.clone(),
+                    local_time: SystemTime::now(),
+                };
+
+                if let Err(err) = sender.send(request) {
+                    tracing::error!(%err, "Error sending renew key request.");
+                }
+            }
+
+            if let Ok(time_to_sleep) = key.soft_terminate_at.duration_since(now) {
+                sleep(time_to_sleep).await;
+            }
+            continue;
+        }
+
+        if let Ok(time_to_sleep) = key.renew_at.duration_since(now) {
+            sleep(time_to_sleep).await;
         }
     }
 }
 
 impl KeyManager {
-    pub fn new(state_store: StateStore, sender: TypedSocketSender<RenewKeyRequest>) -> Self {
+    pub fn new(executor: Arc<Executor>) -> Self {
         Self {
-            state_store,
-            senders: HashMap::new(),
-            sender,
+            executor,
+            handles: HashMap::new(),
+            sender: None,
         }
     }
 
     pub fn set_sender(&mut self, sender: TypedSocketSender<RenewKeyRequest>) {
-        self.sender = sender;
-        // todo: if a lock renewal was in-flight, it could get dropped. We need to
-        // re-request it after a reconnect.
+        self.sender.replace(sender);
+
+        for (_, (acquired_key, handle)) in self.handles.iter_mut() {
+            let mut new_handle = GuardHandle::new(renew_key_loop(
+                acquired_key.clone(),
+                self.sender.clone(),
+                self.executor.clone(),
+            ));
+
+            std::mem::swap(handle, &mut new_handle);
+        }
     }
 
     pub fn register_key(&mut self, key: AcquiredKey) {
-        let (sender, receiver) = tokio::sync::watch::channel(key.clone());
+        let handle = GuardHandle::new(renew_key_loop(
+            key.clone(),
+            self.sender.clone(),
+            self.executor.clone(),
+        ));
 
-        tokio::spawn(renew_key_loop(key.clone(), self.sender.clone(), receiver));
-
-        self.senders.insert(key.key, sender);
+        self.handles.insert(key.backend.clone(), (key, handle));
     }
 
-    pub fn unregister_key(&mut self, key: &KeyConfig) {
-        self.senders.remove(key);
-    }
-
-    pub fn receive_response(&mut self, response: AcquiredKey) {
-        if let Some(sender) = self.senders.get_mut(&response.key) {
-            let _ = sender.send(response);
-        } else {
-            tracing::warn!(?response, "Received response for unknown key.");
-        }
+    pub fn unregister_key(&mut self, backend: &BackendName) {
+        self.handles.remove(backend);
     }
 }

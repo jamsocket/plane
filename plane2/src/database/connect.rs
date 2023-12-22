@@ -82,6 +82,7 @@ async fn create_backend_with_key(
 
     let acquired_key = AcquiredKey {
         key: key.clone(),
+        backend: backend_id.clone(),
         renew_at: drone_for_spawn.last_local_time + KEY_LEASE_RENEW_AFTER,
         soft_terminate_at: drone_for_spawn.last_local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
         hard_terminate_at: drone_for_spawn.last_local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,

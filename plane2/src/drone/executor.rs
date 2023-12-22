@@ -59,7 +59,7 @@ impl Executor {
         }
     }
 
-    pub fn register_listener<F>(&mut self, listener: F) -> Result<()>
+    pub fn register_listener<F>(&self, listener: F) -> Result<()>
     where
         F: Fn(BackendStateMessage) + Send + Sync + 'static,
     {

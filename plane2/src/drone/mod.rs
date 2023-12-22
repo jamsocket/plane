@@ -6,7 +6,7 @@ use crate::{
     database::backend::BackendActionMessage,
     drone::docker::PlaneDocker,
     names::DroneName,
-    protocol::{MessageFromDrone, MessageToDrone},
+    protocol::{BackendAction, MessageFromDrone, MessageToDrone},
     signals::wait_for_shutdown_signal,
     typed_socket::client::TypedSocketConnector,
     types::ClusterName,
@@ -20,6 +20,7 @@ use std::{
     net::IpAddr,
     os::unix::fs::PermissionsExt,
     path::Path,
+    sync::Arc,
 };
 use tokio::task::JoinHandle;
 
@@ -34,11 +35,16 @@ mod wait_backend;
 pub async fn drone_loop(
     name: DroneName,
     mut connection: TypedSocketConnector<MessageFromDrone>,
-    mut executor: Executor,
+    executor: Executor,
 ) {
+    let executor = Arc::new(executor);
+    let mut key_manager = KeyManager::new(executor.clone());
+
     loop {
         let mut socket = connection.connect_with_retry(&name).await;
         let _heartbeat_guard = HeartbeatLoop::start(socket.sender(MessageFromDrone::Heartbeat));
+
+        key_manager.set_sender(socket.sender(MessageFromDrone::RenewKey));
 
         {
             // Forward state changes to the socket.
@@ -69,6 +75,11 @@ pub async fn drone_loop(
                 }) => {
                     tracing::info!(?backend_id, ?action, "Received action.");
 
+                    if let BackendAction::Spawn { key, .. } = &action {
+                        // Register the key with the key manager, ensuring that it will be refreshed.
+                        key_manager.register_key(key.clone());
+                    }
+
                     if let Err(err) = executor.apply_action(&backend_id, &action).await {
                         tracing::error!(?err, "Error applying action.");
                         continue;
@@ -85,8 +96,9 @@ pub async fn drone_loop(
                         tracing::error!(?err, "Error acking event.");
                     }
                 }
-                MessageToDrone::RenewKeyResponse { .. } => {
-                    unimplemented!("Renew key response.");
+                MessageToDrone::RenewKeyResponse(acquired_key) => {
+                    tracing::info!(?acquired_key, "Received key renewal response.");
+                    key_manager.register_key(acquired_key);
                 }
             }
         }

@@ -16,6 +16,9 @@ pub struct AcquiredKey {
     /// The key which has been acquired.
     pub key: KeyConfig,
 
+    /// The backend for which the key was acquired.
+    pub backend: BackendName,
+
     /// When the key should be renewed.
     pub renew_at: SystemTime,
 
