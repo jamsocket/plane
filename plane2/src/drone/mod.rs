@@ -9,7 +9,7 @@ use crate::{
     protocol::{BackendAction, MessageFromDrone, MessageToDrone},
     signals::wait_for_shutdown_signal,
     typed_socket::client::TypedSocketConnector,
-    types::ClusterName,
+    types::{BackendStatus, ClusterName},
     util::get_internal_host_ip,
 };
 use anyhow::Result;
@@ -20,7 +20,7 @@ use std::{
     net::IpAddr,
     os::unix::fs::PermissionsExt,
     path::Path,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 use tokio::task::JoinHandle;
 
@@ -38,19 +38,30 @@ pub async fn drone_loop(
     executor: Executor,
 ) {
     let executor = Arc::new(executor);
-    let mut key_manager = KeyManager::new(executor.clone());
+    let key_manager = Arc::new(Mutex::new(KeyManager::new(executor.clone())));
 
     loop {
         let mut socket = connection.connect_with_retry(&name).await;
         let _heartbeat_guard = HeartbeatLoop::start(socket.sender(MessageFromDrone::Heartbeat));
 
-        key_manager.set_sender(socket.sender(MessageFromDrone::RenewKey));
+        key_manager
+            .lock()
+            .expect("Key manager lock poisoned")
+            .set_sender(socket.sender(MessageFromDrone::RenewKey));
 
         {
             // Forward state changes to the socket.
             // This will start by sending any existing unacked events.
             let sender = socket.sender(MessageFromDrone::BackendEvent);
+            let key_manager = key_manager.clone();
             if let Err(err) = executor.register_listener(move |message| {
+                if message.status == BackendStatus::Terminated {
+                    key_manager
+                        .lock()
+                        .expect("Key manager lock poisoned.")
+                        .unregister_key(&message.backend_id);
+                }
+
                 if let Err(e) = sender.send(message) {
                     tracing::error!(%e, "Error sending message.");
                 }
@@ -77,7 +88,10 @@ pub async fn drone_loop(
 
                     if let BackendAction::Spawn { key, .. } = &action {
                         // Register the key with the key manager, ensuring that it will be refreshed.
-                        key_manager.register_key(key.clone());
+                        key_manager
+                            .lock()
+                            .expect("Key manager lock poisoned.")
+                            .register_key(key.clone());
                     }
 
                     if let Err(err) = executor.apply_action(&backend_id, &action).await {
@@ -98,7 +112,10 @@ pub async fn drone_loop(
                 }
                 MessageToDrone::RenewKeyResponse(acquired_key) => {
                     tracing::info!(?acquired_key, "Received key renewal response.");
-                    key_manager.register_key(acquired_key);
+                    key_manager
+                        .lock()
+                        .expect("Key manager lock poisoned.")
+                        .register_key(acquired_key);
                 }
             }
         }

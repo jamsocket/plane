@@ -134,7 +134,7 @@ async fn create_backend_with_key(
         key.name,
         key.namespace,
         key.tag,
-        PgInterval::try_from(KEY_LEASE_EXPIRATION).unwrap(),
+        PgInterval::try_from(KEY_LEASE_EXPIRATION).expect("valid constant interval"),
     )
     .execute(&mut *txn)
     .await?;

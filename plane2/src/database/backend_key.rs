@@ -46,7 +46,7 @@ impl<'a> KeysDatabase<'a> {
             where id = $1
             "#,
             id.as_i32(),
-            PgInterval::try_from(KEY_LEASE_EXPIRATION).unwrap(),
+            PgInterval::try_from(KEY_LEASE_EXPIRATION).expect("valid constant interval"),
         )
         .execute(self.pool)
         .await?;

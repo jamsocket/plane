@@ -78,7 +78,7 @@ async fn renew_key_loop(
             if let Some(ref sender) = sender {
                 let request = RenewKeyRequest {
                     key: key.key.clone(),
-                    token: key.token.clone(),
+                    token: key.token,
                     local_time: SystemTime::now(),
                 };
 
