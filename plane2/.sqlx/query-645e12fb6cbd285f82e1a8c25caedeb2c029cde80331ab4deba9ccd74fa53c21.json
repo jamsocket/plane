@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            select\n                backend_key.id as id,\n                backend_key.tag as tag,\n                backend_key.last_renewed as last_renewed,\n                backend.id as backend_id,\n                now() as \"as_of!\"\n            from backend_key\n            left join backend on backend_key.backend_id = backend.id\n            where backend_key.cluster = $1\n            and backend_key.key_name = $2\n            and backend_key.namespace = $3\n            ",
+  "query": "\n            select\n                backend_key.id as id,\n                backend_key.tag as tag,\n                backend_key.expires_at as expires_at,\n                backend.id as backend_id,\n                now() as \"as_of!\"\n            from backend_key\n            left join backend on backend_key.backend_id = backend.id\n            where backend_key.cluster = $1\n            and backend_key.key_name = $2\n            and backend_key.namespace = $3\n            ",
   "describe": {
     "columns": [
       {
@@ -15,7 +15,7 @@
       },
       {
         "ordinal": 2,
-        "name": "last_renewed",
+        "name": "expires_at",
         "type_info": "Timestamptz"
       },
       {
@@ -44,5 +44,5 @@
       null
     ]
   },
-  "hash": "c588012da8bee23bccb09e813ca8b294caa350dcdee40395a1e6d5e26eabedd0"
+  "hash": "645e12fb6cbd285f82e1a8c25caedeb2c029cde80331ab4deba9ccd74fa53c21"
 }

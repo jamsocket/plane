@@ -165,7 +165,7 @@ CREATE TABLE public.backend_key (
     namespace character varying(255) NOT NULL,
     key_name character varying(255) NOT NULL,
     tag character varying(255) NOT NULL,
-    last_renewed timestamp with time zone NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
     backend_id character varying(255) NOT NULL
 );
 

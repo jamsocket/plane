@@ -116,7 +116,7 @@ async fn create_backend_with_key(
             values ($1, $2, $3, now(), $4, now() + $5, $6, now())
             returning id
         )
-        insert into backend_key (backend_id, cluster, key_name, namespace, tag, last_renewed)
+        insert into backend_key (backend_id, cluster, key_name, namespace, tag, expires_at)
         select $1, $2, $7, $8, $9, now() + $10 from backend_insert
         "#,
         backend_id.to_string(),

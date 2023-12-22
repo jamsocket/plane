@@ -28,11 +28,9 @@ impl<'a> KeysDatabase<'a> {
             r#"
             delete from backend_key
             where id = $1
-            and last_renewed - now() > $2
+            and expires_at > now()
             "#,
             id.as_i32(),
-            PgInterval::try_from(Duration::from_secs(ASSUME_LOST_SECONDS as _))
-                .expect("valid interval"),
         )
         .execute(self.pool)
         .await?;
@@ -44,10 +42,11 @@ impl<'a> KeysDatabase<'a> {
         sqlx::query!(
             r#"
             update backend_key
-            set last_renewed = now()
+            set expires_at = now() + $2
             where id = $1
             "#,
             id.as_i32(),
+            PgInterval::try_from(KEY_LEASE_EXPIRATION).unwrap(),
         )
         .execute(self.pool)
         .await?;
@@ -65,7 +64,7 @@ impl<'a> KeysDatabase<'a> {
             select
                 backend_key.id as id,
                 backend_key.tag as tag,
-                backend_key.last_renewed as last_renewed,
+                backend_key.expires_at as expires_at,
                 backend.id as backend_id,
                 now() as "as_of!"
             from backend_key
@@ -87,7 +86,7 @@ impl<'a> KeysDatabase<'a> {
                 tag: lock_result.tag,
                 backend_id: BackendName::try_from(lock_result.backend_id)
                     .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?,
-                last_renewed: lock_result.last_renewed,
+                expires_at: lock_result.expires_at,
                 as_of: lock_result.as_of,
             }))
         } else {
@@ -113,13 +112,13 @@ pub struct BackendKeyResult {
     pub id: BackendKeyId,
     pub tag: String,
     backend_id: BackendName,
-    last_renewed: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
     as_of: DateTime<Utc>,
 }
 
 impl BackendKeyResult {
     pub fn key_health(&self) -> BackendKeyHealth {
-        let key_age = (self.as_of - self.last_renewed).num_seconds();
+        let key_age = (self.as_of - self.expires_at).num_seconds();
         if key_age > ASSUME_LOST_SECONDS {
             return BackendKeyHealth::Expired;
         }

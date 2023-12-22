@@ -96,7 +96,7 @@ create table backend_key (
     namespace varchar(255) not null,
     key_name varchar(255) not null,
     tag varchar(255) not null,
-    last_renewed timestamptz not null,
+    expires_at timestamptz not null,
     backend_id varchar(255) references backend(id) not null
 );
 
