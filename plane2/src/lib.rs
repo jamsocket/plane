@@ -1,3 +1,6 @@
+#![warn(clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::unwrap_used))]
+
 use serde::{Deserialize, Serialize};
 
 pub mod client;

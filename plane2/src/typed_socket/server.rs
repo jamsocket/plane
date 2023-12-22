@@ -14,13 +14,13 @@ pub async fn handle_messages<T: ChannelMessage>(
             Some(msg) = messages_to_send.recv() => {
                 match msg {
                     SocketAction::Send(msg) => {
-                        let msg = Message::Text(serde_json::to_string(&msg).unwrap());
+                        let msg = Message::Text(serde_json::to_string(&msg).expect("Always serializable."));
                         if let Err(err) = socket.send(msg).await {
                             tracing::error!(?err, "Failed to send message on websocket.");
                         }
                     }
                     SocketAction::Close => {
-                        socket.close().await.unwrap();
+                        let _ = socket.close().await;
                         break;
                     }
                 }
@@ -33,8 +33,16 @@ pub async fn handle_messages<T: ChannelMessage>(
                         continue;
                     }
                 };
-                let msg: T::Reply = serde_json::from_str(&msg).context("Parsing message from client.").unwrap();
-                messages_received.send(msg).await.unwrap();
+                let msg: T::Reply = match serde_json::from_str(&msg) {
+                    Ok(msg) => msg,
+                    Err(err) => {
+                        tracing::warn!(?err, "Failed to parse message.");
+                        continue;
+                    }
+                };
+                if let Err(err) = messages_received.send(msg).await {
+                    tracing::error!(?err, "Failed to receive message.");
+                }
             }
             else => {
                 break;

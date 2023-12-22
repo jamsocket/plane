@@ -71,7 +71,7 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                     )
                 } else {
                     "Disconnected".yellow().to_string()
-                };                   
+                };
 
                 if drone.active() || all {
                     println!(

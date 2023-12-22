@@ -198,7 +198,7 @@ mod tests {
 
     impl Drop for DemoSseServer {
         fn drop(&mut self) {
-            self.handle.take().expect("Drop is only called once.").abort();
+            self.handle.take().unwrap().abort();
         }
     }
 
