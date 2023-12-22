@@ -15,7 +15,7 @@
 use std::time::Duration;
 
 /// How often the drone should emit a heartbeat.
-pub const HEARTBEAT_INTERVAL_SECONDS: i64 = 5;
+pub const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 
 /// If we have not heard from a drone in this many seconds,
 /// we will consider it unhealthy. This means that we will
@@ -39,5 +39,3 @@ pub const HARD_TERMINATE_DEADLINE_SECONDS: i64 = 90;
 /// we will consider it lost. This means that we will remove
 /// its locks.
 pub const ASSUME_LOST_SECONDS: i64 = 120;
-
-pub const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(HEARTBEAT_INTERVAL_SECONDS as u64);

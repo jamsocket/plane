@@ -1,3 +1,6 @@
+#![warn(clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::unwrap_used))]
+
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use plane2::client::PlaneClient;
@@ -221,8 +224,7 @@ async fn run(opts: Opts) -> Result<()> {
                 port_config,
                 acme_config,
             )
-            .await
-            .unwrap();
+            .await?;
         }
         Command::Dns {
             name,
@@ -232,7 +234,7 @@ async fn run(opts: Opts) -> Result<()> {
             let name = name.or_random();
             tracing::info!("Starting DNS server");
             let client = PlaneClient::new(controller_url);
-            run_dns(name, client, port).await.unwrap();
+            run_dns(name, client, port).await?;
         }
     }
 

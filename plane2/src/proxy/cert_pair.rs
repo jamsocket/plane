@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use pem::Pem;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs1KeyDer};
 use serde::{Deserialize, Serialize};
-use std::{io, path::Path, time::SystemTime};
+use std::{fs::Permissions, io, os::unix::fs::PermissionsExt, path::Path, time::SystemTime};
 use tokio_rustls::rustls::{
     sign::{any_supported_type, CertifiedKey},
     Certificate, PrivateKey,
@@ -127,6 +127,15 @@ impl CertificatePair {
         let cert_pair = SerializedCertificatePair { cert, key };
 
         let contents = serde_json::to_string_pretty(&cert_pair)?;
+
+        // If the file does not exist, we want to make sure it is created with specific
+        // permissions instead of the default system umask.
+        if !path.exists() {
+            std::fs::File::create(&path)?;
+            let permissions = Permissions::from_mode(0o600);
+            std::fs::set_permissions(path, permissions)?;
+        }
+
         std::fs::write(path, contents)?;
 
         Ok(())

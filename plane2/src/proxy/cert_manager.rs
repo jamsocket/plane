@@ -10,7 +10,7 @@ use acme2_eab::{
 use anyhow::{anyhow, Context, Result};
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex},
     time::{Duration, SystemTime},
 };
 use tokio::sync::{
@@ -23,52 +23,93 @@ use tokio_rustls::rustls::{
 };
 
 const DNS_01: &str = "dns-01";
-const MAX_SLEEP_TIME: Duration = Duration::from_secs(30 * 60); // 30 minutes
+
+/// How long to sleep after failing to acquire the certificate lease, or after
+/// acquiring the lease but failing to get a certificate.
 const LOCK_SLEEP_TIME: Duration = Duration::from_secs(60); // 1 minute
+
+/// How long in advance of the certificate expiring to renew it.
 const RENEWAL_WINDOW: Duration = Duration::from_secs(24 * 60 * 60 * 30); // 30 days
 
 /// Handle for receiving new certificates. Implements ResolvesServerCert, which
 /// allows it to be used as a rustls cert_resolver.
 pub struct CertWatcher {
-    receiver: Receiver<Option<Arc<CertifiedKey>>>,
+    receiver: Receiver<Option<CertificatePair>>,
+    certified_key: Mutex<Option<Arc<CertifiedKey>>>,
 }
 
 impl CertWatcher {
-    fn new(receiver: Receiver<Option<Arc<CertifiedKey>>>) -> Self {
-        Self { receiver }
+    fn new(receiver: Receiver<Option<CertificatePair>>) -> Self {
+        Self {
+            receiver,
+            certified_key: Mutex::new(None),
+        }
     }
 
-    pub async fn next(&mut self) -> Option<Arc<CertifiedKey>> {
-        tracing::info!("Waiting for next certificate...");
-        self.receiver
-            .changed()
-            .await
-            .expect("Certificate receiver should not be closed.");
-        tracing::info!("Received new certificate.");
-        self.receiver.borrow().clone()
+    /// Update the certified key to match the latest CertificatePair from the receiver.
+    fn update_certified_key(&self) {
+        let cert_pair = self.receiver.borrow().as_ref().cloned();
+        let mut lock = self
+            .certified_key
+            .lock()
+            .expect("Certified key lock poisoned.");
+
+        if let Some(cert_pair) = cert_pair.as_ref() {
+            lock.replace(Arc::new(cert_pair.certified_key.clone()));
+        } else {
+            lock.take();
+        }
+    }
+
+    pub async fn next(&mut self) -> Option<CertificatePair> {
+        self.receiver.changed().await.ok()?;
+        self.update_certified_key();
+        self.receiver.borrow().as_ref().cloned()
     }
 }
 
 impl ResolvesServerCert for CertWatcher {
     fn resolve(&self, _client_hello: ClientHello<'_>) -> Option<Arc<CertifiedKey>> {
-        self.receiver.borrow().clone()
+        if self
+            .receiver
+            .has_changed()
+            .expect("Receiver channel should not be closed.")
+        {
+            self.update_certified_key();
+        }
+
+        self.certified_key
+            .lock()
+            .expect("Certified key lock poisoned.")
+            .clone()
     }
 }
 
+/// Manages the certificate refresh loop.
 pub struct CertManager {
     cluster: ClusterName,
-    send_cert: Arc<Sender<Option<Arc<CertifiedKey>>>>,
+
+    /// Channel for sending new certificates to the CertWatcher.
+    send_cert: Arc<Sender<Option<CertificatePair>>>,
     refresh_loop: Option<tokio::task::JoinHandle<()>>,
-    current_cert: Arc<RwLock<Option<CertificatePair>>>,
+
+    /// Sender for forwarding responses from the controller to the refresh loop
+    /// task. This technically doesn't need to be a broadcast channel, since there's
+    /// only one instance of the refresh loop task running at a time,
+    /// This doesn't need to be a broadcast channel, since there's only one
     response_sender: broadcast::Sender<CertManagerResponse>,
+
+    /// Configuration used for the ACME certificate request.
     acme_config: Option<AcmeConfig>,
+
+    /// Path to save the certificate to.
     path: Option<PathBuf>,
 }
 
 impl CertManager {
     pub fn new(
         cluster: ClusterName,
-        send_cert: Sender<Option<Arc<CertifiedKey>>>,
+        send_cert: Sender<Option<CertificatePair>>,
         cert_path: Option<&Path>,
         acme_config: Option<AcmeConfig>,
     ) -> Result<Self> {
@@ -82,7 +123,7 @@ impl CertManager {
             None
         };
 
-        if let Some(cert) = &initial_cert {
+        if let Some(cert) = initial_cert {
             tracing::info!(
                 "Loaded certificate for {} (valid from {:?} to {:?})",
                 cert.common_name,
@@ -90,7 +131,7 @@ impl CertManager {
                 cert.validity_end
             );
 
-            send_cert.send(Some(Arc::new(cert.certified_key.clone())))?;
+            send_cert.send(Some(cert))?;
         }
 
         let (response_sender, _) = broadcast::channel(1);
@@ -100,7 +141,7 @@ impl CertManager {
             send_cert: Arc::new(send_cert),
             refresh_loop: None,
             acme_config,
-            current_cert: Arc::new(RwLock::new(initial_cert)),
+            // current_cert: Arc::new(RwLock::new(initial_cert)),
             path: cert_path.map(|p| p.to_owned()),
             response_sender,
         })
@@ -116,7 +157,6 @@ impl CertManager {
 
         if let Some(acme_config) = self.acme_config.as_ref() {
             let send_cert = self.send_cert.clone();
-            let current_cert = self.current_cert.clone();
             let response_sender = self.response_sender.subscribe();
             let path = self.path.clone();
 
@@ -125,7 +165,6 @@ impl CertManager {
                 acme_config.clone(),
                 send_cert,
                 sender,
-                current_cert,
                 response_sender,
                 path,
             ));
@@ -141,12 +180,13 @@ impl CertManager {
     }
 }
 
+/// Create a CertWatcher and CertManager pair.
 pub fn watcher_manager_pair(
     cluster: ClusterName,
     path: Option<&Path>,
     acme_config: Option<AcmeConfig>,
 ) -> Result<(CertWatcher, CertManager)> {
-    let (send_cert, recv_cert) = tokio::sync::watch::channel::<Option<Arc<CertifiedKey>>>(None);
+    let (send_cert, recv_cert) = tokio::sync::watch::channel::<Option<CertificatePair>>(None);
 
     let cert_watcher = CertWatcher::new(recv_cert);
     let cert_manager = CertManager::new(cluster, send_cert, path, acme_config)?;
@@ -154,16 +194,19 @@ pub fn watcher_manager_pair(
     Ok((cert_watcher, cert_manager))
 }
 
-pub async fn do_refresh(
+/// One step of the refresh loop.
+/// If we have a valid certificate, sleep until it's time to renew it.
+/// Otherwise, request a certificate lease from the cert manager, and then
+/// request a certificate from the ACME server.
+async fn refresh_loop_step(
     cluster: &ClusterName,
     acme_config: &AcmeConfig,
-    send_cert: &Arc<Sender<Option<Arc<CertifiedKey>>>>,
+    send_cert: &Arc<Sender<Option<CertificatePair>>>,
     request_sender: &(impl Fn(CertManagerRequest) + Send + Sync + 'static),
-    current_cert: &Arc<RwLock<Option<CertificatePair>>>,
     response_receiver: &mut broadcast::Receiver<CertManagerResponse>,
     path: Option<&PathBuf>,
 ) -> Result<()> {
-    let last_current_cert = current_cert.read().expect("Cert lock is poisoned.").clone();
+    let last_current_cert = send_cert.borrow().clone();
 
     if let Some(current_cert) = last_current_cert {
         let renewal_time = current_cert
@@ -180,7 +223,7 @@ pub async fn do_refresh(
                 renewal_time,
                 time_until_renew
             );
-            tokio::time::sleep(time_until_renew.max(MAX_SLEEP_TIME)).await;
+            tokio::time::sleep(time_until_renew).await;
             return Ok(());
         }
     }
@@ -217,13 +260,10 @@ pub async fn do_refresh(
     match result {
         Ok(cert_pair) => {
             tracing::info!("Got certificate.");
-            let cert = cert_pair.certified_key.clone();
-            send_cert.send(Some(Arc::new(cert)))?;
-            let mut current_cert = current_cert.write().expect("Cert lock is poisoned.");
+            send_cert.send(Some(cert_pair.clone()))?;
             if let Some(path) = path.as_ref() {
                 cert_pair.save(path)?;
             }
-            *current_cert = Some(cert_pair);
         }
         Err(err) => {
             tracing::error!(?err, "Error getting certificate.");
@@ -237,19 +277,17 @@ pub async fn do_refresh(
 pub async fn refresh_loop(
     cluster: ClusterName,
     acme_config: AcmeConfig,
-    send_cert: Arc<Sender<Option<Arc<CertifiedKey>>>>,
+    send_cert: Arc<Sender<Option<CertificatePair>>>,
     request_sender: impl Fn(CertManagerRequest) + Send + Sync + 'static,
-    current_cert: Arc<RwLock<Option<CertificatePair>>>,
     mut response_receiver: broadcast::Receiver<CertManagerResponse>,
     path: Option<PathBuf>,
 ) {
     loop {
-        let result = do_refresh(
+        let result = refresh_loop_step(
             &cluster,
             &acme_config,
             &send_cert,
             &request_sender,
-            &current_cert,
             &mut response_receiver,
             path.as_ref(),
         )
@@ -261,7 +299,7 @@ pub async fn refresh_loop(
     }
 }
 
-pub async fn get_certificate(
+async fn get_certificate(
     cluster: &ClusterName,
     acme_config: &AcmeConfig,
     request_sender: &(impl Fn(CertManagerRequest) + Send + Sync + 'static),

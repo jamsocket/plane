@@ -1,7 +1,7 @@
 use super::connection_monitor::ConnectionMonitorHandle;
 use super::route_map::RouteMap;
 use super::tls::TlsStream;
-use super::{Protocol, RemoteMeta};
+use super::{ForwardableRequestInfo, Protocol};
 use crate::proxy::cert_manager::CertWatcher;
 use crate::proxy::rewriter::RequestRewriter;
 use crate::proxy::tls::TlsAcceptor;
@@ -61,7 +61,7 @@ impl ProxyState {
 struct RequestHandler {
     state: Arc<ProxyState>,
     https_redirect: bool,
-    remote_meta: RemoteMeta,
+    remote_meta: ForwardableRequestInfo,
 }
 
 impl RequestHandler {
@@ -296,7 +296,7 @@ impl<'a> Service<&'a AddrStream> for ProxyMakeService {
         let handler = Arc::new(RequestHandler {
             state: self.state.clone(),
             https_redirect: self.https_redirect,
-            remote_meta: RemoteMeta {
+            remote_meta: ForwardableRequestInfo {
                 ip: remote_ip,
                 protocol: Protocol::Http,
             },
@@ -319,7 +319,7 @@ impl<'a> Service<&'a TlsStream> for ProxyMakeService {
         let handler = Arc::new(RequestHandler {
             state: self.state.clone(),
             https_redirect: false,
-            remote_meta: RemoteMeta {
+            remote_meta: ForwardableRequestInfo {
                 ip: remote_ip,
                 protocol: Protocol::Https,
             },
