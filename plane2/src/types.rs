@@ -26,6 +26,7 @@ impl Display for NodeId {
     }
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct BackendKeyId(i32);
 
 impl From<i32> for BackendKeyId {

@@ -166,6 +166,7 @@ CREATE TABLE public.backend_key (
     key_name character varying(255) NOT NULL,
     tag character varying(255) NOT NULL,
     expires_at timestamp with time zone NOT NULL,
+    fencing_token bigint NOT NULL,
     backend_id character varying(255) NOT NULL
 );
 

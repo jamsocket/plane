@@ -35,9 +35,8 @@ pub async fn wait_for_backend(address: SocketAddr) {
             continue;
         };
 
-        if let Err(e) = result {
+        if let Err(_) = result {
             // error
-            tracing::warn!(%e, "Error reading from socket.");
             tokio::time::sleep(Duration::from_millis(WAIT_TIMEOUT_MS)).await;
             continue;
         }

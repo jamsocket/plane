@@ -38,22 +38,34 @@ impl<'a> KeysDatabase<'a> {
         Ok(result.rows_affected() > 0)
     }
 
-    pub async fn renew_key(&self, id: BackendKeyId) -> Result<(), sqlx::Error> {
-        sqlx::query!(
+    pub async fn renew_key(&self, key: &KeyConfig, token: i64) -> Result<(), sqlx::Error> {
+        let result = sqlx::query!(
             r#"
             update backend_key
-            set expires_at = now() + $2
-            where id = $1
+            set expires_at = now() + $5
+            where
+                key_name = $1 and
+                namespace = $2 and
+                tag = $3 and
+                fencing_token = $4
             "#,
-            id.as_i32(),
+            key.name.clone(),
+            key.namespace.clone(),
+            key.tag.clone(),
+            token,
             PgInterval::try_from(KEY_LEASE_EXPIRATION).expect("valid constant interval"),
         )
         .execute(self.pool)
         .await?;
 
+        if result.rows_affected() == 0 {
+            return Err(sqlx::Error::RowNotFound);
+        }
+
         Ok(())
     }
 
+    /// Checks if the key is held.
     pub async fn check_key(
         &self,
         cluster: &ClusterName,

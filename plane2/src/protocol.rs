@@ -80,6 +80,7 @@ impl From<BackendEventId> for i64 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RenewKeyRequest {
     pub key: KeyConfig,
+    pub backend: BackendName,
     pub token: i64,
     pub local_time: SystemTime,
 }

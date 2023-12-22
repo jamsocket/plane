@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        with backend_insert as (\n            insert into backend (\n                id,\n                cluster,\n                last_status,\n                last_status_time,\n                drone_id,\n                expiration_time,\n                allowed_idle_seconds,\n                last_keepalive\n            )\n            values ($1, $2, $3, now(), $4, now() + $5, $6, now())\n            returning id\n        )\n        insert into backend_key (backend_id, cluster, key_name, namespace, tag, expires_at, fencing_token)\n        select $1, $2, $7, $8, $9, now() + $10, extract(epoch from now()) from backend_insert\n        returning fencing_token\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fencing_token",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Interval",
+        "Int4",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Interval"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2a60280d4431388a620710a9561d64caeed294b7a2fabde40c5219e8caa2ebb4"
+}

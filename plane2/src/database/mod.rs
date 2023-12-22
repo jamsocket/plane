@@ -74,7 +74,7 @@ impl PlaneDatabase {
         BackendActionDatabase::new(&self.pool)
     }
 
-    pub fn locks(&self) -> backend_key::KeysDatabase {
+    pub fn keys(&self) -> backend_key::KeysDatabase {
         KeysDatabase::new(&self.pool)
     }
 

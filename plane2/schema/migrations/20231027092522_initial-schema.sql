@@ -97,6 +97,7 @@ create table backend_key (
     key_name varchar(255) not null,
     tag varchar(255) not null,
     expires_at timestamptz not null,
+    fencing_token bigint not null,
     backend_id varchar(255) references backend(id) not null
 );
 

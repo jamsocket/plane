@@ -80,28 +80,7 @@ async fn create_backend_with_key(
     let backend_id = BackendName::new_random();
     let mut txn = pool.begin().await?;
 
-    let acquired_key = AcquiredKey {
-        key: key.clone(),
-        backend: backend_id.clone(),
-        renew_at: drone_for_spawn.last_local_time + KEY_LEASE_RENEW_AFTER,
-        soft_terminate_at: drone_for_spawn.last_local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
-        hard_terminate_at: drone_for_spawn.last_local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
-        token: 0,
-    };
-
-    let pending_action = BackendAction::Spawn {
-        executable: Box::new(spawn_config.executable.clone()),
-        key: acquired_key,
-    };
-
-    // Create an action to spawn the backend. If we succeed in acquiring the key,
-    // this will cause the backend to spawn. If we fail to acquire the key, this
-    // will be abandoned.
-    create_pending_action(&mut txn, &backend_id, drone_for_spawn.id, &pending_action)
-        .await
-        .map_err(|e| ConnectError::Other(e.to_string()))?;
-
-    let backend_result = sqlx::query!(
+    let result = sqlx::query!(
         r#"
         with backend_insert as (
             insert into backend (
@@ -117,8 +96,9 @@ async fn create_backend_with_key(
             values ($1, $2, $3, now(), $4, now() + $5, $6, now())
             returning id
         )
-        insert into backend_key (backend_id, cluster, key_name, namespace, tag, expires_at)
-        select $1, $2, $7, $8, $9, now() + $10 from backend_insert
+        insert into backend_key (backend_id, cluster, key_name, namespace, tag, expires_at, fencing_token)
+        select $1, $2, $7, $8, $9, now() + $10, extract(epoch from now()) from backend_insert
+        returning fencing_token
         "#,
         backend_id.to_string(),
         cluster.to_string(),
@@ -136,14 +116,35 @@ async fn create_backend_with_key(
         key.tag,
         PgInterval::try_from(KEY_LEASE_EXPIRATION).expect("valid constant interval"),
     )
-    .execute(&mut *txn)
+    .fetch_optional(&mut *txn)
     .await?;
 
-    txn.commit().await?;
-
-    if backend_result.rows_affected() == 0 {
+    let Some(result) = result else {
         return Ok(None);
-    }
+    };
+
+    let acquired_key = AcquiredKey {
+        key: key.clone(),
+        backend: backend_id.clone(),
+        renew_at: drone_for_spawn.last_local_time + KEY_LEASE_RENEW_AFTER,
+        soft_terminate_at: drone_for_spawn.last_local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
+        hard_terminate_at: drone_for_spawn.last_local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
+        token: result.fencing_token,
+    };
+
+    let pending_action = BackendAction::Spawn {
+        executable: Box::new(spawn_config.executable.clone()),
+        key: acquired_key,
+    };
+
+    // Create an action to spawn the backend. If we succeed in acquiring the key,
+    // this will cause the backend to spawn. If we fail to acquire the key, this
+    // will be abandoned.
+    create_pending_action(&mut txn, &backend_id, drone_for_spawn.id, &pending_action)
+        .await
+        .map_err(|e| ConnectError::Other(e.to_string()))?;
+
+    txn.commit().await?;
 
     Ok(Some(backend_id))
 }

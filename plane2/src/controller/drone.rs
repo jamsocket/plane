@@ -1,8 +1,15 @@
 use super::Controller;
 use crate::{
     controller::error::IntoApiError,
-    database::{backend::BackendActionMessage, subscribe::Subscription, PlaneDatabase},
-    protocol::{BackendAction, Heartbeat, MessageFromDrone, MessageToDrone},
+    database::{
+        backend::BackendActionMessage,
+        backend_key::{
+            KEY_LEASE_HARD_TERMINATE_AFTER, KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER,
+        },
+        subscribe::Subscription,
+        PlaneDatabase,
+    },
+    protocol::{AcquiredKey, BackendAction, Heartbeat, MessageFromDrone, MessageToDrone},
     typed_socket::{server::new_server, TypedSocket},
     types::{ClusterName, NodeId, TerminationKind},
 };
@@ -57,8 +64,25 @@ pub async fn handle_message_from_drone(
                 .ack_pending_action(&action_id, drone_id)
                 .await?;
         }
-        MessageFromDrone::RenewKey { .. } => {
-            unimplemented!()
+        MessageFromDrone::RenewKey(renew_key_request) => {
+            controller
+                .db
+                .keys()
+                .renew_key(&renew_key_request.key, renew_key_request.token)
+                .await?;
+
+            let acquired_key = AcquiredKey {
+                token: renew_key_request.token,
+                key: renew_key_request.key.clone(),
+                backend: renew_key_request.backend.clone(),
+                renew_at: renew_key_request.local_time + KEY_LEASE_RENEW_AFTER,
+                soft_terminate_at: renew_key_request.local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
+                hard_terminate_at: renew_key_request.local_time + KEY_LEASE_HARD_TERMINATE_AFTER,
+            };
+
+            sender
+                .send(MessageToDrone::RenewKeyResponse(acquired_key))
+                .await?;
         }
     }
 
