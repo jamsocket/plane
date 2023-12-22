@@ -97,7 +97,7 @@ async fn create_backend_with_key(
             returning id
         )
         insert into backend_key (backend_id, cluster, key_name, namespace, tag, expires_at, fencing_token)
-        select $1, $2, $7, $8, $9, now() + $10, extract(epoch from now()) from backend_insert
+        select $1, $2, $7, $8, $9, now() + $10, extract(epoch from now()) * 1000 from backend_insert
         returning fencing_token
         "#,
         backend_id.to_string(),
