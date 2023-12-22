@@ -1,4 +1,4 @@
-use super::RemoteMeta;
+use super::ForwardableRequestInfo;
 use crate::{protocol::RouteInfo, types::BearerToken};
 use hyper::{
     http::{request, uri},
@@ -22,11 +22,11 @@ pub struct RequestRewriter {
     body: Body,
     bearer_token: BearerToken,
     prefix_uri: Uri,
-    remote_meta: RemoteMeta,
+    remote_meta: ForwardableRequestInfo,
 }
 
 impl RequestRewriter {
-    pub fn new(request: Request<Body>, remote_meta: RemoteMeta) -> Option<Self> {
+    pub fn new(request: Request<Body>, remote_meta: ForwardableRequestInfo) -> Option<Self> {
         let (parts, body) = request.into_parts();
 
         let mut uri_parts = parts.uri.clone().into_parts();
@@ -61,7 +61,7 @@ impl RequestRewriter {
         &self.bearer_token
     }
 
-    fn into_parts(self) -> (request::Parts, Body, Uri, RemoteMeta) {
+    fn into_parts(self) -> (request::Parts, Body, Uri, ForwardableRequestInfo) {
         let Self {
             mut parts,
             uri_parts,
@@ -110,7 +110,7 @@ fn clone_request_with_empty_body(
     parts: &request::Parts,
     route_info: &RouteInfo,
     prefix_uri: &Uri,
-    remote_meta: RemoteMeta,
+    remote_meta: ForwardableRequestInfo,
 ) -> request::Request<Body> {
     let mut builder = request::Builder::new()
         .method(parts.method.clone())
@@ -150,7 +150,7 @@ fn set_headers_from_route_info(
     headers: &mut HeaderMap,
     route_info: &RouteInfo,
     prefix_uri: &Uri,
-    remote_meta: RemoteMeta,
+    remote_meta: ForwardableRequestInfo,
 ) {
     let mut headers_to_remove = Vec::new();
     for header_name in headers.keys() {

@@ -23,8 +23,12 @@ use tokio_rustls::rustls::{
 };
 
 const DNS_01: &str = "dns-01";
-const MAX_SLEEP_TIME: Duration = Duration::from_secs(30 * 60); // 30 minutes
+
+/// How long to sleep after failing to acquire the certificate lease, or after
+/// acquiring the lease but failing to get a certificate.
 const LOCK_SLEEP_TIME: Duration = Duration::from_secs(60); // 1 minute
+
+/// How long in advance of the certificate expiring to renew it.
 const RENEWAL_WINDOW: Duration = Duration::from_secs(24 * 60 * 60 * 30); // 30 days
 
 /// Handle for receiving new certificates. Implements ResolvesServerCert, which
@@ -55,8 +59,11 @@ impl ResolvesServerCert for CertWatcher {
     }
 }
 
+/// Manages the certificate refresh loop.
 pub struct CertManager {
     cluster: ClusterName,
+
+    /// Channel for sending new certificates to the CertWatcher.
     send_cert: Arc<Sender<Option<Arc<CertifiedKey>>>>,
     refresh_loop: Option<tokio::task::JoinHandle<()>>,
     current_cert: Arc<RwLock<Option<CertificatePair>>>,
@@ -141,6 +148,7 @@ impl CertManager {
     }
 }
 
+/// Create a CertWatcher and CertManager pair.
 pub fn watcher_manager_pair(
     cluster: ClusterName,
     path: Option<&Path>,
@@ -154,7 +162,11 @@ pub fn watcher_manager_pair(
     Ok((cert_watcher, cert_manager))
 }
 
-pub async fn do_refresh(
+/// One step of the refresh loop.
+/// If we have a valid certificate, sleep until it's time to renew it.
+/// Otherwise, request a certificate lease from the cert manager, and then
+/// request a certificate from the ACME server.
+async fn refresh_loop_step(
     cluster: &ClusterName,
     acme_config: &AcmeConfig,
     send_cert: &Arc<Sender<Option<Arc<CertifiedKey>>>>,
@@ -180,7 +192,7 @@ pub async fn do_refresh(
                 renewal_time,
                 time_until_renew
             );
-            tokio::time::sleep(time_until_renew.max(MAX_SLEEP_TIME)).await;
+            tokio::time::sleep(time_until_renew).await;
             return Ok(());
         }
     }
@@ -244,7 +256,7 @@ pub async fn refresh_loop(
     path: Option<PathBuf>,
 ) {
     loop {
-        let result = do_refresh(
+        let result = refresh_loop_step(
             &cluster,
             &acme_config,
             &send_cert,
@@ -261,7 +273,7 @@ pub async fn refresh_loop(
     }
 }
 
-pub async fn get_certificate(
+async fn get_certificate(
     cluster: &ClusterName,
     acme_config: &AcmeConfig,
     request_sender: &(impl Fn(CertManagerRequest) + Send + Sync + 'static),
