@@ -5,7 +5,8 @@ use self::{
 use crate::{names::BackendName, types::ExecutorConfig};
 use anyhow::Result;
 use bollard::{
-    auth::DockerCredentials, errors::Error, service::EventMessage, system::EventsOptions, Docker,
+    auth::DockerCredentials, container::StatsOptions, errors::Error, service::EventMessage,
+    system::EventsOptions, Docker,
 };
 use tokio_stream::{Stream, StreamExt};
 
@@ -143,6 +144,60 @@ impl PlaneDocker {
                 .stop_container(&container_id.to_string(), None)
                 .await?;
         }
+
+        Ok(())
+    }
+
+    pub async fn get_metrics(
+        &self,
+        container_id: &ContainerId,
+    ) -> Result<bollard::container::Stats> {
+        let options = StatsOptions {
+            stream: false,
+            one_shot: false,
+        };
+
+        self.docker
+            .stats(&container_id.to_string(), Some(options))
+            .next()
+            .await
+            .ok_or(anyhow::anyhow!("no stats found for {container_id}"))?
+            .map_err(|e| anyhow::anyhow!("{e:?}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::names::Name;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_metrics() -> anyhow::Result<()> {
+        let docker = bollard::Docker::connect_with_local_defaults()?;
+        let plane_docker = PlaneDocker::new(docker, None).await?;
+
+        //TODO: replace with locally built hello world
+        plane_docker
+            .pull(
+                "ghcr.io/drifting-in-space/demo-image-drop-four",
+                None,
+                false,
+            )
+            .await?;
+
+        let backend_name = BackendName::new_random();
+        let container_id = ContainerId::from(format!("plane-test-{}", backend_name));
+        let executor_config = ExecutorConfig::from_image_with_defaults(
+            "ghcr.io/drifting-in-space/demo-image-drop-four",
+        );
+        plane_docker
+            .spawn_backend(&backend_name, &container_id, executor_config)
+            .await?;
+
+        let metrics = plane_docker.get_metrics(&container_id).await;
+        assert!(metrics.is_ok());
+        //TODO: add checks for required fields for conversion
 
         Ok(())
     }
