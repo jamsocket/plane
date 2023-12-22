@@ -63,15 +63,15 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                     continue;
                 }
 
-                let connected_string = if drone.active() {
+                let connected_string = if let Some(controller) = &drone.controller {
                     format!(
                         "{} to {}",
                         "Connected".green(),
-                        drone.controller.as_ref().unwrap().to_string().purple()
+                        controller.to_string().purple()
                     )
                 } else {
                     "Disconnected".yellow().to_string()
-                };
+                };                   
 
                 if drone.active() || all {
                     println!(

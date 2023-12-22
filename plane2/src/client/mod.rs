@@ -169,7 +169,7 @@ impl PlaneClient {
     pub fn backend_status_url(&self, cluster: &ClusterName, backend_id: &BackendName) -> Url {
         self.base_url
             .join(&format!("/pub/c/{}/b/{}/status", cluster, backend_id))
-            .unwrap()
+            .expect("Constructed URL is always valid.")
     }
 
     pub async fn backend_status(
@@ -194,7 +194,7 @@ impl PlaneClient {
                 "/pub/c/{}/b/{}/status-stream",
                 cluster, backend_id
             ))
-            .unwrap()
+            .expect("Constructed URL is always valid.")
     }
 
     pub async fn backend_status_stream(
