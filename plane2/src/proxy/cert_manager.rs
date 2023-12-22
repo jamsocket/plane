@@ -10,12 +10,12 @@ use acme2_eab::{
 use anyhow::{anyhow, Context, Result};
 use std::{
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{Duration, SystemTime},
 };
 use tokio::sync::{
     broadcast,
-    watch::{self, Receiver, Sender},
+    watch::{Receiver, Sender},
 };
 use tokio_rustls::rustls::{
     server::{ClientHello, ResolvesServerCert},
@@ -35,23 +35,36 @@ const RENEWAL_WINDOW: Duration = Duration::from_secs(24 * 60 * 60 * 30); // 30 d
 /// allows it to be used as a rustls cert_resolver.
 pub struct CertWatcher {
     receiver: Receiver<Option<CertificatePair>>,
-    send_certified_key: Sender<Option<Arc<CertifiedKey>>>,
-    recv_certified_key: Receiver<Option<Arc<CertifiedKey>>>,
+    certified_key: Mutex<Option<Arc<CertifiedKey>>>,
 }
 
 impl CertWatcher {
     fn new(receiver: Receiver<Option<CertificatePair>>) -> Self {
-        let (send_certified_key, recv_certified_key) = watch::channel(None);
         Self {
             receiver,
-            send_certified_key,
-            recv_certified_key,
+            certified_key: Mutex::new(None),
+        }
+    }
+
+    /// Update the certified key to match the latest CertificatePair from the receiver.
+    fn update_certified_key(&self) {
+        let cert_pair = self.receiver.borrow().as_ref().cloned();
+        let mut lock = self
+            .certified_key
+            .lock()
+            .expect("Certified key lock poisoned.");
+
+        if let Some(cert_pair) = cert_pair.as_ref() {
+            lock.replace(Arc::new(cert_pair.certified_key.clone()));
+        } else {
+            lock.take();
         }
     }
 
     pub async fn next(&mut self) -> Option<CertificatePair> {
         self.receiver.changed().await.ok()?;
-        self.receiver.borrow().clone()
+        self.update_certified_key();
+        self.receiver.borrow().as_ref().cloned()
     }
 }
 
@@ -62,16 +75,13 @@ impl ResolvesServerCert for CertWatcher {
             .has_changed()
             .expect("Receiver channel should not be closed.")
         {
-            let certified_key = self.receiver.borrow().as_ref().map(|cert_pair| {
-                let cert = cert_pair.certified_key.clone();
-                Arc::new(cert)
-            });
-            self.send_certified_key
-                .send(certified_key)
-                .expect("Certified key receiver should not be closed.");
+            self.update_certified_key();
         }
 
-        self.recv_certified_key.borrow().clone()
+        self.certified_key
+            .lock()
+            .expect("Certified key lock poisoned.")
+            .clone()
     }
 }
 
@@ -82,7 +92,14 @@ pub struct CertManager {
     /// Channel for sending new certificates to the CertWatcher.
     send_cert: Arc<Sender<Option<CertificatePair>>>,
     refresh_loop: Option<tokio::task::JoinHandle<()>>,
+
+    /// Sender for forwarding responses from the controller to the refresh loop
+    /// task. This technically doesn't need to be a broadcast channel, since there's
+    /// only one instance of the refresh loop task running at a time,
+    /// This doesn't need to be a broadcast channel, since there's only one
     response_sender: broadcast::Sender<CertManagerResponse>,
+
+    /// Configuration used for the ACME certificate request.
     acme_config: Option<AcmeConfig>,
 
     /// Path to save the certificate to.
