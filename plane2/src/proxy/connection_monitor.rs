@@ -1,11 +1,11 @@
-use crate::{heartbeat_consts::HEARTBEAT_INTERVAL_SECONDS, names::BackendName};
+use crate::{heartbeat_consts::HEARTBEAT_INTERVAL, names::BackendName};
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
         Arc, Mutex,
     },
-    time::{Duration, SystemTime},
+    time::SystemTime,
 };
 use tokio::task::JoinHandle;
 
@@ -35,10 +35,8 @@ impl ConnectionMonitor {
                 if let Some(listener) = &self.listener {
                     listener(backend_id);
                 }
-                self.visit_queue.push_back((
-                    SystemTime::now() + Duration::from_secs(HEARTBEAT_INTERVAL_SECONDS as _),
-                    backend_id.clone(),
-                ));
+                self.visit_queue
+                    .push_back((SystemTime::now() + HEARTBEAT_INTERVAL, backend_id.clone()));
                 entry.insert((AtomicU32::new(0), AtomicBool::new(false)));
             }
         }
@@ -56,10 +54,8 @@ impl ConnectionMonitor {
                     listener(backend_id);
                 }
 
-                self.visit_queue.push_back((
-                    SystemTime::now() + Duration::from_secs(HEARTBEAT_INTERVAL_SECONDS as _),
-                    backend_id.clone(),
-                ));
+                self.visit_queue
+                    .push_back((SystemTime::now() + HEARTBEAT_INTERVAL, backend_id.clone()));
                 entry.insert((AtomicU32::new(1), AtomicBool::new(false)));
             }
         }
@@ -100,8 +96,7 @@ impl ConnectionMonitorHandle {
                         .visit_queue
                         .pop_front()
                     else {
-                        tokio::time::sleep(Duration::from_secs(HEARTBEAT_INTERVAL_SECONDS as _))
-                            .await;
+                        tokio::time::sleep(HEARTBEAT_INTERVAL).await;
                         continue;
                     };
 
@@ -136,11 +131,9 @@ impl ConnectionMonitorHandle {
                             listener(&backend);
                         }
 
-                        monitor_lock.visit_queue.push_back((
-                            SystemTime::now()
-                                + Duration::from_secs(HEARTBEAT_INTERVAL_SECONDS as _),
-                            backend,
-                        ));
+                        monitor_lock
+                            .visit_queue
+                            .push_back((SystemTime::now() + HEARTBEAT_INTERVAL, backend));
                     }
                 }
             })

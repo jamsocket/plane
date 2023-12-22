@@ -14,13 +14,12 @@ const ALLOWED_CHARS: &str = "abcdefghijklmnopqrstuvwxyz0123456789";
 
 pub fn random_string() -> String {
     let range = Uniform::new(0, ALLOWED_CHARS.len());
-
     let mut rng = rand::thread_rng();
 
     range
         .sample_iter(&mut rng)
         .take(14)
-        .map(|i| ALLOWED_CHARS.chars().nth(i).unwrap())
+        .map(|i| ALLOWED_CHARS.chars().nth(i).expect("Index is always valid"))
         .collect()
 }
 

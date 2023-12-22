@@ -97,6 +97,7 @@ pub struct Handshake {
 }
 
 impl Handshake {
+    /// Compare a local and remote handshake, and log a warning if they are not compatible.
     pub fn check_compat(&self, other: &Handshake) {
         if self.version.version != other.version.version {
             tracing::warn!(
