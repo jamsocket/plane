@@ -29,12 +29,29 @@ enum Command {
         #[clap(long)]
         drone: DroneName,
     },
+    BlockRenew {
+        key_name: String,
+
+        #[clap(long, default_value = "")]
+        namespace: String,
+    },
 }
 
 async fn main_inner(opts: Opts) -> anyhow::Result<()> {
     let db = connect(&opts.db).await?;
 
     match opts.command {
+        Command::BlockRenew {
+            key_name,
+            namespace,
+        } => {
+            db.keys().block_renew(&key_name, &namespace).await?;
+
+            println!(
+                "Blocked renew for key {} in namespace {:?}",
+                key_name, namespace
+            );
+        }
         Command::Events => {
             let mut events = db.subscribe_all_events();
 

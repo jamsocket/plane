@@ -98,10 +98,13 @@ create table backend_key (
     tag varchar(255) not null,
     expires_at timestamptz not null,
     fencing_token bigint not null,
+    allow_renew bool not null default true,
     backend_id varchar(255) references backend(id) not null
 );
 
 create unique index idx_cluster_namespace_name on backend_key(cluster, namespace, key_name);
+
+comment on column backend_key.allow_renew is 'If false, the key cannot be renewed with the same fencing token.';
 
 create table token (
     token varchar(255) primary key,

@@ -21,6 +21,28 @@ impl<'a> KeysDatabase<'a> {
         Self { pool }
     }
 
+    pub async fn block_renew(&self, key_name: &str, namespace: &str) -> Result<(), sqlx::Error> {
+        let result = sqlx::query!(
+            r#"
+            update backend_key
+            set allow_renew = false
+            where
+                key_name = $1 and
+                namespace = $2
+            "#,
+            key_name,
+            namespace,
+        )
+        .execute(self.pool)
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(sqlx::Error::RowNotFound);
+        }
+
+        Ok(())
+    }
+
     /// Remove a key, ensuring that it is still expired.
     /// Returns Ok(true) if the key was successfully removed.
     pub async fn remove_key(&self, id: BackendKeyId) -> Result<bool, sqlx::Error> {
@@ -47,6 +69,7 @@ impl<'a> KeysDatabase<'a> {
                 key_name = $1 and
                 namespace = $2 and
                 tag = $3 and
+                allow_renew = true and
                 fencing_token = $4
             "#,
             key.name.clone(),

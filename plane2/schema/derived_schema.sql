@@ -167,11 +167,19 @@ CREATE TABLE public.backend_key (
     tag character varying(255) NOT NULL,
     expires_at timestamp with time zone NOT NULL,
     fencing_token bigint NOT NULL,
+    allow_renew boolean DEFAULT true NOT NULL,
     backend_id character varying(255) NOT NULL
 );
 
 
 ALTER TABLE public.backend_key OWNER TO postgres;
+
+--
+-- Name: COLUMN backend_key.allow_renew; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_key.allow_renew IS 'If false, the key cannot be renewed with the same fencing token.';
+
 
 --
 -- Name: backend_key_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres

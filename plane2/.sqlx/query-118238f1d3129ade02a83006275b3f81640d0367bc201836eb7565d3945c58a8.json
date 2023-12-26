@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update backend_key\n            set expires_at = now() + $5\n            where\n                key_name = $1 and\n                namespace = $2 and\n                tag = $3 and\n                allow_renew = true and\n                fencing_token = $4\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Int8",
+        "Interval"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "118238f1d3129ade02a83006275b3f81640d0367bc201836eb7565d3945c58a8"
+}
