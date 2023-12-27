@@ -26,21 +26,6 @@ impl Display for NodeId {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
-pub struct BackendKeyId(i32);
-
-impl From<i32> for BackendKeyId {
-    fn from(i: i32) -> Self {
-        Self(i)
-    }
-}
-
-impl BackendKeyId {
-    pub fn as_i32(&self) -> i32 {
-        self.0
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
 pub struct ClusterName(String);
 

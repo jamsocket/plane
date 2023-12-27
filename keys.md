@@ -45,11 +45,7 @@ When first acquiring a key, the drone is not involved until after the key is acq
 
 ## Fencing Tokens
 
-Each key has an associated **fencing token** which is increased each time the key is acquired, but stays the same each time it is renewed.
-
-This token has two purposes:
-1. It is used as a sort of nonce to prevent a drone from renewing a key assignment that has already been recorded as lost and re-assigned to another backend.
-2. It is provided to the backend itself for optional use as a [fencing token](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html).
+Each key has an associated **fencing token** which is increased each time the key is acquired, but stays the same each time it is renewed. This is not used by the key system itself, but is provided to the backend itself for optional use as a [fencing token](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html).
 
 In practice, the token is created from the epoch timestamp (in milliseconds) of the database at the time the lock is acquired. This behavior is not guaranteed, but the token will always be monotonically increasing.
 

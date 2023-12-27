@@ -35,7 +35,7 @@ pub async fn wait_for_backend(address: SocketAddr) {
             continue;
         };
 
-        if let Err(_) = result {
+        if result.is_err() {
             // error
             tokio::time::sleep(Duration::from_millis(WAIT_TIMEOUT_MS)).await;
             continue;

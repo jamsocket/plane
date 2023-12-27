@@ -1,6 +1,10 @@
 use clap::{Parser, Subcommand};
 use colored::{self, Colorize};
-use plane2::{database::connect, names::DroneName, types::ClusterName};
+use plane2::{
+    database::connect,
+    names::{BackendName, DroneName},
+    types::ClusterName,
+};
 
 #[derive(Parser)]
 struct Opts {
@@ -29,11 +33,8 @@ enum Command {
         #[clap(long)]
         drone: DroneName,
     },
-    BlockRenew {
-        key_name: String,
-
-        #[clap(long, default_value = "")]
-        namespace: String,
+    PreventRenew {
+        backend: BackendName,
     },
 }
 
@@ -41,16 +42,14 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
     let db = connect(&opts.db).await?;
 
     match opts.command {
-        Command::BlockRenew {
-            key_name,
-            namespace,
-        } => {
-            db.keys().block_renew(&key_name, &namespace).await?;
+        Command::PreventRenew { backend } => {
+            let success = db.keys().prevent_renew(&backend).await?;
 
-            println!(
-                "Blocked renew for key {} in namespace {:?}",
-                key_name, namespace
-            );
+            if success {
+                println!("Blocked renew for {}.", backend);
+            } else {
+                println!("Could not find active key for: {}", backend);
+            }
         }
         Command::Events => {
             let mut events = db.subscribe_all_events();

@@ -1,7 +1,7 @@
 use super::executor::Executor;
 use crate::{
     names::BackendName,
-    protocol::{AcquiredKey, BackendAction, RenewKeyRequest},
+    protocol::{AcquiredKey, BackendAction, KeyDeadlines, RenewKeyRequest},
     typed_socket::TypedSocketSender,
     types::TerminationKind,
     util::GuardHandle,
@@ -26,16 +26,18 @@ pub struct KeyManager {
 
 async fn renew_key_loop(
     key: AcquiredKey,
+    backend: BackendName,
     sender: Option<TypedSocketSender<RenewKeyRequest>>,
     executor: Arc<Executor>,
 ) {
     loop {
         let now = SystemTime::now();
-        if now >= key.hard_terminate_at {
+        let deadlines = &key.deadlines;
+        if now >= deadlines.hard_terminate_at {
             tracing::warn!("Key {:?} has expired, hard-terminating.", key.key);
             if let Err(err) = executor
                 .apply_action(
-                    &key.backend,
+                    &backend,
                     &BackendAction::Terminate {
                         kind: TerminationKind::Hard,
                     },
@@ -49,11 +51,11 @@ async fn renew_key_loop(
             break;
         }
 
-        if now >= key.soft_terminate_at {
+        if now >= deadlines.soft_terminate_at {
             tracing::warn!("Key {:?} has expired, soft-terminating.", key.key);
             if let Err(err) = executor
                 .apply_action(
-                    &key.backend,
+                    &backend,
                     &BackendAction::Terminate {
                         kind: TerminationKind::Soft,
                     },
@@ -65,21 +67,19 @@ async fn renew_key_loop(
                 continue;
             }
 
-            if let Ok(time_to_sleep) = key.hard_terminate_at.duration_since(now) {
+            if let Ok(time_to_sleep) = deadlines.hard_terminate_at.duration_since(now) {
                 sleep(time_to_sleep).await;
             }
 
             continue;
         }
 
-        if now >= key.renew_at {
+        if now >= deadlines.renew_at {
             tracing::info!("Renewing key {:?}.", key.key);
 
             if let Some(ref sender) = sender {
                 let request = RenewKeyRequest {
-                    key: key.key.clone(),
-                    token: key.token,
-                    backend: key.backend.clone(),
+                    backend: backend.clone(),
                     local_time: SystemTime::now(),
                 };
 
@@ -88,13 +88,13 @@ async fn renew_key_loop(
                 }
             }
 
-            if let Ok(time_to_sleep) = key.soft_terminate_at.duration_since(now) {
+            if let Ok(time_to_sleep) = deadlines.soft_terminate_at.duration_since(now) {
                 sleep(time_to_sleep).await;
             }
             continue;
         }
 
-        if let Ok(time_to_sleep) = key.renew_at.duration_since(now) {
+        if let Ok(time_to_sleep) = deadlines.renew_at.duration_since(now) {
             sleep(time_to_sleep).await;
         }
     }
@@ -112,9 +112,10 @@ impl KeyManager {
     pub fn set_sender(&mut self, sender: TypedSocketSender<RenewKeyRequest>) {
         self.sender.replace(sender);
 
-        for (_, (acquired_key, handle)) in self.handles.iter_mut() {
+        for (backend, (acquired_key, handle)) in self.handles.iter_mut() {
             let mut new_handle = GuardHandle::new(renew_key_loop(
                 acquired_key.clone(),
+                backend.clone(),
                 self.sender.clone(),
                 self.executor.clone(),
             ));
@@ -123,14 +124,28 @@ impl KeyManager {
         }
     }
 
-    pub fn register_key(&mut self, key: AcquiredKey) {
+    pub fn register_key(&mut self, backend: BackendName, key: AcquiredKey) {
         let handle = GuardHandle::new(renew_key_loop(
             key.clone(),
+            backend.clone(),
             self.sender.clone(),
             self.executor.clone(),
         ));
 
-        self.handles.insert(key.backend.clone(), (key, handle));
+        self.handles.insert(backend, (key, handle));
+    }
+
+    pub fn update_deadlines(&mut self, backend: &BackendName, deadlines: KeyDeadlines) {
+        if let Some((key, handle)) = self.handles.get_mut(backend) {
+            key.deadlines = deadlines;
+
+            *handle = GuardHandle::new(renew_key_loop(
+                key.clone(),
+                backend.clone(),
+                self.sender.clone(),
+                self.executor.clone(),
+            ));
+        }
     }
 
     pub fn unregister_key(&mut self, backend: &BackendName) {

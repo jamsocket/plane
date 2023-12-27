@@ -12,13 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, time::SystemTime};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AcquiredKey {
-    /// The key which has been acquired.
-    pub key: KeyConfig,
-
-    /// The backend for which the key was acquired.
-    pub backend: BackendName,
-
+pub struct KeyDeadlines {
     /// When the key should be renewed.
     pub renew_at: SystemTime,
 
@@ -27,6 +21,15 @@ pub struct AcquiredKey {
 
     /// When the backend should be hard-terminated if the key could not be renewed.
     pub hard_terminate_at: SystemTime,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AcquiredKey {
+    /// Details of the key itself.
+    pub key: KeyConfig,
+
+    /// Deadlines for key expiration stages.
+    pub deadlines: KeyDeadlines,
 
     /// A unique key associated with a key for the duration it is acquired. This does not
     /// change across renewals, but is incremented when the key is released and then acquired.
@@ -79,9 +82,8 @@ impl From<BackendEventId> for i64 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RenewKeyRequest {
-    pub key: KeyConfig,
     pub backend: BackendName,
-    pub token: i64,
+
     pub local_time: SystemTime,
 }
 
@@ -103,13 +105,23 @@ impl ChannelMessage for MessageFromDrone {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RenewKeyResponse {
+    /// The backend whose associated key was renewed.
+    pub backend: BackendName,
+
+    /// The key that was renewed, if successful.
+    /// If the key was not renewed, this will be None.
+    pub deadlines: Option<KeyDeadlines>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageToDrone {
     Action(BackendActionMessage),
     /// Acknowledge that the container has received and processed a backend event.
     AckEvent {
         event_id: BackendEventId,
     },
-    RenewKeyResponse(AcquiredKey),
+    RenewKeyResponse(RenewKeyResponse),
 }
 
 impl ChannelMessage for MessageToDrone {

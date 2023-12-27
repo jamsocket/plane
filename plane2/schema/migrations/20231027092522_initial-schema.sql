@@ -91,15 +91,14 @@ create index idx_backend_action_pending on backend_action(drone_id) where acked_
 create index idx_backend_action_backend on backend_action(backend_id);
 
 create table backend_key (
-    id serial primary key,
+    id varchar(255) references backend(id) not null,
     cluster varchar(255) not null,
     namespace varchar(255) not null,
     key_name varchar(255) not null,
     tag varchar(255) not null,
     expires_at timestamptz not null,
     fencing_token bigint not null,
-    allow_renew bool not null default true,
-    backend_id varchar(255) references backend(id) not null
+    allow_renew bool not null default true
 );
 
 create unique index idx_cluster_namespace_name on backend_key(cluster, namespace, key_name);

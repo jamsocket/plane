@@ -6,7 +6,7 @@ use crate::{
     database::backend::BackendActionMessage,
     drone::docker::PlaneDocker,
     names::DroneName,
-    protocol::{BackendAction, MessageFromDrone, MessageToDrone},
+    protocol::{BackendAction, MessageFromDrone, MessageToDrone, RenewKeyResponse},
     signals::wait_for_shutdown_signal,
     typed_socket::client::TypedSocketConnector,
     types::{BackendStatus, ClusterName},
@@ -91,7 +91,7 @@ pub async fn drone_loop(
                         key_manager
                             .lock()
                             .expect("Key manager lock poisoned.")
-                            .register_key(key.clone());
+                            .register_key(backend_id.clone(), key.clone());
                     }
 
                     if let Err(err) = executor.apply_action(&backend_id, &action).await {
@@ -110,12 +110,19 @@ pub async fn drone_loop(
                         tracing::error!(?err, "Error acking event.");
                     }
                 }
-                MessageToDrone::RenewKeyResponse(acquired_key) => {
-                    tracing::info!(?acquired_key, "Received key renewal response.");
-                    key_manager
-                        .lock()
-                        .expect("Key manager lock poisoned.")
-                        .register_key(acquired_key);
+                MessageToDrone::RenewKeyResponse(renew_key_response) => {
+                    let RenewKeyResponse { backend, deadlines } = renew_key_response;
+                    tracing::info!(?deadlines, "Received key renewal response.");
+
+                    if let Some(deadlines) = deadlines {
+                        key_manager
+                            .lock()
+                            .expect("Key manager lock poisoned.")
+                            .update_deadlines(&backend, deadlines);
+                    } else {
+                        // TODO: we could begin the graceful termiation here.
+                        tracing::warn!("Key renewal failed.");
+                    }
                 }
             }
         }

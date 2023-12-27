@@ -5,7 +5,7 @@
     "columns": [],
     "parameters": {
       "Left": [
-        "Int4"
+        "Text"
       ]
     },
     "nullable": []

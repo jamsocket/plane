@@ -9,7 +9,9 @@ use crate::{
         subscribe::Subscription,
         PlaneDatabase,
     },
-    protocol::{AcquiredKey, BackendAction, Heartbeat, MessageFromDrone, MessageToDrone},
+    protocol::{
+        BackendAction, Heartbeat, KeyDeadlines, MessageFromDrone, MessageToDrone, RenewKeyResponse,
+    },
     typed_socket::{server::new_server, TypedSocket},
     types::{ClusterName, NodeId, TerminationKind},
 };
@@ -68,20 +70,22 @@ pub async fn handle_message_from_drone(
             controller
                 .db
                 .keys()
-                .renew_key(&renew_key_request.key, renew_key_request.token)
+                .renew_key(&renew_key_request.backend)
                 .await?;
 
-            let acquired_key = AcquiredKey {
-                token: renew_key_request.token,
-                key: renew_key_request.key.clone(),
-                backend: renew_key_request.backend.clone(),
+            let deadlines = KeyDeadlines {
                 renew_at: renew_key_request.local_time + KEY_LEASE_RENEW_AFTER,
                 soft_terminate_at: renew_key_request.local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
                 hard_terminate_at: renew_key_request.local_time + KEY_LEASE_HARD_TERMINATE_AFTER,
             };
 
+            let renew_key_response = RenewKeyResponse {
+                backend: renew_key_request.backend,
+                deadlines: Some(deadlines),
+            };
+
             sender
-                .send(MessageToDrone::RenewKeyResponse(acquired_key))
+                .send(MessageToDrone::RenewKeyResponse(renew_key_response))
                 .await?;
         }
     }

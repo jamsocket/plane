@@ -1,7 +1,7 @@
 use crate::{
     heartbeat_consts::{ASSUME_LOST_SECONDS, UNHEALTHY_SECONDS},
     names::BackendName,
-    types::{BackendKeyId, ClusterName, KeyConfig},
+    types::{ClusterName, KeyConfig},
 };
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, PgPool};
@@ -21,38 +21,16 @@ impl<'a> KeysDatabase<'a> {
         Self { pool }
     }
 
-    pub async fn block_renew(&self, key_name: &str, namespace: &str) -> Result<(), sqlx::Error> {
+    pub async fn prevent_renew(&self, backend: &BackendName) -> Result<bool, sqlx::Error> {
         let result = sqlx::query!(
             r#"
             update backend_key
             set allow_renew = false
             where
-                key_name = $1 and
-                namespace = $2
+                id = $1 and
+                allow_renew = true
             "#,
-            key_name,
-            namespace,
-        )
-        .execute(self.pool)
-        .await?;
-
-        if result.rows_affected() == 0 {
-            return Err(sqlx::Error::RowNotFound);
-        }
-
-        Ok(())
-    }
-
-    /// Remove a key, ensuring that it is still expired.
-    /// Returns Ok(true) if the key was successfully removed.
-    pub async fn remove_key(&self, id: BackendKeyId) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query!(
-            r#"
-            delete from backend_key
-            where id = $1
-            and expires_at > now()
-            "#,
-            id.as_i32(),
+            backend.to_string(),
         )
         .execute(self.pool)
         .await?;
@@ -60,22 +38,33 @@ impl<'a> KeysDatabase<'a> {
         Ok(result.rows_affected() > 0)
     }
 
-    pub async fn renew_key(&self, key: &KeyConfig, token: i64) -> Result<(), sqlx::Error> {
+    /// Remove a key, ensuring that it is still expired.
+    /// Returns Ok(true) if the key was successfully removed.
+    pub async fn remove_key(&self, backend: BackendName) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query!(
+            r#"
+            delete from backend_key
+            where id = $1
+            and expires_at > now()
+            "#,
+            backend.to_string(),
+        )
+        .execute(self.pool)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn renew_key(&self, id: &BackendName) -> Result<(), sqlx::Error> {
         let result = sqlx::query!(
             r#"
             update backend_key
-            set expires_at = now() + $5
+            set expires_at = now() + $2
             where
-                key_name = $1 and
-                namespace = $2 and
-                tag = $3 and
-                allow_renew = true and
-                fencing_token = $4
+                id = $1 and
+                allow_renew = true
             "#,
-            key.name.clone(),
-            key.namespace.clone(),
-            key.tag.clone(),
-            token,
+            id.to_string(),
             PgInterval::try_from(KEY_LEASE_EXPIRATION).expect("valid constant interval"),
         )
         .execute(self.pool)
@@ -100,10 +89,11 @@ impl<'a> KeysDatabase<'a> {
                 backend_key.id as id,
                 backend_key.tag as tag,
                 backend_key.expires_at as expires_at,
-                backend.id as backend_id,
+                backend_key.fencing_token as token,
+                backend_key.key_name as name,
                 now() as "as_of!"
             from backend_key
-            left join backend on backend_key.backend_id = backend.id
+            left join backend on backend_key.id = backend.id
             where backend_key.cluster = $1
             and backend_key.key_name = $2
             and backend_key.namespace = $3
@@ -117,10 +107,11 @@ impl<'a> KeysDatabase<'a> {
 
         if let Some(lock_result) = lock_result {
             Ok(Some(BackendKeyResult {
-                id: BackendKeyId::from(lock_result.id),
+                id: BackendName::try_from(lock_result.id)
+                    .map_err(|_| sqlx::Error::Decode("Invalid backend name.".into()))?,
+                token: lock_result.token,
+                key: lock_result.name,
                 tag: lock_result.tag,
-                backend_id: BackendName::try_from(lock_result.backend_id)
-                    .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?,
                 expires_at: lock_result.expires_at,
                 as_of: lock_result.as_of,
             }))
@@ -144,9 +135,10 @@ pub enum BackendKeyHealth {
 }
 
 pub struct BackendKeyResult {
-    pub id: BackendKeyId,
+    pub id: BackendName,
     pub tag: String,
-    backend_id: BackendName,
+    pub token: i64,
+    pub key: String,
     expires_at: DateTime<Utc>,
     as_of: DateTime<Utc>,
 }
@@ -160,6 +152,6 @@ impl BackendKeyResult {
         if key_age > UNHEALTHY_SECONDS {
             return BackendKeyHealth::Unhealthy;
         }
-        BackendKeyHealth::Active(self.backend_id.clone())
+        BackendKeyHealth::Active(self.id.clone())
     }
 }

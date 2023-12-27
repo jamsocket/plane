@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                delete from backend_key\n                where id = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a63ab377f348bd39786deb4b49ea63970b671234b53a3beb897a2b0d5cf8efad"
+}
