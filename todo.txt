@@ -1,3 +1,0 @@
-- [ ] When a backend is terminated, broadcast its termination to proxies so that they can remove it from their route cache.
-- [ ] When a backend is termianted, the key should be released automatically.
-
