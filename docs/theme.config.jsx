@@ -5,5 +5,4 @@ export default {
     project: {
         link: 'https://github.com/drifting-in-space/plane'
     }
-    // ... other theme options
 }
