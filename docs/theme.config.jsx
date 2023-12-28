@@ -1,7 +1,9 @@
+import Logo from './components/logo'
+
 export default {
-    logo: <span>My Nextra Documentation</span>,
+    logo: <div style={{height: 25}}><Logo /></div>,
     project: {
-        link: 'https://github.com/shuding/nextra'
+        link: 'https://github.com/drifting-in-space/plane'
     }
     // ... other theme options
 }
