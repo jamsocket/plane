@@ -1,0 +1,13 @@
+{
+    "index": {
+        "title": "Plane",
+        "theme": {
+            "breadcrumb": false,
+            "footer": true,
+            "sidebar": true,
+            "navbar": false,
+            "toc": true,
+            "pagination": false
+        }
+    }
+}

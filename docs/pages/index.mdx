@@ -1,13 +1,22 @@
+---
+title: Plane
+---
+
 import Logo from '../components/logo'
 
 <div style={{height: 60}}>
     <Logo />
 </div>
 
-<div>
+<div style={{marginTop: 20}}>
     <a href="https://github.com/drifting-in-space/plane"><img style={{display: 'inline', marginRight: 5}} src="https://img.shields.io/github/stars/drifting-in-space/plane?style=social" alt="Plane GitHub Repo" /></a>
     <a href="https://discord.gg/N5sEpsuhh9"><img style={{display: 'inline', marginRight: 5}} src="https://img.shields.io/static/v1?label=chat&message=discord&color=404eed" alt="Chat on Discord" /></a>
     <a href="https://github.com/drifting-in-space/plane/actions/workflows/unit-tests.yml"><img style={{display: 'inline', marginRight: 5}} src="https://github.com/drifting-in-space/plane/actions/workflows/tests.yml/badge.svg" alt="Tests" /></a>
 </div>
 
-Hello, world!
+Plane is infrastructure software for **running stateful WebSocket backends at scale**. Plane is heavily inspired by [Figma’s mulitplayer infrastructure](https://www.figma.com/blog/rust-in-production-at-figma/), which dynamically spawns a process for each active document.
+
+Use cases include:
+- Scaling up [authoritative multiplayer backends](https://driftingin.space/posts/you-might-not-need-a-crdt).
+- Running isolated code environments (like REPLs, code notebooks, and LLM agent sandboxes).
+- Data-intensive applications that need a dedicated high-RAM process for each active user session.

@@ -1,0 +1,70 @@
+import { Callout } from 'nextra/components'
+
+# Getting Started
+
+## Docker Compose
+
+The easiest way to try out Plane is to use Docker Compose. These instructions are for a Linux or Mac environment
+with Docker installed.
+
+### 1. Clone Plane’s [git repo](https://github.com/drifting-in-space/plane)
+
+```bash
+git clone https://github.com/drifting-in-space/plane.git
+cd plane
+```
+
+### 2. Start Plane
+
+```bash
+docker compose -f docker/docker-compose.yml up
+```
+
+This will run:
+- An instance of Postgres
+- A Plane controller
+- A Plane “drone”
+- A Plane proxy
+
+### 3. Connect to a backend
+
+TODO: this part requires Rust; we should replace it with a Docker container.
+
+```bash
+dev/cli.sh \
+    connect \
+    --cluster 'localhost:9090' \
+    --key 'my-first-backend' \
+    --image 'ghcr.io/drifting-in-space/demo-image-drop-four'
+```
+
+You can think of Plane as a big key-value store that associates “keys” (arbitrary strings) with running processes (backends).
+
+When you issue a “connect” request, Plane will return a URL that routes to the process associated with the key you provide.
+If no process is running, Plane will start one (provided that you supply an image name in the connect request).
+
+Here’s a breakdown of the command above:
+
+- `dev/cli.sh` is a lightweight shell script that runs the Plane CLI, pre-configuring it to point to
+  a Plane instance listening at `localhost:8080` (this corresponds to how the Docker Compose setup is configured).
+- `connect` is the Plane CLI subcommand for issuing a “connect request”, which will return a URL that routes to
+  a backend process.
+- `--cluster 'localhost:9090'` tells the CLI to start the backend on the `localhost:9090` cluster. More on clusters later,
+  but for now just know that `localhost:9090` is the cluster that the Docker Compose setup is configured to use.
+- `--key 'my-first-backend'` tells the CLI to associate the backend with the key `my-first-backend`. The first time we run
+  this command, no backend with the key `my-first-backend` will exist, so Plane will start a new backend process. If we
+  subsequently run this command again while that backend process is still running, Plane will return a URL that routes
+  to that backend process.
+- `--image '...'` tells the CLI that if it needs to start a new backend process,
+  it should use the given Docker image. In this case, the image serves a simple turn-based multiplayer game.
+
+<Callout type="info">
+  At least one of `--key` or `--image` must be provided, but it is not neccesary to include both.
+
+  If you **only** want to connect to an existing backend, you can provide `--key` only. If a
+  backend with the given key is not running, Plane will return an error.
+
+  If you **don’t** want to connect to an existing backend process, you can provide `--image` only.
+  Plane will use a unique key to start a new backend, and return a URL that routes to it.
+</Callout>
+
