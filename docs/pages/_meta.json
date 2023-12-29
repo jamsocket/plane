@@ -2,14 +2,20 @@
     "index": {
         "title": "Plane",
         "theme": {
-            "breadcrumb": false,
-            "footer": true,
-            "sidebar": true,
-            "navbar": false,
-            "toc": true,
-            "pagination": false
+            "breadcrumb": false
         }
     },
-    "quickstart-guide": "Quickstart Guide",
-    "concepts": "Concepts"
+    "quickstart-guide": {
+        "title": "Quickstart Guide",
+        "theme": {
+            "breadcrumb": false
+        }
+    },
+    "concepts": "Concepts",
+    "plane-api": {
+        "title": "Plane API",
+        "theme": {
+            "breadcrumb": false
+        }
+    }
 }

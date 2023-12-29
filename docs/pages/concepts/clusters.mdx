@@ -1,0 +1,35 @@
+# Clusters
+
+A **cluster** in Plane refers to a pool of [drones](architecture.mdx). Using Plane requires at least
+one cluster, but it is possible to have multiple in order to manage different pools of drones without
+treating them as interchangeable.
+
+For example, you might have some CPU-only drones, and some drones with GPUs. Clusters allow you to
+manage both sets of drones from the same controller, whilst having control over which set of drones
+an individual backend is run on.
+
+Drones and proxy instances are associated with a single cluster, and are **not** shared between them.
+This allows you to run each cluster on a different network or VPC.
+
+## Cluster names
+
+Clusters are identified by a name, which doubles as the hostname through which clients will connect
+to backends belonging to that cluster.
+
+For example, when drones beloning to the cluster `c1.mysite.com` run backends, those backends will
+be accessible through URLs that begin with `https://c1.mysite.com/...`.
+
+Plane proxies associated with the `c1.mysite.com` will expect inbound traffic to have the `Host`
+header `c1.mysite.com`, and will proxy it to the appropriate drone. It is up to you to configure
+your DNS and/or load balancers so that inbound traffic actually arrives at the proxy.
+
+### Non-HTTPS clusters (development only)
+
+If a port is *not* specified in the cluster name (as in `c1.mysite.com`), Plane assumes that inbound
+traffic will come over HTTPS on port 443. If a port is specified (as in `localhost:9090`),
+Plane will assume that inbound traffic is **not** HTTPS, but raw HTTP, and will arrive on the
+specified port. This is useful for testing locally without DNS or certificate configuration, and
+is not intended for production use.
+
+Since Plane uses the presence of a port in the cluster name to determine whether to use HTTPS or
+HTTP, it is not currently possible to use HTTPS on a non-standard port.

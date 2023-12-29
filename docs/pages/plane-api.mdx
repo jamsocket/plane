@@ -1,0 +1,24 @@
+# Plane API
+
+The controller in Plane serves an HTTP/JSON API, which is used both by other Plane components and other trusted components
+(such as your own application web server) to interact with Plane.
+
+The Plane API is partitioned into two parts:
+- A **control API** which trusted clients can use to control aspects of Plane, such as starting and terminating backends.
+- A **public API** which can be used by trusted or untrusted clients alike (including your app end-users’ browsers).
+
+The control API is served with the `/ctrl` prefix, and the public API is served with the `/pub` prefix. For flexibility,
+Plane itself does not implement any access control or TLS termination on these endpoints. If you intend to expose Plane's API
+over the open internet, you should use a reverse proxy (like Nginx, Caddy, or Envoy) to terminate TLS and implement access
+control for each path prefix.
+
+## Connect API
+
+One way to think about Plane is that it acts like a distributed key-value store, except that instead of storing data associated
+with each key, it manages a running process for each key. When you ask Plane for the process associated with a key, Plane
+ensures that a process is running for that key, and returns a URL that points to it.
+
+In the key-value map analogy, the default behavior of Plane is comparable to “get or create” semantics that some key-value maps
+implement (such as [`setdefault`](https://docs.python.org/3.8/library/stdtypes.html?highlight=setdefault#dict.setdefault) in Python).
+
+The `connect` API is the endpoint that implements this behavior.

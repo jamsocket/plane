@@ -26,6 +26,8 @@ This will run:
 - A Plane “drone”
 - A Plane proxy
 
+See the [architecture overview](concepts/architecture.mdx) for background on each Plane component.
+
 ### 3. Connect to a backend
 
 TODO: this part requires Rust; we should replace it with a Docker container.
@@ -39,7 +41,8 @@ dev/cli.sh \
     --wait
 ```
 
-You can think of Plane as a big key-value store that associates “keys” (arbitrary strings) with running processes (backends).
+You can think of Plane as a big key-value store that associates “keys” (arbitrary strings) with running processes
+([session backends](concepts/session-backends.mdx)).
 
 When you issue a “connect” request, Plane will return a URL that routes to the process associated with the key you provide.
 If no process is running, Plane will start one (provided that you supply an image name in the connect request).
@@ -50,8 +53,9 @@ Here’s a breakdown of the command above:
   a Plane instance listening at `localhost:8080` (this corresponds to how the Docker Compose setup is configured).
 - `connect` is the Plane CLI subcommand for issuing a “connect request”, which will return a URL that routes to
   a backend process.
-- `--cluster 'localhost:9090'` tells the CLI to start the backend on the `localhost:9090` cluster. More on clusters later,
-  but for now just know that `localhost:9090` is the cluster that the Docker Compose setup is configured to use.
+- `--cluster 'localhost:9090'` tells the CLI to start the backend on the `localhost:9090` cluster. Since the cluster name
+  includes a port (`:9090`), Plane will treat it as a “development” cluster and not enable HTTPS on it. See [clusters](concepts/clusters.mdx)
+  for more details.
 - `--key 'my-first-backend'` tells the CLI to associate the backend with the key `my-first-backend`. The first time we run
   this command, no backend with the key `my-first-backend` will exist, so Plane will start a new backend process. If we
   subsequently run this command again while that backend process is still running, Plane will return a URL that routes

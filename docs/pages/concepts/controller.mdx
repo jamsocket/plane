@@ -1,7 +1,0 @@
-The **controller** is the core communication hub of Plane. Other components, including drones, proxies,
-and the CLI tool, all connect to the controller through its HTTP API.
-
-The controller is the only component that holds a direct connection to the database.
-
-It is only necessary to have one controller, but it is possible to run multiple controllers behind a
-load balancer for redundancy (which is recommended in production).
