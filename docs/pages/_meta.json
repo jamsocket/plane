@@ -17,5 +17,11 @@
         "theme": {
             "breadcrumb": false
         }
+    },
+    "deploy-to-prod": {
+        "title": "Deploying to Production",
+        "theme": {
+            "breadcrumb": false
+        }
     }
 }
