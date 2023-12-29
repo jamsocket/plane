@@ -9,5 +9,7 @@
             "toc": true,
             "pagination": false
         }
-    }
+    },
+    "quickstart-guide": "Quickstart Guide",
+    "concepts": "Concepts"
 }

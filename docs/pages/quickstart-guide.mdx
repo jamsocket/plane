@@ -1,6 +1,6 @@
 import { Callout } from 'nextra/components'
 
-# Getting Started
+# Quickstart Guide
 
 ## Docker Compose
 
@@ -35,7 +35,8 @@ dev/cli.sh \
     connect \
     --cluster 'localhost:9090' \
     --key 'my-first-backend' \
-    --image 'ghcr.io/drifting-in-space/demo-image-drop-four'
+    --image 'ghcr.io/drifting-in-space/demo-image-drop-four' \
+    --wait
 ```
 
 You can think of Plane as a big key-value store that associates “keys” (arbitrary strings) with running processes (backends).
@@ -57,6 +58,8 @@ Here’s a breakdown of the command above:
   to that backend process.
 - `--image '...'` tells the CLI that if it needs to start a new backend process,
   it should use the given Docker image. In this case, the image serves a simple turn-based multiplayer game.
+- `--wait` tells the CLI to display the backend’s status as it starts up, and to wait until the backend is `Ready` before
+  returning.
 
 <Callout type="info">
   At least one of `--key` or `--image` must be provided, but it is not neccesary to include both.
@@ -67,4 +70,22 @@ Here’s a breakdown of the command above:
   If you **don’t** want to connect to an existing backend process, you can provide `--image` only.
   Plane will use a unique key to start a new backend, and return a URL that routes to it.
 </Callout>
+
+When you run the command above, you should see output like this:
+
+```
+Created backend: ba-xt8nmtlgti18qx
+URL: http://localhost:9090/tYVHfS4PKgufdhwGCnn6LLfAaCo_iAHitbw4Bg8ETjA/
+Status URL: http://0.0.0.0:8080/pub/c/localhost:9090/b/ba-xt8nmtlgti18qx/status
+```
+
+The first line tells you that Plane has created a backend with the key `ba-xt8nmtlgti18qx`. The second line tells you
+a URL that routes to that backend. The third line tells you a URL that you can use to check the status of the backend
+as JSON.
+
+Below that output, it will show a running list of states and the time they were entered. The first
+time you run a particular image, it may spend some time in the `Loading` state, because it will download the container
+image if it does not have it cached.
+
+Once the image is in the `Ready` state, you can open the URL provided in your browser to open the game.
 
