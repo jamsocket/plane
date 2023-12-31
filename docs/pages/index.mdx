@@ -2,6 +2,7 @@
 title: Plane
 ---
 
+import { Callout } from 'nextra/components'
 import Logo from '../components/logo'
 
 <div style={{height: 60}}>
@@ -18,6 +19,14 @@ Use cases include:
 - Scaling up [authoritative multiplayer backends](https://driftingin.space/posts/you-might-not-need-a-crdt).
 - Running isolated code environments (like REPLs, code notebooks, and LLM agent sandboxes).
 - Data-intensive applications that need a dedicated high-RAM process for each active user session.
+
+<Callout type="warning">
+    This documentation refers to the 0.4.0 release of Plane, which is a complete rewrite released in
+    January, 2024. We’re still working on getting the docs up to date, so please mind the wet paint!
+
+    If anything is unclear in the meantime, feel free to [open a discussion](https://github.com/drifting-in-space/plane/discussions)
+    on Plane’s GitHub.
+</Callout>
 
 ## Architecture Overview
 

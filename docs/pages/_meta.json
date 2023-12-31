@@ -23,5 +23,6 @@
         "theme": {
             "breadcrumb": false
         }
-    }
+    },
+    "developing": "Developing Plane"
 }

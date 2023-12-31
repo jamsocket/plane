@@ -1,4 +1,7 @@
 {
     "session-backends": "Session Backends",
-    "architecture": "Architectue Overview"
+    "architecture": "Architectue Overview",
+    "clusters": "Clusters",
+    "backend-lifecycle": "Backend Lifecycle",
+    "auth": "Connection Authorization"
 }

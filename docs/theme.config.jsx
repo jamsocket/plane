@@ -12,6 +12,10 @@ export default {
             return {
                 titleTemplate: '%s – Plane'
             }
+        } else {
+            return {
+                title: 'Plane – run WebSocket backends at scale'
+            }
         }
     }
 }

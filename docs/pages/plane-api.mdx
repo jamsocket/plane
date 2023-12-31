@@ -1,3 +1,5 @@
+import { Callout, Code } from 'nextra/components'
+
 # Plane API
 
 The controller in Plane serves an HTTP/JSON API, which is used both by other Plane components and other trusted components
@@ -22,3 +24,152 @@ In the key-value map analogy, the default behavior of Plane is comparable to “
 implement (such as [`setdefault`](https://docs.python.org/3.8/library/stdtypes.html?highlight=setdefault#dict.setdefault) in Python).
 
 The `connect` API is the endpoint that implements this behavior.
+
+The connect request is located at the path `/ctrl/c/:cluster/connect` where `:cluster` is the name of the cluster you want to spawn a
+backend on if a new backend needs to be spawned.
+
+The connect request is a `POST` request that takes a JSON body. An example payload might look like this:
+
+```json
+{
+    "key": {
+        "name": "room-abcde",
+        "namespace": "games",
+        "tag": "drop-four"
+    },
+    "spawn_config": {
+        "executable": {
+            "image": "ghcr.io/drifting-in-space/demo-image-drop-four",
+        },
+        "lifetime_limit_seconds": 3600,
+        "max_idle_seconds": 60,
+    },
+    "name": "user-123",
+    "auth": {
+        "any arbitrary JSON object": "can go here",
+        "Plane does not read it": "it is just passed through to your backend",
+        "even lists and numbers": ["like", 3.14, "are", "fine"]
+    }
+}
+```
+
+- `key`: Optional object describing the key to connect to. If not provided, one will be generated randomly
+  (forcing a new backend to start).
+- `spawn_config`: Optional configuration that is used to start a new backend if necessary.
+- `user`: Optional string to associate with the user on whose behalf this request is being made.
+- `auth`: Optional key-value map of unforgable data (such as claims) that you would like to pass to the
+  backend about this user.
+
+At least one of `key` or `spawn_config` must be provided. If only `spawn_config` is provided, the connect call
+will always attempt to spawn the backend. If only `key` is provided, the connect call will attempt to connect
+to an existing backend, and will return an error if one does not exist.
+
+### Key configuration object
+
+The key configuration passed as `key` refers to an object, with a required `name` field and two optional fields.
+
+- `name`: The name of the key. Keys with the same name in the same namespace are considered the same key,
+meaning that only one backend will run for them at a time.
+- `namespace`: The namespace of the key. Keys with the same name in different namespaces are considered different keys,
+- `tag`: If provided, only a backend with the same tag as requested will be returned, but if there is a backend
+  with the same `name` and `namespace` but a different tag, an error will be returned instead.
+
+It is expected that most users of Plane will only need to care about the `name` field; the others are provided
+for users who need more advanced control.
+
+### Spawn configuration
+
+The spawn configuration tells Plane how to spawn a new backend for this request if necessary (i.e. if the
+key does not match an existing backend). It is an object with the following fields:
+
+- `max_idle_seconds`: An optional numeric field which, if provided, creates a limit for how long (in seconds)
+  a backend can have no inbound connections to it before it is terminated. If not provided, there is no limit.
+- `lifetime_limit_seconds`: An optional numeric field which, if provided, creates a deadline (in seconds from
+  now) that the backend will be terminated *regardless* of whether it has inbound connections.
+- `executable`: An object containing configuration of the backend process itself.
+
+Both `max_idle_seconds` and `lifetime_limit_seconds` are optional; if neither is provided, the backend
+will continue running until it is either terminated through the control API, or exits on its own accord.
+
+If *both* `max_idle_seconds` and `lifetime_limit_seconds` are provided, the backend will be terminated
+when *either* limit is reached.
+
+#### Executable configuration
+
+The `executable` field of the spawn configuration is an object with the following fields. Only `image` is
+required; the others are optional.
+
+- `image`: The Docker image to use to run the backend.
+- `pull_policy`: Optional string specifying the Docker pull policy to use when pulling the image. Valid values
+  are `Always`, `IfNotPresent`, and `Never`. If not provided, `IfNotPresent` is used.
+- `credentials`: Optional object containing credentials to use to connect to the Docker registry. Currently,
+  only username/password credentials are supported, by providing an object with the fields `username` and `password`.
+- `env`: Optional object containing environment variables to pass to the backend. The keys and values of this
+  object are passed directly to the backend as environment variables.
+- `resource_limits`: Optional object containing resource limits to apply to the backend.
+
+TODO: Document resource limits.
+
+TODO: Document return value.
+
+## Terminate API
+
+<Callout type="info">
+  The terminate API is mainly provided to support manual termination from the Plane CLI.
+  
+  You are free to call it from application code as well, but consider whether using
+  `max_idle_seconds`, `lifetime_limit_seconds`, or exiting from your backend code instead.
+</Callout>
+
+To “soft-terminate” a backend, send a `POST` request with an empty body to:
+
+```
+/ctrl/c/:cluster/b/:backend/soft-terminate
+```
+
+Where `:cluster` is the name of the cluster the backend is running on, and `:backend` is the name of the backend.
+
+Soft-terminating first sends a `SIGTERM` signal to the backend, and then waits for 10 seconds for the backend
+to exit gracefully before force-terminating it.
+
+To “hard-terminate” a backend, send a `POST` request with an empty body to:
+
+```
+/ctrl/c/:cluster/b/:backend/hard-terminate
+```
+
+Hard-terminating does not send a `SIGTERM` signal to the backend, and instead immediately force-terminates it.
+
+## Status API
+
+The status API tells you the status of a given backend. Unlike the connect and terminate APIs, it is considered
+a “public” API, meaning that it is safe to expose on the open internet without authentication.
+
+To get the status of a backend, send a `GET` request to:
+
+```
+/pub/c/:cluster/b/:backend/status
+```
+
+Where `:cluster` is the name of the cluster the backend is running on, and `:backend` is the name of the backend.
+
+The response is a JSON object with the following fields:
+
+- `status`: The status of the backend, such as `Ready`. See [backend lifecycle](concepts/backend-lifecycle.mdx)
+  for a list of possible values.
+- `time`: The time at which the backend entered its current status, in milliseconds since the Unix epoch.
+
+### Streaming status API
+
+A streaming variant of the status API is also available. To use it, send a `GET` request to:
+
+```
+/pub/c/:cluster/b/:backend/status-stream
+```
+
+Provided that the client supports it, this returns a [server-sent event](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
+stream that emits a JSON object every time the backend changes status. Each JSON object emitted has the same fields as
+the non-streaming status API.
+
+The streaming API will also replay past state changes on connection. It supports reconnects without duplication
+as specified by the server-sent event protocol.
