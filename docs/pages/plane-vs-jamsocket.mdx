@@ -1,0 +1,34 @@
+# Plane vs. Jamsocket
+
+[Drifting in Space Corp.](https://driftingin.space) is the company behind both Plane and
+[Jamsocket](https://jamsocket.com).
+
+<a href="https://jamsocket.com"><img src="/jamsocket.svg" style={{height: 30, margin: "40px 0"}} /></a>
+
+Jamsocket is a managed platform for session backends, built on Plane. Jamsocket
+is a proprietary commercial product, while Plane is MIT-licensed open source.
+
+Jamsocket’s goal is to be to Plane akin to what GitHub is to Git: a commercial managed service
+for using the underlying open-source code effectively in production.
+
+Plane is narrowly scoped to concerns directly relating to the lifecycle of backends, leaving decisions
+like how new code gets deployed up to the user. Jamsocket is a more prescriptive, full-service platform
+that also integrates deployment, monitoring, and other concerns.
+
+Things that are within Plane’s scope:
+
+- Receiving “connect requests” for session backends from clients.
+- Managing the entire lifecycle of session backends, from startup to shutdown.
+- Routing HTTP traffic to session backends.
+- Providing status information about backends via an API.
+
+Things that are out of scope for Plane, but within the scope of Jamsocket, include:
+
+- A web-based dashboard for managing backends.
+- An integrated container registry for deploying new backend code.
+- Session backend observability tools.
+- Managing access to deploying code and generating API keys within an organization.
+- Developer tools for working with session backends.
+- Auto-scaling backends on on-demand cloud machines.
+- Configuration of cloud network infrastructure for Plane clusters.
+- Hardening drone networking and kernel surface areas for untrusted code execution.

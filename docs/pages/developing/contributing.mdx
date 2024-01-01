@@ -18,5 +18,6 @@ These checks are:
   on running tests.
 - Clippy should not identify new issues. Run `cargo clippy` to check this.
 - The code must be formatted. Run `cargo fmt` to format it in-place.
-
+- The `plane2/schema/derived_schema.sql` file must reflect all migrations. If your PR adds a migration,
+  run `plane2/schema/prepare.sh` (see [DB Migrations](db-migrations.mdx)).
 

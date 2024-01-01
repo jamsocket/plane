@@ -1,3 +1,6 @@
 {
-    "keys": "How Keys Work"
+    "design-principles": "Design Principles",
+    "contributing": "Contributing",
+    "keys": "How Keys Work",
+    "db-migrations": "Database Migrations"
 }

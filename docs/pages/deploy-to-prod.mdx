@@ -1,5 +1,3 @@
-import { Callout } from 'nextra/components'
-
 # Deploying Plane to Production
 
 A production setup of Plane involves a number of pieces:
@@ -19,13 +17,14 @@ containers, and Linux cgroups, ACME, TLS, and DNS.
 
 We recommend having at least cursory knowledge of these technologies before deploying Plane in production.
 
-<Callout>
-  If you want to use Plane in your own cloud without the burden of operating it, the team behind Plane
-  runs a managed platform for session backends called [Jamsocket](https://jamsocket.com/), which is built
-  on Plane.
+<div style={{background: 'black', color: 'white', marginTop: 20, padding: 20, borderRadius: 13, border: '3px solid white', fontSize: '120%'}}>
+    <a href="https://jamsocket.com"><img src="/jamsocket.svg" style={{height: 30}} alt="Jamsocket logo"/></a>
 
-  With Jamsocket, Plane proxies and drones are auto-scaled within your own cloud account.
-</Callout>
+    If you want to use Plane in your own cloud without the burden of operating it, [Jamsocket](https://jamsocket.com/)
+    provides a managed platform for session backends that runs on top of Plane.
+
+    Jamsocket is built by the team that builds Plane, and can manage drones in your own AWS account.
+</div>
 
 ## Postgres database
 

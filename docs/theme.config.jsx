@@ -6,6 +6,9 @@ export default {
     project: {
         link: 'https://github.com/drifting-in-space/plane'
     },
+    chat: {
+        link: "https://discord.gg/N5sEpsuhh9"
+    },
     useNextSeoProps() {
         const { asPath } = useRouter()
         if (asPath !== '/') {
