@@ -23,3 +23,15 @@ reporting all status changes.
 
 Statuses returned from the [status API](../plane-api.mdx#status-api) are returned as strings matching the
 monospace string above; that is, they begin with a capital letter followed by lowercase letters.
+
+## Backend termination:
+
+There are four ways a backend can be terminated:
+
+- It can exit on its own.
+- A call to the [terminate API](../plane-api.mdx#terminate-api)
+  (this is also how the CLI `terminate` command works).
+- It can become idle for more than `max_idle_seconds` seconds, if one was provided
+  when the backend was created.
+- It can reach a deadline of `lifetime_limit_seconds` seconds after it was created,
+  if one was provided when the backend was created.

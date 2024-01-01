@@ -11,13 +11,13 @@
             "breadcrumb": false
         }
     },
-    "concepts": "Concepts",
     "plane-api": {
-        "title": "Plane API",
+        "title": "HTTP API",
         "theme": {
             "breadcrumb": false
         }
     },
+    "concepts": "Concepts",
     "deploy-to-prod": {
         "title": "Deploying to Production",
         "theme": {

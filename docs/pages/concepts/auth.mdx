@@ -1,0 +1,47 @@
+import { Callout } from 'nextra/components'
+
+# Connection Authorization
+
+When you issue a successful [connect request](../plane-api.mdx#connect-api), Plane returns
+a URL that can be used to route traffic to that particular backend.
+
+Such a URL might look like this:
+
+```
+http://plane.mysite.com/tYVHfS4PKgufdhwGCnn6LLfAaCo_iAHitbw4Bg8ETjA/
+```
+
+The random-looking string in the path is a **connection token**. It tells the Plane
+proxy which backend to route traffic to. Treat the connection token like a bearer token, because
+any client that knows it can access the backend.
+
+<Callout type="info">
+    One of the design goals of Plane is to allow you to keep authorization logic in one place, your
+    primary application backend.
+</Callout>
+
+The use of connection tokens allows you to delegate backend access business logic to
+your own application backend. Typically, the way it works is:
+
+- A user of your application performs an action that requires a session backend, such as opening a new
+  document or starting a notebook session.
+- In your (traditional; non-session) app backend, you verify (usually with a cookie) that the user who
+  needs to access the backend is authenticated and authorized to access that backend, based on your
+  application’s access control business logic.
+- If the user is authorized, you issue a [connect request](../plane-api.mdx#connect-api) API call to Plane,
+  resulting in a **connection token** (a tokenized URL for connecting to the backend).
+- You return the connection token to the user’s browser, which then connects to the backend via
+  the connection token (using `fetch(...)`, `new WebSocket(...)`, etc.)
+
+## Associating data with a connection token
+
+You can also associate other information with a connection token, such as the username
+on whose behalf the connection token was generated. This can be done by passing a
+string as the `user` field of the [connect request](../plane-api.mdx#connect-api).
+
+You can also specify a JSON object that can be used to associate other arbitrary data
+with a connection token. This is passed as the optional `auth` field of the
+connect request.
+
+
+
