@@ -91,7 +91,7 @@ create index idx_backend_action_pending on backend_action(drone_id) where acked_
 create index idx_backend_action_backend on backend_action(backend_id);
 
 create table backend_key (
-    id varchar(255) references backend(id) not null,
+    id varchar(255) primary key references backend(id) not null,
     cluster varchar(255) not null,
     namespace varchar(255) not null,
     key_name varchar(255) not null,

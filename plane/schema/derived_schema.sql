@@ -500,6 +500,14 @@ ALTER TABLE ONLY public.backend_action
 
 
 --
+-- Name: backend_key backend_key_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.backend_key
+    ADD CONSTRAINT backend_key_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: backend backend_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
