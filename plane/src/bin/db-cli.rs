@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use colored::{self, Colorize};
-use plane2::{database::connect, names::DroneName, types::ClusterName};
+use plane::{database::connect, names::DroneName, types::ClusterName};
 
 #[derive(Parser)]
 struct Opts {

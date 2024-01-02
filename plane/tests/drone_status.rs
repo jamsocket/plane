@@ -1,5 +1,5 @@
 use common::test_env::TestEnvironment;
-use plane2::database::{node::NodeConnectionStatusChangeNotification, subscribe::Subscription};
+use plane::database::{node::NodeConnectionStatusChangeNotification, subscribe::Subscription};
 use plane_test_macro::plane_test;
 
 mod common;

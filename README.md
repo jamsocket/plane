@@ -10,8 +10,8 @@
 </div>
 
 [![Docker image](https://img.shields.io/docker/v/plane/plane-preview)](https://hub.docker.com/r/plane/plane-preview/tags)
-[![Build Docker Image](https://github.com/drifting-in-space/plane/actions/workflows/plane2-build-image.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/plane2-build-image.yml)
-[![Tests](https://github.com/drifting-in-space/plane/actions/workflows/plane2-tests.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/plane2-tests.yml)
+[![Build Docker Image](https://github.com/drifting-in-space/plane/actions/workflows/plane-build-image.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/plane-build-image.yml)
+[![Tests](https://github.com/drifting-in-space/plane/actions/workflows/plane-tests.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/plane-tests.yml)
 
 Plane is infrastructure software for **running stateful WebSocket backends at scale**. Plane is heavily inspired by [Figma’s mulitplayer infrastructure](https://www.figma.com/blog/rust-in-production-at-figma/), which dynamically spawns a process for each active document.
 

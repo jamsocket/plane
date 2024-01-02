@@ -1,8 +1,8 @@
 [package]
-name = "plane2"
+name = "plane"
 version = "0.2.0"
 edition = "2021"
-default-run = "plane2"
+default-run = "plane"
 
 [dependencies]
 acme2-eab = "0.5.4"

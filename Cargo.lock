@@ -1599,16 +1599,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
 
 [[package]]
-name = "plane-test-macro"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.39",
-]
-
-[[package]]
-name = "plane2"
+name = "plane"
 version = "0.2.0"
 dependencies = [
  "acme2-eab",
@@ -1650,6 +1641,15 @@ dependencies = [
  "tungstenite",
  "url",
  "x509-parser",
+]
+
+[[package]]
+name = "plane-test-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.39",
 ]
 
 [[package]]
