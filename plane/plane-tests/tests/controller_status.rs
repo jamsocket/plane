@@ -1,7 +1,6 @@
 use common::test_env::TestEnvironment;
 use common::timeout::WithTimeout;
-use plane::database::controller::ControllerHeartbeatNotification;
-use plane::database::subscribe::Subscription;
+use plane::database::{controller::ControllerHeartbeatNotification, subscribe::Subscription};
 use plane_test_macro::plane_test;
 
 mod common;

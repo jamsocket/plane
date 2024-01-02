@@ -2,6 +2,7 @@
 name = "plane"
 version = "0.4.0"
 edition = "2021"
+autotests = false
 default-run = "plane"
 description = "Session backend orchestrator for ambitious browser-based apps."
 repository = "https://github.com/drifting-in-space/plane"
@@ -48,6 +49,3 @@ tungstenite = "0.20.1"
 url = "2.4.1"
 x509-parser = "0.15.1"
 
-[dev-dependencies]
-tracing-appender = "0.2.2"
-plane-test-macro = { path = "tests/plane-test-macro" }

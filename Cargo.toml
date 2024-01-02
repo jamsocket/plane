@@ -2,5 +2,7 @@
 resolver = "2"
 members = [
     "plane",
-    "plane/tests/plane-test-macro",
+    "plane/plane-dynamic",
+    "plane/plane-tests",
+    "plane/plane-tests/plane-test-macro",
 ]
