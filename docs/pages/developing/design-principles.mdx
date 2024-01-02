@@ -1,0 +1,46 @@
+# Plane Design Principles
+
+This document describes principles applied to the design of Plane. It is intended to be useful both for
+interpreting Plane design decisions, and informing new ones.
+
+## Business logic should live in the controller.
+
+It is easier to reason about how a system will operate when business logic is concentrated in one component.
+The way we apply this in
+Plane is by moving as much business logic as possible into the controller, rather than pushing it out to other
+components (proxies, drones, and ACME DNS servers).
+
+One advantage of this is that business logic changes can often be made with controller-only code changes, since
+the nodes are just “dumb executors” of the controller’s commands. This makes it far simpler to reason about
+updates, since you don’t need to coordinate simultaneous updates to each component.
+
+## Assume network connections are fragile.
+
+Components connect to Plane over a stateful WebSocket connection. Plane must assume that these connections can
+go away at any time. Clients will attempt to reconnect repeatedly (with capped exponential backoff) until they
+reconnect, but there are no guarantees that they will connect to the _same_ controller process &ndash; the controller
+process may have been restarted, or there could be multiple controllers running behind a load balancer.
+
+A consequence of this is that the controller can be stateful during a connection, but is assumed not to hold
+state about another component across connections. Instead, that state should either live in the database,
+or in the component itself.
+
+## Assume clocks are wrong.
+
+Plane is designed to accomedate scenarios where the controller and components run across different data centers
+and regions, which makes it hard to keep clocks precisely synchronized. In order to be as robust as possible to
+timing differences, Plane is designed to operate correctly even if all clocks are set to entirely different times,
+as long as they move forward through time at roughly the same rate.
+
+This means that Plane will generally not compare a system time measured on one machine to a system time measured on
+another.
+
+There are two exceptions to this rule:
+- If there is a database failover, the database’s clock will refer to the system time of another machine.
+- When determining when to renew a certificate, the proxy component will compare the current system time with
+  the certificate’s expiration time.
+
+Since Plane allows multiple controller instances to run at the same time, we never trust the clock on the
+controller instances themselves. Instead, we use the database’s clock as the source of truth for time. For
+keys, where we need to be able to do comparisons on the drone while offline, we use the drone’s system time
+(even on the controller side), as described in [How Keys Work](keys.mdx).

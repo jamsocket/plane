@@ -1,0 +1,82 @@
+import { Callout } from 'nextra/components'
+
+# Connection Authorization
+
+When you issue a successful [connect request](../plane-api.mdx#connect-api), Plane returns
+a URL that can be used to route traffic to that particular backend.
+
+Such a URL might look like this:
+
+```
+http://plane.mysite.com/tYVHfS4PKgufdhwGCnn6LLfAaCo_iAHitbw4Bg8ETjA/
+```
+
+The random-looking string in the path is a **connection token**. It tells the Plane
+proxy which backend to route traffic to. Treat the connection token like a bearer token, because
+any client that knows it can access the backend.
+
+<Callout type="info">
+    One of the design goals of Plane is to allow you to keep authorization logic in one place, your
+    primary application backend.
+</Callout>
+
+The use of connection tokens allows you to delegate backend access business logic to
+your own application backend. Typically, the way it works is:
+
+- A user of your application performs an action that requires a session backend, such as opening a new
+  document or starting a notebook session.
+- In your (traditional; non-session) app backend, you verify (usually with a cookie) that the user who
+  needs to access the backend is authenticated and authorized to access that backend, based on your
+  application’s access control business logic.
+- If the user is authorized, you issue a [connect request](../plane-api.mdx#connect-api) API call to Plane,
+  resulting in a **connection token** (a tokenized URL for connecting to the backend).
+- You return the connection token to the user’s browser, which then connects to the backend via
+  the connection token (using `fetch(...)`, `new WebSocket(...)`, etc.)
+
+## Associating data with a connection token
+
+You can also associate other information with a connection token, such as the username
+on whose behalf the connection token was generated. This can be done by passing a
+string as the `user` field of the [connect request](../plane-api.mdx#connect-api).
+
+You can also specify a JSON object that can be used to associate other arbitrary data
+with a connection token. This is passed as the optional `auth` field of the
+connect request.
+
+When an HTTP request passes through a Plane proxy, the proxy will pass the user and auth
+data associated with the connection token to the backend as HTTP headers:
+
+- `x-verified-username` will pass the `user` field of the connect request, if it exists.
+- `x-verified-user-data` will pass the `auth` field of the connect request, if it exists.
+
+The `x-verified-*` prefix in Plane is reserved for data that comes from the Plane proxy itself.
+Plane will strip these headers from any incoming HTTP requests, so that they cannot be spoofed.
+
+`user` and `auth` data is treated as secret from the client by Plane; it is only available to the
+client if you expose it to the client via your session backend.
+
+## Secondary secret validation
+
+While embedding bearer tokens in a URL is now [accepted practice](https://www.w3.org/TR/capability-urls/)
+on the web, it is possible that some environments may treat URLs as non-secret. For example, your
+application may use a third-party telemetry system that logs metadata associated with fetch requests including
+the URL, or a user may have a browser extension that logs URLs.
+
+If these are concerns for your application, Plane provies a mechanim for you to do an additional check in
+your session backend that would prevent someone from using a connection token without knowing an additional
+secret.
+
+Here’s how it works:
+
+- When you make a connect request, one of the fields returned is a string field called `secret_token`.
+  This contains a random string that is unique to the connection token.
+- When you make a request to the backend, you pass along the secret token in any way you like. For example,
+  you could pass it as a header, as a field in a request body, or in a WebSocket handshake message.
+- When a client connects to a backend using a connection token, the Plane proxy will pass the same token in the
+  HTTP request as the `x-verified-secret` header.
+- The code running in the application backend should then unpack both the token sent by the client (however
+  you decide to encode it) as well as the `x-verified-secret` header, and ensure that they are the same string.
+
+Note that as far as Plane is concerned, the secret token is just a random string associated with a connection
+token. It is meant to provide a way for you to optionally do extra validation, but Plane itself does not
+implement that validation.

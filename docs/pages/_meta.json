@@ -1,0 +1,29 @@
+{
+    "index": {
+        "title": "Plane",
+        "theme": {
+            "breadcrumb": false
+        }
+    },
+    "quickstart-guide": {
+        "title": "Quickstart Guide",
+        "theme": {
+            "breadcrumb": false
+        }
+    },
+    "plane-api": {
+        "title": "HTTP API",
+        "theme": {
+            "breadcrumb": false
+        }
+    },
+    "concepts": "Concepts",
+    "deploy-to-prod": {
+        "title": "Deploying to Production",
+        "theme": {
+            "breadcrumb": false
+        }
+    },
+    "developing": "Developing",
+    "plane-vs-jamsocket": "Plane vs. Jamsocket"
+}

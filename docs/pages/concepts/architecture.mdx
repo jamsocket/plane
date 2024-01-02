@@ -1,0 +1,79 @@
+import { Callout } from 'nextra/components'
+
+# Architecture of Plane
+
+Plane is a distributed system, consisting of a number of components that interact with each other, external
+systems, and your application.
+
+The diagram below outlines the important connections between parts of the Plane system and how your application is
+expected to talk to it.
+
+<img src="/arch-diagram.svg" style={{marginTop: 30}} />
+
+## Controller
+
+The **controller** is the core communication hub of Plane. Other components, including drones, proxies,
+and the CLI tool, all connect to the controller through its HTTP/WebSocket API.
+
+The controller is the only component that holds a direct connection to the database.
+
+Only one instance of the controller is required, but multiple instances are allowed for redundancy.
+In this case, the controller will sit behind a load balancer through which all inbound connections
+will pass (not shown in the diagram).
+
+In order to support flexible configurations, the controller does not handle authentication or TLS termination
+itself, but instead can be put behind a reverse proxy (like nginx, Caddy, or Envoy) to handle those concerns.
+
+## Drone
+
+The term **drone** refers to a machine (or virtual machine) on which session backends are actually run.
+
+Machines are added to the system by running the `plane drone` command on them, which will connect to the
+controller and register the machine as a drone. The `plane drone` command then acts as an agent, issuing
+Docker API calls locally on behalf of the controller.
+
+## Proxy
+
+Proxies are used to route inbound traffic from outside of Plane towards the correct drone. Proxies are also
+responsible for terminating TLS connections. When they need to obtain a new certificate, they coordinate
+with the controller to do so.
+
+## DNS Server
+
+The DNS server is used exclusively to respond to ACME DNS-01 challenges as part of the certificate issuance
+process.
+
+<Callout type="info">
+  Prior to Plane 0.4.x, the DNS server was used to route traffic to drones in addition to being used for
+  ACME challenges. Plane 0.4.0 introduced the proxy component, which is now responsible for routing traffic
+  to drones. The DNS server is now only used for ACME DNS-01 challenges.
+</Callout>
+
+## Controller API
+
+The Plane controller HTTP API is partitioned into two parts: the **public** API and the **control** API. The
+control API has the path prefix `/ctrl/*` and is used for trusted communication between Plane components,
+as well as trusted parts of your application. The public API has the path prefix `/pub/*` and is used for
+communication with untrusted clients, including your client-side code. **Your client-side code should not
+be able to make requests to the control API.**
+
+When using Plane for applications that face the external web, you are expected to use a reverse proxy to
+add TLS termination to the `/pub/*` endpoints, and to either add authentication to the `/ctrl/*` endpoints
+or to not expose them on the public web at all.
+
+## Integrating with your application
+
+In a typical application, your application will integrate with Plane by making requests to the control
+endpoints from a traditional backend. By **traditional backend**, we mean a stateless backend that handles requests
+from all of your users, in contrast to the **session backends** that Plane is responsible for managing.
+
+When your application wants to connect to a session backend (whether spawning a new one or connecting to a
+running one), your traditional backend is responsible for making sure that the user is authorized to do so,
+and then making a request to the controller.
+
+If the request is successful, the controller will return a tokenized URL that the client can use to connect
+to the session backend (via a Plane proxy).
+
+Proxies report active connections to the controller. The controller periodically checks which backends have not
+had any active connections for some time threshold, and issues commands to the drone responsible for them to
+shut them down.

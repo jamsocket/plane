@@ -1,0 +1,28 @@
+# Session Backends
+
+Session backends are stateful server-side processes that are bound to the life of a
+user’s usage interaction session with an application. Client-side code can connect directly
+to a running session backend using a tokenized URL.
+
+Typically, an application will start a session backend in response to some user action
+(such as opening a document). Session backends are terminated when the user navigates
+away from that document, or closes the browser tab.
+
+Unlike a traditional web backend server, session backends are not expected to be stateless
+or interchangable. Instead, session backends provide a way to guarantee that every
+request from a particular user (or group of users) is handled by the same process, and
+no other requests are.
+
+You can use a session backend to, for example, load a single user’s large dataset
+into memory, and then serve low-latency requests to the user. Or, you could use a session backend
+as a real-time collaboration server, and have multiple users connect to the same backend
+to synchronize their changes.
+
+With appropriate protections, session backends can also be a good sandbox for running untrusted
+user- (or LLM-) provided code, since they can be isolated to a particular user and treated as disposable.
+
+Although the term *session backend* is relatively new, the concept is not. [Figma has written](https://www.figma.com/blog/rust-in-production-at-figma/#scaling-our-service-with-rust)
+about their multiplayer approach which could be described as a session backend, as could the architecture
+of the [Jupyter](https://jupyter.org/) scientific computing environment and [VS Code for the web](https://code.visualstudio.com/docs/editor/vscode-web).
+
+Read more about [session backends](https://driftingin.space/posts/session-lived-application-backends).

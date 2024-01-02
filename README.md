@@ -13,7 +13,7 @@
 [![Build Docker Image](https://github.com/drifting-in-space/plane/actions/workflows/plane2-build-image.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/plane2-build-image.yml)
 [![Tests](https://github.com/drifting-in-space/plane/actions/workflows/plane2-tests.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/plane2-tests.yml)
 
-Plane is infrastructure software for **running stateful WebSocket backends at scale**. Plane is heavily inspired by [Figma’s mulitplayer infrastructure](https://www.figma.com/blog/rust-in-production-at-figma/), which dynamically spawns a process for each active document.
+Plane is a distributed system for **running stateful WebSocket backends at scale**. Plane is heavily inspired by [Figma’s mulitplayer infrastructure](https://www.figma.com/blog/rust-in-production-at-figma/), which dynamically spawns a process for each active document.
 
 Use cases include:
 - Scaling up [authoritative multiplayer backends](https://driftingin.space/posts/you-might-not-need-a-crdt).
@@ -27,6 +27,12 @@ You can think of Plane as a distributed hashmap, but instead of storing data, it
 Plane will keep the process running for as long as there is an open connection (usually a WebSocket connection) to it. Once all connections to a process have been closed for some time threshold, Plane will shut down the process.
 
 Plane guarantees that only one process will be running for each key at any given time, allowing that process to act as an authoritative source of document state for as long as it is running.
+
+### Architecture
+
+Read more about [Plane’s architecture](https://plane.dev/concepts/architecture).
+
+[![Architecture diagram of Plane](./docs/public/arch-diagram.svg)](https://plane.dev/concepts/architecture)
 
 ## Example
 
