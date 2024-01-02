@@ -334,12 +334,12 @@ impl KeyConfig {
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct ConnectRequest {
-    /// Config to use if we need to create a new backend to connect to.
-    pub spawn_config: Option<SpawnConfig>,
-
     /// Configuration for the key to use.
     #[serde(default)]
     pub key: Option<KeyConfig>,
+
+    /// Config to use if we need to create a new backend to connect to.
+    pub spawn_config: Option<SpawnConfig>,
 
     /// Username or other identifier to associate with the generated connection URL.
     /// Passed to the backend through the X-Plane-User header.
