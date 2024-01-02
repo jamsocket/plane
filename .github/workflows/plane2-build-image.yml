@@ -15,7 +15,7 @@ on:
     - 'docker/Dockerfile'
 
 env:
-  IMAGE_NAME: plane/plane-preview
+  IMAGE_NAME: plane/plane
 
 jobs:
   build:
