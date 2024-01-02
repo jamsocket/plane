@@ -45,7 +45,7 @@ impl<'a> KeysDatabase<'a> {
             r#"
             delete from backend_key
             where id = $1
-            and expires_at > now()
+            and expires_at < now()
             "#,
             backend.to_string(),
         )

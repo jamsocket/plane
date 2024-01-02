@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            delete from backend_key\n            where id = $1\n            and expires_at < now()\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "64b150061b2f107c8b6aa7b9a6d0bab87f02d262bc15d3ba12069f4b35fa1873"
+}
