@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
+use plane::admin::AdminOpts;
 use plane::client::PlaneClient;
 use plane::controller::run_controller;
 use plane::database::connect_and_migrate;
@@ -104,6 +105,7 @@ enum Command {
         #[clap(long)]
         db: String,
     },
+    Admin(AdminOpts),
 }
 
 async fn run(opts: Opts) -> Result<()> {
@@ -235,6 +237,9 @@ async fn run(opts: Opts) -> Result<()> {
             tracing::info!("Starting DNS server");
             let client = PlaneClient::new(controller_url);
             run_dns(name, client, port).await?;
+        }
+        Command::Admin(admin_opts) => {
+            plane::admin::run_admin_command(admin_opts).await;
         }
     }
 

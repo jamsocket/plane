@@ -66,6 +66,7 @@ The `dev/cli.sh` script runs the Plane CLI, configured to connect to the local P
 
 ```bash
 dev/cli.sh connect \
+    --wait \
     --cluster 'localhost:9090' \
     --image ghcr.io/drifting-in-space/demo-image-drop-four
 ```
