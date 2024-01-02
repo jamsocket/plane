@@ -1,11 +1,10 @@
-use clap::{Parser, Subcommand};
-use colored::Colorize;
-use plane::{
+use crate::{
     client::{PlaneClient, PlaneClientError},
-    init_tracing::init_tracing,
     names::{BackendName, DroneName},
     types::{BackendStatus, ClusterName, ConnectRequest, ExecutorConfig, KeyConfig, SpawnConfig},
 };
+use clap::{Parser, Subcommand};
+use colored::Colorize;
 use url::Url;
 
 fn show_error(error: &PlaneClientError) {
@@ -51,16 +50,16 @@ fn show_error(error: &PlaneClientError) {
 }
 
 #[derive(Parser)]
-struct Opts {
+pub struct AdminOpts {
     #[clap(long)]
     controller: Url,
 
     #[clap(subcommand)]
-    command: Command,
+    command: AdminCommand,
 }
 
 #[derive(Subcommand)]
-enum Command {
+enum AdminCommand {
     Connect {
         #[clap(long)]
         cluster: ClusterName,
@@ -96,11 +95,18 @@ enum Command {
     },
 }
 
-async fn inner_main(opts: Opts) -> Result<(), PlaneClientError> {
+pub async fn run_admin_command(opts: AdminOpts) {
+    if let Err(error) = run_admin_command_inner(opts).await {
+        show_error(&error);
+        std::process::exit(1);
+    }
+}
+
+pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientError> {
     let client = PlaneClient::new(opts.controller);
 
     match opts.command {
-        Command::Connect {
+        AdminCommand::Connect {
             cluster,
             image,
             key,
@@ -150,7 +156,7 @@ async fn inner_main(opts: Opts) -> Result<(), PlaneClientError> {
                 }
             }
         }
-        Command::Terminate {
+        AdminCommand::Terminate {
             backend,
             cluster,
             hard,
@@ -183,24 +189,11 @@ async fn inner_main(opts: Opts) -> Result<(), PlaneClientError> {
                 }
             }
         }
-        Command::Drain { cluster, drone } => {
+        AdminCommand::Drain { cluster, drone } => {
             client.drain(&cluster, &drone).await?;
             println!("Sent drain signal to {}", drone.to_string().bright_green());
         }
     };
 
     Ok(())
-}
-
-#[tokio::main]
-async fn main() {
-    let opts = Opts::parse();
-    init_tracing();
-
-    let result = inner_main(opts).await;
-
-    if let Err(error) = result {
-        show_error(&error);
-        std::process::exit(1);
-    }
 }
