@@ -3,8 +3,8 @@
 //! These are expected to conform to some invariants:
 //! ```
 //! use plane::heartbeat_consts::*;
-//! assert!(HEARTBEAT_INTERVAL_SECONDS > 0);
-//! assert!(UNHEALTHY_SECONDS > HEARTBEAT_INTERVAL_SECONDS,
+//! assert!(HEARTBEAT_INTERVAL.as_secs() as i64 > 0);
+//! assert!(UNHEALTHY_SECONDS > HEARTBEAT_INTERVAL.as_secs() as i64,
 //!   "Drones will be considered unhealthy before they are expected to send a heartbeat!");
 //! assert!(HARD_TERMINATE_DEADLINE_SECONDS > SOFT_TERMINATE_DEADLINE_SECONDS,
 //!   "Backends will be hard terminated before they are soft terminated!");

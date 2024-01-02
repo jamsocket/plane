@@ -1,3 +1,12 @@
+//! ```
+//! use std::time::Duration;
+//! use plane::database::backend_key::*;
+//! assert!(KEY_LEASE_RENEW_AFTER > Duration::from_secs(0));
+//! assert!(KEY_LEASE_SOFT_TERMINATE_AFTER > KEY_LEASE_RENEW_AFTER);
+//! assert!(KEY_LEASE_HARD_TERMINATE_AFTER > KEY_LEASE_SOFT_TERMINATE_AFTER);
+//! assert!(KEY_LEASE_EXPIRATION > KEY_LEASE_HARD_TERMINATE_AFTER);
+//! ```
+
 use crate::{
     names::BackendName,
     types::{ClusterName, KeyConfig},
