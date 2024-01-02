@@ -3,4 +3,17 @@ const withNextra = require('nextra')({
     themeConfig: './theme.config.jsx'
 })
 
-module.exports = withNextra()
+module.exports = withNextra({
+    async rewrites() {
+        return [
+            {
+                source: '/js/script.js',
+                destination: 'https://plausible.io/js/script.js'
+            },
+            {
+                source: '/api/event',
+                destination: 'https://plausible.io/api/event'
+            }
+        ];
+    },
+})
