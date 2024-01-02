@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "plane2",
-    "plane2/tests/plane-test-macro",
+    "plane",
+    "plane/tests/plane-test-macro",
 ]

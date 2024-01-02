@@ -1,0 +1,85 @@
+import { Callout } from 'nextra/components'
+
+# Developing Plane
+
+<Callout type="warning">
+    This page and its subpages describe **modifying Plane itself**, not developing applications
+    that use Plane.
+    
+    If you want to build applications that use Plane, see the [API reference](plane-api.mdx).
+</Callout>
+
+## Requirements
+
+In order to run Plane locally for development, you will need a Linux or Mac OS machine with
+Rust and Docker installed.
+
+Follow [these instructions](https://www.rust-lang.org/tools/install) to install Rust, and
+[these instructions](https://docs.docker.com/get-docker/) to install Docker.
+
+## Running locally
+
+The [quickstart guide](quickstart-guide.mdx) describes a simple way to run Plane locally
+using Docker Compose. By default, this will pull a build of Plane from our container
+repository, but you can also build a version from the repo source (including any changes
+you’ve made locally) by running:
+
+```bash
+docker compose -f docker/docker-compose.yml build
+```
+
+You can also use the `--build` flag when running `docker compose up` to build the image,
+like this:
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```
+
+Instead of building a Docker image for each change, you can also use the `dev/*.sh` scripts
+to run Plane directly from the source code. In different terminals, run:
+
+```bash
+./dev/postgres.sh && ./dev/controller.sh
+```
+
+```bash
+./dev/drone.sh
+```
+
+```bash
+./dev/proxy.sh
+```
+
+Each of these scripts will build (if changed) and run the appropriate component of Plane. The
+components are configured similarly to how they are in the Dockerfile, so they can be accessed
+with `./dev/cli.sh` in the same way.
+
+## Running tests
+
+Individual tests in Plane’s integration test suite can take tens of seconds to run, so while it
+is possible to run them with `cargo test`, it is better to ues a test runner like `nextest` that
+supports parallel execution. To install `nextest`, run:
+
+```bash
+cargo install nextest
+```
+
+Then, to run the tests, run:
+
+```bash
+cargo nextest run -j 8
+```
+
+The `-j` flag specifies the number of tests to run in parallel. Since the tests are IO-bound
+rather than CPU-bound, you can run more tests in parallel than you have CPU cores.
+
+As is standard with Rust, Plane has unit tests alongside the code itself (conditionally compiled 
+with `#[cfg(test)]` blocks), as well as integration tests in the `tests` directory.
+
+Since the unit tests can be slow to run, you may want to run only the unit tests. This can be
+done by passing the `--lib` flag, whether using `cargo test` or `nextest`:
+
+```bash
+cargo test --lib
+```
+

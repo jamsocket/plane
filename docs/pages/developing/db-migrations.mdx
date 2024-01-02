@@ -1,0 +1,56 @@
+# Database Migrations
+
+Plane uses [sqlx](https://github.com/launchbadge/sqlx) to manage database migrations.
+
+Migrations are located in the `plane2/schema/migrations` directory as a series of `.sql` files that are
+prefixed with a timestamp.
+
+The migrations are built into the Plane binary. When a controller starts, it will compare the latest
+migration in the database with the latest migration in the binary. If the database is behind, the
+controller will run the necessary migrations to bring the database up to date.
+
+The `derived_schema.sql` file in `plane2/schema` is a generated file that contains a complete database
+dump of an empty database after applying all migrations. This file is meant to be a reference for
+the current database state. It is also useful when evaluating a PR that introduces a migration, as it
+shows how the migration will impact the entire schema.
+
+## Modifying the schema
+
+Never attempt to modify the schema by changing already-committed migration files or `derived_schema.sql`
+directly. Changing existing migration files will break users who have already applied those migrations,
+and changing `derived_schema.sql` will not have the desired effect because it is only provided as a reference.
+
+Instead, schema changes should be made by adding a new migration file. You can use the `sqlx` CLI tool to
+create a new migration file:
+
+```bash
+cargo install sqlx-cli
+cd plane2/schema
+sqlx migrate add [describe-the-migration]
+```
+
+This will create a blank migration file, in which you can add Postgres commands that modify the schema.
+
+### Comments
+
+When a migration creates new tables or columns, it should generally add comments for those tables and columns.
+
+Rather than using SQL comment syntax, it is recommended to use the `COMMENT ON` Postgres command. This
+will cause the comments to be stored in the database itself, and therefore in the `derived_schema.sql` file,
+rather than only in the migration file.
+
+## Developing with SQL
+
+SQL queries in Plane are type-checked at compile time through `sqlx`. For this to work, `sqlx` needs to find all
+SQL statements in the code, compare them to a Postgres server with the database schema applied, and generate
+type information (stored in `plane2/.sqlx/` as `.json` files.)
+
+When you modify an existing SQL statement or add a new one, sqlx will initially complain because it does not
+have type information for the new SQL statement. This can be rectified by running `plane2/schema/prepare.sh`,
+which does the following:
+
+- Runs a Postgres server in a Docker container
+- Applies all migrations to the Postgres server
+- Runs `sqlx prepare` to generate type information for all SQL statements
+- Dumps the Postgres database to `plane2/schema/derived_schema.sql`
+- Shuts down the Postgres server

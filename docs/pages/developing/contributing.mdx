@@ -1,0 +1,23 @@
+# Contributing to Plane
+
+Plane is [developed on GitHub](https://github.com/drifting-in-space/plane), primarily by the
+[Drifting in Space](https://driftingin.space/) team.
+
+We accept code contributions, as long as they are aligned with our roadmap and vision for Plane.
+
+Before you start working on large PR, we recommend opening an issue to discuss whether it fits the
+roadmap, and whether we have any planned work that would overlap or conflict with your feature.
+
+## Merge prerequisites
+
+We run automated checks against every PR opened. When a PR is submitted for review, these tests
+must pass before being merged.
+
+These checks are:
+- Tests must pass, including integration tests. See [Developing Plane)(../developing.mdx) for instructions
+  on running tests.
+- Clippy should not identify new issues. Run `cargo clippy` to check this.
+- The code must be formatted. Run `cargo fmt` to format it in-place.
+- The `plane2/schema/derived_schema.sql` file must reflect all migrations. If your PR adds a migration,
+  run `plane2/schema/prepare.sh` (see [DB Migrations](db-migrations.mdx)).
+

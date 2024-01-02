@@ -1,0 +1,40 @@
+---
+title: Plane
+---
+
+import { Callout } from 'nextra/components'
+import Logo from '../components/logo'
+
+<div style={{height: 60}}>
+    <Logo />
+</div>
+
+<div style={{marginTop: 20}}>
+    <a href="https://github.com/drifting-in-space/plane"><img src="https://img.shields.io/github/stars/drifting-in-space/plane?style=social" alt="Plane GitHub Repo" /></a>
+</div>
+
+Plane is a distributed system for **running stateful WebSocket backends at scale**. Plane is heavily inspired by [Figma’s mulitplayer infrastructure](https://www.figma.com/blog/rust-in-production-at-figma/), which dynamically spawns a process for each active document.
+
+Use cases include:
+- Scaling up [authoritative multiplayer backends](https://driftingin.space/posts/you-might-not-need-a-crdt).
+- Running isolated code environments (like REPLs, code notebooks, and LLM agent sandboxes).
+- Data-intensive applications that need a dedicated high-RAM process for each active user session.
+
+<Callout type="warning">
+    This documentation refers to the 0.4.0 release of Plane, which is a complete rewrite. These docs are
+    brand new as of January 2024, and still a work in progres. Please mind the wet paint!
+
+    If anything is unclear in the meantime, please [open a discussion](https://github.com/drifting-in-space/plane/discussions)
+    on Plane’s GitHub.
+</Callout>
+
+## Architecture Overview
+
+See the [architecture guide](concepts/architecture.mdx) for a detailed explanation of each component.
+
+<img src="/arch-diagram.svg" style={{marginTop: 30}} />
+
+## Getting Started
+
+- Jump in with the [quickstart guide](/quickstart-guide.mdx).
+- Familiarize yourself with the [concepts](/concepts/session-backends.mdx) and architecture used in Plane.

@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [ plane2-preview ]
+    branches: [ plane-preview ]
   pull_request:
-    branches: [ plane2-preview ]
+    branches: [ plane-preview ]
 
 env:
   CARGO_TERM_COLOR: always

@@ -7,7 +7,7 @@ services:
       dockerfile: docker/Dockerfile
       context: ../
     command:
-      "controller --db postgres://postgres@postgres"
+      "controller --db postgres://postgres@postgres --host 0.0.0.0"
     networks:
       - plane-dev
     ports:

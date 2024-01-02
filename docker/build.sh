@@ -4,4 +4,4 @@ set -e
 
 # Build the docker image
 
-docker build ../ -f ./Dockerfile -t plane2
+docker build ../ -f ./Dockerfile -t plane
