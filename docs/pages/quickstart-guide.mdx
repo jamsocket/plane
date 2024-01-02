@@ -2,10 +2,10 @@ import { Callout } from 'nextra/components'
 
 # Quickstart Guide
 
-## Docker Compose
-
 The easiest way to try out Plane is to use Docker Compose. These instructions are for a Linux or Mac environment
 with Docker installed.
+
+## Quickstart Steps
 
 ### 1. Clone Plane’s [git repo](https://github.com/drifting-in-space/plane)
 
@@ -93,3 +93,18 @@ image if it does not have it cached.
 
 Once the image is in the `Ready` state, you can open the URL provided in your browser to open the game.
 
+## Docker Compose Configuration
+
+The Docker Compose file defines four services:
+
+| Container        | Image                | Port |
+|------------------|----------------------|------|
+| plane-postgres   | `postgres:16`        | 5432 |
+| plane-controller | `plane/plane:latest` | 8080 |
+| plane-drone      | `plane/plane:latest` |      |
+| plane-proxy      | `plane/plane:latest` | 9090 |
+
+Note that the name of the cluster (`localhost:9090`) refers to the port of the proxy, not the controller.
+This is because the name of the cluster refers to the address that end-user clients will use to access the
+backends, and clients access backends through the cluster. See [the documentation on clusters](concepts/clusters.mdx)
+for more information.

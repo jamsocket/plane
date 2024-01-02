@@ -5,23 +5,23 @@ one cluster, but it is possible to have multiple in order to manage different po
 treating them as interchangeable.
 
 For example, you might have some CPU-only drones, and some drones with GPUs. Clusters allow you to
-manage both sets of drones from the same controller, whilst having control over which set of drones
-an individual backend is run on.
+manage both sets of drones from the same controller, while still having control over which set of drones
+a particular session backend is run on.
 
 Drones and proxy instances are associated with a single cluster, and are **not** shared between them.
 This allows you to run each cluster on a different network or VPC.
 
 ## Cluster names
 
-Clusters are identified by a name, which doubles as the hostname through which clients will connect
-to backends belonging to that cluster.
+Clusters are identified by the hostname through which they will be accessed.
 
 For example, when drones beloning to the cluster `c1.mysite.com` run backends, those backends will
 be accessible through URLs that begin with `https://c1.mysite.com/...`.
 
 Plane proxies associated with the `c1.mysite.com` will expect inbound traffic to have the `Host`
 header `c1.mysite.com`, and will proxy it to the appropriate drone. It is up to you to configure
-your DNS and/or load balancers so that inbound traffic actually arrives at the proxy.
+your DNS and/or load balancers so that inbound traffic actually arrives at the proxy
+(see [deploying to production](../deploy-to-prod.mdx#proxies)).
 
 ### Non-HTTPS clusters (development only)
 
