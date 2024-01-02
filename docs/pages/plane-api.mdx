@@ -117,8 +117,8 @@ TODO: Document return value.
 <Callout type="info">
   The terminate API is mainly provided to support manual termination from the Plane CLI.
   
-  You are free to call it from application code as well, but consider whether using
-  `max_idle_seconds`, `lifetime_limit_seconds`, or exiting from your backend code instead.
+  You are free to call it from application code as well, but consider using
+  `max_idle_seconds`, `lifetime_limit_seconds`, or exiting from within your session backend instead.
 </Callout>
 
 To “soft-terminate” a backend, send a `POST` request with an empty body to:
