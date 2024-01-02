@@ -1,5 +1,4 @@
 use crate::{
-    heartbeat_consts::{ASSUME_LOST_SECONDS, UNHEALTHY_SECONDS},
     names::BackendName,
     types::{ClusterName, KeyConfig},
 };
@@ -121,19 +120,6 @@ impl<'a> KeysDatabase<'a> {
     }
 }
 
-#[derive(Debug)]
-pub enum BackendKeyHealth {
-    /// The lock has been renewed within the normal interval.
-    Active(BackendName),
-
-    /// The lock has not been renewed within the normal interval (plus grace period),
-    /// but it has not been inactive long enough to be removed.
-    Unhealthy,
-
-    /// The lock has expired.
-    Expired,
-}
-
 pub struct BackendKeyResult {
     pub id: BackendName,
     pub tag: String,
@@ -144,14 +130,7 @@ pub struct BackendKeyResult {
 }
 
 impl BackendKeyResult {
-    pub fn key_health(&self) -> BackendKeyHealth {
-        let key_age = (self.as_of - self.expires_at).num_seconds();
-        if key_age > ASSUME_LOST_SECONDS {
-            return BackendKeyHealth::Expired;
-        }
-        if key_age > UNHEALTHY_SECONDS {
-            return BackendKeyHealth::Unhealthy;
-        }
-        BackendKeyHealth::Active(self.id.clone())
+    pub fn is_live(&self) -> bool {
+        self.as_of > self.expires_at
     }
 }

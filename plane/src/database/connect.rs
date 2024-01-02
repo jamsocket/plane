@@ -6,7 +6,7 @@ use super::{
 use crate::{
     client::PlaneClient,
     database::{
-        backend_key::{BackendKeyHealth, KeysDatabase, KEY_LEASE_EXPIRATION},
+        backend_key::{KeysDatabase, KEY_LEASE_EXPIRATION},
         drone::DroneDatabase,
     },
     names::{BackendName, Name},
@@ -190,51 +190,41 @@ async fn attempt_connect(
         if let Some(key_result) = key_result {
             // Key is held. Check if we can connect to existing backend.
 
-            let key_action = key_result.key_health();
-
-            match key_action {
-                BackendKeyHealth::Active(backend_id) => {
-                    if key_result.tag != key.tag {
-                        return Err(ConnectError::KeyHeld {
-                            request_tag: key.tag.clone(),
-                            key_tag: key_result.tag,
-                        });
-                    }
-
-                    let (token, secret_token) = create_token(
-                        pool,
-                        &backend_id,
-                        request.user.as_deref(),
-                        request.auth.clone(),
-                    )
-                    .await?;
-
-                    let connect_response = ConnectResponse::new(
-                        backend_id,
-                        cluster,
-                        false,
-                        token,
-                        secret_token,
-                        client,
-                    );
-
-                    return Ok(connect_response);
+            if key_result.is_live() {
+                if key_result.tag != key.tag {
+                    return Err(ConnectError::KeyHeld {
+                        request_tag: key.tag.clone(),
+                        key_tag: key_result.tag,
+                    });
                 }
-                BackendKeyHealth::Unhealthy => {
-                    tracing::info!("Key is unhealthy");
-                    // Key is unhealthy but cannot be removed; return error.
-                    return Err(ConnectError::KeyHeldUnhealthy);
-                }
-                BackendKeyHealth::Expired => {
-                    tracing::info!("Key will be removed");
 
-                    // Key is expired. Remove it.
-                    let removed = KeysDatabase::new(pool).remove_key(key_result.id).await?;
-                    if !removed {
-                        // Key was not removed, so it must have been renewed
-                        // since we checked it. Return error.
-                        return Err(ConnectError::FailedToRemoveKey);
-                    }
+                let (token, secret_token) = create_token(
+                    pool,
+                    &key_result.id,
+                    request.user.as_deref(),
+                    request.auth.clone(),
+                )
+                .await?;
+
+                let connect_response = ConnectResponse::new(
+                    key_result.id,
+                    cluster,
+                    false,
+                    token,
+                    secret_token,
+                    client,
+                );
+
+                return Ok(connect_response);
+            } else {
+                tracing::info!("Key will be removed");
+
+                // Key is expired. Remove it.
+                let removed = KeysDatabase::new(pool).remove_key(key_result.id).await?;
+                if !removed {
+                    // Key was not removed, so it must have been renewed
+                    // since we checked it. Return error.
+                    return Err(ConnectError::FailedToRemoveKey);
                 }
             }
         }
