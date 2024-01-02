@@ -131,7 +131,7 @@ impl CertificatePair {
         // If the file does not exist, we want to make sure it is created with specific
         // permissions instead of the default system umask.
         if !path.exists() {
-            std::fs::File::create(&path)?;
+            std::fs::File::create(path)?;
             let permissions = Permissions::from_mode(0o600);
             std::fs::set_permissions(path, permissions)?;
         }

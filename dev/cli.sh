@@ -1,3 +1,3 @@
 #!/bin/sh
 
-cargo -q run --bin cli -- --controller http://localhost:8080 "$@"
+cargo -q run -- admin --controller http://localhost:8080 "$@"
