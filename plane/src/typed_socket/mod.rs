@@ -2,6 +2,7 @@ use crate::PlaneVersionInfo;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::sync::Arc;
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -23,9 +24,10 @@ pub struct TypedSocket<T: ChannelMessage> {
     pub remote_handshake: Handshake,
 }
 
+#[derive(Clone)]
 pub struct TypedSocketSender<A> {
     inner_send:
-        Box<dyn Fn(SocketAction<A>) -> Result<(), TypedSocketError> + 'static + Send + Sync>,
+        Arc<dyn Fn(SocketAction<A>) -> Result<(), TypedSocketError> + 'static + Send + Sync>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -81,7 +83,7 @@ impl<T: ChannelMessage> TypedSocket<T> {
         };
 
         TypedSocketSender {
-            inner_send: Box::new(inner_send),
+            inner_send: Arc::new(inner_send),
         }
     }
 

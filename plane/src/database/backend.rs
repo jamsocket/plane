@@ -192,6 +192,19 @@ impl<'a> BackendDatabase<'a> {
         .execute(&mut *txn)
         .await?;
 
+        // If the backend is terminated, we can delete its associated key.
+        if status == BackendStatus::Terminated {
+            sqlx::query!(
+                r#"
+                delete from backend_key
+                where id = $1
+                "#,
+                backend.to_string(),
+            )
+            .execute(&mut *txn)
+            .await?;
+        }
+
         txn.commit().await?;
 
         Ok(())

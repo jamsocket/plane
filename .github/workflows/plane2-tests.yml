@@ -24,6 +24,9 @@ jobs:
 
     - name: Run tests
       run: cargo nextest run
+    
+    - name: Run doctests
+      run: cargo test --doc
 
     - uses: actions/upload-artifact@v3
       if: always()

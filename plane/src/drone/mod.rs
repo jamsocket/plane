@@ -1,13 +1,15 @@
-use self::{executor::Executor, heartbeat::HeartbeatLoop, state_store::StateStore};
+use self::{
+    executor::Executor, heartbeat::HeartbeatLoop, key_manager::KeyManager, state_store::StateStore,
+};
 use crate::{
     client::PlaneClient,
     database::backend::BackendActionMessage,
     drone::docker::PlaneDocker,
     names::DroneName,
-    protocol::{MessageFromDrone, MessageToDrone},
+    protocol::{BackendAction, MessageFromDrone, MessageToDrone, RenewKeyResponse},
     signals::wait_for_shutdown_signal,
     typed_socket::client::TypedSocketConnector,
-    types::ClusterName,
+    types::{BackendStatus, ClusterName},
     util::get_internal_host_ip,
 };
 use anyhow::Result;
@@ -18,6 +20,7 @@ use std::{
     net::IpAddr,
     os::unix::fs::PermissionsExt,
     path::Path,
+    sync::{Arc, Mutex},
 };
 use tokio::task::JoinHandle;
 
@@ -25,23 +28,40 @@ mod backend_manager;
 pub mod docker;
 mod executor;
 mod heartbeat;
+mod key_manager;
 mod state_store;
 mod wait_backend;
 
 pub async fn drone_loop(
     name: DroneName,
     mut connection: TypedSocketConnector<MessageFromDrone>,
-    mut executor: Executor,
+    executor: Executor,
 ) {
+    let executor = Arc::new(executor);
+    let key_manager = Arc::new(Mutex::new(KeyManager::new(executor.clone())));
+
     loop {
         let mut socket = connection.connect_with_retry(&name).await;
         let _heartbeat_guard = HeartbeatLoop::start(socket.sender(MessageFromDrone::Heartbeat));
+
+        key_manager
+            .lock()
+            .expect("Key manager lock poisoned")
+            .set_sender(socket.sender(MessageFromDrone::RenewKey));
 
         {
             // Forward state changes to the socket.
             // This will start by sending any existing unacked events.
             let sender = socket.sender(MessageFromDrone::BackendEvent);
+            let key_manager = key_manager.clone();
             if let Err(err) = executor.register_listener(move |message| {
+                if message.status == BackendStatus::Terminated {
+                    key_manager
+                        .lock()
+                        .expect("Key manager lock poisoned.")
+                        .unregister_key(&message.backend_id);
+                }
+
                 if let Err(e) = sender.send(message) {
                     tracing::error!(%e, "Error sending message.");
                 }
@@ -66,6 +86,14 @@ pub async fn drone_loop(
                 }) => {
                     tracing::info!(?backend_id, ?action, "Received action.");
 
+                    if let BackendAction::Spawn { key, .. } = &action {
+                        // Register the key with the key manager, ensuring that it will be refreshed.
+                        key_manager
+                            .lock()
+                            .expect("Key manager lock poisoned.")
+                            .register_key(backend_id.clone(), key.clone());
+                    }
+
                     if let Err(err) = executor.apply_action(&backend_id, &action).await {
                         tracing::error!(?err, "Error applying action.");
                         continue;
@@ -80,6 +108,20 @@ pub async fn drone_loop(
                     tracing::info!(?event_id, "Received status ack.");
                     if let Err(err) = executor.ack_event(event_id) {
                         tracing::error!(?err, "Error acking event.");
+                    }
+                }
+                MessageToDrone::RenewKeyResponse(renew_key_response) => {
+                    let RenewKeyResponse { backend, deadlines } = renew_key_response;
+                    tracing::info!(?deadlines, "Received key renewal response.");
+
+                    if let Some(deadlines) = deadlines {
+                        key_manager
+                            .lock()
+                            .expect("Key manager lock poisoned.")
+                            .update_deadlines(&backend, deadlines);
+                    } else {
+                        // TODO: we could begin the graceful termiation here.
+                        tracing::warn!("Key renewal failed.");
                     }
                 }
             }

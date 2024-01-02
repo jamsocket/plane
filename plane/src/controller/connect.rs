@@ -11,22 +11,22 @@ use reqwest::StatusCode;
 
 fn connect_error_to_response(connect_error: &ConnectError) -> Response {
     match connect_error {
-        ConnectError::FailedToAcquireLock => err_to_response(
+        ConnectError::FailedToAcquireKey => err_to_response(
             connect_error,
             StatusCode::INTERNAL_SERVER_ERROR,
             "Failed to acquire lock.",
         ),
-        ConnectError::LockUnheldNoSpawnConfig => err_to_response(
+        ConnectError::KeyUnheldNoSpawnConfig => err_to_response(
             connect_error,
             StatusCode::CONFLICT,
             "Lock is unheld but no spawn config was provided.",
         ),
-        ConnectError::LockHeldUnhealthy => err_to_response(
+        ConnectError::KeyHeldUnhealthy => err_to_response(
             connect_error,
             StatusCode::INTERNAL_SERVER_ERROR,
             "Lock is held but unhealthy.",
         ),
-        ConnectError::LockHeld { .. } => err_to_response(
+        ConnectError::KeyHeld { .. } => err_to_response(
             connect_error,
             StatusCode::CONFLICT,
             "Lock is held but tag does not match.",
@@ -36,7 +36,7 @@ fn connect_error_to_response(connect_error: &ConnectError) -> Response {
             StatusCode::INTERNAL_SERVER_ERROR,
             "No active drone available.",
         ),
-        ConnectError::FailedToRemoveLock => err_to_response(
+        ConnectError::FailedToRemoveKey => err_to_response(
             connect_error,
             StatusCode::CONFLICT,
             "Failed to remove lock.",

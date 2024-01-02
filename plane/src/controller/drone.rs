@@ -1,8 +1,17 @@
 use super::Controller;
 use crate::{
     controller::error::IntoApiError,
-    database::{backend::BackendActionMessage, subscribe::Subscription, PlaneDatabase},
-    protocol::{BackendAction, Heartbeat, MessageFromDrone, MessageToDrone},
+    database::{
+        backend::BackendActionMessage,
+        backend_key::{
+            KEY_LEASE_HARD_TERMINATE_AFTER, KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER,
+        },
+        subscribe::Subscription,
+        PlaneDatabase,
+    },
+    protocol::{
+        BackendAction, Heartbeat, KeyDeadlines, MessageFromDrone, MessageToDrone, RenewKeyResponse,
+    },
     typed_socket::{server::new_server, TypedSocket},
     types::{ClusterName, NodeId, TerminationKind},
 };
@@ -20,13 +29,11 @@ pub async fn handle_message_from_drone(
     sender: &mut TypedSocket<MessageToDrone>,
 ) -> anyhow::Result<()> {
     match msg {
-        MessageFromDrone::Heartbeat(Heartbeat {
-            local_time_epoch_millis,
-        }) => {
+        MessageFromDrone::Heartbeat(Heartbeat { local_time }) => {
             controller
                 .db
                 .drone()
-                .heartbeat(drone_id, local_time_epoch_millis)
+                .heartbeat(drone_id, local_time)
                 .await?;
         }
         MessageFromDrone::BackendEvent(backend_event) => {
@@ -57,6 +64,28 @@ pub async fn handle_message_from_drone(
                 .db
                 .backend_actions()
                 .ack_pending_action(&action_id, drone_id)
+                .await?;
+        }
+        MessageFromDrone::RenewKey(renew_key_request) => {
+            controller
+                .db
+                .keys()
+                .renew_key(&renew_key_request.backend)
+                .await?;
+
+            let deadlines = KeyDeadlines {
+                renew_at: renew_key_request.local_time + KEY_LEASE_RENEW_AFTER,
+                soft_terminate_at: renew_key_request.local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
+                hard_terminate_at: renew_key_request.local_time + KEY_LEASE_HARD_TERMINATE_AFTER,
+            };
+
+            let renew_key_response = RenewKeyResponse {
+                backend: renew_key_request.backend,
+                deadlines: Some(deadlines),
+            };
+
+            sender
+                .send(MessageToDrone::RenewKeyResponse(renew_key_response))
                 .await?;
         }
     }

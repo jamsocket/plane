@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update backend_key\n            set expires_at = now() + $2\n            where\n                id = $1 and\n                allow_renew = true\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Interval"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fac3425151169b6382f9abe7ab872e1b7ebb98331b3682b529b82a7ba63b0cc2"
+}
