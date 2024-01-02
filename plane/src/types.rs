@@ -26,20 +26,6 @@ impl Display for NodeId {
     }
 }
 
-pub struct BackendKeyId(i32);
-
-impl From<i32> for BackendKeyId {
-    fn from(i: i32) -> Self {
-        Self(i)
-    }
-}
-
-impl BackendKeyId {
-    pub fn as_i32(&self) -> i32 {
-        self.0
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
 pub struct ClusterName(String);
 
@@ -303,7 +289,7 @@ pub struct SpawnConfig {
     pub max_idle_seconds: Option<i32>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct KeyConfig {
     /// If provided, and a running backend was created with the same key,
     /// cluster, namespace, and tag, we will connect to that backend instead

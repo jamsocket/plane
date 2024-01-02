@@ -32,7 +32,6 @@ impl Executor {
             GuardHandle::new(async move {
                 let mut events = docker.backend_events().await;
                 while let Some(event) = events.next().await {
-                    tracing::info!("Received backend event!!: {:?}", event);
                     if let Some((_, manager)) = backends.remove(&event.backend_id) {
                         tracing::info!(
                             "Backend {} terminated with exit code {}.",
@@ -59,7 +58,7 @@ impl Executor {
         }
     }
 
-    pub fn register_listener<F>(&mut self, listener: F) -> Result<()>
+    pub fn register_listener<F>(&self, listener: F) -> Result<()>
     where
         F: Fn(BackendStateMessage) + Send + Sync + 'static,
     {

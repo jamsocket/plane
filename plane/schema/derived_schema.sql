@@ -160,38 +160,24 @@ ALTER TABLE public.backend_action OWNER TO postgres;
 --
 
 CREATE TABLE public.backend_key (
-    id integer NOT NULL,
+    id character varying(255) NOT NULL,
     cluster character varying(255) NOT NULL,
     namespace character varying(255) NOT NULL,
     key_name character varying(255) NOT NULL,
     tag character varying(255) NOT NULL,
-    last_renewed timestamp with time zone NOT NULL,
-    backend_id character varying(255) NOT NULL
+    expires_at timestamp with time zone NOT NULL,
+    fencing_token bigint NOT NULL,
+    allow_renew boolean DEFAULT true NOT NULL
 );
 
 
 ALTER TABLE public.backend_key OWNER TO postgres;
 
 --
--- Name: backend_key_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: COLUMN backend_key.allow_renew; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE SEQUENCE public.backend_key_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.backend_key_id_seq OWNER TO postgres;
-
---
--- Name: backend_key_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE public.backend_key_id_seq OWNED BY public.backend_key.id;
+COMMENT ON COLUMN public.backend_key.allow_renew IS 'If false, the key cannot be renewed with the same fencing token.';
 
 
 --
@@ -256,7 +242,7 @@ CREATE TABLE public.drone (
     ready boolean NOT NULL,
     draining boolean DEFAULT false NOT NULL,
     last_heartbeat timestamp with time zone,
-    last_local_epoch_millis bigint
+    last_local_time timestamp with time zone
 );
 
 
@@ -291,10 +277,10 @@ COMMENT ON COLUMN public.drone.last_heartbeat IS 'The last time local_epoch_mill
 
 
 --
--- Name: COLUMN drone.last_local_epoch_millis; Type: COMMENT; Schema: public; Owner: postgres
+-- Name: COLUMN drone.last_local_time; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.drone.last_local_epoch_millis IS 'The last reported milliseconds since epoch from the drone, used to assign initial key leases when spawning.';
+COMMENT ON COLUMN public.drone.last_local_time IS 'The last reported local timestamp on the drone, used to assign initial key leases when spawning.';
 
 
 --
@@ -460,13 +446,6 @@ CREATE TABLE public.token (
 
 
 ALTER TABLE public.token OWNER TO postgres;
-
---
--- Name: backend_key id; Type: DEFAULT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.backend_key ALTER COLUMN id SET DEFAULT nextval('public.backend_key_id_seq'::regclass);
-
 
 --
 -- Name: backend_status id; Type: DEFAULT; Schema: public; Owner: postgres
@@ -673,11 +652,11 @@ ALTER TABLE ONLY public.backend
 
 
 --
--- Name: backend_key backend_key_backend_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: backend_key backend_key_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.backend_key
-    ADD CONSTRAINT backend_key_backend_id_fkey FOREIGN KEY (backend_id) REFERENCES public.backend(id);
+    ADD CONSTRAINT backend_key_id_fkey FOREIGN KEY (id) REFERENCES public.backend(id);
 
 
 --

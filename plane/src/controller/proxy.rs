@@ -30,7 +30,6 @@ pub async fn proxy_socket_inner(
 
     loop {
         let message_from_proxy_result = socket.recv().await;
-        tracing::info!(?message_from_proxy_result, "Handling message from proxy...");
         match message_from_proxy_result {
             Some(MessageFromProxy::RouteInfoRequest(RouteInfoRequest { token })) => {
                 let route_info = match controller.db.backend().route_info_for_token(&token).await {

@@ -1,3 +1,4 @@
+use chrono::Utc;
 use common::test_env::TestEnvironment;
 use hyper::StatusCode;
 use plane::{
@@ -60,7 +61,7 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
         tracing::info!("Sending initial heartbeat message (mocking the drone).");
         drone_connection
             .send(MessageFromDrone::Heartbeat(Heartbeat {
-                local_time_epoch_millis: 0, // Doesn't matter for this test.
+                local_time: Utc::now(),
             }))
             .await
             .unwrap();

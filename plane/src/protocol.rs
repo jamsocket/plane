@@ -9,13 +9,41 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::SystemTime};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct KeyDeadlines {
+    /// When the key should be renewed.
+    pub renew_at: SystemTime,
+
+    /// When the backend should be soft-terminated if the key could not be renewed.
+    pub soft_terminate_at: SystemTime,
+
+    /// When the backend should be hard-terminated if the key could not be renewed.
+    pub hard_terminate_at: SystemTime,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AcquiredKey {
+    /// Details of the key itself.
+    pub key: KeyConfig,
+
+    /// Deadlines for key expiration stages.
+    pub deadlines: KeyDeadlines,
+
+    /// A unique key associated with a key for the duration it is acquired. This does not
+    /// change across renewals, but is incremented when the key is released and then acquired.
+    /// This is used internally to track the key during renewals, but can also be exposed to
+    /// backends as a fencing token.
+    /// (https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html).
+    pub token: i64,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum BackendAction {
     Spawn {
         executable: Box<ExecutorConfig>,
-        key: KeyConfig,
+        key: AcquiredKey,
     },
     Terminate {
         kind: TerminationKind,
@@ -53,8 +81,15 @@ impl From<BackendEventId> for i64 {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RenewKeyRequest {
+    pub backend: BackendName,
+
+    pub local_time: SystemTime,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Heartbeat {
-    pub local_time_epoch_millis: u64,
+    pub local_time: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -62,10 +97,21 @@ pub enum MessageFromDrone {
     Heartbeat(Heartbeat),
     BackendEvent(BackendStateMessage),
     AckAction { action_id: BackendActionName },
+    RenewKey(RenewKeyRequest),
 }
 
 impl ChannelMessage for MessageFromDrone {
     type Reply = MessageToDrone;
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RenewKeyResponse {
+    /// The backend whose associated key was renewed.
+    pub backend: BackendName,
+
+    /// The key that was renewed, if successful.
+    /// If the key was not renewed, this will be None.
+    pub deadlines: Option<KeyDeadlines>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -75,6 +121,7 @@ pub enum MessageToDrone {
     AckEvent {
         event_id: BackendEventId,
     },
+    RenewKeyResponse(RenewKeyResponse),
 }
 
 impl ChannelMessage for MessageToDrone {

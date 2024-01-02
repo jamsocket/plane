@@ -34,14 +34,14 @@ create table drone (
     ready boolean not null,
     draining boolean not null default false,
     last_heartbeat timestamptz,
-    last_local_epoch_millis bigint
+    last_local_time timestamptz
 );
 
 comment on column drone.id is 'The unique id of the drone (shared with the node associated with this drone).';
 comment on column drone.ready is 'Whether the drone is ready to accept backends.';
 comment on column drone.draining is 'Whether the drone is draining. If true, this drone will not be considered by the scheduler.';
 comment on column drone.last_heartbeat is 'The last time local_epoch_millis was received from the drone.';
-comment on column drone.last_local_epoch_millis is 'The last reported milliseconds since epoch from the drone, used to assign initial key leases when spawning.';
+comment on column drone.last_local_time is 'The last reported local timestamp on the drone, used to assign initial key leases when spawning.';
 
 create table backend (
     id varchar(255) primary key,
@@ -91,16 +91,19 @@ create index idx_backend_action_pending on backend_action(drone_id) where acked_
 create index idx_backend_action_backend on backend_action(backend_id);
 
 create table backend_key (
-    id serial primary key,
+    id varchar(255) primary key references backend(id) not null,
     cluster varchar(255) not null,
     namespace varchar(255) not null,
     key_name varchar(255) not null,
     tag varchar(255) not null,
-    last_renewed timestamptz not null,
-    backend_id varchar(255) references backend(id) not null
+    expires_at timestamptz not null,
+    fencing_token bigint not null,
+    allow_renew bool not null default true
 );
 
 create unique index idx_cluster_namespace_name on backend_key(cluster, namespace, key_name);
+
+comment on column backend_key.allow_renew is 'If false, the key cannot be renewed with the same fencing token.';
 
 create table token (
     token varchar(255) primary key,

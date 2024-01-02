@@ -54,7 +54,6 @@ impl<'a> ControllerDatabase<'a> {
         .execute(&mut *transaction)
         .await?;
 
-        tracing::info!(%name, %is_online, "controller heartbeat");
         emit(
             &mut *transaction,
             &ControllerHeartbeatNotification {

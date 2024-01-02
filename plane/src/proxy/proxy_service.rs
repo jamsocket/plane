@@ -110,8 +110,6 @@ impl RequestHandler {
         self: Arc<Self>,
         req: hyper::Request<hyper::Body>,
     ) -> Result<hyper::Response<hyper::Body>> {
-        tracing::info!(req=%req.uri(), "Handling request");
-
         let Some(mut request_rewriter) = RequestRewriter::new(req, self.remote_meta) else {
             return Ok(hyper::Response::builder()
                 .status(hyper::StatusCode::BAD_REQUEST)

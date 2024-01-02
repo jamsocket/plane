@@ -44,6 +44,7 @@ pub async fn handle_messages<T: ChannelMessage>(
                 };
                 if let Err(err) = messages_received.send(msg).await {
                     tracing::error!(?err, "Failed to receive message.");
+                    break;
                 }
             }
             else => {
