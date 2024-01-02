@@ -2,7 +2,6 @@
 name = "plane"
 version = "0.4.0"
 edition = "2021"
-autotests = false
 default-run = "plane"
 description = "Session backend orchestrator for ambitious browser-based apps."
 repository = "https://github.com/drifting-in-space/plane"
