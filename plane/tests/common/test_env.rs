@@ -3,7 +3,7 @@ use super::{
     resources::{database::DevDatabase, pebble::Pebble},
 };
 use bollard::Docker;
-use plane2::{
+use plane::{
     controller::ControllerServer,
     database::PlaneDatabase,
     dns::run_dns_with_listener,

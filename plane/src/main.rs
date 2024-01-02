@@ -3,15 +3,15 @@
 
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
-use plane2::client::PlaneClient;
-use plane2::controller::run_controller;
-use plane2::database::connect_and_migrate;
-use plane2::dns::run_dns;
-use plane2::drone::run_drone;
-use plane2::init_tracing::init_tracing;
-use plane2::names::{AcmeDnsServerName, ControllerName, DroneName, Name, OrRandom, ProxyName};
-use plane2::proxy::{run_proxy, AcmeConfig, ServerPortConfig};
-use plane2::types::ClusterName;
+use plane::client::PlaneClient;
+use plane::controller::run_controller;
+use plane::database::connect_and_migrate;
+use plane::dns::run_dns;
+use plane::drone::run_drone;
+use plane::init_tracing::init_tracing;
+use plane::names::{AcmeDnsServerName, ControllerName, DroneName, Name, OrRandom, ProxyName};
+use plane::proxy::{run_proxy, AcmeConfig, ServerPortConfig};
+use plane::types::ClusterName;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use url::Url;

@@ -1,6 +1,6 @@
 use common::test_env::TestEnvironment;
 use hyper::StatusCode;
-use plane2::{
+use plane::{
     client::PlaneClientError,
     database::backend::BackendActionMessage,
     names::{DroneName, Name},

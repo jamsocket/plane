@@ -2,7 +2,7 @@ name: Check Rust formatting
 
 on:
   pull_request:
-    branches: [ "plane2-preview" ]
+    branches: [ "plane-preview" ]
 
 jobs:
   check-rust-format:

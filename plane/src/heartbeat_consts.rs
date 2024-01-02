@@ -2,7 +2,7 @@
 //!
 //! These are expected to conform to some invariants:
 //! ```
-//! use plane2::heartbeat_consts::*;
+//! use plane::heartbeat_consts::*;
 //! assert!(HEARTBEAT_INTERVAL_SECONDS > 0);
 //! assert!(UNHEALTHY_SECONDS > HEARTBEAT_INTERVAL_SECONDS,
 //!   "Drones will be considered unhealthy before they are expected to send a heartbeat!");

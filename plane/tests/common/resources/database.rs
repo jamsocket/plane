@@ -1,7 +1,7 @@
 use crate::common::{async_drop::AsyncDrop, docker::Container, test_env::TestEnvironment};
 use anyhow::{Context, Result};
 use bollard::{container::Config, Docker};
-use plane2::database::{connect_and_migrate, PlaneDatabase};
+use plane::database::{connect_and_migrate, PlaneDatabase};
 use std::{
     path::{Path, PathBuf},
     sync::OnceLock,

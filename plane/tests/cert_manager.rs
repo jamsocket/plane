@@ -1,7 +1,7 @@
 use crate::common::resources::pebble::Pebble;
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
-use plane2::{
+use plane::{
     names::{Name, ProxyName},
     proxy::{cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection, AcmeConfig},
 };

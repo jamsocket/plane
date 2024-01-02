@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use plane2::{
+use plane::{
     client::{PlaneClient, PlaneClientError},
     init_tracing::init_tracing,
     names::{BackendName, DroneName},
