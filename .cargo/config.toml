@@ -1,6 +1,0 @@
-[build]
-#this flag is set to speed up compile times for the tests, it prevents
-#the compiler from getting confused when using plane-dynamic. it does not
-#affect the plane binaries at all.
-rustflags = ["-C", "prefer-dynamic"]
-

@@ -1,8 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
-    "plane",
-    "plane/plane-dynamic",
     "plane/plane-tests",
+    "plane/plane-dynamic",
+    "plane",
     "plane/plane-tests/plane-test-macro",
+]
+default-members = [
+    "plane",
+    "plane/plane-tests"
 ]
