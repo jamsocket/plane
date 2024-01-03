@@ -63,10 +63,10 @@ The Plane Controller will be available at http://localhost:8080, and the Plane P
 
 ### Connecting to a process
 
-The `dev/cli.sh` script runs the Plane CLI, configured to connect to the local Plane Controller.
+The `docker/cli.sh` script runs the Plane CLI, configured to connect to the local Plane Controller.
 
 ```bash
-dev/cli.sh connect \
+docker/cli.sh connect \
     --wait \
     --cluster 'localhost:9090' \
     --image ghcr.io/drifting-in-space/demo-image-drop-four
