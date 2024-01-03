@@ -19,6 +19,4 @@ hyper = { version = "0.14.27", features = ["server"] }
 anyhow = "1.0.75"
 url = "2.4.1"
 futures-util = "0.3.29"
-
-[dev-dependencies]
 plane-test-macro = { path = "plane-test-macro" }
