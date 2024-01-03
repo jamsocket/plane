@@ -10,6 +10,11 @@ export default {
     chat: {
         link: "https://discord.gg/N5sEpsuhh9"
     },
+    footer: {
+        text: <span>
+            Plane is an open-source project of <a href="https://driftingin.space">Drifting in Space Corp.</a>
+        </span>,
+    },
     head: () => {
         const { frontMatter, title } = useConfig()
         const { asPath } = useRouter()
