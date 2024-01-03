@@ -30,10 +30,8 @@ See the [architecture overview](concepts/architecture.mdx) for background on eac
 
 ### 3. Connect to a backend
 
-TODO: this part requires Rust; we should replace it with a Docker container.
-
 ```bash
-dev/cli.sh \
+docker/cli.sh \
     connect \
     --cluster 'localhost:9090' \
     --key 'my-first-backend' \
@@ -49,8 +47,8 @@ If no process is running, Plane will start one (provided that you supply an imag
 
 Here’s a breakdown of the command above:
 
-- `dev/cli.sh` is a lightweight shell script that runs the Plane CLI, pre-configuring it to point to
-  a Plane instance listening at `localhost:8080` (this corresponds to how the Docker Compose setup is configured).
+- `docker/cli.sh` is a shell script that runs the Plane CLI in a Docker container, pre-configuring it to point to
+  a Plane instance started in the Docker Compose file.
 - `connect` is the Plane CLI subcommand for issuing a “connect request”, which will return a URL that routes to
   a backend process.
 - `--cluster 'localhost:9090'` tells the CLI to start the backend on the `localhost:9090` cluster. Since the cluster name
