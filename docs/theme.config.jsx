@@ -45,5 +45,6 @@ export default {
                 title: 'Plane – run WebSocket backends at scale'
             }
         }
-    }
+    },
+    docsRepositoryBase: 'https://github.com/drifting-in-space/plane/tree/main/docs',
 }
