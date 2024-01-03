@@ -13,6 +13,7 @@
 [![Build Docker Image](https://github.com/drifting-in-space/plane/actions/workflows/build-image.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/build-image.yml)
 [![Tests](https://github.com/drifting-in-space/plane/actions/workflows/tests.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/tests.yml)
 [![Chat on Discord](https://img.shields.io/static/v1?label=chat&message=discord&color=404eed)](https://discord.gg/N5sEpsuhh9)
+[![crates.io](https://img.shields.io/crates/v/plane.svg)](https://crates.io/crates/plane)
 
 Plane is a distributed system for **running stateful WebSocket backends at scale**. Plane is heavily inspired by [Figma’s mulitplayer infrastructure](https://www.figma.com/blog/rust-in-production-at-figma/), which dynamically spawns a process for each active document.
 
