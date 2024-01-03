@@ -18,3 +18,10 @@ Use cases include:
 Read more about [Plane’s architecture](https://plane.dev/concepts/architecture).
 
 [![Architecture diagram of Plane](../docs/public/arch-diagram.svg)](https://plane.dev/concepts/architecture)
+
+## Learn more
+
+- Read the [quickstart guide](https://plane.dev/quickstart-guide)
+- Learn about [Plane concepts](https://plane.dev/concepts/session-backends)
+- See instructions for [building and developing Plane locally](https://plane.dev/developing)
+- Read about [production deployment](https://plane.dev/deploy-to-prod)
