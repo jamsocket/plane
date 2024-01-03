@@ -36,52 +36,9 @@ Read more about [Plane’s architecture](https://plane.dev/concepts/architecture
 
 [![Architecture diagram of Plane](./docs/public/arch-diagram.svg)](https://plane.dev/concepts/architecture)
 
-## Example
+## Learn more
 
-Imagine a multiplayer document editor. When Sam opens a document with ID `abc123`, the application requests a process from Plane with that key. In this case no process is running, so Plane starts a new one.
-
-When Jane opens the *same* document, the application requests a process from Plane with the same key (`abc123`). This time Plane already has a process running for that key, so it returns a URL which maps to that process.
-
-As long as either Jane or Sam has document `abc123` open, Plane will keep the process associated with that document running. After **both** Jane and Sam have closed the document, Plane will shut down the process.
-
-If Carl later opens the same document, Plane will start a _new_ process for him, possibly on a different machine.
-
-## Quick Start
-
-This repo includes a Docker Compose file that is suitable for running a local development instance of Plane.
-
-This works on Linux and Mac systems with Docker installed.
-
-In the root of this repo, run:
-
-```bash
-docker compose -f docker/docker-compose.yml up
-```
-
-This tells Docker to run a Postgres database, as well as a minimal Plane stack: one controller, one drone, and one proxy (see below for an explanation).
-
-The Plane Controller will be available at http://localhost:8080, and the Plane Proxy will be available at http://localhost:9090.
-
-### Connecting to a process
-
-The `docker/cli.sh` script runs the Plane CLI, configured to connect to the local Plane Controller.
-
-```bash
-docker/cli.sh connect \
-    --wait \
-    --cluster 'localhost:9090' \
-    --image ghcr.io/drifting-in-space/demo-image-drop-four
-```
-
-## Running tests
-
-Tests can be run with `cargo test`, but it can be slow because it does not run tests in parallel and some of the tests are slow.
-
-You can use `nextest` to run tests in parallel:
-
-```bash
-cargo install nextest
-cargo nextest run -j 5
-```
-
-The `-j 5` flag tells `nextest` to run 5 tests in parallel. If you set it too high, you may encounter Docker issues.
+- Read the [quickstart guide](https://plane.dev/quickstart-guide)
+- Learn about [Plane concepts](https://plane.dev/concepts/session-backends)
+- See instructions for [building and developing Plane locally](https://plane.dev/developing)
+- Read about [production deployment](https://plane.dev/deploy-to-prod)

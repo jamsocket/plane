@@ -10,7 +10,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <link rel="icon" href="/favicon.png" />
       </Head>
       <Component {...pageProps} />
-      <Script defer data-domain="y-sweet.cloud" src="/js/script.js"></Script>
+      <Script defer data-domain="plane.dev" src="/js/script.js"></Script>
     </>
   )
 }

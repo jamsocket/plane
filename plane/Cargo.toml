@@ -1,12 +1,13 @@
 [package]
 name = "plane"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2021"
 default-run = "plane"
 description = "Session backend orchestrator for ambitious browser-based apps."
 repository = "https://github.com/drifting-in-space/plane"
 license = "MIT"
-readme = "../README.md"
+homepage = "https://plane.dev"
+readme = "README.md"
 
 [dependencies]
 acme2-eab = "0.5.4"

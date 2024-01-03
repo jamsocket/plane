@@ -1,5 +1,6 @@
 #![warn(clippy::unwrap_used)]
 #![cfg_attr(test, allow(clippy::unwrap_used))]
+#![doc = include_str!("../README.md")]
 
 use serde::{Deserialize, Serialize};
 
