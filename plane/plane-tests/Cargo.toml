@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 plane = { path = "../plane-dynamic", package = "plane-dynamic" }
-plane-test-macro = { path = "plane-test-macro" }
+chrono = { version = "0.4.31", features = ["serde"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.2"
 tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread", "signal"] }
@@ -19,3 +19,6 @@ hyper = { version = "0.14.27", features = ["server"] }
 anyhow = "1.0.75"
 url = "2.4.1"
 futures-util = "0.3.29"
+
+[dev-dependencies]
+plane-test-macro = { path = "plane-test-macro" }
