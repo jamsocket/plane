@@ -1,6 +1,16 @@
 [workspace]
 resolver = "2"
 members = [
+    "plane/plane-tests",
+    "plane/plane-dynamic",
     "plane",
-    "plane/tests/plane-test-macro",
+    "plane/plane-tests/plane-test-macro",
+]
+# DO NOT PUT plane/plane-dynamic INTO default-members below
+# this is needed for the condition in cargo to be satisfied
+# that passes it -C prefer-dynamic
+# https://github.com/rust-lang/cargo/pull/9252/files
+default-members = [
+    "plane",
+    "plane/plane-tests"
 ]

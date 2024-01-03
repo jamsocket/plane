@@ -48,6 +48,3 @@ tungstenite = "0.20.1"
 url = "2.4.1"
 x509-parser = "0.15.1"
 
-[dev-dependencies]
-tracing-appender = "0.2.2"
-plane-test-macro = { path = "tests/plane-test-macro" }

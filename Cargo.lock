@@ -1617,7 +1617,6 @@ dependencies = [
  "hyper",
  "lru",
  "pem",
- "plane-test-macro",
  "rand",
  "reqwest",
  "ring",
@@ -1635,12 +1634,18 @@ dependencies = [
  "tokio-tungstenite",
  "tower-http",
  "tracing",
- "tracing-appender",
  "tracing-subscriber",
  "trust-dns-server",
  "tungstenite",
  "url",
  "x509-parser",
+]
+
+[[package]]
+name = "plane-dynamic"
+version = "0.2.0"
+dependencies = [
+ "plane",
 ]
 
 [[package]]
@@ -1650,6 +1655,28 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.39",
+]
+
+[[package]]
+name = "plane-tests"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bollard",
+ "chrono",
+ "futures-util",
+ "hyper",
+ "plane-dynamic",
+ "plane-test-macro",
+ "reqwest",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
