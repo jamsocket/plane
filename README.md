@@ -1,4 +1,4 @@
-**Note:** This branch is an in-progress rewrite of Plane! Please poke around, but don’t use it in production yet, and don’t be surprised if documentation is missing or inconsistent.
+**Note:** This branch represents a recent rewrite of Plane. Feel free to poke around, but we recommend [talking to us](https://discord.gg/N5sEpsuhh9) before using it in production. See the [0.3.x branch](https://github.com/drifting-in-space/Plane/tree/plane-0.3.x) for the previous version.
 
 <div style="postion: relative; width: 337px; height: 110px;">
     <a href="https://plane.dev#gh-light-mode-only" style="position: absolute;">
@@ -9,9 +9,10 @@
     </a>
 </div>
 
-[![Docker image](https://img.shields.io/docker/v/plane/plane-preview)](https://hub.docker.com/r/plane/plane-preview/tags)
-[![Build Docker Image](https://github.com/drifting-in-space/plane/actions/workflows/plane-build-image.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/plane-build-image.yml)
-[![Tests](https://github.com/drifting-in-space/plane/actions/workflows/plane-tests.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/plane-tests.yml)
+[![Docker image](https://img.shields.io/docker/v/plane/plane)](https://hub.docker.com/r/plane/plane/tags)
+[![Build Docker Image](https://github.com/drifting-in-space/plane/actions/workflows/build-image.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/build-image.yml)
+[![Tests](https://github.com/drifting-in-space/plane/actions/workflows/tests.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/tests.yml)
+[![Chat on Discord](https://img.shields.io/static/v1?label=chat&message=discord&color=404eed)](https://discord.gg/N5sEpsuhh9)
 
 Plane is a distributed system for **running stateful WebSocket backends at scale**. Plane is heavily inspired by [Figma’s mulitplayer infrastructure](https://www.figma.com/blog/rust-in-production-at-figma/), which dynamically spawns a process for each active document.
 
