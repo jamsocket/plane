@@ -124,7 +124,7 @@ impl RequestHandler {
 
         let Some(route_info) = route_info else {
             return Ok(hyper::Response::builder()
-                .status(hyper::StatusCode::NOT_FOUND)
+                .status(hyper::StatusCode::FORBIDDEN)
                 .body(hyper::Body::empty())?);
         };
 
