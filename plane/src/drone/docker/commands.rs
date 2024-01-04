@@ -85,7 +85,7 @@ async fn try_get_port(docker: &Docker, container_id: &ContainerId) -> Result<u16
         .and_then(|settings| settings.ports)
         .and_then(|ports| ports.get(&format!("{}/tcp", CONTAINER_PORT)).cloned())
         .and_then(|bindings| bindings.clone())
-        .and_then(|bindings| bindings.get(0).cloned())
+        .and_then(|bindings| bindings.first().cloned())
         .and_then(|binding| binding.host_port.clone())
         .and_then(|port| port.parse::<u16>().ok())
         .ok_or_else(|| anyhow::anyhow!("Failed to get port for container."))?;
