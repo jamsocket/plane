@@ -425,7 +425,7 @@ COMMENT ON COLUMN public.controller.is_online IS 'Whether the controller is onli
 -- Name: COLUMN controller.plane_version; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.controller.plane_version IS 'The version of the plane running on the controller.';
+COMMENT ON COLUMN public.controller.plane_version IS 'The version of plane running on the controller.';
 
 
 --
@@ -643,7 +643,7 @@ COMMENT ON COLUMN public.node.cluster IS 'The cluster the node belongs to. May b
 -- Name: COLUMN node.plane_version; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.node.plane_version IS 'The version of the plane running on the node.';
+COMMENT ON COLUMN public.node.plane_version IS 'The version of plane running on the node.';
 
 
 --

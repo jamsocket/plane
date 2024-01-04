@@ -12,7 +12,7 @@ comment on table controller is 'Self-reported information about controllers.';
 comment on column controller.first_seen is 'The first time the controller came online.';
 comment on column controller.last_heartbeat is 'The last time the controller sent a heartbeat.';
 comment on column controller.is_online is 'Whether the controller is online (self-reported; if a controller dies suddenly this will not be updated).';
-comment on column controller.plane_version is 'The version of the plane running on the controller.';
+comment on column controller.plane_version is 'The version of plane running on the controller.';
 comment on column controller.plane_hash is 'The git hash of the plane version running on the controller.';
 comment on column controller.ip is 'The last-seen IP of the controller (as seen from the Postgres server)';
 
@@ -33,7 +33,7 @@ comment on table node is 'Information about nodes (drones, proxies, DNS servers)
 comment on column node.kind is 'A string representing the kind of node this is (serialized types::NodeKind).';
 comment on column node.name is 'A string name provided by the node, unique within a cluster.';
 comment on column node.cluster is 'The cluster the node belongs to. May be null if the node is cross-cluster (currently only DNS servers may have a null cluster).';
-comment on column node.plane_version is 'The version of the plane running on the node.';
+comment on column node.plane_version is 'The version of plane running on the node.';
 comment on column node.plane_hash is 'The git hash of the plane version running on the node.';
 comment on column node.controller is 'The controller the node is registered with (null if the node is offline).';
 comment on column node.ip is 'The last-seen IP of the node relative to the controller. This is just for reference; drones self-report their IP for use by proxies.';
