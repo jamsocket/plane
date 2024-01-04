@@ -2,7 +2,7 @@ version: "3.9"
 services:
   controller:
     container_name: plane-controller
-    image: plane/plane-preview:latest
+    image: plane/plane:latest
     build:
       dockerfile: docker/Dockerfile
       context: ../
@@ -15,7 +15,7 @@ services:
 
   drone:
     container_name: plane-drone
-    image: plane/plane-preview:latest
+    image: plane/plane:latest
     build:
       dockerfile: docker/Dockerfile
       context: ../
@@ -30,7 +30,7 @@ services:
 
   proxy:
     container_name: plane-proxy
-    image: plane/plane-preview:latest
+    image: plane/plane:latest
     build:
       dockerfile: docker/Dockerfile
       context: ../
