@@ -96,8 +96,8 @@ async fn create_backend_with_key(
             values ($1, $2, $3, now(), $4, now() + $5, $6, now())
             returning id
         )
-        insert into backend_key (id, cluster, key_name, namespace, tag, expires_at, fencing_token)
-        select $1, $2, $7, $8, $9, now() + $10, extract(epoch from now()) * 1000 from backend_insert
+        insert into backend_key (id, key_name, namespace, tag, expires_at, fencing_token)
+        select $1, $7, $8, $9, now() + $10, extract(epoch from now()) * 1000 from backend_insert
         returning fencing_token
         "#,
         backend_id.to_string(),
@@ -185,7 +185,7 @@ async fn attempt_connect(
 ) -> Result<ConnectResponse> {
     let key = if let Some(key) = &request.key {
         // Request includes a key, so we need to check if it is held.
-        let key_result = KeysDatabase::new(pool).check_key(cluster, key).await?;
+        let key_result = KeysDatabase::new(pool).check_key(key).await?;
 
         if let Some(key_result) = key_result {
             // Key is held. Check if we can connect to existing backend.

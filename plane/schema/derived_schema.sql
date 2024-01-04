@@ -57,6 +57,41 @@ CREATE TABLE public.acme_txt_entries (
 ALTER TABLE public.acme_txt_entries OWNER TO postgres;
 
 --
+-- Name: TABLE acme_txt_entries; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.acme_txt_entries IS 'TXT entries used for ACME DNS challenges. Doubles as a leasing mechanism to ensure that only one drone can do an ACME challenge at a time.';
+
+
+--
+-- Name: COLUMN acme_txt_entries.cluster; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.acme_txt_entries.cluster IS 'The cluster the TXT entry is associated with.';
+
+
+--
+-- Name: COLUMN acme_txt_entries.leased_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.acme_txt_entries.leased_at IS 'The time the TXT entry was leased.';
+
+
+--
+-- Name: COLUMN acme_txt_entries.leased_by; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.acme_txt_entries.leased_by IS 'The proxy that last leased the entry.';
+
+
+--
+-- Name: COLUMN acme_txt_entries.txt_value; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.acme_txt_entries.txt_value IS 'The TXT value of the entry.';
+
+
+--
 -- Name: backend; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -77,10 +112,10 @@ CREATE TABLE public.backend (
 ALTER TABLE public.backend OWNER TO postgres;
 
 --
--- Name: COLUMN backend.id; Type: COMMENT; Schema: public; Owner: postgres
+-- Name: TABLE backend; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.backend.id IS 'The unique id of the backend.';
+COMMENT ON TABLE public.backend IS 'Information about backends. A row is created when a backend is scheduled.';
 
 
 --
@@ -112,10 +147,17 @@ COMMENT ON COLUMN public.backend.cluster_address IS 'The address (IP:PORT) of th
 
 
 --
+-- Name: COLUMN backend.exit_code; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend.exit_code IS 'The exit code of the backend (null if it has not exited; may remain null if exit is forced).';
+
+
+--
 -- Name: COLUMN backend.drone_id; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.backend.drone_id IS 'The drone the backend is running on.';
+COMMENT ON COLUMN public.backend.drone_id IS 'The drone the backend is assigned to.';
 
 
 --
@@ -145,8 +187,8 @@ COMMENT ON COLUMN public.backend.allowed_idle_seconds IS 'The number of seconds 
 
 CREATE TABLE public.backend_action (
     id character varying(255) NOT NULL,
-    drone_id integer NOT NULL,
     backend_id character varying(255),
+    drone_id integer NOT NULL,
     action jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     acked_at timestamp with time zone
@@ -156,12 +198,53 @@ CREATE TABLE public.backend_action (
 ALTER TABLE public.backend_action OWNER TO postgres;
 
 --
+-- Name: TABLE backend_action; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.backend_action IS 'Actions which are either queued to take place, or have taken place, on each backend.';
+
+
+--
+-- Name: COLUMN backend_action.backend_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_action.backend_id IS 'The backend the action applies to.';
+
+
+--
+-- Name: COLUMN backend_action.drone_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_action.drone_id IS 'The drone associated with the backend_id. This is denormalized from the backend table so that we can efficiently index it.';
+
+
+--
+-- Name: COLUMN backend_action.action; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_action.action IS 'A JSON representation of the action to take. Deserializes to a BackendActionMessage.';
+
+
+--
+-- Name: COLUMN backend_action.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_action.created_at IS 'The time the action was created.';
+
+
+--
+-- Name: COLUMN backend_action.acked_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_action.acked_at IS 'The time the action was acked by the drone. Null if the action has not been acked. Will be re-sent on drone reconnect if not already acked.';
+
+
+--
 -- Name: backend_key; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.backend_key (
     id character varying(255) NOT NULL,
-    cluster character varying(255) NOT NULL,
     namespace character varying(255) NOT NULL,
     key_name character varying(255) NOT NULL,
     tag character varying(255) NOT NULL,
@@ -174,10 +257,59 @@ CREATE TABLE public.backend_key (
 ALTER TABLE public.backend_key OWNER TO postgres;
 
 --
+-- Name: TABLE backend_key; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.backend_key IS 'Information about the key associated with each backend.';
+
+
+--
+-- Name: COLUMN backend_key.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_key.id IS 'The id of the backend the key is associated with.';
+
+
+--
+-- Name: COLUMN backend_key.namespace; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_key.namespace IS 'The namespace the key belongs to.';
+
+
+--
+-- Name: COLUMN backend_key.key_name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_key.key_name IS 'The name of the key, unique within the namespace.';
+
+
+--
+-- Name: COLUMN backend_key.tag; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_key.tag IS 'A value which must match for an existing backend to be returned based on key.';
+
+
+--
+-- Name: COLUMN backend_key.expires_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_key.expires_at IS 'The time the key expires, unless renewed first.';
+
+
+--
+-- Name: COLUMN backend_key.fencing_token; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_key.fencing_token IS 'A number that monotonically increases when the same key is re-acquired, but stays the same across refreshes.';
+
+
+--
 -- Name: COLUMN backend_key.allow_renew; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.backend_key.allow_renew IS 'If false, the key cannot be renewed with the same fencing token.';
+COMMENT ON COLUMN public.backend_key.allow_renew IS 'If false, the key cannot be renewed for this backend, forcing the backend to be terminated.';
 
 
 --
@@ -193,6 +325,34 @@ CREATE TABLE public.backend_status (
 
 
 ALTER TABLE public.backend_status OWNER TO postgres;
+
+--
+-- Name: TABLE backend_status; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.backend_status IS 'A history of status changes across all backends.';
+
+
+--
+-- Name: COLUMN backend_status.backend_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_status.backend_id IS 'The backend the status change refers to.';
+
+
+--
+-- Name: COLUMN backend_status.status; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_status.status IS 'The status of the backend.';
+
+
+--
+-- Name: COLUMN backend_status.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_status.created_at IS 'The time the status change was received.';
+
 
 --
 -- Name: backend_status_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -234,6 +394,55 @@ CREATE TABLE public.controller (
 ALTER TABLE public.controller OWNER TO postgres;
 
 --
+-- Name: TABLE controller; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.controller IS 'Self-reported information about controllers.';
+
+
+--
+-- Name: COLUMN controller.first_seen; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.controller.first_seen IS 'The first time the controller came online.';
+
+
+--
+-- Name: COLUMN controller.last_heartbeat; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.controller.last_heartbeat IS 'The last time the controller sent a heartbeat.';
+
+
+--
+-- Name: COLUMN controller.is_online; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.controller.is_online IS 'Whether the controller is online (self-reported; if a controller dies suddenly this will not be updated).';
+
+
+--
+-- Name: COLUMN controller.plane_version; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.controller.plane_version IS 'The version of the plane running on the controller.';
+
+
+--
+-- Name: COLUMN controller.plane_hash; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.controller.plane_hash IS 'The git hash of the plane version running on the controller.';
+
+
+--
+-- Name: COLUMN controller.ip; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.controller.ip IS 'The last-seen IP of the controller (as seen from the Postgres server)';
+
+
+--
 -- Name: drone; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -247,6 +456,13 @@ CREATE TABLE public.drone (
 
 
 ALTER TABLE public.drone OWNER TO postgres;
+
+--
+-- Name: TABLE drone; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.drone IS 'Information about drones used for scheduling.';
+
 
 --
 -- Name: COLUMN drone.id; Type: COMMENT; Schema: public; Owner: postgres
@@ -321,6 +537,41 @@ CREATE TABLE public.event (
 ALTER TABLE public.event OWNER TO postgres;
 
 --
+-- Name: TABLE event; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.event IS 'A history of events that have been broacast in the system.';
+
+
+--
+-- Name: COLUMN event.kind; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.event.kind IS 'The kind of event (value of NotificationPayload::kind()).';
+
+
+--
+-- Name: COLUMN event.key; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.event.key IS 'An optional key associated with the event. Along with "kind", acts like a pub/sub "subject". Subscriptions can filter on this key.';
+
+
+--
+-- Name: COLUMN event.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.event.created_at IS 'The time the event was created.';
+
+
+--
+-- Name: COLUMN event.data; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.event.data IS 'A JSON representation of the event payload. Must be a type that implements NotificationPayload.';
+
+
+--
 -- Name: event_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -361,6 +612,13 @@ CREATE TABLE public.node (
 ALTER TABLE public.node OWNER TO postgres;
 
 --
+-- Name: TABLE node; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.node IS 'Information about nodes (drones, proxies, DNS servers).';
+
+
+--
 -- Name: COLUMN node.kind; Type: COMMENT; Schema: public; Owner: postgres
 --
 
@@ -378,7 +636,7 @@ COMMENT ON COLUMN public.node.name IS 'A string name provided by the node, uniqu
 -- Name: COLUMN node.cluster; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.node.cluster IS 'The cluster the node is registered with.';
+COMMENT ON COLUMN public.node.cluster IS 'The cluster the node belongs to. May be null if the node is cross-cluster (currently only DNS servers may have a null cluster).';
 
 
 --
@@ -446,6 +704,55 @@ CREATE TABLE public.token (
 
 
 ALTER TABLE public.token OWNER TO postgres;
+
+--
+-- Name: TABLE token; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.token IS 'Information about tokens used to make authorized connections to backends.';
+
+
+--
+-- Name: COLUMN token.token; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.token.token IS 'The token used to make the connection.';
+
+
+--
+-- Name: COLUMN token.backend_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.token.backend_id IS 'The backend the token is associated with.';
+
+
+--
+-- Name: COLUMN token.expiration_time; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.token.expiration_time IS 'The time the token expires.';
+
+
+--
+-- Name: COLUMN token.username; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.token.username IS 'The username associated with the token.';
+
+
+--
+-- Name: COLUMN token.auth; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.token.auth IS 'A JSON representation of arbitrary auth metadata which is passed to the backend.';
+
+
+--
+-- Name: COLUMN token.secret_token; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.token.secret_token IS 'A secret token optionally used for secondary authentication.';
+
 
 --
 -- Name: backend_status id; Type: DEFAULT; Schema: public; Owner: postgres
@@ -574,7 +881,7 @@ CREATE INDEX idx_backend_action_backend ON public.backend_action USING btree (ba
 -- Name: idx_backend_action_pending; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_backend_action_pending ON public.backend_action USING btree (drone_id) WHERE (acked_at IS NULL);
+CREATE INDEX idx_backend_action_pending ON public.backend_action USING btree (drone_id, created_at) WHERE (acked_at IS NULL);
 
 
 --
@@ -588,7 +895,7 @@ CREATE INDEX idx_backend_drone_id ON public.backend USING btree (cluster, drone_
 -- Name: INDEX idx_backend_drone_id; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON INDEX public.idx_backend_drone_id IS 'An index for running/starting backends on a particular drone.';
+COMMENT ON INDEX public.idx_backend_drone_id IS 'An index for identifying running backends on a particular drone.';
 
 
 --
@@ -606,17 +913,17 @@ CREATE UNIQUE INDEX idx_cluster_name ON public.node USING btree (cluster, name);
 
 
 --
--- Name: idx_cluster_namespace_name; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX idx_cluster_namespace_name ON public.backend_key USING btree (cluster, namespace, key_name);
-
-
---
 -- Name: idx_event_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_event_created_at ON public.event USING btree (created_at);
+
+
+--
+-- Name: idx_namespace_name; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_namespace_name ON public.backend_key USING btree (namespace, key_name);
 
 
 --
