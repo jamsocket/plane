@@ -7,10 +7,7 @@
 //! assert!(KEY_LEASE_EXPIRATION > KEY_LEASE_HARD_TERMINATE_AFTER);
 //! ```
 
-use crate::{
-    names::BackendName,
-    types::{ClusterName, KeyConfig},
-};
+use crate::{names::BackendName, types::KeyConfig};
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, PgPool};
 use std::time::Duration;
@@ -88,7 +85,6 @@ impl<'a> KeysDatabase<'a> {
     /// Checks if the key is held.
     pub async fn check_key(
         &self,
-        cluster: &ClusterName,
         key: &KeyConfig,
     ) -> Result<Option<BackendKeyResult>, sqlx::Error> {
         let lock_result = sqlx::query!(
@@ -102,11 +98,9 @@ impl<'a> KeysDatabase<'a> {
                 now() as "as_of!"
             from backend_key
             left join backend on backend_key.id = backend.id
-            where backend_key.cluster = $1
-            and backend_key.key_name = $2
-            and backend_key.namespace = $3
+            where backend_key.key_name = $1
+            and backend_key.namespace = $2
             "#,
-            cluster.to_string(),
             key.name,
             key.namespace,
         )
