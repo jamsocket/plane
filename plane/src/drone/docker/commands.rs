@@ -262,31 +262,24 @@ mod tests {
         let _container_id = ContainerId::from(format!("plane-test-{}", backend_name));
         let mut executor_config = ExecutorConfig::from_image_with_defaults("debian:bookworm");
 
-        let resource_limits: ResourceLimits = serde_json::from_str(
-            r#"
-        {
+        let resource_limits: ResourceLimits = serde_json::from_value(serde_json::json!( {
         "cpu_period": 1000000,
         "cpu_time_limit": 100,
         "cpu_period_percent": 80,
         "memory_limit_bytes": 10000000,
-        "disk_limit_bytes": 10000000000
-        }
-        "#,
-        )?;
-
+        "disk_limit_bytes": 10000000000 as i64
+        }))?;
         executor_config.resource_limits = resource_limits;
         let info = docker.info().await?;
         match info.driver {
             Some(t) if matches!(t.as_str(), "btrfs" | "zfs") => {}
             Some(t)
                 if t == "overlay2" && {
-                    let fs_ok;
                     if let Some(status) = info.driver_status {
-                        fs_ok = !status.iter().flatten().any(|s| s.contains("xfs"));
+                        status.iter().flatten().any(|s| s.contains("xfs"))
                     } else {
-                        fs_ok = false
-                    };
-                    !fs_ok
+                        true
+                    }
                 } =>
             {
                 //disk limits not supported with xfs backend for overlay 2
@@ -298,8 +291,11 @@ mod tests {
             }
         }
 
-        let mut config =
-            get_container_config_from_executor_config(&backend_name, executor_config, &None)?;
+        let mut config = get_container_config_from_executor_config(
+            &backend_name,
+            executor_config.clone(),
+            &None,
+        )?;
         config.cmd = Some(vec!["echo".into(), "hello world".into()]);
         let out = run_container_with_config(config.clone()).await?;
         assert_eq!(out.trim(), "hello world".to_string());
@@ -323,10 +319,19 @@ mod tests {
 
         //unfortunately, the docker disk limit is dependent on the storage backend
         //hence just validating here that config is as expected.
-        config.host_config.unwrap().storage_opt.map(|hm| {
-            let size = hm.get("size").cloned();
-            assert_eq!(size, Some("10000000000".to_string()));
-        });
+        if let Some(expected_size) = executor_config.resource_limits.disk_limit_bytes {
+            assert_eq!(
+                expected_size.to_string(),
+                config
+                    .host_config
+                    .unwrap()
+                    .storage_opt
+                    .unwrap()
+                    .get("size")
+                    .unwrap()
+                    .clone()
+            );
+        }
 
         Ok(())
     }
