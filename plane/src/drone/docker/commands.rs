@@ -109,18 +109,11 @@ pub async fn get_port(docker: &Docker, container_id: &ContainerId) -> Result<u16
     Err(anyhow::anyhow!("Failed to get port after retries."))
 }
 
-pub async fn run_container(
-    docker: &Docker,
+fn get_container_config_from_executor_config(
     backend_id: &BackendName,
-    container_id: &ContainerId,
     exec_config: ExecutorConfig,
     runtime: &Option<String>,
-) -> Result<()> {
-    let options = bollard::container::CreateContainerOptions {
-        name: container_id.to_string(),
-        ..Default::default()
-    };
-
+) -> Result<bollard::container::Config<String>> {
     let mut env = exec_config.env;
     env.insert("PORT".to_string(), CONTAINER_PORT.to_string());
     env.insert("PLANE_BACKEND_ID".to_string(), backend_id.to_string());
@@ -130,7 +123,7 @@ pub async fn run_container(
         .map(|(k, v)| format!("{}={}", k, v))
         .collect();
 
-    let config = bollard::container::Config {
+    Ok(bollard::container::Config {
         image: Some(exec_config.image.clone()),
         labels: Some(create_labels(backend_id)),
         env: Some(env),
@@ -177,7 +170,22 @@ pub async fn run_container(
             ..Default::default()
         }),
         ..Default::default()
+    })
+}
+
+pub async fn run_container(
+    docker: &Docker,
+    backend_id: &BackendName,
+    container_id: &ContainerId,
+    exec_config: ExecutorConfig,
+    runtime: &Option<String>,
+) -> Result<()> {
+    let options = bollard::container::CreateContainerOptions {
+        name: container_id.to_string(),
+        ..Default::default()
     };
+
+    let config = get_container_config_from_executor_config(backend_id, exec_config, runtime)?;
 
     docker.create_container(Some(options), config).await?;
 
