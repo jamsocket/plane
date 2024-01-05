@@ -387,7 +387,7 @@ CREATE TABLE public.controller (
     is_online boolean NOT NULL,
     plane_version character varying(255) NOT NULL,
     plane_hash character varying(255) NOT NULL,
-    ip inet NOT NULL
+    ip inet
 );
 
 
