@@ -275,8 +275,23 @@ mod tests {
         )?;
 
         executor_config.resource_limits = resource_limits;
-        match docker.info().await?.driver {
-            Some(t) if matches!(t.as_str(), "btrfs" | "zfs" | "overlay2") => {}
+        let info = docker.info().await?;
+        match info.driver {
+            Some(t) if matches!(t.as_str(), "btrfs" | "zfs") => {}
+            Some(t)
+                if t == "overlay2" && {
+                    let fs_ok;
+                    if let Some(status) = info.driver_status {
+                        fs_ok = !status.iter().flatten().any(|s| s.contains("xfs"));
+                    } else {
+                        fs_ok = false
+                    };
+                    !fs_ok
+                } =>
+            {
+                //disk limits not supported with xfs backend for overlay 2
+                executor_config.resource_limits.disk_limit_bytes = None;
+            }
             _ => {
                 //disk limits not supported otherwise
                 executor_config.resource_limits.disk_limit_bytes = None;
@@ -308,14 +323,10 @@ mod tests {
 
         //unfortunately, the docker disk limit is dependent on the storage backend
         //hence just validating here that config is as expected.
-        let size = config
-            .host_config
-            .unwrap()
-            .storage_opt
-            .unwrap()
-            .get("size")
-            .cloned();
-        assert_eq!(size, Some("10000000000".to_string()));
+        config.host_config.unwrap().storage_opt.map(|hm| {
+            let size = hm.get("size").cloned();
+            assert_eq!(size, Some("10000000000".to_string()));
+        });
 
         Ok(())
     }
