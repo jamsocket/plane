@@ -47,6 +47,7 @@ impl BackendActionDatabase {
             from "backend_action"
             where "drone_id" = $1
             and acked_at is null
+            order by created_at asc
             "#,
             drone.as_i32(),
         )
