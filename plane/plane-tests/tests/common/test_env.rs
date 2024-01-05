@@ -14,7 +14,7 @@ use plane::{
 };
 use std::{
     net::Ipv4Addr,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 use tracing::subscriber::DefaultGuard;
@@ -152,8 +152,23 @@ impl Drop for DnsServer {
     }
 }
 
+fn get_project_root() -> PathBuf {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("not in cargo project");
+    let manifest_dir_path = Path::new(&manifest_dir);
+    let project_root = manifest_dir_path
+        .ancestors()
+        .filter(|e| e.join(".git").exists())
+        .next()
+        .expect("not in git repo");
+    project_root.to_path_buf()
+}
+
 fn create_scratch_dir(name: &str) -> PathBuf {
-    let scratch_dir = PathBuf::from(format!("../test-scratch/{}", name));
+    let scratch_dir = {
+        let mut dir = get_project_root();
+        dir.push(format!("test-scratch/{}", name));
+        dir
+    };
     std::fs::remove_dir_all(&scratch_dir).unwrap_or(());
     std::fs::create_dir_all(&scratch_dir).unwrap();
     scratch_dir
