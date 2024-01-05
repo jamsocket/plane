@@ -257,7 +257,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_resource_limits() -> anyhow::Result<()> {
-        let _docker = bollard::Docker::connect_with_local_defaults()?;
+        let docker = bollard::Docker::connect_with_local_defaults()?;
         let backend_name = BackendName::new_random();
         let _container_id = ContainerId::from(format!("plane-test-{}", backend_name));
         let mut executor_config = ExecutorConfig::from_image_with_defaults("debian:bookworm");
@@ -273,7 +273,16 @@ mod tests {
         }
         "#,
         )?;
+
         executor_config.resource_limits = resource_limits;
+        match docker.info().await?.driver {
+            Some(t) if matches!(t.as_str(), "btrfs" | "zfs" | "overlay2") => {}
+            _ => {
+                //disk limits not supported otherwise
+                executor_config.resource_limits.disk_limit_bytes = None;
+            }
+        }
+
         let mut config =
             get_container_config_from_executor_config(&backend_name, executor_config, &None)?;
         config.cmd = Some(vec!["echo".into(), "hello world".into()]);
