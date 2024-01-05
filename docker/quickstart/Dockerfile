@@ -1,15 +1,7 @@
 # =======
 # Builder
 # =======
-FROM debian:bookworm as builder
-
-# We can't just use a rust image because we need a version of libssl that is compatible
-# with the postgres base image.
-
-RUN apt-get update && \
-    apt-get install -y curl build-essential pkg-config libssl-dev git
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+FROM rust:bookworm as builder
 
 WORKDIR /work
 COPY Cargo.toml /work/
@@ -29,10 +21,10 @@ RUN touch /work/plane/plane-tests/plane-test-macro/src/lib.rs
 RUN touch /work/plane/plane-tests/src/lib.rs
 RUN touch /work/plane/plane-dynamic/src/lib.rs
 
-RUN $HOME/.cargo/bin/cargo build -p plane --release --locked
+RUN cargo build -p plane --release --locked
 
 COPY plane plane
-RUN $HOME/.cargo/bin/cargo build -p plane --release --locked
+RUN cargo build -p plane --release --locked
 
 # =======
 # Runtime
