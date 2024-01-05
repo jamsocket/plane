@@ -191,8 +191,12 @@ pub enum PullPolicy {
     Never,
 }
 
+#[serde_with::serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct DockerCpuPeriod(std::time::Duration);
+#[serde(transparent)]
+pub struct DockerCpuPeriod(
+    #[serde_as(as = "serde_with::DurationMicroSeconds<u64>")] std::time::Duration,
+);
 
 impl Default for DockerCpuPeriod {
     fn default() -> Self {
@@ -206,15 +210,17 @@ impl From<&DockerCpuPeriod> for std::time::Duration {
     }
 }
 
+#[serde_with::serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct ResourceLimits {
-    /// Period of cpu time
+    /// Period of cpu time (de/serializes as microseconds)
     pub cpu_period: Option<DockerCpuPeriod>,
 
     /// Proportion of period used by container
     pub cpu_period_percent: Option<u8>,
 
     /// Total cpu time allocated to container
+    #[serde_as(as = "Option<serde_with::DurationSeconds<u64>>")]
     pub cpu_time_limit: Option<std::time::Duration>,
 
     /// Maximum amount of memory container can use (in bytes)
