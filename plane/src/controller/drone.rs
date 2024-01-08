@@ -10,7 +10,7 @@ use crate::{
         PlaneDatabase,
     },
     protocol::{
-        BackendAction, Heartbeat, KeyDeadlines, MessageFromDrone, MessageToDrone, RenewKeyResponse,
+        BackendAction, Heartbeat, KeyDeadlines, MessageFromDrone, MessageToDrone, RenewKeyResponse, BackendMetricsMessage,
     },
     typed_socket::{server::new_server, TypedSocket},
     types::{ClusterName, NodeId, TerminationKind},
@@ -29,6 +29,9 @@ pub async fn handle_message_from_drone(
     sender: &mut TypedSocket<MessageToDrone>,
 ) -> anyhow::Result<()> {
     match msg {
+		MessageFromDrone::BackendMetrics(BackendMetricsMessage { backend_id}) => {
+			tracing::debug!("metrics message received from {backend_id}");
+		}
         MessageFromDrone::Heartbeat(Heartbeat { local_time }) => {
             controller
                 .db

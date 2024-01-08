@@ -1,16 +1,16 @@
 use super::{
-    docker::{types::ContainerId, PlaneDocker},
+    docker::{types::ContainerId, PlaneDocker, get_metrics_message_from_container_stats},
     wait_backend::wait_for_backend,
 };
 use crate::{
     names::BackendName,
     types::{BackendState, BackendStatus, ExecutorConfig, PullPolicy, TerminationKind},
-    util::{ExponentialBackoff, GuardHandle},
+    util::{ExponentialBackoff, GuardHandle}, typed_socket::TypedSocketSender, protocol::BackendMetricsMessage,
 };
 use anyhow::Result;
 use bollard::auth::DockerCredentials;
 use futures_util::Future;
-use std::{error::Error, fmt::Debug};
+use std::{error::Error, fmt::Debug, time::Duration, path::PrefixComponent};
 use std::{future::pending, pin::Pin};
 use std::{
     net::IpAddr,
@@ -40,6 +40,50 @@ impl StepStatusResult {
 
 type StateCallback = Box<dyn Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync>;
 
+#[derive(Debug)]
+struct MetricsManager {
+	handle: Mutex<Option<GuardHandle>>,
+	sender: TypedSocketSender<BackendMetricsMessage>,
+	docker: PlaneDocker,
+	container_id: ContainerId,
+	backend_id: BackendName
+}	
+
+impl MetricsManager {
+	fn new(sender: TypedSocketSender<BackendMetricsMessage>, docker: PlaneDocker, container_id: ContainerId, backend_id: BackendName) -> Self {
+		Self {
+			handle: Mutex::new(None),
+			sender,
+			docker,
+			container_id,
+			backend_id
+		}
+	} 
+
+	#[tracing::instrument]
+	fn start_gathering_metrics(&self) {
+		let docker = self.docker.clone();
+		let sender = self.sender.clone();
+		let container_id = self.container_id.clone();
+		let backend_id = self.backend_id.clone();
+		let block = async move {
+
+			let mut backoff = ExponentialBackoff::default();
+			loop {
+			let mut interval = tokio::time::interval(Duration::from_secs(1));
+			while let Ok(stats) = {
+				interval.tick().await; docker.get_metrics(&container_id).await } {
+
+				let Ok(metrics_message) = get_metrics_message_from_container_stats(stats, backend_id.clone()) else { continue };
+				let Ok(_) = sender.send(metrics_message) else { continue };
+			}
+				backoff.wait().await;
+			}
+		};
+		*self.handle.lock().unwrap() = Some(GuardHandle::new(block));
+	}
+}
+
 /// A backend manager is responsible for driving the state of one backend.
 /// Every active backend should have a backend manager.
 /// All container- and image-level commands sent to Docker go through the backend manager.
@@ -48,6 +92,9 @@ pub struct BackendManager {
     /// If we are currently running a task, this is the handle to that task.
     /// It is always dropped (and aborted) when the state changes.
     handle: Mutex<Option<GuardHandle>>,
+
+	/// handle for task that collects metrics and sends them to the controller.
+	metrics_manager: MetricsManager,
 
     /// The ID of the backend this manager is responsible for.
     backend_id: BackendName,
@@ -84,12 +131,14 @@ impl BackendManager {
         state: BackendState,
         docker: PlaneDocker,
         state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
+		metrics_sender: TypedSocketSender<BackendMetricsMessage>,
         ip: IpAddr,
     ) -> Arc<Self> {
         let container_id = ContainerId::from(format!("plane-{}", backend_id));
 
         let manager = Arc::new(Self {
             handle: Mutex::new(None),
+			metrics_manager: MetricsManager::new(metrics_sender, docker.clone(), container_id.clone(), backend_id.clone()),
             backend_id,
             docker,
             executor_config,
@@ -137,6 +186,7 @@ impl BackendManager {
                 let docker = self.docker.clone();
                 let executor_config = self.executor_config.clone();
                 let ip = self.ip;
+				self.metrics_manager.start_gathering_metrics();
 
                 StepStatusResult::future_status(async move {
                     let spawn_result = docker

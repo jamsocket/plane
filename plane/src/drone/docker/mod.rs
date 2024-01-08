@@ -2,7 +2,7 @@ use self::{
     commands::{get_port, run_container},
     types::ContainerId,
 };
-use crate::{names::BackendName, types::ExecutorConfig};
+use crate::{names::BackendName, types::ExecutorConfig, protocol::BackendMetricsMessage};
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials, container::StatsOptions, errors::Error, service::EventMessage,
@@ -17,7 +17,15 @@ pub mod types;
 /// The existence of this label is used to determine whether a container is managed by Plane.
 const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
-#[derive(Clone)]
+pub enum MetricsConversionError {
+	InvalidValue
+}
+
+pub fn get_metrics_message_from_container_stats(stats: bollard::container::Stats, backend_id: BackendName) -> std::result::Result<BackendMetricsMessage, MetricsConversionError> {
+	todo!()
+}
+
+#[derive(Clone, Debug)]
 pub struct PlaneDocker {
     docker: Docker,
     runtime: Option<String>,

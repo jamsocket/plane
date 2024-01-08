@@ -30,6 +30,12 @@ pub struct TypedSocketSender<A> {
         Arc<dyn Fn(SocketAction<A>) -> Result<(), TypedSocketError> + 'static + Send + Sync>,
 }
 
+impl<T> Debug for TypedSocketSender<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str("typed socket sender")
+	}
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum TypedSocketError {
     #[error("Socket closed")]
@@ -47,7 +53,8 @@ impl<A> From<TrySendError<A>> for TypedSocketError {
     }
 }
 
-impl<A> TypedSocketSender<A> {
+impl<A: Debug> TypedSocketSender<A> {
+	#[tracing::instrument]
     pub fn send(&self, message: A) -> Result<(), TypedSocketError> {
         (self.inner_send)(SocketAction::Send(message))?;
         Ok(())

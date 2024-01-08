@@ -1,7 +1,7 @@
 use crate::{
     names::BackendName,
-    protocol::{BackendEventId, BackendStateMessage},
-    types::BackendState,
+    protocol::{BackendEventId, BackendStateMessage, BackendMetricsMessage},
+    types::BackendState, typed_socket::TypedSocketSender,
 };
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -34,6 +34,9 @@ pub struct StateStore {
 
     /// A function that is called when a backend's state changes.
     listener: Option<Box<dyn Fn(BackendStateMessage) + Send + Sync + 'static>>,
+
+	/// Sender for metrics
+	metrics: Option<TypedSocketSender<BackendMetricsMessage>>
 }
 
 impl StateStore {
@@ -45,6 +48,7 @@ impl StateStore {
         Ok(Self {
             db_conn,
             listener: None,
+			metrics: None
         })
     }
 
@@ -188,6 +192,14 @@ impl StateStore {
 
         Ok(())
     }
+
+	pub fn register_metrics_sender(&mut self, sender: TypedSocketSender<BackendMetricsMessage>) {
+		self.metrics = Some(sender);
+	}
+
+	pub fn get_metrics_sender(&self) -> Result<TypedSocketSender<BackendMetricsMessage>> {
+		self.metrics.clone().ok_or_else(|| anyhow::anyhow!("metrics sender not initialized"))
+	}
 
     pub fn ack_event(&self, event_id: BackendEventId) -> Result<()> {
         self.db_conn.execute(

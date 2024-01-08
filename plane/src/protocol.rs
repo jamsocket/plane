@@ -93,9 +93,16 @@ pub struct Heartbeat {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BackendMetricsMessage {
+    pub backend_id: BackendName,
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageFromDrone {
     Heartbeat(Heartbeat),
     BackendEvent(BackendStateMessage),
+	BackendMetrics(BackendMetricsMessage),
     AckAction { action_id: BackendActionName },
     RenewKey(RenewKeyRequest),
 }
