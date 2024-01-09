@@ -18,7 +18,7 @@ use axum::{
     routing::{get, post},
     Json, Router, Server,
 };
-use serde_json::{json, Value};
+use serde::{Deserialize, Serialize};
 use std::net::{SocketAddr, TcpListener};
 use tokio::{
     sync::oneshot::{self},
@@ -38,12 +38,19 @@ pub mod error;
 mod proxy;
 mod terminate;
 
-pub async fn status() -> Json<Value> {
-    Json(json!({
-        "status": "ok",
-        "version": PLANE_VERSION,
-        "hash": PLANE_GIT_HASH,
-    }))
+#[derive(Serialize, Deserialize)]
+pub struct StatusResponse {
+    pub status: String,
+    pub version: String,
+    pub hash: String,
+}
+
+pub async fn status() -> Json<StatusResponse> {
+    Json(StatusResponse {
+        status: "ok".to_string(),
+        version: PLANE_VERSION.to_string(),
+        hash: PLANE_GIT_HASH.to_string(),
+    })
 }
 
 struct HeartbeatSender {

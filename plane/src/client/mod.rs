@@ -1,5 +1,6 @@
+use self::controller_address::AuthorizedAddress;
 use crate::{
-    controller::error::ApiError,
+    controller::{error::ApiError, StatusResponse},
     names::{BackendName, DroneName},
     protocol::{MessageFromDns, MessageFromDrone, MessageFromProxy},
     typed_socket::client::TypedSocketConnector,
@@ -7,9 +8,9 @@ use crate::{
 };
 use reqwest::{Response, StatusCode};
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 use url::Url;
 
+pub mod controller_address;
 mod sse;
 
 #[derive(thiserror::Error, Debug)]
@@ -33,78 +34,52 @@ pub enum PlaneClientError {
 #[derive(Clone)]
 pub struct PlaneClient {
     client: reqwest::Client,
-    base_url: Url,
-}
-
-async fn get_response<T: DeserializeOwned>(response: Response) -> Result<T, PlaneClientError> {
-    if response.status().is_success() {
-        Ok(response.json::<T>().await?)
-    } else {
-        let url = response.url().to_string();
-        tracing::error!(?url, "Got error response from API server.");
-        let status = response.status();
-        if let Ok(api_error) = response.json::<ApiError>().await {
-            Err(PlaneClientError::PlaneError(api_error, status))
-        } else {
-            Err(PlaneClientError::UnexpectedStatus(status))
-        }
-    }
-}
-
-fn http_to_ws_url(url: &mut Url) {
-    if url.scheme() == "http" {
-        url.set_scheme("ws")
-            .expect("should always be able to set URL scheme to static value ws");
-    } else if url.scheme() == "https" {
-        url.set_scheme("wss")
-            .expect("should always be able to set URL scheme to static value wss");
-    }
+    controller_address: AuthorizedAddress,
 }
 
 impl PlaneClient {
     pub fn new(base_url: Url) -> Self {
         let client = reqwest::Client::new();
-        Self { client, base_url }
+        let controller_address = AuthorizedAddress::from(base_url);
+
+        Self {
+            client,
+            controller_address,
+        }
     }
 
-    pub async fn status(&self) -> Result<(), PlaneClientError> {
-        let url = self.base_url.join("/ctrl/status")?;
-
-        let response = self.client.get(url).send().await?;
-        get_response::<Value>(response).await?;
-        Ok(())
+    pub async fn status(&self) -> Result<StatusResponse, PlaneClientError> {
+        let addr = self.controller_address.join("/ctrl/status");
+        authed_get(&self.client, &addr).await
     }
 
     pub fn drone_connection(
         &self,
         cluster: &ClusterName,
     ) -> TypedSocketConnector<MessageFromDrone> {
-        let mut url = self
-            .base_url
+        let addr = self
+            .controller_address
             .join(&format!("/ctrl/c/{}/drone-socket", cluster))
-            .expect("url is always valid");
-        http_to_ws_url(&mut url);
-        TypedSocketConnector::new(url)
+            .to_websocket_address();
+        TypedSocketConnector::new(addr)
     }
 
     pub fn proxy_connection(
         &self,
         cluster: &ClusterName,
     ) -> TypedSocketConnector<MessageFromProxy> {
-        let mut url = self
-            .base_url
+        let addr = self
+            .controller_address
             .join(&format!("/ctrl/c/{}/proxy-socket", cluster))
-            .expect("url is always valid");
-        http_to_ws_url(&mut url);
-        TypedSocketConnector::new(url)
+            .to_websocket_address();
+        TypedSocketConnector::new(addr)
     }
 
     pub fn dns_connection(&self) -> TypedSocketConnector<MessageFromDns> {
-        let mut url = self
-            .base_url
+        let url = self
+            .controller_address
             .join("/ctrl/dns-socket")
-            .expect("url is always valid");
-        http_to_ws_url(&mut url);
+            .to_websocket_address();
         TypedSocketConnector::new(url)
     }
 
@@ -113,13 +88,12 @@ impl PlaneClient {
         cluster: &ClusterName,
         connect_request: &ConnectRequest,
     ) -> Result<ConnectResponse, PlaneClientError> {
-        let url = self
-            .base_url
-            .join(&format!("/ctrl/c/{}/connect", cluster))?;
+        let addr = self
+            .controller_address
+            .join(&format!("/ctrl/c/{}/connect", cluster));
 
-        let respose = self.client.post(url).json(connect_request).send().await?;
-        let connect_response: ConnectResponse = get_response(respose).await?;
-        Ok(connect_response)
+        let response = authed_post(&self.client, &addr, connect_request).await?;
+        Ok(response)
     }
 
     pub async fn drain(
@@ -127,12 +101,11 @@ impl PlaneClient {
         cluster: &ClusterName,
         drone: &DroneName,
     ) -> Result<(), PlaneClientError> {
-        let url = self
-            .base_url
-            .join(&format!("/ctrl/c/{}/d/{}/drain", cluster, drone))?;
+        let addr = self
+            .controller_address
+            .join(&format!("/ctrl/c/{}/d/{}/drain", cluster, drone));
 
-        let response = self.client.post(url).send().await?;
-        get_response::<Value>(response).await?;
+        authed_post(&self.client, &addr, &()).await?;
         Ok(())
     }
 
@@ -141,13 +114,12 @@ impl PlaneClient {
         cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Result<(), PlaneClientError> {
-        let url = self.base_url.join(&format!(
+        let addr = self.controller_address.join(&format!(
             "/ctrl/c/{}/b/{}/soft-terminate",
             cluster, backend_id
-        ))?;
+        ));
 
-        let response = self.client.post(url).send().await?;
-        get_response::<Value>(response).await?;
+        authed_post(&self.client, &addr, &()).await?;
         Ok(())
     }
 
@@ -156,20 +128,19 @@ impl PlaneClient {
         cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Result<(), PlaneClientError> {
-        let url = self.base_url.join(&format!(
+        let addr = self.controller_address.join(&format!(
             "/ctrl/c/{}/b/{}/hard-terminate",
             cluster, backend_id
-        ))?;
+        ));
 
-        let response = self.client.post(url).send().await?;
-        get_response::<Value>(response).await?;
+        authed_post(&self.client, &addr, &()).await?;
         Ok(())
     }
 
     pub fn backend_status_url(&self, cluster: &ClusterName, backend_id: &BackendName) -> Url {
-        self.base_url
+        self.controller_address
             .join(&format!("/pub/c/{}/b/{}/status", cluster, backend_id))
-            .expect("Constructed URL is always valid.")
+            .url
     }
 
     pub async fn backend_status(
@@ -189,12 +160,12 @@ impl PlaneClient {
         cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Url {
-        self.base_url
+        self.controller_address
             .join(&format!(
                 "/pub/c/{}/b/{}/status-stream",
                 cluster, backend_id
             ))
-            .expect("Constructed URL is always valid.")
+            .url
     }
 
     pub async fn backend_status_stream(
@@ -207,4 +178,46 @@ impl PlaneClient {
         let stream = sse::sse_request(url, self.client.clone()).await?;
         Ok(stream)
     }
+}
+
+async fn get_response<T: DeserializeOwned>(response: Response) -> Result<T, PlaneClientError> {
+    if response.status().is_success() {
+        Ok(response.json::<T>().await?)
+    } else {
+        let url = response.url().to_string();
+        tracing::error!(?url, "Got error response from API server.");
+        let status = response.status();
+        if let Ok(api_error) = response.json::<ApiError>().await {
+            Err(PlaneClientError::PlaneError(api_error, status))
+        } else {
+            Err(PlaneClientError::UnexpectedStatus(status))
+        }
+    }
+}
+
+async fn authed_get<T: DeserializeOwned>(
+    client: &reqwest::Client,
+    addr: &AuthorizedAddress,
+) -> Result<T, PlaneClientError> {
+    let mut req = client.get(addr.url.clone());
+    if let Some(header) = addr.bearer_header() {
+        req = req.header("Authorization", header);
+    }
+
+    let response = req.send().await?;
+    get_response(response).await
+}
+
+async fn authed_post<T: DeserializeOwned>(
+    client: &reqwest::Client,
+    addr: &AuthorizedAddress,
+    body: &impl serde::Serialize,
+) -> Result<T, PlaneClientError> {
+    let mut req = client.post(addr.url.clone());
+    if let Some(header) = addr.bearer_header() {
+        req = req.header("Authorization", header);
+    }
+
+    let response = req.json(body).send().await?;
+    get_response(response).await
 }
