@@ -93,9 +93,29 @@ pub struct Heartbeat {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BackendMetricsMessage {
+    pub backend_id: BackendName,
+    /// Memory used by backend in bytes
+    pub mem_total: u64,
+    /// Active memory ( non reclaimable )
+    pub mem_active: u64,
+    /// Inactive memory ( reclaimable )
+    pub mem_inactive: u64,
+    /// unevictable memory (mlock etc)
+    pub mem_unevictable: u64,
+    /// Total available memory for backend in bytes
+    pub mem_available: u64,
+    /// nanoseconds of CPU used by backend since last message
+    pub cpu_used: u64,
+    /// Total CPU nanoseconds for system since last message
+    pub sys_cpu: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageFromDrone {
     Heartbeat(Heartbeat),
     BackendEvent(BackendStateMessage),
+    BackendMetrics(BackendMetricsMessage),
     AckAction { action_id: BackendActionName },
     RenewKey(RenewKeyRequest),
 }
