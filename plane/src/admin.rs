@@ -2,6 +2,7 @@ use crate::{
     client::{PlaneClient, PlaneClientError},
     names::{BackendName, DroneName},
     types::{BackendStatus, ClusterName, ConnectRequest, ExecutorConfig, KeyConfig, SpawnConfig},
+    PLANE_GIT_HASH, PLANE_VERSION,
 };
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -93,6 +94,7 @@ enum AdminCommand {
         #[clap(long)]
         drone: DroneName,
     },
+    Status,
 }
 
 pub async fn run_admin_command(opts: AdminOpts) {
@@ -192,6 +194,33 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
         AdminCommand::Drain { cluster, drone } => {
             client.drain(&cluster, &drone).await?;
             println!("Sent drain signal to {}", drone.to_string().bright_green());
+        }
+        AdminCommand::Status => {
+            let status = client.status().await?;
+            println!("Status: {}", status.status.to_string().bright_cyan());
+
+            let client_version = if status.version == PLANE_VERSION {
+                PLANE_VERSION.bright_green()
+            } else {
+                PLANE_VERSION.bright_yellow()
+            };
+
+            let client_hash = if status.hash == PLANE_GIT_HASH {
+                PLANE_GIT_HASH.bright_green()
+            } else {
+                PLANE_GIT_HASH.bright_yellow()
+            };
+
+            println!(
+                "Version: {} (client: {})",
+                status.version.bright_white(),
+                client_version
+            );
+            println!(
+                "Hash: {} (client: {})",
+                status.hash.bright_white(),
+                client_hash
+            );
         }
     };
 
