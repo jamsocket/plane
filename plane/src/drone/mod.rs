@@ -44,8 +44,8 @@ pub async fn drone_loop(
         let mut socket = connection.connect_with_retry(&name).await;
         let _heartbeat_guard = HeartbeatLoop::start(socket.sender(MessageFromDrone::Heartbeat));
 
-		let metrics_sender = socket.sender(MessageFromDrone::BackendMetrics);
-		executor.register_metrics_sender(metrics_sender);
+        let metrics_sender = socket.sender(MessageFromDrone::BackendMetrics);
+        executor.register_metrics_sender(metrics_sender);
 
         key_manager
             .lock()

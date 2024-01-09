@@ -1,9 +1,10 @@
 use super::{backend_manager::BackendManager, docker::PlaneDocker, state_store::StateStore};
 use crate::{
     names::BackendName,
-    protocol::{BackendAction, BackendEventId, BackendStateMessage, BackendMetricsMessage},
+    protocol::{BackendAction, BackendEventId, BackendMetricsMessage, BackendStateMessage},
+    typed_socket::TypedSocketSender,
     types::BackendState,
-    util::GuardHandle, typed_socket::TypedSocketSender,
+    util::GuardHandle,
 };
 use anyhow::Result;
 use dashmap::DashMap;
@@ -68,11 +69,14 @@ impl Executor {
             .register_listener(listener)
     }
 
-	pub fn register_metrics_sender(&self, sender: TypedSocketSender<BackendMetricsMessage>) {
-		self.state_store.lock().expect("State store lock poisoned").register_metrics_sender(sender);
-	}
+    pub fn register_metrics_sender(&self, sender: TypedSocketSender<BackendMetricsMessage>) {
+        self.state_store
+            .lock()
+            .expect("State store lock poisoned")
+            .register_metrics_sender(sender);
+    }
 
-	pub fn ack_event(&self, event_id: BackendEventId) -> Result<()> {
+    pub fn ack_event(&self, event_id: BackendEventId) -> Result<()> {
         self.state_store
             .lock()
             .expect("State store lock poisoned.")
@@ -100,7 +104,12 @@ impl Executor {
                     }
                 };
 
-				let metrics_sender = self.state_store.clone().lock().expect("State store lock poisoned").get_metrics_sender()?;
+                let metrics_sender = self
+                    .state_store
+                    .clone()
+                    .lock()
+                    .expect("State store lock poisoned")
+                    .get_metrics_sender()?;
 
                 let manager = BackendManager::new(
                     backend_id.clone(),
@@ -108,7 +117,7 @@ impl Executor {
                     BackendState::default(),
                     self.docker.clone(),
                     callback,
-					metrics_sender,
+                    metrics_sender,
                     self.ip,
                 );
                 tracing::info!("Inserting backend {}.", backend_id);

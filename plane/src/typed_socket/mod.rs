@@ -31,9 +31,9 @@ pub struct TypedSocketSender<A> {
 }
 
 impl<T> Debug for TypedSocketSender<T> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str("typed socket sender")
-	}
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("typed socket sender")
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -54,7 +54,7 @@ impl<A> From<TrySendError<A>> for TypedSocketError {
 }
 
 impl<A: Debug> TypedSocketSender<A> {
-	#[tracing::instrument]
+    #[tracing::instrument]
     pub fn send(&self, message: A) -> Result<(), TypedSocketError> {
         (self.inner_send)(SocketAction::Send(message))?;
         Ok(())
