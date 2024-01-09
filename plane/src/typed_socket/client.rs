@@ -86,8 +86,7 @@ impl<T: ChannelMessage> TypedSocketConnector<T> {
     }
 }
 
-/// Turns a URL (which may have a token) into a request. If the URL contains a token, it is
-/// removed from the URL and turned into a bearer token Authorization header.
+/// Creates a WebSocket request from an AuthorizedAddress.
 fn auth_url_to_request(addr: &AuthorizedAddress) -> Result<hyper::Request<()>> {
     let mut request = hyper::Request::builder()
         .method(hyper::Method::GET)
