@@ -29,6 +29,9 @@ pub async fn handle_message_from_drone(
     sender: &mut TypedSocket<MessageToDrone>,
 ) -> anyhow::Result<()> {
     match msg {
+        MessageFromDrone::BackendMetrics(_) => {
+            //TODO: Forward backend metrics to postgres pub/sub here.
+        }
         MessageFromDrone::Heartbeat(Heartbeat { local_time }) => {
             controller
                 .db
