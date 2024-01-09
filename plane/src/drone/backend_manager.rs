@@ -4,6 +4,8 @@ use super::{
 };
 use crate::{
     names::BackendName,
+    protocol::BackendMetricsMessage,
+    typed_socket::TypedSocketSender,
     types::{BackendState, BackendStatus, ExecutorConfig, PullPolicy, TerminationKind},
     util::{ExponentialBackoff, GuardHandle},
 };
@@ -14,7 +16,7 @@ use std::{error::Error, fmt::Debug};
 use std::{future::pending, pin::Pin};
 use std::{
     net::IpAddr,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 
 /// The backend manager uses a state machine internally to manage the state of the backend.
@@ -84,6 +86,7 @@ impl BackendManager {
         state: BackendState,
         docker: PlaneDocker,
         state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
+        _metrics_sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
         ip: IpAddr,
     ) -> Arc<Self> {
         let container_id = ContainerId::from(format!("plane-{}", backend_id));
