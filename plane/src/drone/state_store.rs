@@ -1,11 +1,13 @@
 use crate::{
     names::BackendName,
-    protocol::{BackendEventId, BackendStateMessage},
+    protocol::{BackendEventId, BackendMetricsMessage, BackendStateMessage},
+    typed_socket::TypedSocketSender,
     types::BackendState,
 };
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
+use std::sync::{Arc, RwLock};
 
 /// An array of sqlite commands used to initialize the state store.
 /// These must be idempotent, because they are run every time a state store
@@ -34,6 +36,10 @@ pub struct StateStore {
 
     /// A function that is called when a backend's state changes.
     listener: Option<Box<dyn Fn(BackendStateMessage) + Send + Sync + 'static>>,
+
+    /// Sender for metrics
+    /// NOTE: downstream code assumes that this sender is refreshed on reconnect
+    metrics: Option<Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>>,
 }
 
 impl StateStore {
@@ -45,6 +51,7 @@ impl StateStore {
         Ok(Self {
             db_conn,
             listener: None,
+            metrics: None,
         })
     }
 
@@ -187,6 +194,24 @@ impl StateStore {
         self.listener = Some(Box::new(listener));
 
         Ok(())
+    }
+
+    pub fn register_metrics_sender(&mut self, sender: TypedSocketSender<BackendMetricsMessage>) {
+        if let Some(ref metrics) = self.metrics {
+            *metrics
+                .write()
+                .expect("backend metrics sender lock poisoned!") = sender;
+        } else {
+            self.metrics = Some(Arc::new(RwLock::new(sender)));
+        }
+    }
+
+    pub fn get_metrics_sender(
+        &self,
+    ) -> Result<Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>> {
+        self.metrics
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("metrics sender not initialized"))
     }
 
     pub fn ack_event(&self, event_id: BackendEventId) -> Result<()> {
