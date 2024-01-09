@@ -1,4 +1,5 @@
 use super::{ChannelMessage, Handshake, SocketAction, TypedSocket};
+use crate::client::controller_address::AuthorizedAddress;
 use crate::names::NodeName;
 use crate::{plane_version_info, util::ExponentialBackoff};
 use anyhow::{anyhow, Result};
@@ -8,20 +9,19 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tungstenite::handshake::client::generate_key;
 use tungstenite::{error::ProtocolError, Message};
-use url::Url;
 
 type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 pub struct TypedSocketConnector<T: ChannelMessage> {
-    pub url: Url,
+    authorized_address: AuthorizedAddress,
     backoff: ExponentialBackoff,
     _phantom: PhantomData<T>,
 }
 
 impl<T: ChannelMessage> TypedSocketConnector<T> {
-    pub fn new(url: Url) -> Self {
+    pub fn new(authorized_address: AuthorizedAddress) -> Self {
         Self {
-            url,
+            authorized_address,
             backoff: ExponentialBackoff::default(),
             _phantom: PhantomData,
         }
@@ -53,7 +53,7 @@ impl<T: ChannelMessage> TypedSocketConnector<T> {
             version: plane_version_info(),
         };
 
-        let req = auth_url_to_request(&self.url)?;
+        let req = auth_url_to_request(&self.authorized_address)?;
         let (mut socket, _) = tokio_tungstenite::connect_async(req).await?;
 
         socket
@@ -86,17 +86,15 @@ impl<T: ChannelMessage> TypedSocketConnector<T> {
     }
 }
 
-/// Turns a URL (which may have a token) into a request. If the URL contains a token, it is
-/// removed from the URL and turned into a bearer token Authorization header.
-fn auth_url_to_request(url: &Url) -> Result<hyper::Request<()>> {
-    let token = url.username().to_string();
-
+/// Creates a WebSocket request from an AuthorizedAddress.
+fn auth_url_to_request(addr: &AuthorizedAddress) -> Result<hyper::Request<()>> {
     let mut request = hyper::Request::builder()
         .method(hyper::Method::GET)
-        .uri(url.as_str())
+        .uri(addr.url.as_str())
         .header(
             "Host",
-            url.host_str()
+            addr.url
+                .host_str()
                 .ok_or_else(|| anyhow!("No host in URL."))?
                 .to_string(),
         )
@@ -105,11 +103,10 @@ fn auth_url_to_request(url: &Url) -> Result<hyper::Request<()>> {
         .header("Sec-WebSocket-Version", "13")
         .header("Sec-WebSocket-Key", generate_key());
 
-    if !token.is_empty() {
-        let token = data_encoding::BASE64.encode(token.as_bytes());
+    if let Some(bearer_header) = addr.bearer_header() {
         request = request.header(
             hyper::header::AUTHORIZATION,
-            hyper::header::HeaderValue::from_str(&format!("Bearer {}", token))?,
+            hyper::header::HeaderValue::from_str(&bearer_header)?,
         );
     }
 
@@ -187,23 +184,27 @@ async fn new_client<T: ChannelMessage>(
 
 #[cfg(test)]
 mod test {
+    use crate::client::controller_address::AuthorizedAddress;
+
     #[test]
     fn test_url_no_token() {
         let url = url::Url::parse("https://foo.bar.com/").unwrap();
-        let request = super::auth_url_to_request(&url).unwrap();
+        let addr = AuthorizedAddress::from(url);
+        let request = super::auth_url_to_request(&addr).unwrap();
         assert!(request.headers().get("Authorization").is_none());
     }
 
     #[test]
     fn test_url_with_token() {
         let url = url::Url::parse("https://abcdefg@foo.bar.com/").unwrap();
-        let request = super::auth_url_to_request(&url).unwrap();
+        let addr = AuthorizedAddress::from(url);
+        let request = super::auth_url_to_request(&addr).unwrap();
         assert_eq!(
             request
                 .headers()
                 .get("Authorization")
                 .map(|d| d.to_str().unwrap()),
-            Some("Bearer YWJjZGVmZw==")
+            Some("Bearer abcdefg")
         );
         assert_eq!(
             request.headers().get("Host").map(|d| d.to_str().unwrap()),
