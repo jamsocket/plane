@@ -2,7 +2,7 @@ use crate::types::NodeKind;
 use clap::error::ErrorKind;
 use std::fmt::{Debug, Display};
 
-const MAX_NAME_LENGTH: usize = 30;
+const MAX_NAME_LENGTH: usize = 45;
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum NameError {
