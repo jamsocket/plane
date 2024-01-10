@@ -1,5 +1,5 @@
 use super::{
-    docker::{types::ContainerId, PlaneDocker},
+    docker::{get_metrics_message_from_container_stats, types::ContainerId, PlaneDocker},
     wait_backend::wait_for_backend,
 };
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
 use anyhow::Result;
 use bollard::auth::DockerCredentials;
 use futures_util::Future;
-use std::{error::Error, fmt::Debug};
+use std::{error::Error, fmt::Debug, sync::atomic::AtomicU64, time::Duration};
 use std::{future::pending, pin::Pin};
 use std::{
     net::IpAddr,
@@ -42,6 +42,70 @@ impl StepStatusResult {
 
 type StateCallback = Box<dyn Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync>;
 
+#[derive(Debug)]
+struct MetricsManager {
+    handle: Mutex<Option<GuardHandle>>,
+    sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
+    docker: PlaneDocker,
+    container_id: ContainerId,
+    backend_id: BackendName,
+    prev_container_cpu_cumulative_ns: Arc<AtomicU64>,
+    prev_sys_cpu_cumulative_ns: Arc<AtomicU64>,
+}
+
+impl MetricsManager {
+    fn new(
+        sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
+        docker: PlaneDocker,
+        container_id: ContainerId,
+        backend_id: BackendName,
+    ) -> Self {
+        Self {
+            handle: Mutex::new(None),
+            sender,
+            docker,
+            container_id,
+            backend_id,
+            prev_container_cpu_cumulative_ns: Arc::new(AtomicU64::new(0)),
+            prev_sys_cpu_cumulative_ns: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    fn start_gathering_metrics(&self) {
+        let docker = self.docker.clone();
+        let sender = self.sender.clone();
+        let container_id = self.container_id.clone();
+        let backend_id = self.backend_id.clone();
+        let prev_sys_cpu_cumulative_ns = self.prev_sys_cpu_cumulative_ns.clone();
+        let prev_container_cpu_cumulative_ns = self.prev_container_cpu_cumulative_ns.clone();
+        let block = async move {
+            let mut backoff = ExponentialBackoff::default();
+            loop {
+                let mut interval = tokio::time::interval(Duration::from_secs(1));
+                while let Ok(stats) = {
+                    interval.tick().await;
+                    docker.get_metrics(&container_id).await
+                } {
+                    let Ok(metrics_message) = get_metrics_message_from_container_stats(
+                        stats,
+                        backend_id.clone(),
+                        &prev_sys_cpu_cumulative_ns,
+                        &prev_container_cpu_cumulative_ns,
+                    ) else {
+                        continue;
+                    };
+                    let _ = sender
+                        .read()
+                        .expect("failed to get read lock on metrics sender!")
+                        .send(metrics_message);
+                }
+                backoff.wait().await;
+            }
+        };
+        *self.handle.lock().expect("metrics handle lock poisoned") = Some(GuardHandle::new(block));
+    }
+}
+
 /// A backend manager is responsible for driving the state of one backend.
 /// Every active backend should have a backend manager.
 /// All container- and image-level commands sent to Docker go through the backend manager.
@@ -50,6 +114,9 @@ pub struct BackendManager {
     /// If we are currently running a task, this is the handle to that task.
     /// It is always dropped (and aborted) when the state changes.
     handle: Mutex<Option<GuardHandle>>,
+
+    /// handle for task that collects metrics and sends them to the controller.
+    metrics_manager: MetricsManager,
 
     /// The ID of the backend this manager is responsible for.
     backend_id: BackendName,
@@ -86,13 +153,19 @@ impl BackendManager {
         state: BackendState,
         docker: PlaneDocker,
         state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
-        _metrics_sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
+        metrics_sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
         ip: IpAddr,
     ) -> Arc<Self> {
         let container_id = ContainerId::from(format!("plane-{}", backend_id));
 
         let manager = Arc::new(Self {
             handle: Mutex::new(None),
+            metrics_manager: MetricsManager::new(
+                metrics_sender,
+                docker.clone(),
+                container_id.clone(),
+                backend_id.clone(),
+            ),
             backend_id,
             docker,
             executor_config,
@@ -140,6 +213,7 @@ impl BackendManager {
                 let docker = self.docker.clone();
                 let executor_config = self.executor_config.clone();
                 let ip = self.ip;
+                self.metrics_manager.start_gathering_metrics();
 
                 StepStatusResult::future_status(async move {
                     let spawn_result = docker
