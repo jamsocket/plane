@@ -137,6 +137,7 @@ impl Default for ExponentialBackoff {
     }
 }
 
+#[derive(Debug)]
 pub struct GuardHandle {
     handle: JoinHandle<()>,
 }
