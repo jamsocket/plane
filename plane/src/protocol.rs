@@ -95,7 +95,11 @@ pub struct Heartbeat {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BackendMetricsMessage {
     pub backend_id: BackendName,
+    /// Memory used by backend excluding inactive file cache, same as use shown by docker stats
+    /// ref: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go#L227C45-L227C45
+    pub mem_used: u64,
     /// Memory used by backend in bytes
+    /// (calculated using kernel memory used by cgroup + page cache memory used by cgroup)
     pub mem_total: u64,
     /// Active memory ( non reclaimable )
     pub mem_active: u64,
