@@ -1,4 +1,4 @@
-use self::error::Result;
+use self::{error::Result, name_to_cluster::NameToCluster};
 use crate::{
     client::PlaneClient,
     dns::error::OrDnsError,
@@ -28,6 +28,7 @@ use trust_dns_server::{
 };
 
 mod error;
+mod name_to_cluster;
 
 const TCP_TIMEOUT_SECONDS: u64 = 10;
 
@@ -35,7 +36,7 @@ struct AcmeDnsServer {
     loop_handle: Option<JoinHandle<()>>,
     send: Sender<MessageFromDns>,
     request_map: Arc<DashMap<ClusterName, Sender<Option<String>>>>,
-    zone: Option<String>,
+    name_to_cluster: NameToCluster,
 }
 
 impl AcmeDnsServer {
@@ -95,7 +96,7 @@ impl AcmeDnsServer {
             loop_handle: Some(loop_handle),
             send,
             request_map,
-            zone,
+            name_to_cluster: NameToCluster::new(zone),
         }
     }
 
@@ -121,37 +122,19 @@ impl AcmeDnsServer {
         match request.query().query_type() {
             RecordType::TXT => {
                 tracing::info!(?request, ?name, "TXT query.");
-                let name = name.strip_suffix('.').unwrap_or(&name);
-                let Some(name) = name.strip_prefix("_acme-challenge.") else {
-                    tracing::warn!(?request, ?name, "TXT query on non _acme-challenge domain.");
+
+                let Some(cluster) = self.name_to_cluster.cluster_name(&name) else {
+                    tracing::warn!(
+                        ?request,
+                        ?name,
+                        "TXT query for record that does not match configured zone."
+                    );
                     return Err(error::DnsError {
                         code: ResponseCode::FormErr,
                         message: format!("Invalid TXT query: {}", name),
                     });
                 };
 
-                let name = if let Some(zone) = &self.zone {
-                    if let Some(name) = name.strip_suffix(zone) {
-                        name.strip_suffix('.').unwrap_or(name)
-                    } else {
-                        tracing::warn!(
-                            ?request,
-                            ?name,
-                            "TXT query for record that does not match configured zone."
-                        );
-                        return Err(error::DnsError {
-                            code: ResponseCode::FormErr,
-                            message: format!("Invalid TXT query: {}", name),
-                        });
-                    }
-                } else {
-                    name
-                };
-
-                let cluster: ClusterName =
-                    name.parse().or_dns_error(ResponseCode::ServFail, || {
-                        format!("No TXT record found for {}", name)
-                    })?;
                 let result = self
                     .request(cluster)
                     .await

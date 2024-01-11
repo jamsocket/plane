@@ -100,13 +100,13 @@ enum Command {
 
         /// Suffix to strip from requests before looking up TXT records.
         /// E.g. if the zone is "example.com", a TXT record lookup
-        /// for _acme-challenge.foo.bar.baz.example.com
+        /// for foo.bar.baz.example.com
         /// will return the TXT records for the cluster "foo.bar.baz".
         ///
-        /// The DNS record for foo.bar.baz in this case should have a CNAME
-        /// record pointing to this DNS server.
+        /// The DNS record for _acme-challenge.foo.bar.baz in this case
+        /// should have a CNAME record pointing to foo.bar.baz.example.com.
         #[clap(long)]
-        zone: Option<String>,
+        zone: String,
 
         #[clap(long, default_value = "53")]
         port: u16,
@@ -247,7 +247,7 @@ async fn run(opts: Opts) -> Result<()> {
             let name = name.or_random();
             tracing::info!("Starting DNS server");
             let client = PlaneClient::new(controller_url);
-            run_dns(name, client, port, zone).await?;
+            run_dns(name, client, port, Some(zone)).await?;
         }
         Command::Admin(admin_opts) => {
             plane::admin::run_admin_command(admin_opts).await;
