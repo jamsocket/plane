@@ -121,8 +121,9 @@ Obtaining a certificate involves proving to a third party that you control the d
 Plane implements the [ACME DNS-01](https://letsencrypt.org/docs/challenge-types/#dns-01-challenge) challenge type to obtain a TLS
 certificate for each proxy. Each proxy generates its own private key, which never leaves that proxy.
 
-For this to work, the `NS` record for the `_acme-challenge.<cluster name>` subdomain needs to point to one or more Plane DNS servers.
-These are basic DNS servers that exist only to serve the ACME DNS-01 challenge.
+For this to work, the `CNAME` record for the `_acme-challenge.<cluster name>` subdomain needs to point to a domain like
+`<cluster name>.my-dns-acme-server.com`. The `A` record of `<cluster name>.my-dns-acme-server.com` needs to contain the public
+IP of a DNS server that is running the Plane ACME DNS-01 receiver, with port 53 (TCP and UDP) open to the public internet.
 
-The DNS servers need to be able to accept incoming connections from the public internet on port 53 (both UDP and TCP).
-
+These are basic DNS servers that exist only to serve the ACME DNS-01 challenge, which is required for proxies to update their
+certificates.
