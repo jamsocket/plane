@@ -35,10 +35,15 @@ struct AcmeDnsServer {
     loop_handle: Option<JoinHandle<()>>,
     send: Sender<MessageFromDns>,
     request_map: Arc<DashMap<ClusterName, Sender<Option<String>>>>,
+    zone: Option<String>,
 }
 
 impl AcmeDnsServer {
-    fn new(name: AcmeDnsServerName, mut client: TypedSocketConnector<MessageFromDns>) -> Self {
+    fn new(
+        name: AcmeDnsServerName,
+        mut client: TypedSocketConnector<MessageFromDns>,
+        zone: Option<String>,
+    ) -> Self {
         let (send, mut recv) = broadcast::channel::<MessageFromDns>(1);
         let request_map: Arc<DashMap<ClusterName, Sender<Option<String>>>> = Arc::default();
 
@@ -90,6 +95,7 @@ impl AcmeDnsServer {
             loop_handle: Some(loop_handle),
             send,
             request_map,
+            zone,
         }
     }
 
@@ -122,6 +128,24 @@ impl AcmeDnsServer {
                         code: ResponseCode::FormErr,
                         message: format!("Invalid TXT query: {}", name),
                     });
+                };
+
+                let name = if let Some(zone) = &self.zone {
+                    if let Some(name) = name.strip_suffix(zone) {
+                        name.strip_suffix('.').unwrap_or(name)
+                    } else {
+                        tracing::warn!(
+                            ?request,
+                            ?name,
+                            "TXT query for record that does not match configured zone."
+                        );
+                        return Err(error::DnsError {
+                            code: ResponseCode::FormErr,
+                            message: format!("Invalid TXT query: {}", name),
+                        });
+                    }
+                } else {
+                    name
                 };
 
                 let cluster: ClusterName =
@@ -203,8 +227,9 @@ pub async fn run_dns_with_listener(
     name: AcmeDnsServerName,
     client: PlaneClient,
     listener: TcpListener,
+    zone: Option<String>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let mut fut = ServerFuture::new(AcmeDnsServer::new(name, client.dns_connection()));
+    let mut fut = ServerFuture::new(AcmeDnsServer::new(name, client.dns_connection(), zone));
 
     let addr = listener.local_addr()?;
 
@@ -233,10 +258,11 @@ pub async fn run_dns(
     name: AcmeDnsServerName,
     client: PlaneClient,
     port: u16,
+    zone: Option<String>,
 ) -> anyhow::Result<()> {
     let ip_port_pair = (Ipv4Addr::UNSPECIFIED, port);
     let listener = TcpListener::bind(ip_port_pair).await?;
-    run_dns_with_listener(name, client, listener)
+    run_dns_with_listener(name, client, listener, zone)
         .await
         .map_err(|err| anyhow!("Error running DNS server {:?}", err))
 }

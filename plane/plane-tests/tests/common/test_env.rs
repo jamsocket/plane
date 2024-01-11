@@ -125,7 +125,9 @@ impl TestEnvironment {
         let port = listener.local_addr().unwrap().port();
         let name = AcmeDnsServerName::new_random();
         let handle = tokio::spawn(async move {
-            run_dns_with_listener(name, client, listener).await.unwrap();
+            run_dns_with_listener(name, client, listener, None)
+                .await
+                .unwrap();
         });
 
         DnsServer {

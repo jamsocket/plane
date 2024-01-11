@@ -1,6 +1,7 @@
 use crate::{
     client::{PlaneClient, PlaneClientError},
-    names::{BackendName, DroneName},
+    names::{BackendName, DroneName, Name, ProxyName},
+    protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
     types::{BackendStatus, ClusterName, ConnectRequest, ExecutorConfig, KeyConfig, SpawnConfig},
     PLANE_GIT_HASH, PLANE_VERSION,
 };
@@ -93,6 +94,10 @@ enum AdminCommand {
 
         #[clap(long)]
         drone: DroneName,
+    },
+    PutDummyDns {
+        #[clap(long)]
+        cluster: ClusterName,
     },
     Status,
 }
@@ -221,6 +226,57 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                 status.hash.bright_white(),
                 client_hash
             );
+        }
+        AdminCommand::PutDummyDns { cluster } => {
+            let connection = client.proxy_connection(&cluster);
+            let proxy_name = ProxyName::new_random();
+            let mut conn = connection.connect(&proxy_name).await.unwrap();
+
+            conn.send(MessageFromProxy::CertManagerRequest(
+                CertManagerRequest::CertLeaseRequest,
+            ))
+            .await
+            .unwrap();
+
+            let response = conn.recv().await.unwrap();
+
+            match response {
+                MessageToProxy::CertManagerResponse(CertManagerResponse::CertLeaseResponse {
+                    accepted,
+                }) => {
+                    if accepted {
+                        tracing::info!("Leased dummy DNS.");
+                    } else {
+                        tracing::error!("Failed to lease dummy DNS.");
+                    }
+                }
+                _ => panic!("Unexpected response"),
+            }
+
+            let message = format!("Dummy message from {}", proxy_name.to_string());
+
+            conn.send(MessageFromProxy::CertManagerRequest(
+                CertManagerRequest::SetTxtRecord {
+                    txt_value: message.clone(),
+                },
+            ))
+            .await
+            .unwrap();
+
+            let response = conn.recv().await.unwrap();
+
+            match response {
+                MessageToProxy::CertManagerResponse(
+                    CertManagerResponse::SetTxtRecordResponse { accepted },
+                ) => {
+                    if accepted {
+                        tracing::info!(?message, "Sent dummy DNS message.");
+                    } else {
+                        tracing::error!(?message, "Failed to set DNS message.");
+                    }
+                }
+                _ => panic!("Unexpected response"),
+            }
         }
     };
 
