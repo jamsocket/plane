@@ -29,6 +29,18 @@ pub enum PlaneClientError {
 
     #[error("API error: {0} ({1})")]
     PlaneError(ApiError, StatusCode),
+
+    #[error("Failed to connect.")]
+    ConnectFailed(&'static str),
+
+    #[error("Bad configuration.")]
+    BadConfiguration(&'static str),
+
+    #[error("WebSocket error: {0}")]
+    Tungstenite(#[from] tokio_tungstenite::tungstenite::Error),
+
+    #[error("Send error")]
+    SendFailed,
 }
 
 #[derive(Clone)]
