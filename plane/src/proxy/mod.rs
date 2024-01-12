@@ -5,6 +5,7 @@ use crate::proxy::proxy_service::ProxyMakeService;
 use crate::proxy::shutdown_signal::ShutdownSignal;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
+use base64::Engine;
 use std::net::IpAddr;
 use std::path::Path;
 use url::Url;
@@ -54,11 +55,31 @@ pub struct ServerPortConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct AcmeEabConfiguration {
+    pub key_id: String,
+    pub key: Vec<u8>,
+}
+
+impl AcmeEabConfiguration {
+    pub fn eab_key_b64(&self) -> String {
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&self.key)
+    }
+
+    pub fn new(key_id: &str, key_b64: &str) -> Result<Self> {
+        let key = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(key_b64)?;
+        Ok(Self {
+            key_id: key_id.into(),
+            key,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct AcmeConfig {
     pub endpoint: Url,
     pub mailto_email: String,
     pub client: reqwest::Client,
-    // TODO: EAB credentials.
+    pub acme_eab_keypair: Option<AcmeEabConfiguration>,
 }
 
 pub async fn run_proxy(

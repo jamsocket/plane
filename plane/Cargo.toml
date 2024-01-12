@@ -11,6 +11,8 @@ readme = "README.md"
 
 [dependencies]
 acme2-eab = "0.5.4"
+openssl = "0.10.40"
+base64 = "0.21.0"
 anyhow = "1.0.75"
 async-stream = "0.3.5"
 async-trait = "0.1.74"

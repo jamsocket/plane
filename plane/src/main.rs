@@ -223,6 +223,7 @@ async fn run(opts: Opts) -> Result<()> {
                 (Some(endpoint), Some(email)) => Some(AcmeConfig {
                     endpoint,
                     mailto_email: email,
+                    acme_eab_keypair: None,
                     client: reqwest::Client::new(),
                 }),
                 (None, None) => None,
