@@ -2,12 +2,14 @@ use self::{
     commands::{get_port, run_container},
     types::ContainerId,
 };
-use crate::{names::BackendName, types::ExecutorConfig};
+use crate::{names::BackendName, protocol::BackendMetricsMessage, types::ExecutorConfig};
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials, container::StatsOptions, errors::Error, service::EventMessage,
     system::EventsOptions, Docker,
 };
+use std::sync::atomic::{AtomicU64, Ordering};
+use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 
 mod commands;
@@ -166,6 +168,112 @@ impl PlaneDocker {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum MetricsConversionError {
+    #[error("{0} stat not present in provided struct")]
+    NoStatsAvailable(String),
+    #[error("Measured cumulative system cpu use: {current} is less than previous cumulative total: {prev}")]
+    SysCpuLessThanCurrent { current: u64, prev: u64 },
+    #[error("Measured cumulative container cpu use: {current} is less than previous cumulative total: {prev}")]
+    ContainerCpuLessThanCurrent { current: u64, prev: u64 },
+}
+
+pub fn get_metrics_message_from_container_stats(
+    stats: bollard::container::Stats,
+    backend_id: BackendName,
+    prev_sys_cpu_ns: &AtomicU64,
+    prev_container_cpu_ns: &AtomicU64,
+) -> std::result::Result<BackendMetricsMessage, MetricsConversionError> {
+    let Some(mem_stats) = stats.memory_stats.stats else {
+        return Err(MetricsConversionError::NoStatsAvailable(
+            "memory_stats.stats".into(),
+        ));
+    };
+
+    let Some(total_system_cpu_used) = stats.cpu_stats.system_cpu_usage else {
+        return Err(MetricsConversionError::NoStatsAvailable(
+            "cpu_stats.system_cpu_usage".into(),
+        ));
+    };
+
+    let Some(mem_used_total_docker) = stats.memory_stats.usage else {
+        return Err(MetricsConversionError::NoStatsAvailable(
+            "memory_stats.usage".into(),
+        ));
+    };
+
+    let container_cpu_used = stats.cpu_stats.cpu_usage.total_usage;
+    let prev_sys_cpu_ns_load = prev_sys_cpu_ns.load(Ordering::SeqCst);
+    let prev_container_cpu_ns_load = prev_container_cpu_ns.load(Ordering::SeqCst);
+
+    if container_cpu_used < prev_container_cpu_ns_load {
+        return Err(MetricsConversionError::ContainerCpuLessThanCurrent {
+            current: container_cpu_used,
+            prev: prev_container_cpu_ns_load,
+        });
+    }
+    if total_system_cpu_used < prev_sys_cpu_ns_load {
+        return Err(MetricsConversionError::SysCpuLessThanCurrent {
+            current: total_system_cpu_used,
+            prev: prev_sys_cpu_ns_load,
+        });
+    }
+
+    let container_cpu_used_delta =
+        container_cpu_used - prev_container_cpu_ns.load(Ordering::SeqCst);
+
+    let system_cpu_used_delta = total_system_cpu_used - prev_sys_cpu_ns_load;
+
+    prev_container_cpu_ns.store(container_cpu_used, Ordering::SeqCst);
+    prev_sys_cpu_ns.store(total_system_cpu_used, Ordering::SeqCst);
+
+    // NOTE: a BIG limitation here is that docker does not report swap info!
+    // This may be important for scheduling decisions!
+
+    let (mem_total, mem_active, mem_inactive, mem_unevictable, mem_used) = match mem_stats {
+        bollard::container::MemoryStatsStats::V1(v1_stats) => {
+            let active_mem = v1_stats.total_active_anon + v1_stats.total_active_file;
+            let total_mem = v1_stats.total_rss + v1_stats.total_cache;
+            let unevictable_mem = v1_stats.total_unevictable;
+            let inactive_mem = v1_stats.total_inactive_anon + v1_stats.total_inactive_file;
+            let mem_used = mem_used_total_docker - v1_stats.total_inactive_file;
+            (
+                total_mem,
+                active_mem,
+                inactive_mem,
+                unevictable_mem,
+                mem_used,
+            )
+        }
+        bollard::container::MemoryStatsStats::V2(v2_stats) => {
+            let active_mem = v2_stats.active_anon + v2_stats.active_file;
+            let kernel = v2_stats.kernel_stack + v2_stats.sock + v2_stats.slab;
+            let total_mem = v2_stats.file + v2_stats.anon + kernel;
+            let unevictable_mem = v2_stats.unevictable;
+            let inactive_mem = v2_stats.inactive_anon + v2_stats.inactive_file;
+            let mem_used = mem_used_total_docker - v2_stats.inactive_file;
+            (
+                total_mem,
+                active_mem,
+                inactive_mem,
+                unevictable_mem,
+                mem_used,
+            )
+        }
+    };
+
+    Ok(BackendMetricsMessage {
+        backend_id,
+        mem_total,
+        mem_used,
+        mem_active,
+        mem_inactive,
+        mem_unevictable,
+        cpu_used: container_cpu_used_delta,
+        sys_cpu: system_cpu_used_delta,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use crate::names::Name;
@@ -197,7 +305,94 @@ mod tests {
 
         let metrics = plane_docker.get_metrics(&container_id).await;
         assert!(metrics.is_ok());
-        //TODO: add checks for required fields for conversion
+        let mut metrics = metrics.unwrap();
+        let prev_container_cpu = AtomicU64::new(0);
+        let prev_sys_cpu = AtomicU64::new(0);
+
+        let backend_metrics_message = get_metrics_message_from_container_stats(
+            metrics.clone(),
+            backend_name.clone(),
+            &prev_sys_cpu,
+            &prev_container_cpu,
+        );
+
+        assert!(backend_metrics_message.is_ok());
+
+        let tmp_mem = metrics.memory_stats.usage.clone();
+        metrics.memory_stats.usage = None;
+
+        let backend_metrics_message = get_metrics_message_from_container_stats(
+            metrics.clone(),
+            backend_name.clone(),
+            &prev_sys_cpu,
+            &prev_container_cpu,
+        );
+
+        assert!(matches!(
+            backend_metrics_message,
+            Err(MetricsConversionError::NoStatsAvailable(_))
+        ));
+
+        metrics.memory_stats.usage = tmp_mem;
+        let tmp_mem = metrics.memory_stats.stats;
+        metrics.memory_stats.stats = None;
+
+        let backend_metrics_message = get_metrics_message_from_container_stats(
+            metrics.clone(),
+            backend_name.clone(),
+            &prev_sys_cpu,
+            &prev_container_cpu,
+        );
+
+        assert!(matches!(
+            backend_metrics_message,
+            Err(MetricsConversionError::NoStatsAvailable(_))
+        ));
+        metrics.memory_stats.stats = tmp_mem;
+
+        let tmp_mem = metrics.cpu_stats.system_cpu_usage;
+        metrics.cpu_stats.system_cpu_usage = None;
+
+        let backend_metrics_message = get_metrics_message_from_container_stats(
+            metrics.clone(),
+            backend_name.clone(),
+            &prev_sys_cpu,
+            &prev_container_cpu,
+        );
+
+        assert!(matches!(
+            backend_metrics_message,
+            Err(MetricsConversionError::NoStatsAvailable(_))
+        ));
+        metrics.cpu_stats.system_cpu_usage = tmp_mem;
+
+        prev_sys_cpu.store(u64::MAX, Ordering::SeqCst);
+        let backend_metrics_message = get_metrics_message_from_container_stats(
+            metrics.clone(),
+            backend_name.clone(),
+            &prev_sys_cpu,
+            &prev_container_cpu,
+        );
+
+        assert!(matches!(
+            backend_metrics_message,
+            Err(MetricsConversionError::SysCpuLessThanCurrent { .. })
+        ));
+        prev_sys_cpu.store(0, Ordering::SeqCst);
+
+        prev_container_cpu.store(u64::MAX, Ordering::SeqCst);
+        let backend_metrics_message = get_metrics_message_from_container_stats(
+            metrics.clone(),
+            backend_name.clone(),
+            &prev_sys_cpu,
+            &prev_container_cpu,
+        );
+
+        assert!(matches!(
+            backend_metrics_message,
+            Err(MetricsConversionError::ContainerCpuLessThanCurrent { .. })
+        ));
+        prev_container_cpu.store(0, Ordering::SeqCst);
 
         Ok(())
     }
