@@ -11,10 +11,11 @@ docker build -f docker/quickstart/Dockerfile . -t plane/quickstart
 ```
 
 ```bash
-docker run plane/quickstart \
+docker run \
     -p 8080:8080 \
     -p 9090:9090 \
-    -v /var/run/docker.sock:/var/run/docker.sock
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    plane/quickstart
 ```
 
 Note: passing `-v /var/run/docker.sock:/var/run/docker.sock` is required to allow the drone to spawn
