@@ -1,3 +1,4 @@
+use crate::client::PlaneClientError;
 use crate::PlaneVersionInfo;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -66,8 +67,11 @@ impl<A: Debug> TypedSocketSender<A> {
 }
 
 impl<T: ChannelMessage> TypedSocket<T> {
-    pub async fn send(&mut self, message: T) -> anyhow::Result<()> {
-        self.send.send(SocketAction::Send(message)).await?;
+    pub async fn send(&mut self, message: T) -> Result<(), PlaneClientError> {
+        self.send
+            .send(SocketAction::Send(message))
+            .await
+            .map_err(|_| PlaneClientError::SendFailed)?;
         Ok(())
     }
 
