@@ -48,6 +48,30 @@ fn show_error(error: &PlaneClientError) {
                 error.id.bright_yellow(),
             );
         }
+        PlaneClientError::ConnectFailed(message) => {
+            eprintln!(
+                "{}: {}",
+                "Failed to connect to API server".bright_red(),
+                message.magenta()
+            );
+        }
+        PlaneClientError::BadConfiguration(message) => {
+            eprintln!(
+                "{}: {}",
+                "Bad configuration".bright_red(),
+                message.magenta()
+            );
+        }
+        PlaneClientError::Tungstenite(error) => {
+            eprintln!(
+                "{}: {}",
+                "WebSocket error".bright_red(),
+                error.to_string().magenta()
+            );
+        }
+        PlaneClientError::SendFailed => {
+            eprintln!("{}", "Failed to send message to channel".bright_red());
+        }
     }
 }
 
@@ -230,15 +254,14 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
         AdminCommand::PutDummyDns { cluster } => {
             let connection = client.proxy_connection(&cluster);
             let proxy_name = ProxyName::new_random();
-            let mut conn = connection.connect(&proxy_name).await.unwrap();
+            let mut conn = connection.connect(&proxy_name).await?;
 
             conn.send(MessageFromProxy::CertManagerRequest(
                 CertManagerRequest::CertLeaseRequest,
             ))
-            .await
-            .unwrap();
+            .await?;
 
-            let response = conn.recv().await.unwrap();
+            let response = conn.recv().await.expect("Failed to receive response");
 
             match response {
                 MessageToProxy::CertManagerResponse(CertManagerResponse::CertLeaseResponse {
@@ -253,17 +276,16 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                 _ => panic!("Unexpected response"),
             }
 
-            let message = format!("Dummy message from {}", proxy_name.to_string());
+            let message = format!("Dummy message from {}", proxy_name);
 
             conn.send(MessageFromProxy::CertManagerRequest(
                 CertManagerRequest::SetTxtRecord {
                     txt_value: message.clone(),
                 },
             ))
-            .await
-            .unwrap();
+            .await?;
 
-            let response = conn.recv().await.unwrap();
+            let response = conn.recv().await.expect("Failed to receive response");
 
             match response {
                 MessageToProxy::CertManagerResponse(
