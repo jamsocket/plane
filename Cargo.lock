@@ -1640,6 +1640,7 @@ dependencies = [
  "futures-util",
  "hyper",
  "lru",
+ "openssl",
  "pem",
  "rand",
  "reqwest",

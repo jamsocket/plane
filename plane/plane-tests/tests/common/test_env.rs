@@ -9,6 +9,7 @@ use plane::{
     dns::run_dns_with_listener,
     drone::Drone,
     names::{AcmeDnsServerName, ControllerName, DroneName, Name},
+    proxy::AcmeEabConfiguration,
     types::ClusterName,
     util::random_string,
 };
@@ -137,7 +138,21 @@ impl TestEnvironment {
     }
 
     pub async fn pebble(&mut self, dns_port: u16) -> Arc<Pebble> {
-        let pebble = Arc::new(Pebble::new(&self, dns_port).await.unwrap());
+        let pebble = Arc::new(Pebble::new(&self, dns_port, None).await.unwrap());
+        self.drop_futures.lock().unwrap().push(pebble.clone());
+        pebble
+    }
+
+    pub async fn pebble_with_eab(
+        &mut self,
+        dns_port: u16,
+        eab_keypair: AcmeEabConfiguration,
+    ) -> Arc<Pebble> {
+        let pebble = Arc::new(
+            Pebble::new(&self, dns_port, Some(eab_keypair))
+                .await
+                .unwrap(),
+        );
         self.drop_futures.lock().unwrap().push(pebble.clone());
         pebble
     }

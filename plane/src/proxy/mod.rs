@@ -54,11 +54,31 @@ pub struct ServerPortConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct AcmeEabConfiguration {
+    pub key_id: String,
+    pub key: Vec<u8>,
+}
+
+impl AcmeEabConfiguration {
+    pub fn eab_key_b64(&self) -> String {
+        data_encoding::BASE64URL_NOPAD.encode(&self.key)
+    }
+
+    pub fn new(key_id: &str, key_b64: &str) -> Result<Self> {
+        let key = data_encoding::BASE64URL_NOPAD.decode(key_b64.as_bytes())?;
+        Ok(Self {
+            key_id: key_id.into(),
+            key,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct AcmeConfig {
     pub endpoint: Url,
     pub mailto_email: String,
     pub client: reqwest::Client,
-    // TODO: EAB credentials.
+    pub acme_eab_keypair: Option<AcmeEabConfiguration>,
 }
 
 pub async fn run_proxy(

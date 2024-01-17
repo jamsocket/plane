@@ -314,10 +314,10 @@ async fn get_certificate(
     let mut builder = AccountBuilder::new(dir);
     // builder.private_key(...);
     builder.contact(vec![format!("mailto:{}", acme_config.mailto_email)]);
-    // if let Some(acme_eab_keypair) = acme_eab_keypair {
-    //     let eab_key = PKey::hmac(&acme_eab_keypair.key)?;
-    //     builder.external_account_binding(acme_eab_keypair.key_id.clone(), eab_key);
-    // }
+    if let Some(acme_eab_keypair) = acme_config.acme_eab_keypair.clone() {
+        let eab_key = openssl::pkey::PKey::hmac(&acme_eab_keypair.key)?;
+        builder.external_account_binding(acme_eab_keypair.key_id.clone(), eab_key);
+    }
     builder.terms_of_service_agreed(true);
     let account = builder.build().await.context("Building account")?;
 

@@ -4,6 +4,7 @@ use crate::common::test_env::TestEnvironment;
 use anyhow::anyhow;
 use anyhow::Result;
 use bollard::{container::Config, Docker};
+use plane::proxy::AcmeEabConfiguration;
 use reqwest::Client;
 use serde_json::json;
 use std::os::unix::fs::PermissionsExt;
@@ -86,13 +87,17 @@ impl Pebble {
         }
     }
 
-    pub async fn new(env: &TestEnvironment, dns_port: u16) -> Result<Pebble> {
+    pub async fn new(
+        env: &TestEnvironment,
+        dns_port: u16,
+        eab_keypair: Option<AcmeEabConfiguration>,
+    ) -> Result<Pebble> {
         let scratch_dir = env.scratch_dir.clone();
 
         let pebble_dir = scratch_dir.canonicalize()?.join("pebble");
         std::fs::create_dir_all(&pebble_dir)?;
 
-        let pebble_config = json!({
+        let mut pebble_config = json!({
             "pebble": {
                 "listenAddress": "0.0.0.0:14000",
                 "managementListenAddress": "0.0.0.0:15000",
@@ -110,6 +115,13 @@ impl Pebble {
                 "certificateValidityPeriod": 157766400,
             }
         });
+
+        if let Some(eab_keypair) = eab_keypair {
+            pebble_config["pebble"]["externalAccountBindingRequired"] = json!(true);
+            pebble_config["pebble"]["externalAccountMacKeys"] = json!({
+                eab_keypair.clone().key_id : eab_keypair.eab_key_b64()
+            });
+        }
 
         std::fs::write(
             pebble_dir.join("config.json"),
