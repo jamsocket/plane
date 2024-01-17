@@ -5,7 +5,6 @@ use crate::proxy::proxy_service::ProxyMakeService;
 use crate::proxy::shutdown_signal::ShutdownSignal;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
-use base64::Engine;
 use std::net::IpAddr;
 use std::path::Path;
 use url::Url;
@@ -62,11 +61,11 @@ pub struct AcmeEabConfiguration {
 
 impl AcmeEabConfiguration {
     pub fn eab_key_b64(&self) -> String {
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&self.key)
+        data_encoding::BASE64URL_NOPAD.encode(&self.key)
     }
 
     pub fn new(key_id: &str, key_b64: &str) -> Result<Self> {
-        let key = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(key_b64)?;
+        let key = data_encoding::BASE64URL_NOPAD.decode(key_b64.as_bytes())?;
         Ok(Self {
             key_id: key_id.into(),
             key,
