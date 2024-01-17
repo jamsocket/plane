@@ -210,6 +210,7 @@ async fn attempt_connect(
                     key_result.id,
                     cluster,
                     false,
+                    key_result.status,
                     token,
                     secret_token,
                     client,
@@ -259,8 +260,15 @@ async fn attempt_connect(
     )
     .await?;
 
-    let connect_response =
-        ConnectResponse::new(backend_id, cluster, true, token, secret_token, client);
+    let connect_response = ConnectResponse::new(
+        backend_id,
+        cluster,
+        true,
+        BackendStatus::Scheduled,
+        token,
+        secret_token,
+        client,
+    );
 
     Ok(connect_response)
 }

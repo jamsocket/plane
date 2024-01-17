@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            select\n                backend_key.id as id,\n                backend_key.tag as tag,\n                backend_key.expires_at as expires_at,\n                backend_key.fencing_token as token,\n                backend_key.key_name as name,\n                now() as \"as_of!\"\n            from backend_key\n            left join backend on backend_key.id = backend.id\n            where backend_key.key_name = $1\n            and backend_key.namespace = $2\n            ",
+  "query": "\n            select\n                backend_key.id as id,\n                backend_key.tag as tag,\n                backend_key.expires_at as expires_at,\n                backend_key.fencing_token as token,\n                backend_key.key_name as name,\n                backend.last_status as status,\n                now() as \"as_of!\"\n            from backend_key\n            left join backend on backend_key.id = backend.id\n            where backend_key.key_name = $1\n            and backend_key.namespace = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -30,6 +30,11 @@
       },
       {
         "ordinal": 5,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
         "name": "as_of!",
         "type_info": "Timestamptz"
       }
@@ -46,8 +51,9 @@
       false,
       false,
       false,
+      false,
       null
     ]
   },
-  "hash": "f77eb5db0c9b07ded9a515ef3593ca6883e8ac711bcf7c353d9d1d50747d676a"
+  "hash": "bb4d67150e3808a0b443ad0e1fd66b3b5f713518a772007b6caa85a86d12acf6"
 }
