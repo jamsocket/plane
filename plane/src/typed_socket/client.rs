@@ -1,8 +1,8 @@
 use super::{ChannelMessage, Handshake, SocketAction, TypedSocket};
 use crate::client::controller_address::AuthorizedAddress;
+use crate::client::PlaneClientError;
 use crate::names::NodeName;
 use crate::{plane_version_info, util::ExponentialBackoff};
-use anyhow::{anyhow, Result};
 use futures_util::{SinkExt, StreamExt};
 use std::marker::PhantomData;
 use tokio::net::TcpStream;
@@ -47,7 +47,7 @@ impl<T: ChannelMessage> TypedSocketConnector<T> {
         }
     }
 
-    pub async fn connect<N: NodeName>(&self, name: &N) -> Result<TypedSocket<T>> {
+    pub async fn connect<N: NodeName>(&self, name: &N) -> Result<TypedSocket<T>, PlaneClientError> {
         let handshake = Handshake {
             name: name.to_string(),
             version: plane_version_info(),
@@ -60,15 +60,16 @@ impl<T: ChannelMessage> TypedSocketConnector<T> {
             .send(Message::Text(serde_json::to_string(&handshake)?))
             .await?;
 
-        let msg = socket
-            .next()
-            .await
-            .ok_or_else(|| anyhow!("Socket closed before handshake received."))??;
+        let msg = socket.next().await.ok_or(PlaneClientError::ConnectFailed(
+            "Socket closed before handshake received.",
+        ))??;
         let msg = match msg {
             Message::Text(msg) => msg,
             msg => {
                 tracing::error!("Unexpected handshake message: {:?}", msg);
-                return Err(anyhow::anyhow!("Handshake message was not text."));
+                return Err(PlaneClientError::ConnectFailed(
+                    "Handshake message was not text.",
+                ));
             }
         };
 
@@ -87,7 +88,7 @@ impl<T: ChannelMessage> TypedSocketConnector<T> {
 }
 
 /// Creates a WebSocket request from an AuthorizedAddress.
-fn auth_url_to_request(addr: &AuthorizedAddress) -> Result<hyper::Request<()>> {
+fn auth_url_to_request(addr: &AuthorizedAddress) -> Result<hyper::Request<()>, PlaneClientError> {
     let mut request = hyper::Request::builder()
         .method(hyper::Method::GET)
         .uri(addr.url.as_str())
@@ -95,7 +96,9 @@ fn auth_url_to_request(addr: &AuthorizedAddress) -> Result<hyper::Request<()>> {
             "Host",
             addr.url
                 .host_str()
-                .ok_or_else(|| anyhow!("No host in URL."))?
+                .ok_or(PlaneClientError::BadConfiguration(
+                    "URL does not have a hostname.",
+                ))?
                 .to_string(),
         )
         .header("Connection", "Upgrade")
@@ -106,17 +109,17 @@ fn auth_url_to_request(addr: &AuthorizedAddress) -> Result<hyper::Request<()>> {
     if let Some(bearer_header) = addr.bearer_header() {
         request = request.header(
             hyper::header::AUTHORIZATION,
-            hyper::header::HeaderValue::from_str(&bearer_header)?,
+            hyper::header::HeaderValue::from_str(&bearer_header).expect("Bearer header is valid"),
         );
     }
 
-    Ok(request.body(())?)
+    Ok(request.body(()).expect("Request is valid"))
 }
 
 async fn new_client<T: ChannelMessage>(
     mut socket: Socket,
     remote_handshake: Handshake,
-) -> Result<TypedSocket<T>> {
+) -> Result<TypedSocket<T>, PlaneClientError> {
     let (send_to_client, recv_to_client) = tokio::sync::mpsc::channel::<T::Reply>(100);
     let (send_from_client, mut recv_from_client) =
         tokio::sync::mpsc::channel::<SocketAction<T>>(100);

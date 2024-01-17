@@ -15,6 +15,7 @@ use crate::{
 };
 use anyhow::Result;
 use axum::{
+    http::{header, Method},
     routing::{get, post},
     Json, Router, Server,
 };
@@ -24,6 +25,7 @@ use tokio::{
     sync::oneshot::{self},
     task::JoinHandle,
 };
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 use url::Url;
@@ -159,6 +161,11 @@ impl ControllerServer {
                 post(terminate::handle_hard_terminate),
             );
 
+        let cors_public = CorsLayer::new()
+            .allow_methods(vec![Method::GET, Method::POST])
+            .allow_headers(vec![header::CONTENT_TYPE])
+            .allow_origin(Any);
+
         // Routes that are may be accessed directly from end-user code. These are placed
         // under the /pub/ top-level route to make it easier to expose only these routes,
         // using a reverse proxy configuration.
@@ -167,7 +174,8 @@ impl ControllerServer {
             .route(
                 "/c/:cluster/b/:backend/status-stream",
                 get(handle_backend_status_stream),
-            );
+            )
+            .layer(cors_public.clone());
 
         let app = Router::new()
             .nest("/pub", public_routes)

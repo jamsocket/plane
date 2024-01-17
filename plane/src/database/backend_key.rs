@@ -134,6 +134,6 @@ pub struct BackendKeyResult {
 
 impl BackendKeyResult {
     pub fn is_live(&self) -> bool {
-        self.as_of > self.expires_at
+        self.as_of < self.expires_at
     }
 }

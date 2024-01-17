@@ -322,7 +322,8 @@ async fn get_certificate(
     let account = builder.build().await.context("Building account")?;
 
     let mut builder = OrderBuilder::new(account);
-    builder.add_dns_identifier(format!("*.{}", cluster));
+    builder.add_dns_identifier(format!("{}", cluster));
+    builder.add_dns_identifier(format!("*.{}", cluster)); // wildcard
     let order = builder.build().await.context("Building order")?;
 
     let authorizations = order

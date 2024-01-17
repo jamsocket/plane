@@ -4,19 +4,19 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-plane = { path = "../plane-dynamic", package = "plane-dynamic" }
+anyhow = "1.0.75"
+async-trait = "0.1.74"
+bollard = "0.15.0"
 chrono = { version = "0.4.31", features = ["serde"] }
+futures-util = "0.3.29"
+hyper = { version = "0.14.27", features = ["server"] }
+plane = { path = "../plane-dynamic", package = "plane-dynamic" }
+plane-test-macro = { path = "plane-test-macro" }
+reqwest = { version = "0.11.22", features = ["json", "rustls-tls"], default-features = false }
+serde_json = "1.0.107"
+thiserror = "1.0.50"
+tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread", "signal"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.2"
-tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread", "signal"] }
-async-trait = "0.1.74"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
-serde_json = "1.0.107"
-bollard = "0.15.0"
-reqwest = { version = "0.11.22", features = ["json", "rustls-tls"], default-features = false }
-thiserror = "1.0.50"
-hyper = { version = "0.14.27", features = ["server"] }
-anyhow = "1.0.75"
 url = "2.4.1"
-futures-util = "0.3.29"
-plane-test-macro = { path = "plane-test-macro" }
