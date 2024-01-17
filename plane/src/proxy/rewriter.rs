@@ -136,11 +136,14 @@ fn extract_bearer_token(parts: &mut uri::Parts) -> Option<BearerToken> {
     let (token, path) = path_and_query.path().strip_prefix('/')?.split_once('/')?;
     let token = BearerToken::from(token.to_string());
 
+    let query = path_and_query
+        .query()
+        .map(|query| format!("?{}", query))
+        .unwrap_or_default();
+
     parts.path_and_query = Some(
-        PathAndQuery::from_str(
-            format!("/{}{}", path, path_and_query.query().unwrap_or_default()).as_str(),
-        )
-        .expect("Path and query is valid."),
+        PathAndQuery::from_str(format!("/{}{}", path, query).as_str())
+            .expect("Path and query is valid."),
     );
 
     Some(token)

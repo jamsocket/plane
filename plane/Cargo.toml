@@ -41,11 +41,10 @@ tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread", "signal"]
 tokio-rustls = "0.24.1"
 tokio-stream = "0.1.14"
 tokio-tungstenite = { version = "0.20.1", features = ["rustls-tls-webpki-roots"] }
-tower-http = { version = "0.4.4", features = ["trace"] }
+tower-http = { version = "0.4.4", features = ["trace", "cors"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 trust-dns-server = "0.23.2"
 tungstenite = "0.20.1"
 url = "2.4.1"
 x509-parser = "0.15.1"
-
