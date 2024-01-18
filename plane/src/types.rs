@@ -267,6 +267,7 @@ pub struct ExecutorConfig {
     pub credentials: Option<DockerRegistryAuth>,
     #[serde(default)]
     pub env: HashMap<String, String>,
+    #[serde(default)]
     pub resource_limits: ResourceLimits,
 }
 
