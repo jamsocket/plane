@@ -7,7 +7,10 @@
 //! assert!(KEY_LEASE_EXPIRATION > KEY_LEASE_HARD_TERMINATE_AFTER);
 //! ```
 
-use crate::{names::BackendName, types::KeyConfig};
+use crate::{
+    names::BackendName,
+    types::{BackendStatus, KeyConfig},
+};
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, PgPool};
 use std::time::Duration;
@@ -95,6 +98,7 @@ impl<'a> KeysDatabase<'a> {
                 backend_key.expires_at as expires_at,
                 backend_key.fencing_token as token,
                 backend_key.key_name as name,
+                backend.last_status as status,
                 now() as "as_of!"
             from backend_key
             left join backend on backend_key.id = backend.id
@@ -112,6 +116,8 @@ impl<'a> KeysDatabase<'a> {
                 id: BackendName::try_from(lock_result.id)
                     .map_err(|_| sqlx::Error::Decode("Invalid backend name.".into()))?,
                 token: lock_result.token,
+                status: BackendStatus::try_from(lock_result.status)
+                    .map_err(|_| sqlx::Error::Decode("Invalid backend status.".into()))?,
                 key: lock_result.name,
                 tag: lock_result.tag,
                 expires_at: lock_result.expires_at,
@@ -128,6 +134,7 @@ pub struct BackendKeyResult {
     pub tag: String,
     pub token: i64,
     pub key: String,
+    pub status: BackendStatus,
     expires_at: DateTime<Utc>,
     as_of: DateTime<Utc>,
 }

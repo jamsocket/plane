@@ -380,6 +380,8 @@ pub struct ConnectResponse {
     /// Whether the backend is a new one spawned due to the request.
     pub spawned: bool,
 
+    pub status: BackendStatus,
+
     pub token: BearerToken,
 
     pub url: String,
@@ -394,6 +396,7 @@ impl ConnectResponse {
         backend_id: BackendName,
         cluster: &ClusterName,
         spawned: bool,
+        status: BackendStatus,
         token: BearerToken,
         secret_token: SecretToken,
         client: &PlaneClient,
@@ -409,6 +412,7 @@ impl ConnectResponse {
         Self {
             backend_id,
             spawned,
+            status,
             token,
             url,
             secret_token,
