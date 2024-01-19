@@ -54,6 +54,9 @@ pub enum ConnectError {
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
+    #[error("No cluster provided, and no default cluster for this controller.")]
+    NoClusterProvided,
+
     #[error("Other internal error. {0}")]
     Other(String),
 }
@@ -179,7 +182,7 @@ async fn create_token(
 
 async fn attempt_connect(
     pool: &PgPool,
-    cluster: &ClusterName,
+    default_cluster: Option<&ClusterName>,
     request: &ConnectRequest,
     client: &PlaneClient,
 ) -> Result<ConnectResponse> {
@@ -208,7 +211,7 @@ async fn attempt_connect(
 
                 let connect_response = ConnectResponse::new(
                     key_result.id,
-                    cluster,
+                    &key_result.cluster,
                     false,
                     key_result.status,
                     token,
@@ -240,13 +243,19 @@ async fn attempt_connect(
         return Err(ConnectError::KeyUnheldNoSpawnConfig);
     };
 
+    let cluster = spawn_config
+        .cluster
+        .as_ref()
+        .or(default_cluster)
+        .ok_or(ConnectError::NoClusterProvided)?;
+
     let drone = DroneDatabase::new(pool)
-        .pick_drone_for_spawn(cluster)
+        .pick_drone_for_spawn(&cluster)
         .await?
         .ok_or(ConnectError::NoDroneAvailable)?;
 
     let Some(backend_id) =
-        create_backend_with_key(pool, &key, spawn_config, cluster, &drone).await?
+        create_backend_with_key(pool, &key, spawn_config, &cluster, &drone).await?
     else {
         return Err(ConnectError::FailedToAcquireKey);
     };
@@ -262,7 +271,7 @@ async fn attempt_connect(
 
     let connect_response = ConnectResponse::new(
         backend_id,
-        cluster,
+        &cluster,
         true,
         BackendStatus::Scheduled,
         token,
@@ -275,13 +284,13 @@ async fn attempt_connect(
 
 pub async fn connect(
     pool: &PgPool,
-    cluster: &ClusterName,
+    default_cluster: Option<&ClusterName>,
     request: &ConnectRequest,
     client: &PlaneClient,
 ) -> Result<ConnectResponse> {
     let mut attempt = 1;
     loop {
-        match attempt_connect(pool, cluster, request, client).await {
+        match attempt_connect(pool, default_cluster, request, client).await {
             Ok(response) => return Ok(response),
             Err(error) => {
                 if !error.retryable() || attempt >= 3 {

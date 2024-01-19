@@ -1,19 +1,19 @@
-use url::Url;
-
 use crate::{
     client::PlaneClient,
-    database::PlaneDatabase,
+    database::{connect::ConnectError, PlaneDatabase},
     names::{AnyNodeName, ControllerName},
     typed_socket::Handshake,
-    types::{ClusterName, NodeId},
+    types::{ClusterName, ConnectRequest, ConnectResponse, NodeId},
 };
 use std::net::IpAddr;
+use url::Url;
 
 #[derive(Clone)]
 pub struct Controller {
     pub db: PlaneDatabase,
     pub id: ControllerName,
     pub client: PlaneClient,
+    pub default_cluster: Option<ClusterName>,
 }
 
 pub struct NodeHandle {
@@ -61,9 +61,31 @@ impl Controller {
         })
     }
 
-    pub async fn new(db: PlaneDatabase, id: ControllerName, controller_url: Url) -> Self {
+    pub async fn new(
+        db: PlaneDatabase,
+        id: ControllerName,
+        controller_url: Url,
+        default_cluster: Option<ClusterName>,
+    ) -> Self {
         let client = PlaneClient::new(controller_url);
 
-        Self { db, id, client }
+        Self {
+            db,
+            id,
+            client,
+            default_cluster,
+        }
+    }
+
+    pub async fn connect(
+        &self,
+        connect_request: &ConnectRequest,
+    ) -> Result<ConnectResponse, ConnectError> {
+        let response = self
+            .db
+            .connect(self.default_cluster.as_ref(), connect_request, &self.client)
+            .await?;
+
+        Ok(response)
     }
 }

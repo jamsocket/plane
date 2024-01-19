@@ -6,7 +6,7 @@ use plane::{
     database::backend::BackendActionMessage,
     names::{DroneName, Name},
     protocol::{BackendAction, Heartbeat, MessageFromDrone, MessageToDrone},
-    types::{ConnectRequest, ConnectResponse, ExecutorConfig, SpawnConfig},
+    types::{ClusterName, ConnectRequest, ConnectResponse, ExecutorConfig, SpawnConfig},
 };
 use plane_test_macro::plane_test;
 use std::time::Duration;
@@ -14,9 +14,10 @@ use std::time::Duration;
 mod common;
 
 /// Return a dummy connect request, which does not use a key.
-fn connect_request() -> ConnectRequest {
+fn connect_request(cluster: &ClusterName) -> ConnectRequest {
     ConnectRequest {
         spawn_config: Some(SpawnConfig {
+            cluster: Some(cluster.clone()),
             executable: ExecutorConfig::from_image_with_defaults("alpine"),
             lifetime_limit_seconds: None,
             max_idle_seconds: None,
@@ -31,12 +32,9 @@ async fn no_drone_available(env: TestEnvironment) {
     let controller = env.controller().await;
 
     let client = controller.client();
-    let connect_request = connect_request();
+    let connect_request = connect_request(&env.cluster);
 
-    let result = client
-        .connect(&env.cluster, &connect_request)
-        .await
-        .unwrap_err();
+    let result = client.connect(&connect_request).await.unwrap_err();
 
     assert!(matches!(
         result,
@@ -71,11 +69,8 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
 
         tracing::info!("Issuing the connect request.");
         let client = controller.client();
-        let connect_request = connect_request();
-        let result = client
-            .connect(&env.cluster, &connect_request)
-            .await
-            .unwrap();
+        let connect_request = connect_request(&env.cluster);
+        let result = client.connect(&connect_request).await.unwrap();
 
         let ConnectResponse {
             spawned: true,
@@ -149,7 +144,7 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
 
         controller
             .client()
-            .soft_terminate(&env.cluster, &backend_id)
+            .soft_terminate(&backend_id)
             .await
             .unwrap();
 

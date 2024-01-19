@@ -9,11 +9,11 @@
 
 use crate::{
     names::BackendName,
-    types::{BackendStatus, KeyConfig},
+    types::{BackendStatus, ClusterName, KeyConfig},
 };
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, PgPool};
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 pub const KEY_LEASE_RENEW_AFTER: Duration = Duration::from_secs(30);
 pub const KEY_LEASE_SOFT_TERMINATE_AFTER: Duration = Duration::from_secs(40);
@@ -99,6 +99,7 @@ impl<'a> KeysDatabase<'a> {
                 backend_key.fencing_token as token,
                 backend_key.key_name as name,
                 backend.last_status as status,
+                backend.cluster as cluster,
                 now() as "as_of!"
             from backend_key
             left join backend on backend_key.id = backend.id
@@ -118,6 +119,8 @@ impl<'a> KeysDatabase<'a> {
                 token: lock_result.token,
                 status: BackendStatus::try_from(lock_result.status)
                     .map_err(|_| sqlx::Error::Decode("Invalid backend status.".into()))?,
+                cluster: ClusterName::from_str(&lock_result.cluster)
+                    .map_err(|_| sqlx::Error::Decode("Invalid cluster name.".into()))?,
                 key: lock_result.name,
                 tag: lock_result.tag,
                 expires_at: lock_result.expires_at,
@@ -135,6 +138,7 @@ pub struct BackendKeyResult {
     pub token: i64,
     pub key: String,
     pub status: BackendStatus,
+    pub cluster: ClusterName,
     expires_at: DateTime<Utc>,
     as_of: DateTime<Utc>,
 }

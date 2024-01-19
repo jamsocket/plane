@@ -285,6 +285,9 @@ impl ExecutorConfig {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SpawnConfig {
+    /// Cluster to spawn to. Uses the controller default if not provided.
+    pub cluster: Option<ClusterName>,
+
     /// Config to use to spawn the backend process.
     pub executable: ExecutorConfig,
 
@@ -409,7 +412,7 @@ impl ConnectResponse {
             format!("http://{}/{}/", cluster, token)
         };
 
-        let status_url = client.backend_status_url(cluster, &backend_id).to_string();
+        let status_url = client.backend_status_url(&backend_id).to_string();
 
         Self {
             backend_id,

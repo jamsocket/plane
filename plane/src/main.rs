@@ -41,6 +41,9 @@ enum Command {
 
         #[clap(long)]
         controller_url: Option<Url>,
+
+        #[clap(long)]
+        default_cluster: Option<ClusterName>,
     },
     Drone {
         #[clap(long)]
@@ -125,6 +128,7 @@ async fn run(opts: Opts) -> Result<()> {
             port,
             db,
             controller_url,
+            default_cluster,
         } => {
             let name = ControllerName::new_random();
 
@@ -141,7 +145,7 @@ async fn run(opts: Opts) -> Result<()> {
 
             let addr = (host, port).into();
 
-            run_controller(db, addr, name, controller_url).await?
+            run_controller(db, addr, name, controller_url, default_cluster).await?
         }
         Command::Migrate { db } => {
             let _ = connect_and_migrate(&db).await?;

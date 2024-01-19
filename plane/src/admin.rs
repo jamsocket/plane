@@ -88,7 +88,7 @@ pub struct AdminOpts {
 enum AdminCommand {
     Connect {
         #[clap(long)]
-        cluster: ClusterName,
+        cluster: Option<ClusterName>,
 
         #[clap(long)]
         image: String,
@@ -100,9 +100,6 @@ enum AdminCommand {
         wait: bool,
     },
     Terminate {
-        #[clap(long)]
-        cluster: ClusterName,
-
         #[clap(long)]
         backend: BackendName,
 
@@ -145,6 +142,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
         } => {
             let executor_config = ExecutorConfig::from_image_with_defaults(image);
             let spawn_config = SpawnConfig {
+                cluster: cluster.clone(),
                 executable: executor_config.clone(),
                 lifetime_limit_seconds: None,
                 max_idle_seconds: Some(500),
@@ -159,7 +157,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                 ..Default::default()
             };
 
-            let response = client.connect(&cluster, &spawn_request).await?;
+            let response = client.connect(&spawn_request).await?;
 
             println!(
                 "Created backend: {}",
@@ -170,9 +168,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             println!("Status URL: {}", response.status_url.bright_white());
 
             if wait {
-                let mut stream = client
-                    .backend_status_stream(&cluster, &response.backend_id)
-                    .await?;
+                let mut stream = client.backend_status_stream(&response.backend_id).await?;
 
                 while let Some(status) = stream.next().await {
                     println!(
@@ -189,14 +185,13 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
         }
         AdminCommand::Terminate {
             backend,
-            cluster,
             hard,
             wait,
         } => {
             if hard {
-                client.hard_terminate(&cluster, &backend).await?
+                client.hard_terminate(&backend).await?
             } else {
-                client.soft_terminate(&cluster, &backend).await?
+                client.soft_terminate(&backend).await?
             };
 
             println!(
@@ -205,7 +200,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             );
 
             if wait {
-                let mut stream = client.backend_status_stream(&cluster, &backend).await?;
+                let mut stream = client.backend_status_stream(&backend).await?;
 
                 while let Some(status) = stream.next().await {
                     println!(

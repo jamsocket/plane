@@ -1,9 +1,5 @@
 use super::{core::Controller, error::IntoApiError};
-use crate::{
-    names::BackendName,
-    protocol::BackendAction,
-    types::{ClusterName, TerminationKind},
-};
+use crate::{names::BackendName, protocol::BackendAction, types::TerminationKind};
 use axum::{
     extract::{Path, State},
     response::Response,
@@ -12,14 +8,13 @@ use axum::{
 
 async fn terminate(
     controller: &Controller,
-    cluster: &ClusterName,
     backend_id: &BackendName,
     hard: bool,
 ) -> Result<(), Response> {
     let backend = controller
         .db
         .backend()
-        .backend(cluster, backend_id)
+        .backend(backend_id)
         .await
         .or_internal_error("Database error")?
         .or_not_found("Backend does not exist")?;
@@ -44,17 +39,17 @@ async fn terminate(
 }
 
 pub async fn handle_soft_terminate(
-    Path((cluster, backend_id)): Path<(ClusterName, BackendName)>,
+    Path(backend_id): Path<BackendName>,
     State(controller): State<Controller>,
 ) -> Result<Json<()>, Response> {
-    terminate(&controller, &cluster, &backend_id, false).await?;
+    terminate(&controller, &backend_id, false).await?;
     Ok(Json(()))
 }
 
 pub async fn handle_hard_terminate(
-    Path((cluster, backend_id)): Path<(ClusterName, BackendName)>,
+    Path(backend_id): Path<BackendName>,
     State(controller): State<Controller>,
 ) -> Result<Json<()>, Response> {
-    terminate(&controller, &cluster, &backend_id, true).await?;
+    terminate(&controller, &backend_id, true).await?;
     Ok(Json(()))
 }

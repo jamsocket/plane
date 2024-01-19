@@ -84,11 +84,11 @@ impl PlaneDatabase {
 
     pub async fn connect(
         &self,
-        cluster: &ClusterName,
+        default_cluster: Option<&ClusterName>,
         request: &ConnectRequest,
         client: &PlaneClient,
     ) -> Result<ConnectResponse, ConnectError> {
-        connect::connect(&self.pool, cluster, request, client).await
+        connect::connect(&self.pool, default_cluster, request, client).await
     }
 
     fn subscription_manager(&self) -> &EventSubscriptionManager {
