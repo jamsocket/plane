@@ -91,7 +91,7 @@ impl DevDatabase {
         let port = container.get_port(5432).await?;
         let connection_string = Self::get_connection_string(port);
 
-        println!("Connection_string: {}", connection_string);
+        tracing::info!("Connection string: {}", connection_string);
 
         let db = attempt_to_connect(&connection_string).await?;
 

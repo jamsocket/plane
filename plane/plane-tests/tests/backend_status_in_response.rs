@@ -22,6 +22,7 @@ async fn backend_status_in_response(env: TestEnvironment) {
     tracing::info!("Requesting backend.");
     let connect_request = ConnectRequest {
         spawn_config: Some(SpawnConfig {
+            cluster: Some(env.cluster.clone()),
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
@@ -41,10 +42,7 @@ async fn backend_status_in_response(env: TestEnvironment) {
         auth: Map::default(),
     };
 
-    let response = client
-        .connect(&env.cluster, &connect_request)
-        .await
-        .unwrap();
+    let response = client.connect(&connect_request).await.unwrap();
     tracing::info!("Got response.");
 
     assert!(response.spawned);
@@ -53,7 +51,7 @@ async fn backend_status_in_response(env: TestEnvironment) {
     let backend_id = response.backend_id.clone();
 
     let mut backend_status_stream = client
-        .backend_status_stream(&env.cluster, &backend_id)
+        .backend_status_stream(&backend_id)
         .with_timeout(10)
         .await
         .unwrap()
@@ -71,10 +69,7 @@ async fn backend_status_in_response(env: TestEnvironment) {
         tracing::info!(status=?message, "Got status");
     }
 
-    let response2 = client
-        .connect(&env.cluster, &connect_request)
-        .await
-        .unwrap();
+    let response2 = client.connect(&connect_request).await.unwrap();
 
     assert!(!response2.spawned);
     assert_eq!(response2.backend_id, backend_id);
