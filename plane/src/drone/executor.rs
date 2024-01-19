@@ -122,7 +122,7 @@ impl Executor {
                 tracing::info!("Inserting backend {}.", backend_id);
                 self.backends.insert(backend_id.clone(), manager);
             }
-            BackendAction::Terminate { kind } => {
+            BackendAction::Terminate { kind, reason } => {
                 tracing::info!("Terminating backend {}.", backend_id);
 
                 let manager = {
@@ -134,7 +134,7 @@ impl Executor {
                     manager.clone()
                 };
 
-                manager.terminate(*kind).await?;
+                manager.terminate(*kind, *reason).await?;
             }
         }
 

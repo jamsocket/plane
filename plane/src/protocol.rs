@@ -4,7 +4,7 @@ use crate::{
     typed_socket::ChannelMessage,
     types::{
         BackendStatus, BearerToken, ClusterName, ExecutorConfig, KeyConfig, SecretToken,
-        TerminationKind,
+        TerminationKind, backend_state::TerminationReason,
     },
 };
 use chrono::{DateTime, Utc};
@@ -47,6 +47,7 @@ pub enum BackendAction {
     },
     Terminate {
         kind: TerminationKind,
+        reason: TerminationReason,
     },
 }
 

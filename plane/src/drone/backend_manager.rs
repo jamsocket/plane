@@ -6,7 +6,7 @@ use crate::{
     names::BackendName,
     protocol::BackendMetricsMessage,
     typed_socket::TypedSocketSender,
-    types::{BackendState, BackendStatus, ExecutorConfig, PullPolicy, TerminationKind},
+    types::{BackendState, BackendStatus, ExecutorConfig, PullPolicy, TerminationKind, backend_state::TerminationReason},
     util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
@@ -106,14 +106,21 @@ impl MetricsManager {
     }
 }
 
+struct BackendManagerState {
+    /// The current state of the backend.
+    state: BackendState,
+
+    /// If we are currently running a task, this is the handle to that task.
+    /// It is always dropped (and aborted) when the state changes.
+    handle: Option<GuardHandle>,
+}
+
 /// A backend manager is responsible for driving the state of one backend.
 /// Every active backend should have a backend manager.
 /// All container- and image-level commands sent to Docker go through the backend manager.
 /// The backend manager owns the status for the backend it is responsible for.
 pub struct BackendManager {
-    /// If we are currently running a task, this is the handle to that task.
-    /// It is always dropped (and aborted) when the state changes.
-    handle: Mutex<Option<GuardHandle>>,
+    state: Mutex<BackendManagerState>,
 
     /// handle for task that collects metrics and sends them to the controller.
     metrics_manager: MetricsManager,
@@ -159,7 +166,10 @@ impl BackendManager {
         let container_id = ContainerId::from(format!("plane-{}", backend_id));
 
         let manager = Arc::new(Self {
-            handle: Mutex::new(None),
+            state: Mutex::new(BackendManagerState {
+                state: state.clone(),
+                handle: None,
+            }),
             metrics_manager: MetricsManager::new(
                 metrics_sender,
                 docker.clone(),
@@ -200,7 +210,7 @@ impl BackendManager {
                     tracing::info!(?image, "pulling...");
                     if let Err(err) = docker.pull(image, credentials.as_ref(), force_pull).await {
                         tracing::error!(?err, "failed to pull image");
-                        BackendState::terminated(None)
+                        state.to_terminated(None)
                     } else {
                         tracing::info!("done pulling...");
                         state.to_starting()
@@ -224,7 +234,7 @@ impl BackendManager {
                         Ok(spawn_result) => spawn_result,
                         Err(err) => {
                             tracing::error!(?err, "failed to spawn backend");
-                            return BackendState::terminated(None);
+                            return state.to_terminated(None)
                         }
                     };
 
@@ -237,7 +247,7 @@ impl BackendManager {
                     Some(address) => address,
                     None => {
                         tracing::error!("State is waiting, but no associated address.");
-                        return BackendState::terminated(None);
+                        return state.to_terminated(None);
                     }
                 };
 
@@ -280,9 +290,9 @@ impl BackendManager {
 
     pub fn set_state(self: &Arc<Self>, status: BackendState) {
         tracing::info!(?self.backend_id, ?status, "Updating backend state");
-        let mut handle = self.handle.lock().expect("Guard handle lock is poisoned");
+        let mut state = self.state.lock().expect("State lock is poisoned");
         // Cancel any existing task.
-        handle.take();
+        state.handle.take();
 
         // Call the callback.
         if let Err(err) = (self.state_callback)(&status) {
@@ -295,12 +305,12 @@ impl BackendManager {
             StepStatusResult::DoNothing => {}
             StepStatusResult::SetState(status) => {
                 // We need to drop the lock before we call ourselves recursively!
-                drop(handle);
+                drop(state);
                 self.set_state(status);
             }
             StepStatusResult::FutureSetState(future) => {
                 let self_clone = self.clone();
-                *handle = Some(GuardHandle::new(async move {
+                state.handle = Some(GuardHandle::new(async move {
                     let status = future.await;
                     self_clone.set_state(status);
                 }));
@@ -308,14 +318,16 @@ impl BackendManager {
         }
     }
 
-    pub async fn terminate(self: &Arc<Self>, kind: TerminationKind) -> Result<()> {
-        self.set_state(BackendState::terminating(kind));
+    pub async fn terminate(self: &Arc<Self>, kind: TerminationKind, reason: TerminationReason) -> Result<()> {
+        let state = self.state.lock().expect("State lock is poisoned").state.clone();
+        self.set_state(state.to_terminating(kind, reason));
 
         Ok(())
     }
 
     pub fn mark_terminated(self: &Arc<Self>, exit_code: Option<i32>) -> Result<()> {
-        self.set_state(BackendState::terminated(exit_code));
+        let state = self.state.lock().expect("State lock is poisoned").state.clone();
+        self.set_state(state.to_terminated(exit_code));
 
         Ok(())
     }

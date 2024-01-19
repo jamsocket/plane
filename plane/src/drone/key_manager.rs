@@ -3,7 +3,7 @@ use crate::{
     names::BackendName,
     protocol::{AcquiredKey, BackendAction, KeyDeadlines, RenewKeyRequest},
     typed_socket::TypedSocketSender,
-    types::TerminationKind,
+    types::{TerminationKind, backend_state::TerminationReason},
     util::GuardHandle,
 };
 use std::{
@@ -40,6 +40,7 @@ async fn renew_key_loop(
                     &backend,
                     &BackendAction::Terminate {
                         kind: TerminationKind::Hard,
+                        reason: TerminationReason::KeyExpired,
                     },
                 )
                 .await
@@ -58,6 +59,7 @@ async fn renew_key_loop(
                     &backend,
                     &BackendAction::Terminate {
                         kind: TerminationKind::Soft,
+                        reason: TerminationReason::KeyExpired,
                     },
                 )
                 .await

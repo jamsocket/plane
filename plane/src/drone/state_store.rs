@@ -240,6 +240,8 @@ mod test {
         BackendState {
             status,
             address: None,
+            reason: None,
+            last_status: None,
             exit_code: None,
             termination: None,
         }
