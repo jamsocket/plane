@@ -44,7 +44,7 @@ pub async fn handle_backend_status(
 }
 
 pub async fn handle_backend_status_stream(
-    Path(backend_id): Path<BackendName>, // TODO: check cluster id
+    Path(backend_id): Path<BackendName>,
     State(controller): State<Controller>,
     headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, Response> {
