@@ -182,7 +182,7 @@ impl BackendManager {
         match state.status {
             BackendStatus::Scheduled => StepStatusResult::SetState(state.to_loading()),
             BackendStatus::Loading => {
-                let force_pull = match self.executor_config.pull_policy {
+                let force_pull = match self.executor_config.pull_policy.unwrap_or_default() {
                     PullPolicy::IfNotPresent => false,
                     PullPolicy::Always => true,
                     PullPolicy::Never => {

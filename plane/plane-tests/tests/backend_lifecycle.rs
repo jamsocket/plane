@@ -27,7 +27,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
         spawn_config: Some(SpawnConfig {
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
-                pull_policy: PullPolicy::IfNotPresent,
+                pull_policy: Some(PullPolicy::IfNotPresent),
                 env: HashMap::default(),
                 resource_limits: ResourceLimits::default(),
                 credentials: None,

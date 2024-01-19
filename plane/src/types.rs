@@ -183,7 +183,7 @@ impl Display for BackendStatus {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, Default)]
 pub enum PullPolicy {
     #[default]
     IfNotPresent,
@@ -263,9 +263,11 @@ impl From<DockerRegistryAuth> for DockerCredentials {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutorConfig {
     pub image: String,
-    pub pull_policy: PullPolicy,
+    pub pull_policy: Option<PullPolicy>,
     pub credentials: Option<DockerRegistryAuth>,
+    #[serde(default)]
     pub env: HashMap<String, String>,
+    #[serde(default)]
     pub resource_limits: ResourceLimits,
 }
 
@@ -273,7 +275,7 @@ impl ExecutorConfig {
     pub fn from_image_with_defaults<T: Into<String>>(image: T) -> Self {
         Self {
             image: image.into(),
-            pull_policy: PullPolicy::default(),
+            pull_policy: None,
             env: HashMap::default(),
             resource_limits: ResourceLimits::default(),
             credentials: None,
