@@ -250,12 +250,12 @@ async fn attempt_connect(
         .ok_or(ConnectError::NoClusterProvided)?;
 
     let drone = DroneDatabase::new(pool)
-        .pick_drone_for_spawn(&cluster)
+        .pick_drone_for_spawn(cluster)
         .await?
         .ok_or(ConnectError::NoDroneAvailable)?;
 
     let Some(backend_id) =
-        create_backend_with_key(pool, &key, spawn_config, &cluster, &drone).await?
+        create_backend_with_key(pool, &key, spawn_config, cluster, &drone).await?
     else {
         return Err(ConnectError::FailedToAcquireKey);
     };
@@ -271,7 +271,7 @@ async fn attempt_connect(
 
     let connect_response = ConnectResponse::new(
         backend_id,
-        &cluster,
+        cluster,
         true,
         BackendStatus::Scheduled,
         token,
