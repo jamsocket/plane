@@ -1,10 +1,10 @@
 use crate::{client::PlaneClient, names::BackendName, util::random_prefixed_string};
+pub use backend_state::{BackendState, BackendStatus, TerminationKind, TerminationReason};
 use bollard::auth::DockerCredentials;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{collections::HashMap, fmt::Display, str::FromStr};
-pub use backend_state::{BackendState, BackendStatus, TerminationKind};
 
 pub mod backend_state;
 
@@ -62,7 +62,7 @@ impl FromStr for ClusterName {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, Default)]
 pub enum PullPolicy {
     #[default]
     IfNotPresent,
@@ -142,9 +142,11 @@ impl From<DockerRegistryAuth> for DockerCredentials {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutorConfig {
     pub image: String,
-    pub pull_policy: PullPolicy,
+    pub pull_policy: Option<PullPolicy>,
     pub credentials: Option<DockerRegistryAuth>,
+    #[serde(default)]
     pub env: HashMap<String, String>,
+    #[serde(default)]
     pub resource_limits: ResourceLimits,
 }
 
@@ -152,7 +154,7 @@ impl ExecutorConfig {
     pub fn from_image_with_defaults<T: Into<String>>(image: T) -> Self {
         Self {
             image: image.into(),
-            pull_policy: PullPolicy::default(),
+            pull_policy: None,
             env: HashMap::default(),
             resource_limits: ResourceLimits::default(),
             credentials: None,
@@ -162,6 +164,9 @@ impl ExecutorConfig {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SpawnConfig {
+    /// Cluster to spawn to. Uses the controller default if not provided.
+    pub cluster: Option<ClusterName>,
+
     /// Config to use to spawn the backend process.
     pub executable: ExecutorConfig,
 
@@ -286,7 +291,7 @@ impl ConnectResponse {
             format!("http://{}/{}/", cluster, token)
         };
 
-        let status_url = client.backend_status_url(cluster, &backend_id).to_string();
+        let status_url = client.backend_status_url(&backend_id).to_string();
 
         Self {
             backend_id,

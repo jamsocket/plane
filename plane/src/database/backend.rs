@@ -2,9 +2,7 @@ use super::{subscribe::emit_with_key, util::MapSqlxError, PlaneDatabase};
 use crate::{
     names::{BackendActionName, BackendName},
     protocol::{BackendAction, RouteInfo},
-    types::{
-        BackendStatus, BearerToken, ClusterName, NodeId, SecretToken, TimestampedBackendStatus,
-    },
+    types::{BackendStatus, BearerToken, NodeId, SecretToken, TimestampedBackendStatus},
 };
 use chrono::{DateTime, Utc};
 use futures_util::Stream;
@@ -107,11 +105,7 @@ impl<'a> BackendDatabase<'a> {
         Ok(stream)
     }
 
-    pub async fn backend(
-        &self,
-        cluster: &ClusterName,
-        backend_id: &BackendName,
-    ) -> sqlx::Result<Option<BackendRow>> {
+    pub async fn backend(&self, backend_id: &BackendName) -> sqlx::Result<Option<BackendRow>> {
         let result = sqlx::query!(
             r#"
             select
@@ -126,10 +120,8 @@ impl<'a> BackendDatabase<'a> {
                 now() as "as_of!"
             from backend
             where id = $1
-            and cluster = $2
             "#,
             backend_id.to_string(),
-            cluster.to_string(),
         )
         .fetch_optional(&self.db.pool)
         .await?;

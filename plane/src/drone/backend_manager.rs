@@ -6,7 +6,10 @@ use crate::{
     names::BackendName,
     protocol::BackendMetricsMessage,
     typed_socket::TypedSocketSender,
-    types::{BackendState, BackendStatus, ExecutorConfig, PullPolicy, TerminationKind, backend_state::TerminationReason},
+    types::{
+        backend_state::TerminationReason, BackendState, BackendStatus, ExecutorConfig, PullPolicy,
+        TerminationKind,
+    },
     util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
@@ -192,7 +195,7 @@ impl BackendManager {
         match state.status {
             BackendStatus::Scheduled => StepStatusResult::SetState(state.to_loading()),
             BackendStatus::Loading => {
-                let force_pull = match self.executor_config.pull_policy {
+                let force_pull = match self.executor_config.pull_policy.unwrap_or_default() {
                     PullPolicy::IfNotPresent => false,
                     PullPolicy::Always => true,
                     PullPolicy::Never => {
@@ -234,7 +237,7 @@ impl BackendManager {
                         Ok(spawn_result) => spawn_result,
                         Err(err) => {
                             tracing::error!(?err, "failed to spawn backend");
-                            return state.to_terminated(None)
+                            return state.to_terminated(None);
                         }
                     };
 
@@ -318,15 +321,29 @@ impl BackendManager {
         }
     }
 
-    pub async fn terminate(self: &Arc<Self>, kind: TerminationKind, reason: TerminationReason) -> Result<()> {
-        let state = self.state.lock().expect("State lock is poisoned").state.clone();
+    pub async fn terminate(
+        self: &Arc<Self>,
+        kind: TerminationKind,
+        reason: TerminationReason,
+    ) -> Result<()> {
+        let state = self
+            .state
+            .lock()
+            .expect("State lock is poisoned")
+            .state
+            .clone();
         self.set_state(state.to_terminating(kind, reason));
 
         Ok(())
     }
 
     pub fn mark_terminated(self: &Arc<Self>, exit_code: Option<i32>) -> Result<()> {
-        let state = self.state.lock().expect("State lock is poisoned").state.clone();
+        let state = self
+            .state
+            .lock()
+            .expect("State lock is poisoned")
+            .state
+            .clone();
         self.set_state(state.to_terminated(exit_code));
 
         Ok(())

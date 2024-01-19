@@ -13,7 +13,7 @@ use crate::{
         BackendAction, Heartbeat, KeyDeadlines, MessageFromDrone, MessageToDrone, RenewKeyResponse,
     },
     typed_socket::{server::new_server, TypedSocket},
-    types::{ClusterName, NodeId, TerminationKind, backend_state::TerminationReason},
+    types::{backend_state::TerminationReason, ClusterName, NodeId, TerminationKind},
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},

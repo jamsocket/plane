@@ -232,7 +232,7 @@ mod test {
     use super::*;
     use crate::{
         names::Name,
-        types::{BackendState, BackendStatus, TerminationKind},
+        types::{BackendState, BackendStatus, TerminationKind, TerminationReason},
     };
     use std::sync::mpsc;
 
@@ -271,13 +271,10 @@ mod test {
         let mut state_store = StateStore::new(conn).unwrap();
         let backend_id = BackendName::new_random();
 
+        let ready_state = simple_backend_state(BackendStatus::Ready);
         {
             state_store
-                .register_event(
-                    &backend_id,
-                    &simple_backend_state(BackendStatus::Ready),
-                    Utc::now(),
-                )
+                .register_event(&backend_id, &ready_state, Utc::now())
                 .unwrap();
 
             let result = state_store.backend_state(&backend_id).unwrap();
@@ -288,13 +285,14 @@ mod test {
             state_store
                 .register_event(
                     &backend_id,
-                    &BackendState::terminating(TerminationKind::Hard),
+                    &ready_state.to_terminating(TerminationKind::Hard, TerminationReason::External),
                     Utc::now(),
                 )
                 .unwrap();
 
             let result = state_store.backend_state(&backend_id).unwrap();
-            assert_eq!(result, BackendState::terminating(TerminationKind::Hard));
+            assert_eq!(result.status, BackendStatus::Terminating);
+            assert_eq!(result.reason, Some(TerminationReason::External));
         }
     }
 
@@ -313,17 +311,14 @@ mod test {
 
         let backend_id = BackendName::new_random();
 
+        let ready_state = simple_backend_state(BackendStatus::Ready);
         state_store
-            .register_event(
-                &backend_id,
-                &simple_backend_state(BackendStatus::Ready),
-                Utc::now(),
-            )
+            .register_event(&backend_id, &ready_state, Utc::now())
             .unwrap();
 
         {
             let result = state_store.backend_state(&backend_id).unwrap();
-            assert_eq!(result, simple_backend_state(BackendStatus::Ready));
+            assert_eq!(result, ready_state);
 
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
@@ -334,17 +329,20 @@ mod test {
             state_store
                 .register_event(
                     &backend_id,
-                    &BackendState::terminating(TerminationKind::Hard),
+                    &ready_state.to_terminating(TerminationKind::Hard, TerminationReason::Swept),
                     Utc::now(),
                 )
                 .unwrap();
 
             let result = state_store.backend_state(&backend_id).unwrap();
-            assert_eq!(result, BackendState::terminating(TerminationKind::Hard));
+            assert_eq!(
+                result,
+                ready_state.to_terminating(TerminationKind::Hard, TerminationReason::Swept)
+            );
 
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
-            assert_eq!(event.status, BackendStatus::Terminating,);
+            assert_eq!(event.status, BackendStatus::Terminating);
         }
     }
 
@@ -357,18 +355,15 @@ mod test {
 
         let backend_id = BackendName::new_random();
 
+        let ready_state = simple_backend_state(BackendStatus::Ready);
         state_store
-            .register_event(
-                &backend_id,
-                &simple_backend_state(BackendStatus::Ready),
-                Utc::now(),
-            )
+            .register_event(&backend_id, &ready_state, Utc::now())
             .unwrap();
 
         state_store
             .register_event(
                 &backend_id,
-                &BackendState::terminating(TerminationKind::Hard),
+                &ready_state.to_terminating(TerminationKind::Hard, TerminationReason::Swept),
                 Utc::now(),
             )
             .unwrap();
@@ -390,7 +385,7 @@ mod test {
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
             assert_eq!(event.event_id, BackendEventId::from(2));
-            assert_eq!(event.status, BackendStatus::Terminating,);
+            assert_eq!(event.status, BackendStatus::Terminating);
         }
 
         assert!(recv.try_recv().is_err());
@@ -412,7 +407,7 @@ mod test {
         {
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
-            assert_eq!(event.status, BackendStatus::Terminating,);
+            assert_eq!(event.status, BackendStatus::Terminating);
         }
 
         assert!(recv.try_recv().is_err());

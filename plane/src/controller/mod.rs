@@ -11,6 +11,7 @@ use crate::{
     heartbeat_consts::HEARTBEAT_INTERVAL,
     names::ControllerName,
     signals::wait_for_shutdown_signal,
+    types::ClusterName,
     PLANE_GIT_HASH, PLANE_VERSION,
 };
 use anyhow::Result;
@@ -114,10 +115,11 @@ impl ControllerServer {
         bind_addr: SocketAddr,
         id: ControllerName,
         controller_url: Url,
+        default_cluster: Option<ClusterName>,
     ) -> Result<Self> {
         let listener = TcpListener::bind(bind_addr)?;
 
-        Self::run_with_listener(db, listener, id, controller_url).await
+        Self::run_with_listener(db, listener, id, controller_url, default_cluster).await
     }
 
     pub async fn run_with_listener(
@@ -125,13 +127,15 @@ impl ControllerServer {
         listener: TcpListener,
         id: ControllerName,
         controller_url: Url,
+        default_cluster: Option<ClusterName>,
     ) -> Result<Self> {
         let bind_addr = listener.local_addr()?;
 
         let (graceful_terminate_sender, graceful_terminate_receiver) =
             tokio::sync::oneshot::channel::<()>();
 
-        let controller = Controller::new(db.clone(), id.clone(), controller_url).await;
+        let controller =
+            Controller::new(db.clone(), id.clone(), controller_url, default_cluster).await;
 
         let trace_layer = TraceLayer::new_for_http()
             .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
@@ -150,14 +154,14 @@ impl ControllerServer {
             .route("/c/:cluster/drone-socket", get(handle_drone_socket))
             .route("/c/:cluster/proxy-socket", get(handle_proxy_socket))
             .route("/dns-socket", get(handle_dns_socket))
-            .route("/c/:cluster/connect", post(handle_connect))
+            .route("/connect", post(handle_connect))
             .route("/c/:cluster/d/:drone/drain", post(handle_drain))
             .route(
-                "/c/:cluster/b/:backend/soft-terminate",
+                "/b/:backend/soft-terminate",
                 post(terminate::handle_soft_terminate),
             )
             .route(
-                "/c/:cluster/b/:backend/hard-terminate",
+                "/b/:backend/hard-terminate",
                 post(terminate::handle_hard_terminate),
             );
 
@@ -170,9 +174,9 @@ impl ControllerServer {
         // under the /pub/ top-level route to make it easier to expose only these routes,
         // using a reverse proxy configuration.
         let public_routes = Router::new()
-            .route("/c/:cluster/b/:backend/status", get(handle_backend_status))
+            .route("/b/:backend/status", get(handle_backend_status))
             .route(
-                "/c/:cluster/b/:backend/status-stream",
+                "/b/:backend/status-stream",
                 get(handle_backend_status_stream),
             )
             .layer(cors_public.clone());
@@ -248,8 +252,10 @@ pub async fn run_controller(
     bind_addr: SocketAddr,
     id: ControllerName,
     controller_url: Url,
+    default_cluster: Option<ClusterName>,
 ) -> Result<()> {
-    let mut server = ControllerServer::run(db, bind_addr, id, controller_url).await?;
+    let mut server =
+        ControllerServer::run(db, bind_addr, id, controller_url, default_cluster).await?;
 
     wait_for_shutdown_signal().await;
 

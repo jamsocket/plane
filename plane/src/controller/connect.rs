@@ -1,12 +1,8 @@
 use super::error::err_to_response;
 use super::Controller;
 use crate::database::connect::ConnectError;
-use crate::types::{ClusterName, ConnectRequest, ConnectResponse};
-use axum::{
-    extract::{Path, State},
-    response::Response,
-    Json,
-};
+use crate::types::{ConnectRequest, ConnectResponse};
+use axum::{extract::State, response::Response, Json};
 use reqwest::StatusCode;
 
 fn connect_error_to_response(connect_error: &ConnectError) -> Response {
@@ -46,6 +42,11 @@ fn connect_error_to_response(connect_error: &ConnectError) -> Response {
             StatusCode::INTERNAL_SERVER_ERROR,
             "Internal error.",
         ),
+        ConnectError::NoClusterProvided => err_to_response(
+            connect_error,
+            StatusCode::BAD_REQUEST,
+            "No cluster provided, and no default cluster for this controller.",
+        ),
         ConnectError::Other(_) => err_to_response(
             connect_error,
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -55,13 +56,11 @@ fn connect_error_to_response(connect_error: &ConnectError) -> Response {
 }
 
 pub async fn handle_connect(
-    Path(cluster): Path<ClusterName>,
     State(controller): State<Controller>,
     Json(request): Json<ConnectRequest>,
 ) -> Result<Json<ConnectResponse>, Response> {
     let response = controller
-        .db
-        .connect(&cluster, &request, &controller.client)
+        .connect(&request)
         .await
         .map_err(|e| connect_error_to_response(&e))?;
     Ok(Json(response))

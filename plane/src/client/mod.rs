@@ -97,12 +97,9 @@ impl PlaneClient {
 
     pub async fn connect(
         &self,
-        cluster: &ClusterName,
         connect_request: &ConnectRequest,
     ) -> Result<ConnectResponse, PlaneClientError> {
-        let addr = self
-            .controller_address
-            .join(&format!("/ctrl/c/{}/connect", cluster));
+        let addr = self.controller_address.join("/ctrl/connect");
 
         let response = authed_post(&self.client, &addr, connect_request).await?;
         Ok(response)
@@ -121,71 +118,52 @@ impl PlaneClient {
         Ok(())
     }
 
-    pub async fn soft_terminate(
-        &self,
-        cluster: &ClusterName,
-        backend_id: &BackendName,
-    ) -> Result<(), PlaneClientError> {
-        let addr = self.controller_address.join(&format!(
-            "/ctrl/c/{}/b/{}/soft-terminate",
-            cluster, backend_id
-        ));
+    pub async fn soft_terminate(&self, backend_id: &BackendName) -> Result<(), PlaneClientError> {
+        let addr = self
+            .controller_address
+            .join(&format!("/ctrl/b/{}/soft-terminate", backend_id));
 
         authed_post(&self.client, &addr, &()).await?;
         Ok(())
     }
 
-    pub async fn hard_terminate(
-        &self,
-        cluster: &ClusterName,
-        backend_id: &BackendName,
-    ) -> Result<(), PlaneClientError> {
-        let addr = self.controller_address.join(&format!(
-            "/ctrl/c/{}/b/{}/hard-terminate",
-            cluster, backend_id
-        ));
+    pub async fn hard_terminate(&self, backend_id: &BackendName) -> Result<(), PlaneClientError> {
+        let addr = self
+            .controller_address
+            .join(&format!("/ctrl/b/{}/hard-terminate", backend_id));
 
         authed_post(&self.client, &addr, &()).await?;
         Ok(())
     }
 
-    pub fn backend_status_url(&self, cluster: &ClusterName, backend_id: &BackendName) -> Url {
+    pub fn backend_status_url(&self, backend_id: &BackendName) -> Url {
         self.controller_address
-            .join(&format!("/pub/c/{}/b/{}/status", cluster, backend_id))
+            .join(&format!("/pub/b/{}/status", backend_id))
             .url
     }
 
     pub async fn backend_status(
         &self,
-        cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Result<TimestampedBackendStatus, PlaneClientError> {
-        let url = self.backend_status_url(cluster, backend_id);
+        let url = self.backend_status_url(backend_id);
 
         let response = self.client.get(url).send().await?;
         let status: TimestampedBackendStatus = get_response(response).await?;
         Ok(status)
     }
 
-    pub fn backend_status_stream_url(
-        &self,
-        cluster: &ClusterName,
-        backend_id: &BackendName,
-    ) -> Url {
+    pub fn backend_status_stream_url(&self, backend_id: &BackendName) -> Url {
         self.controller_address
-            .join(&format!(
-                "/pub/c/{}/b/{}/status-stream",
-                cluster, backend_id
-            ))
+            .join(&format!("/pub/b/{}/status-stream", backend_id))
             .url
     }
 
     pub async fn backend_status_stream(
         &self,
-        cluster: &ClusterName,
         backend_id: &BackendName,
     ) -> Result<sse::SseStream<TimestampedBackendStatus>, PlaneClientError> {
-        let url = self.backend_status_stream_url(cluster, backend_id);
+        let url = self.backend_status_stream_url(backend_id);
 
         let stream = sse::sse_request(url, self.client.clone()).await?;
         Ok(stream)

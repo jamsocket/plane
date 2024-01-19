@@ -3,8 +3,8 @@ use crate::{
     names::{BackendActionName, BackendName},
     typed_socket::ChannelMessage,
     types::{
-        BackendStatus, BearerToken, ClusterName, ExecutorConfig, KeyConfig, SecretToken,
-        TerminationKind, backend_state::TerminationReason,
+        backend_state::TerminationReason, BackendStatus, BearerToken, ClusterName, ExecutorConfig,
+        KeyConfig, SecretToken, TerminationKind,
     },
 };
 use chrono::{DateTime, Utc};

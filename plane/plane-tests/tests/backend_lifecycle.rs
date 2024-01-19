@@ -25,9 +25,10 @@ async fn backend_lifecycle(env: TestEnvironment) {
     tracing::info!("Requesting backend.");
     let connect_request = ConnectRequest {
         spawn_config: Some(SpawnConfig {
+            cluster: Some(env.cluster.clone()),
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
-                pull_policy: PullPolicy::IfNotPresent,
+                pull_policy: Some(PullPolicy::IfNotPresent),
                 env: HashMap::default(),
                 resource_limits: ResourceLimits::default(),
                 credentials: None,
@@ -39,10 +40,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
         user: None,
         auth: Map::default(),
     };
-    let response = client
-        .connect(&env.cluster, &connect_request)
-        .await
-        .unwrap();
+    let response = client.connect(&connect_request).await.unwrap();
     tracing::info!("Got response.");
 
     assert!(response.spawned);
@@ -51,7 +49,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
 
     tracing::info!("Streaming status.");
     let mut backend_status_stream = client
-        .backend_status_stream(&env.cluster, &backend_id)
+        .backend_status_stream(&backend_id)
         .with_timeout(10)
         .await
         .unwrap()
@@ -119,7 +117,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
 
     // Test non-streaming status endpoint.
     let status = client
-        .backend_status(&env.cluster, &response.backend_id)
+        .backend_status(&response.backend_id)
         .with_timeout(10)
         .await
         .unwrap()
@@ -156,7 +154,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
     let initial_keepalive = {
         let backend = db
             .backend()
-            .backend(&env.cluster, &response.backend_id)
+            .backend(&response.backend_id)
             .with_timeout(10)
             .await
             .unwrap()
@@ -178,7 +176,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
     {
         let backend = db
             .backend()
-            .backend(&env.cluster, &response.backend_id)
+            .backend(&response.backend_id)
             .with_timeout(10)
             .await
             .unwrap()
@@ -190,7 +188,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
 
     tracing::info!("Terminating backend.");
     client
-        .soft_terminate(&env.cluster, &response.backend_id)
+        .soft_terminate(&response.backend_id)
         .with_timeout(10)
         .await
         .unwrap()

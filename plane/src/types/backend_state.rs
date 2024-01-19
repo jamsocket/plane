@@ -92,7 +92,11 @@ impl BackendState {
         }
     }
 
-    pub fn to_terminating(&self, termination: TerminationKind, reason: TerminationReason) -> BackendState {
+    pub fn to_terminating(
+        &self,
+        termination: TerminationKind,
+        reason: TerminationReason,
+    ) -> BackendState {
         BackendState {
             status: BackendStatus::Terminating,
             termination: Some(termination),

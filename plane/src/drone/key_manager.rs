@@ -3,7 +3,7 @@ use crate::{
     names::BackendName,
     protocol::{AcquiredKey, BackendAction, KeyDeadlines, RenewKeyRequest},
     typed_socket::TypedSocketSender,
-    types::{TerminationKind, backend_state::TerminationReason},
+    types::{backend_state::TerminationReason, TerminationKind},
     util::GuardHandle,
 };
 use std::{
