@@ -198,12 +198,12 @@ pub async fn run_container(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::{names::Name, types::ResourceLimits};
+    use anyhow::Context;
     use bollard::container::LogsOptions;
     use futures_util::TryStreamExt;
     use serde_json;
-
-    use super::*;
 
     /// starts and runs command in container
     /// with given container config, returns stdout + stderr as string
@@ -211,9 +211,12 @@ mod tests {
     async fn run_container_with_config(
         config: bollard::container::Config<String>,
     ) -> anyhow::Result<String> {
-        let docker = bollard::Docker::connect_with_local_defaults()?;
+        let docker =
+            bollard::Docker::connect_with_local_defaults().context("Connecting to Docker")?;
         let image = config.image.clone().unwrap();
-        pull_image(&docker, &image, None, false).await?;
+        pull_image(&docker, &image, None, false)
+            .await
+            .context("Pulling image")?;
         let backend_name = BackendName::new_random();
         let container_id = ContainerId::from(format!("plane-test-{}", backend_name));
         let create_container_options = bollard::container::CreateContainerOptions {
@@ -223,10 +226,12 @@ mod tests {
 
         docker
             .create_container(Some(create_container_options), config)
-            .await?;
+            .await
+            .context("Creating container")?;
         docker
             .start_container::<String>(&container_id.to_string(), None)
-            .await?;
+            .await
+            .context("Starting container")?;
         let mut wait_container = docker.wait_container::<String>(&container_id.to_string(), None);
 
         let mut output = String::new();
@@ -250,27 +255,29 @@ mod tests {
 
         docker
             .remove_container(&container_id.to_string(), None)
-            .await?;
+            .await
+            .context("Removing container")?;
 
         Ok(output)
     }
 
     #[tokio::test]
-    async fn test_resource_limits() -> anyhow::Result<()> {
-        let docker = bollard::Docker::connect_with_local_defaults()?;
+    async fn test_resource_limits() {
+        let docker = bollard::Docker::connect_with_local_defaults().unwrap();
         let backend_name = BackendName::new_random();
         let _container_id = ContainerId::from(format!("plane-test-{}", backend_name));
         let mut executor_config = ExecutorConfig::from_image_with_defaults("debian:bookworm");
 
         let resource_limits: ResourceLimits = serde_json::from_value(serde_json::json!( {
-        "cpu_period": 1000000,
-        "cpu_time_limit": 100,
-        "cpu_period_percent": 80,
-        "memory_limit_bytes": 10000000,
-        "disk_limit_bytes": 10000000000 as i64
-        }))?;
+            "cpu_period": 1000000,
+            "cpu_time_limit": 100,
+            "cpu_period_percent": 80,
+            "memory_limit_bytes": 10000000,
+            "disk_limit_bytes": 10000000000 as i64
+        }))
+        .unwrap();
         executor_config.resource_limits = resource_limits;
-        let info = docker.info().await?;
+        let info = docker.info().await.unwrap();
         match info.driver {
             Some(t) if matches!(t.as_str(), "btrfs" | "zfs") => {}
             Some(t)
@@ -295,26 +302,27 @@ mod tests {
             &backend_name,
             executor_config.clone(),
             &None,
-        )?;
+        )
+        .unwrap();
         config.cmd = Some(vec!["echo".into(), "hello world".into()]);
-        let out = run_container_with_config(config.clone()).await?;
+        let out = run_container_with_config(config.clone()).await.unwrap();
         assert_eq!(out.trim(), "hello world".to_string());
 
         config.cmd = None;
         config.entrypoint = Some(vec!["sh".into(), "-c".into(), "ulimit -t".into()]);
-        let out = run_container_with_config(config.clone()).await?;
+        let out = run_container_with_config(config.clone()).await.unwrap();
         assert_eq!(out.trim(), "100".to_string());
 
         config.entrypoint = None;
         config.cmd = Some(vec!["cat".into(), "/sys/fs/cgroup/cpu.max".into()]);
-        let out = run_container_with_config(config.clone()).await?;
+        let out = run_container_with_config(config.clone()).await.unwrap();
         assert_eq!(out.trim(), "800000 1000000".to_string());
 
         //NOTE: memory limit rounds down to nearest page size multiple,
         // this assumes the page size to be 4096 bytes.
         let mem_limit_corr = 10000000 - (10000000 % 4096);
         config.cmd = Some(vec!["cat".into(), "/sys/fs/cgroup/memory.max".into()]);
-        let out = run_container_with_config(config.clone()).await?;
+        let out = run_container_with_config(config.clone()).await.unwrap();
         assert_eq!(out.trim(), mem_limit_corr.to_string());
 
         //unfortunately, the docker disk limit is dependent on the storage backend
@@ -332,7 +340,5 @@ mod tests {
                     .clone()
             );
         }
-
-        Ok(())
     }
 }
