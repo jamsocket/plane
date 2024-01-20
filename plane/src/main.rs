@@ -13,6 +13,7 @@ use plane::init_tracing::init_tracing;
 use plane::names::{AcmeDnsServerName, ControllerName, DroneName, Name, OrRandom, ProxyName};
 use plane::proxy::{run_proxy, AcmeConfig, ServerPortConfig};
 use plane::types::ClusterName;
+use tracing::instrument;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use url::Url;
@@ -21,13 +22,13 @@ const LOCAL_HTTP_PORT: u16 = 9090;
 const PROD_HTTP_PORT: u16 = 80;
 const PROD_HTTPS_PORT: u16 = 443;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum Command {
     Controller {
         #[clap(long)]

@@ -49,3 +49,8 @@ trust-dns-server = "0.23.2"
 tungstenite = "0.20.1"
 url = "2.4.1"
 x509-parser = "0.15.1"
+tracing-opentelemetry = "0.22.0"
+opentelemetry-otlp = { version = "0.14.0", features = ["tls-roots"] }
+opentelemetry = "0.21.0"
+opentelemetry_sdk = { version = "0.21.2", features = ["rt-tokio"] }
+opentelemetry-semantic-conventions = "0.13.0"

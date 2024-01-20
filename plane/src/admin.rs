@@ -75,7 +75,7 @@ fn show_error(error: &PlaneClientError) {
     }
 }
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 pub struct AdminOpts {
     #[clap(long)]
     controller: Url,
@@ -84,7 +84,7 @@ pub struct AdminOpts {
     command: AdminCommand,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum AdminCommand {
     Connect {
         #[clap(long)]
