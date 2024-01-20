@@ -1,5 +1,6 @@
 use crate::{
     database::backend::BackendActionMessage,
+    log_types::LoggableTime,
     names::{BackendActionName, BackendName},
     typed_socket::ChannelMessage,
     types::{
@@ -11,19 +12,19 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, time::SystemTime};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub struct KeyDeadlines {
     /// When the key should be renewed.
-    pub renew_at: SystemTime,
+    pub renew_at: LoggableTime,
 
     /// When the backend should be soft-terminated if the key could not be renewed.
-    pub soft_terminate_at: SystemTime,
+    pub soft_terminate_at: LoggableTime,
 
     /// When the backend should be hard-terminated if the key could not be renewed.
-    pub hard_terminate_at: SystemTime,
+    pub hard_terminate_at: LoggableTime,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub struct AcquiredKey {
     /// Details of the key itself.
     pub key: KeyConfig,
@@ -39,7 +40,7 @@ pub struct AcquiredKey {
     pub token: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub enum BackendAction {
     Spawn {
         executable: Box<ExecutorConfig>,
@@ -65,7 +66,7 @@ pub struct BackendStateMessage {
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, valuable::Valuable)]
 pub struct BackendEventId(i64);
 
 impl From<i64> for BackendEventId {

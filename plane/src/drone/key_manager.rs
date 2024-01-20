@@ -12,6 +12,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 use tokio::time::sleep;
+use valuable::Valuable;
 
 pub struct KeyManager {
     executor: Arc<Executor>,
@@ -33,7 +34,7 @@ async fn renew_key_loop(
     loop {
         let now = SystemTime::now();
         let deadlines = &key.deadlines;
-        if now >= deadlines.hard_terminate_at {
+        if now >= deadlines.hard_terminate_at.0 {
             tracing::warn!("Key {:?} has expired, hard-terminating.", key.key);
             if let Err(err) = executor
                 .apply_action(
@@ -51,7 +52,7 @@ async fn renew_key_loop(
             break;
         }
 
-        if now >= deadlines.soft_terminate_at {
+        if now >= deadlines.soft_terminate_at.0 {
             tracing::warn!("Key {:?} has expired, soft-terminating.", key.key);
             if let Err(err) = executor
                 .apply_action(
@@ -67,15 +68,15 @@ async fn renew_key_loop(
                 continue;
             }
 
-            if let Ok(time_to_sleep) = deadlines.hard_terminate_at.duration_since(now) {
+            if let Ok(time_to_sleep) = deadlines.hard_terminate_at.0.duration_since(now) {
                 sleep(time_to_sleep).await;
             }
 
             continue;
         }
 
-        if now >= deadlines.renew_at {
-            tracing::info!("Renewing key {:?}.", key.key);
+        if now >= deadlines.renew_at.0 {
+            tracing::info!(key = key.key.as_value(), "Renewing key.");
 
             if let Some(ref sender) = sender {
                 let request = RenewKeyRequest {
@@ -88,13 +89,13 @@ async fn renew_key_loop(
                 }
             }
 
-            if let Ok(time_to_sleep) = deadlines.soft_terminate_at.duration_since(now) {
+            if let Ok(time_to_sleep) = deadlines.soft_terminate_at.0.duration_since(now) {
                 sleep(time_to_sleep).await;
             }
             continue;
         }
 
-        if let Ok(time_to_sleep) = deadlines.renew_at.duration_since(now) {
+        if let Ok(time_to_sleep) = deadlines.renew_at.0.duration_since(now) {
             sleep(time_to_sleep).await;
         }
     }

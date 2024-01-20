@@ -106,7 +106,7 @@ impl StateStore {
                 event_id,
                 backend_id: backend_id.clone(),
                 status: state.status,
-                address: state.address,
+                address: state.address(),
                 exit_code: state.exit_code,
                 timestamp,
             };
@@ -170,7 +170,7 @@ impl StateStore {
                 event_id: BackendEventId::from(event_id),
                 backend_id: BackendName::try_from(backend_id)?,
                 status: state.status,
-                address: state.address,
+                address: state.address(),
                 exit_code: state.exit_code,
                 timestamp: DateTime::UNIX_EPOCH + chrono::Duration::milliseconds(timestamp),
             };

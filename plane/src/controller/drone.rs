@@ -9,6 +9,7 @@ use crate::{
         subscribe::Subscription,
         PlaneDatabase,
     },
+    log_types::LoggableTime,
     protocol::{
         BackendAction, Heartbeat, KeyDeadlines, MessageFromDrone, MessageToDrone, RenewKeyResponse,
     },
@@ -77,9 +78,13 @@ pub async fn handle_message_from_drone(
                 .await?;
 
             let deadlines = KeyDeadlines {
-                renew_at: renew_key_request.local_time + KEY_LEASE_RENEW_AFTER,
-                soft_terminate_at: renew_key_request.local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
-                hard_terminate_at: renew_key_request.local_time + KEY_LEASE_HARD_TERMINATE_AFTER,
+                renew_at: LoggableTime(renew_key_request.local_time + KEY_LEASE_RENEW_AFTER),
+                soft_terminate_at: LoggableTime(
+                    renew_key_request.local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
+                ),
+                hard_terminate_at: LoggableTime(
+                    renew_key_request.local_time + KEY_LEASE_HARD_TERMINATE_AFTER,
+                ),
             };
 
             let renew_key_response = RenewKeyResponse {

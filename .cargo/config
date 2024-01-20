@@ -1,0 +1,4 @@
+# See: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/index.html#unstable-features
+
+[build]
+rustflags = ["--cfg", "tracing_unstable"]

@@ -18,6 +18,7 @@ use std::{
     net::IpAddr,
     sync::{Arc, Mutex, RwLock},
 };
+use valuable::Valuable;
 
 /// The backend manager uses a state machine internally to manage the state of the backend.
 /// Each time we enter a state, we can do one of three things:
@@ -233,7 +234,7 @@ impl BackendManager {
                 })
             }
             BackendStatus::Waiting => StepStatusResult::future_status(async move {
-                let address = match state.address {
+                let address = match state.address() {
                     Some(address) => address,
                     None => {
                         tracing::error!("State is waiting, but no associated address.");
@@ -278,19 +279,23 @@ impl BackendManager {
         }
     }
 
-    pub fn set_state(self: &Arc<Self>, status: BackendState) {
-        tracing::info!(?self.backend_id, ?status, "Updating backend state");
+    pub fn set_state(self: &Arc<Self>, state: BackendState) {
+        tracing::info!(
+            backend_id = self.backend_id.as_value(),
+            state = state.as_value(),
+            "Updating backend state"
+        );
         let mut handle = self.handle.lock().expect("Guard handle lock is poisoned");
         // Cancel any existing task.
         handle.take();
 
         // Call the callback.
-        if let Err(err) = (self.state_callback)(&status) {
+        if let Err(err) = (self.state_callback)(&state) {
             tracing::error!(?err, "Error calling state callback.");
             return;
         }
 
-        let result = self.step_state(status);
+        let result = self.step_state(state);
         match result {
             StepStatusResult::DoNothing => {}
             StepStatusResult::SetState(status) => {
