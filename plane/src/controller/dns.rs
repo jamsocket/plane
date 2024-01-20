@@ -8,6 +8,7 @@ use axum::{
     response::IntoResponse,
 };
 use std::net::{IpAddr, SocketAddr};
+use valuable::Valuable;
 
 pub async fn dns_socket_inner(
     ws: WebSocket,
@@ -21,7 +22,10 @@ pub async fn dns_socket_inner(
 
     loop {
         let message_from_dns_result = socket.recv().await;
-        tracing::info!(?message_from_dns_result, "Handling message from DNS...");
+        tracing::info!(
+            v = message_from_dns_result.as_value(),
+            "Handling message from DNS..."
+        );
         match message_from_dns_result {
             Some(MessageFromDns::TxtRecordRequest { cluster }) => {
                 let txt_value = match controller.db.acme().txt_record_for_cluster(&cluster).await {

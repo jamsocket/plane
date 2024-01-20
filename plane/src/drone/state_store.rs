@@ -1,4 +1,5 @@
 use crate::{
+    log_types::LoggableTime,
     names::BackendName,
     protocol::{BackendEventId, BackendMetricsMessage, BackendStateMessage},
     typed_socket::TypedSocketSender,
@@ -106,9 +107,9 @@ impl StateStore {
                 event_id,
                 backend_id: backend_id.clone(),
                 status: state.status,
-                address: state.address(),
+                address: state.address,
                 exit_code: state.exit_code,
-                timestamp,
+                timestamp: LoggableTime(timestamp),
             };
 
             listener(event_message);
@@ -170,9 +171,11 @@ impl StateStore {
                 event_id: BackendEventId::from(event_id),
                 backend_id: BackendName::try_from(backend_id)?,
                 status: state.status,
-                address: state.address(),
+                address: state.address,
                 exit_code: state.exit_code,
-                timestamp: DateTime::UNIX_EPOCH + chrono::Duration::milliseconds(timestamp),
+                timestamp: LoggableTime(
+                    DateTime::UNIX_EPOCH + chrono::Duration::milliseconds(timestamp),
+                ),
             };
 
             result.push(event);

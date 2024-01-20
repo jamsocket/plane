@@ -22,6 +22,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use std::net::{IpAddr, SocketAddr};
+use valuable::Valuable;
 
 pub async fn handle_message_from_drone(
     msg: MessageFromDrone,
@@ -37,14 +38,11 @@ pub async fn handle_message_from_drone(
             controller
                 .db
                 .drone()
-                .heartbeat(drone_id, local_time)
+                .heartbeat(drone_id, local_time.0)
                 .await?;
         }
         MessageFromDrone::BackendEvent(backend_event) => {
-            tracing::info!(
-                event = ?backend_event,
-                "Received backend event"
-            );
+            tracing::info!(event = backend_event.as_value(), "Received backend event");
 
             controller
                 .db
@@ -78,12 +76,12 @@ pub async fn handle_message_from_drone(
                 .await?;
 
             let deadlines = KeyDeadlines {
-                renew_at: LoggableTime(renew_key_request.local_time + KEY_LEASE_RENEW_AFTER),
+                renew_at: LoggableTime(renew_key_request.local_time.0 + KEY_LEASE_RENEW_AFTER),
                 soft_terminate_at: LoggableTime(
-                    renew_key_request.local_time + KEY_LEASE_SOFT_TERMINATE_AFTER,
+                    renew_key_request.local_time.0 + KEY_LEASE_SOFT_TERMINATE_AFTER,
                 ),
                 hard_terminate_at: LoggableTime(
-                    renew_key_request.local_time + KEY_LEASE_HARD_TERMINATE_AFTER,
+                    renew_key_request.local_time.0 + KEY_LEASE_HARD_TERMINATE_AFTER,
                 ),
             };
 

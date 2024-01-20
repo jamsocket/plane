@@ -1,5 +1,6 @@
 use super::{cert_pair::CertificatePair, AcmeConfig};
 use crate::{
+    log_types::LoggableTime,
     protocol::{CertManagerRequest, CertManagerResponse},
     types::ClusterName,
 };
@@ -8,10 +9,12 @@ use acme2_eab::{
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
 use anyhow::{anyhow, Context, Result};
+use chrono::Utc;
 use std::{
+    ops::Sub,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 use tokio::sync::{
     broadcast,
@@ -21,6 +24,7 @@ use tokio_rustls::rustls::{
     server::{ClientHello, ResolvesServerCert},
     sign::CertifiedKey,
 };
+use valuable::Valuable;
 
 const DNS_01: &str = "dns-01";
 
@@ -209,21 +213,23 @@ async fn refresh_loop_step(
     let last_current_cert = send_cert.borrow().clone();
 
     if let Some(current_cert) = last_current_cert {
-        let renewal_time = current_cert
-            .validity_end
-            .checked_sub(RENEWAL_WINDOW)
-            .expect("Cert validity date arithmetic failed.");
-        let time_until_renew = renewal_time.duration_since(SystemTime::now())?;
+        let renewal_time = LoggableTime(current_cert.validity_end.0.sub(RENEWAL_WINDOW));
+        let time_until_renew = renewal_time.0.sub(Utc::now());
 
-        if time_until_renew > Duration::ZERO {
+        if time_until_renew > chrono::Duration::zero() {
             tracing::info!(
-                "Certificate for {} is valid until {:?}. Renewal scheduled for {:?} ({:?} from now). Sleeping.",
-                current_cert.common_name,
-                current_cert.validity_end,
-                renewal_time,
-                time_until_renew
+                common_name = current_cert.common_name,
+                validity_end = current_cert.validity_end.as_value(),
+                renewal_time = renewal_time.as_value(),
+                days_until_renew = time_until_renew.num_days(),
+                "Obtained certificate.",
             );
-            tokio::time::sleep(time_until_renew).await;
+            tokio::time::sleep(
+                time_until_renew
+                    .to_std()
+                    .expect("time_until_renew is always positive."),
+            )
+            .await;
             return Ok(());
         }
     }
@@ -355,7 +361,10 @@ async fn get_certificate(
                 return Err(anyhow!("Cert manager error."));
             }
         };
-        tracing::info!(?response, "Received response from cert manager.");
+        tracing::info!(
+            response = response.as_value(),
+            "Received response from cert manager."
+        );
 
         match response {
             CertManagerResponse::SetTxtRecordResponse { accepted: true } => (),

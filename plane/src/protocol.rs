@@ -1,6 +1,6 @@
 use crate::{
     database::backend::BackendActionMessage,
-    log_types::LoggableTime,
+    log_types::{BackendAddr, LoggableTime},
     names::{BackendActionName, BackendName},
     typed_socket::ChannelMessage,
     types::{
@@ -8,9 +8,8 @@ use crate::{
         TerminationKind,
     },
 };
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, time::SystemTime};
+use std::net::SocketAddr;
 
 #[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub struct KeyDeadlines {
@@ -51,19 +50,19 @@ pub enum BackendAction {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub struct BackendStateMessage {
     pub event_id: BackendEventId,
     pub backend_id: BackendName,
     pub status: BackendStatus,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub address: Option<SocketAddr>,
+    pub address: Option<BackendAddr>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
 
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: LoggableTime,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, valuable::Valuable)]
@@ -85,12 +84,12 @@ impl From<BackendEventId> for i64 {
 pub struct RenewKeyRequest {
     pub backend: BackendName,
 
-    pub local_time: SystemTime,
+    pub local_time: LoggableTime,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Heartbeat {
-    pub local_time: DateTime<Utc>,
+    pub local_time: LoggableTime,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -178,7 +177,7 @@ impl ChannelMessage for CertManagerRequest {
     type Reply = CertManagerResponse;
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, valuable::Valuable)]
 pub enum CertManagerResponse {
     /// Acknowledge a lease request and indicate whether it was accepted.
     CertLeaseResponse { accepted: bool },
@@ -231,7 +230,7 @@ impl ChannelMessage for MessageToProxy {
     type Reply = MessageFromProxy;
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, valuable::Valuable)]
 pub enum MessageFromDns {
     TxtRecordRequest { cluster: ClusterName },
 }

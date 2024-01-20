@@ -14,6 +14,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use std::net::{IpAddr, SocketAddr};
+use valuable::Valuable;
 
 pub async fn proxy_socket_inner(
     cluster: ClusterName,
@@ -97,7 +98,10 @@ pub async fn proxy_socket_inner(
                     }
                 };
 
-                tracing::info!(?response, "Sending cert manager response");
+                tracing::info!(
+                    response = response.as_value(),
+                    "Sending cert manager response"
+                );
 
                 if let Err(err) = socket
                     .send(MessageToProxy::CertManagerResponse(response))

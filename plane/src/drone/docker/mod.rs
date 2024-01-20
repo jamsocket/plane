@@ -72,7 +72,7 @@ impl PlaneDocker {
                 Ok(e) => e,
             };
 
-            tracing::info!("Received event: {:?}", e);
+            tracing::info!(event=?e, "Received event");
 
             let Some(actor) = e.actor else {
                 tracing::warn!("Received event without actor.");
@@ -101,7 +101,7 @@ impl PlaneDocker {
                 }
             };
 
-            tracing::info!("Received exit code: {:?}", exit_code);
+            tracing::info!(exit_code, "Received exit code");
 
             Some(TerminateEvent {
                 backend_id,

@@ -19,7 +19,6 @@ pub fn init_tracing() {
             .with(layer)
             .with(filter)
             .init();
-        return;
     } else {
         let layer = tracing_subscriber::fmt::layer().with_span_events(FmtSpan::FULL);
 

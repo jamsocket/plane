@@ -1,5 +1,6 @@
 use super::{core::Controller, error::IntoApiError};
 use crate::{
+    log_types::LoggableTime,
     names::BackendName,
     types::{BackendStatus, TimestampedBackendStatus},
 };
@@ -29,7 +30,7 @@ async fn backend_status(
 
     let result = TimestampedBackendStatus {
         status: backend.last_status,
-        time: backend.last_status_time,
+        time: LoggableTime(backend.last_status_time),
     };
 
     Ok(result)

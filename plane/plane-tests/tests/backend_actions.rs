@@ -4,6 +4,7 @@ use hyper::StatusCode;
 use plane::{
     client::PlaneClientError,
     database::backend::BackendActionMessage,
+    log_types::LoggableTime,
     names::{DroneName, Name},
     protocol::{BackendAction, Heartbeat, MessageFromDrone, MessageToDrone},
     types::{ClusterName, ConnectRequest, ConnectResponse, ExecutorConfig, SpawnConfig},
@@ -59,7 +60,7 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
         tracing::info!("Sending initial heartbeat message (mocking the drone).");
         drone_connection
             .send(MessageFromDrone::Heartbeat(Heartbeat {
-                local_time: Utc::now(),
+                local_time: LoggableTime(Utc::now()),
             }))
             .await
             .unwrap();

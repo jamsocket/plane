@@ -1,8 +1,10 @@
 use crate::{
-    client::PlaneClient, log_types::BackendAddr, names::BackendName, util::random_prefixed_string,
+    client::PlaneClient,
+    log_types::{BackendAddr, LoggableTime},
+    names::BackendName,
+    util::random_prefixed_string,
 };
 use bollard::auth::DockerCredentials;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{collections::HashMap, fmt::Display, net::SocketAddr, str::FromStr};
@@ -28,7 +30,7 @@ impl Display for NodeId {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]
 pub struct ClusterName(String);
 
 impl ClusterName {
@@ -489,6 +491,5 @@ impl TryFrom<String> for NodeKind {
 pub struct TimestampedBackendStatus {
     pub status: BackendStatus,
 
-    #[serde(with = "chrono::serde::ts_milliseconds")]
-    pub time: DateTime<Utc>,
+    pub time: LoggableTime,
 }
