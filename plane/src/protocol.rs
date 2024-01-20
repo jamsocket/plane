@@ -153,7 +153,7 @@ impl ChannelMessage for MessageToDrone {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct RouteInfo {
     pub backend_id: BackendName,
-    pub address: SocketAddr,
+    pub address: BackendAddr,
     pub secret_token: SecretToken,
     pub user: Option<String>,
     pub user_data: Option<serde_json::Value>,

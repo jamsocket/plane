@@ -384,7 +384,7 @@ pub struct ConnectRequest {
     pub auth: Map<String, Value>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]
 pub struct BearerToken(String);
 
 impl From<String> for BearerToken {
@@ -399,7 +399,7 @@ impl Display for BearerToken {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, valuable::Valuable)]
 pub struct SecretToken(String);
 
 impl From<String> for SecretToken {
