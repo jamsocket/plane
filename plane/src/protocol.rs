@@ -9,7 +9,6 @@ use crate::{
     },
 };
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 
 #[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub struct KeyDeadlines {

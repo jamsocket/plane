@@ -282,7 +282,7 @@ impl<'a> BackendDatabase<'a> {
         Ok(Some(RouteInfo {
             backend_id: BackendName::try_from(result.backend_id)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?,
-            address,
+            address: BackendAddr(address),
             secret_token: SecretToken::from(result.secret_token),
             user: result.username,
             user_data: Some(result.auth),
