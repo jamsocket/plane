@@ -9,7 +9,6 @@ use bollard::container::{LogOutput, MemoryStatsStats, Stats};
 use chrono::{DateTime, Utc};
 use plane_core_nats_macros::{self, TypedMessage};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use serde_with::serde_as;
 use serde_with::{DurationMicroSeconds, DurationSeconds};
 use std::{
@@ -316,10 +315,9 @@ pub struct DockerExecutableConfig {
     /// Port to serve on. If this is not set, Plane uses port 8080.
     pub port: Option<u16>,
 
-    /// Volume mounts to add to the container.
-    /// Schema: https://pkg.go.dev/github.com/docker/docker@v20.10.22+incompatible/api/types/mount#Mount
+    /// Volume mounts to add to the container, as a list of <host path>:<container path> strings.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub volume_mounts: Vec<Value>,
+    pub volume_mounts: Vec<String>,
 }
 
 impl DockerExecutableConfig {

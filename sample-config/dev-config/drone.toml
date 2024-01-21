@@ -6,6 +6,9 @@ hosts = ["127.0.0.1"]
 [agent]
 ip = "127.0.0.1"
 
+[agent.docker]
+allow_volume_mounts = true
+
 [proxy]
 bind_ip = "127.0.0.1"
 http_port = "8080"

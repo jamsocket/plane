@@ -19,7 +19,7 @@ use bollard::{
     },
     image::CreateImageOptions,
     models::{HostConfig, ResourcesUlimits},
-    service::{DeviceRequest, HostConfigLogConfig, Mount},
+    service::{DeviceRequest, HostConfigLogConfig},
     system::EventsOptions,
     Docker, API_DEFAULT_VERSION,
 };
@@ -31,7 +31,7 @@ use plane_core::{
     timing::Timer,
     types::{BackendId, ClusterName, DroneId},
 };
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 use std::{net::SocketAddr, pin::Pin};
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
@@ -190,22 +190,6 @@ impl DockerInterface {
             None
         };
 
-        let mounts = if self.allow_volume_mounts {
-            let c: std::result::Result<Vec<Mount>, serde_json::Error> = executable_config
-                .volume_mounts
-                .iter()
-                .map(|value| serde_json::from_value(value.clone()))
-                .collect();
-
-            Some(c?)
-        } else {
-            if !executable_config.volume_mounts.is_empty() {
-                return Err(anyhow::anyhow!("Spawn attempt named volume mounts, but these are not enabled on this drone. Set `allow_volume_mounts` to true in the `docker` section of the Plane config to enable."));
-            }
-
-            None
-        };
-
         // Create the container.
         let container_id = {
             let timer = Timer::new();
@@ -226,6 +210,7 @@ impl DockerInterface {
                     .collect(),
                 ),
                 host_config: Some(HostConfig {
+                    binds: Some(executable_config.volume_mounts.clone()),
                     network_mode: self.network.clone(),
                     runtime: self.runtime.clone(),
                     memory: executable_config.resource_limits.memory_limit_bytes,
@@ -264,7 +249,6 @@ impl DockerInterface {
                                 .collect()
                         }),
                     device_requests,
-                    mounts,
 
                     log_config: self.syslog.as_ref().map(|d| HostConfigLogConfig {
                         typ: Some("syslog".to_string()),

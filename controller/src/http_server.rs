@@ -24,7 +24,6 @@ use plane_core::{
     Never,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::cors::{Any, CorsLayer};
 
@@ -56,7 +55,7 @@ struct HttpSpawnRequest {
     #[serde(default = "HashMap::default")]
     env: HashMap<String, String>,
     #[serde(default = "Vec::default")]
-    volume_mounts: Vec<Value>,
+    volume_mounts: Vec<String>,
 }
 
 impl HttpSpawnRequest {

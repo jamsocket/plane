@@ -48,6 +48,10 @@ enum Command {
         /// instead of spawning a new one.
         #[clap(long)]
         lock: Option<String>,
+
+        /// Optional volume to mount, in the form `host_path:container_path`.
+        #[clap(long)]
+        mount: Option<String>,
     },
     Status {
         backend: Option<String>,
@@ -353,6 +357,7 @@ async fn main() -> Result<()> {
             port,
             env,
             lock,
+            mount,
         } => {
             let env: Result<HashMap<String, String>> = env
                 .iter()
@@ -365,6 +370,12 @@ async fn main() -> Result<()> {
                 })
                 .collect();
             let env = env?;
+
+            let volume_mounts = if let Some(mount) = mount {
+                vec![mount]
+            } else {
+                Vec::new()
+            };
 
             let result = nats
                 .request(&ScheduleRequest {
@@ -379,7 +390,7 @@ async fn main() -> Result<()> {
                         resource_limits: ResourceLimits::default(),
                         pull_policy: Default::default(),
                         port,
-                        volume_mounts: Vec::new(),
+                        volume_mounts,
                     },
                     require_bearer_token: false,
                     lock: lock.map(|lock| lock.try_into().unwrap()),
