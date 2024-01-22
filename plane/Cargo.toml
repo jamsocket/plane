@@ -1,6 +1,6 @@
 [package]
 name = "plane"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 default-run = "plane"
 description = "Session backend orchestrator for ambitious browser-based apps."
@@ -44,8 +44,9 @@ tokio-stream = "0.1.14"
 tokio-tungstenite = { version = "0.20.1", features = ["rustls-tls-webpki-roots"] }
 tower-http = { version = "0.4.4", features = ["trace", "cors"] }
 tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "valuable"] }
 trust-dns-server = "0.23.2"
 tungstenite = "0.20.1"
 url = "2.4.1"
 x509-parser = "0.15.1"
+valuable = { version = "0.1.0", features = ["derive"] }

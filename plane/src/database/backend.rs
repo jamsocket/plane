@@ -1,5 +1,6 @@
 use super::{subscribe::emit_with_key, util::MapSqlxError, PlaneDatabase};
 use crate::{
+    log_types::{BackendAddr, LoggableTime},
     names::{BackendActionName, BackendName},
     protocol::{BackendAction, RouteInfo},
     types::{BackendStatus, BearerToken, NodeId, SecretToken, TimestampedBackendStatus},
@@ -68,7 +69,7 @@ impl<'a> BackendDatabase<'a> {
                 match status {
                     Ok(status) => {
                         yield TimestampedBackendStatus {
-                            time: row.created_at,
+                            time: LoggableTime(row.created_at),
                             status,
                         };
                         last_status = Some(status);
@@ -95,7 +96,7 @@ impl<'a> BackendDatabase<'a> {
 
                 let item = TimestampedBackendStatus {
                     status,
-                    time,
+                    time: LoggableTime(time),
                 };
 
                 yield item;
@@ -148,7 +149,7 @@ impl<'a> BackendDatabase<'a> {
         &self,
         backend: &BackendName,
         status: BackendStatus,
-        address: Option<SocketAddr>,
+        address: Option<BackendAddr>,
         exit_code: Option<i32>,
     ) -> sqlx::Result<()> {
         let mut txn = self.db.pool.begin().await?;
@@ -167,7 +168,7 @@ impl<'a> BackendDatabase<'a> {
             "#,
             backend.to_string(),
             status.to_string(),
-            address.map(|a| a.to_string()),
+            address.map(|a| a.0.to_string()),
             exit_code,
         )
         .execute(&mut *txn)
@@ -281,7 +282,7 @@ impl<'a> BackendDatabase<'a> {
         Ok(Some(RouteInfo {
             backend_id: BackendName::try_from(result.backend_id)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?,
-            address,
+            address: BackendAddr(address),
             secret_token: SecretToken::from(result.secret_token),
             user: result.username,
             user_data: Some(result.auth),
@@ -351,7 +352,7 @@ impl<'a> BackendDatabase<'a> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct TerminationCandidate {
     pub backend_id: BackendName,
     pub expiration_time: Option<DateTime<Utc>>,

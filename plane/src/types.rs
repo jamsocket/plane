@@ -1,6 +1,10 @@
-use crate::{client::PlaneClient, names::BackendName, util::random_prefixed_string};
+use crate::{
+    client::PlaneClient,
+    log_types::{BackendAddr, LoggableTime},
+    names::BackendName,
+    util::random_prefixed_string,
+};
 use bollard::auth::DockerCredentials;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{collections::HashMap, fmt::Display, net::SocketAddr, str::FromStr};
@@ -26,7 +30,7 @@ impl Display for NodeId {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]
 pub struct ClusterName(String);
 
 impl ClusterName {
@@ -59,7 +63,7 @@ impl FromStr for ClusterName {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd, valuable::Valuable)]
 pub enum BackendStatus {
     /// The backend has been scheduled to a drone, but has not yet been acknowledged.
     /// This status is only assigned by the controller; the drone will never assign it by definition.
@@ -86,18 +90,18 @@ pub enum BackendStatus {
     Terminated,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
 pub enum TerminationKind {
     Soft,
     Hard,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
 pub struct BackendState {
     pub status: BackendStatus,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub address: Option<SocketAddr>,
+    pub address: Option<BackendAddr>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub termination: Option<TerminationKind>,
@@ -107,6 +111,10 @@ pub struct BackendState {
 }
 
 impl BackendState {
+    pub fn address(&self) -> Option<SocketAddr> {
+        self.address.as_ref().map(|BackendAddr(addr)| *addr)
+    }
+
     pub fn to_loading(&self) -> BackendState {
         BackendState {
             status: BackendStatus::Loading,
@@ -124,7 +132,7 @@ impl BackendState {
     pub fn to_waiting(&self, address: SocketAddr) -> BackendState {
         BackendState {
             status: BackendStatus::Waiting,
-            address: Some(address),
+            address: Some(BackendAddr(address)),
             ..self.clone()
         }
     }
@@ -183,7 +191,7 @@ impl Display for BackendStatus {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, Default, valuable::Valuable)]
 pub enum PullPolicy {
     #[default]
     IfNotPresent,
@@ -198,6 +206,16 @@ pub struct DockerCpuPeriod(
     #[serde_as(as = "serde_with::DurationMicroSeconds<u64>")] std::time::Duration,
 );
 
+impl valuable::Valuable for DockerCpuPeriod {
+    fn as_value(&self) -> valuable::Value {
+        valuable::Value::U128(self.0.as_micros())
+    }
+
+    fn visit(&self, visit: &mut dyn valuable::Visit) {
+        visit.visit_value(self.as_value())
+    }
+}
+
 impl Default for DockerCpuPeriod {
     fn default() -> Self {
         Self(std::time::Duration::from_millis(100))
@@ -211,7 +229,24 @@ impl From<&DockerCpuPeriod> for std::time::Duration {
 }
 
 #[serde_with::serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct DockerCpuTimeLimit(
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")] pub std::time::Duration,
+);
+
+impl valuable::Valuable for DockerCpuTimeLimit {
+    fn as_value(&self) -> valuable::Value {
+        valuable::Value::U64(self.0.as_secs())
+    }
+
+    fn visit(&self, visit: &mut dyn valuable::Visit) {
+        visit.visit_value(self.as_value())
+    }
+}
+
+#[serde_with::serde_as]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default, valuable::Valuable)]
 pub struct ResourceLimits {
     /// Period of cpu time (de/serializes as microseconds)
     pub cpu_period: Option<DockerCpuPeriod>,
@@ -220,8 +255,7 @@ pub struct ResourceLimits {
     pub cpu_period_percent: Option<u8>,
 
     /// Total cpu time allocated to container
-    #[serde_as(as = "Option<serde_with::DurationSeconds<u64>>")]
-    pub cpu_time_limit: Option<std::time::Duration>,
+    pub cpu_time_limit: Option<DockerCpuTimeLimit>,
 
     /// Maximum amount of memory container can use (in bytes)
     pub memory_limit_bytes: Option<i64>,
@@ -242,7 +276,7 @@ impl ResourceLimits {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, valuable::Valuable)]
 #[serde(untagged)]
 pub enum DockerRegistryAuth {
     UsernamePassword { username: String, password: String },
@@ -260,7 +294,7 @@ impl From<DockerRegistryAuth> for DockerCredentials {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, valuable::Valuable)]
 pub struct ExecutorConfig {
     pub image: String,
     pub pull_policy: Option<PullPolicy>,
@@ -300,7 +334,9 @@ pub struct SpawnConfig {
     pub max_idle_seconds: Option<i32>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash, valuable::Valuable,
+)]
 pub struct KeyConfig {
     /// If provided, and a running backend was created with the same key,
     /// cluster, namespace, and tag, we will connect to that backend instead
@@ -348,7 +384,7 @@ pub struct ConnectRequest {
     pub auth: Map<String, Value>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]
 pub struct BearerToken(String);
 
 impl From<String> for BearerToken {
@@ -363,7 +399,7 @@ impl Display for BearerToken {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, valuable::Valuable)]
 pub struct SecretToken(String);
 
 impl From<String> for SecretToken {
@@ -455,6 +491,5 @@ impl TryFrom<String> for NodeKind {
 pub struct TimestampedBackendStatus {
     pub status: BackendStatus,
 
-    #[serde(with = "chrono::serde::ts_milliseconds")]
-    pub time: DateTime<Utc>,
+    pub time: LoggableTime,
 }

@@ -174,7 +174,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                     println!(
                         "Status: {} at {}",
                         status.status.to_string().magenta(),
-                        status.time.to_string().bright_cyan()
+                        status.time.0.to_string().bright_cyan()
                     );
 
                     if status.status >= BackendStatus::Ready {
@@ -206,7 +206,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                     println!(
                         "Status: {} at {}",
                         status.status.to_string().magenta(),
-                        status.time.to_string().bright_cyan()
+                        status.time.0.to_string().bright_cyan()
                     );
 
                     if status.status >= BackendStatus::Terminated {

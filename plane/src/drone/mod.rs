@@ -23,6 +23,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::task::JoinHandle;
+use valuable::Valuable;
 
 mod backend_manager;
 pub mod docker;
@@ -87,7 +88,11 @@ pub async fn drone_loop(
                     action,
                     ..
                 }) => {
-                    tracing::info!(?backend_id, ?action, "Received action.");
+                    tracing::info!(
+                        backend_id = backend_id.as_value(),
+                        action = action.as_value(),
+                        "Received action."
+                    );
 
                     if let BackendAction::Spawn { key, .. } = &action {
                         // Register the key with the key manager, ensuring that it will be refreshed.
@@ -108,14 +113,17 @@ pub async fn drone_loop(
                     }
                 }
                 MessageToDrone::AckEvent { event_id } => {
-                    tracing::info!(?event_id, "Received status ack.");
+                    tracing::info!(event_id = event_id.as_value(), "Received status ack.");
                     if let Err(err) = executor.ack_event(event_id) {
                         tracing::error!(?err, "Error acking event.");
                     }
                 }
                 MessageToDrone::RenewKeyResponse(renew_key_response) => {
                     let RenewKeyResponse { backend, deadlines } = renew_key_response;
-                    tracing::info!(?deadlines, "Received key renewal response.");
+                    tracing::info!(
+                        deadlines = deadlines.as_value(),
+                        "Received key renewal response."
+                    );
 
                     if let Some(deadlines) = deadlines {
                         key_manager
