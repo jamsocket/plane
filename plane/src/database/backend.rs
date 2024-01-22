@@ -355,7 +355,6 @@ impl<'a> BackendDatabase<'a> {
 #[derive(Debug, Clone)]
 pub struct TerminationCandidate {
     pub backend_id: BackendName,
-
     pub expiration_time: Option<DateTime<Utc>>,
     pub last_keepalive: DateTime<Utc>,
     pub allowed_idle_seconds: Option<i32>,
