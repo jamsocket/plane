@@ -2,10 +2,10 @@ name: Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ plane-0.3.x ]
     paths-ignore: [ "/docs" ]
   pull_request:
-    branches: [ main ]
+    branches: [ plane-0.3.x ]
     paths-ignore: [ "/docs" ]
 
 env:
