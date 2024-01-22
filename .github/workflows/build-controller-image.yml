@@ -2,12 +2,12 @@ name: Build Controller Image
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "plane-0.3.x" ]
     tags: [ 'v*.*.*' ]
     paths-ignore: [ "/docs" ]
 
   pull_request:
-    branches: [ "main" ]
+    branches: [ "plane-0.3.x" ]
     paths:
     - '.github/workflows/build-controller-image.yml'
 
