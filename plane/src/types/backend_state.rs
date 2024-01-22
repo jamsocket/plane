@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{fmt::Display, net::SocketAddr};
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd)]
+use crate::log_types::BackendAddr;
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd, valuable::Valuable)]
 pub enum BackendStatus {
     /// The backend has been scheduled to a drone, but has not yet been acknowledged.
     /// This status is only assigned by the controller; the drone will never assign it by definition.
@@ -29,18 +31,18 @@ pub enum BackendStatus {
     Terminated,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
 pub enum TerminationKind {
     Soft,
     Hard,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
 pub struct BackendState {
     pub status: BackendStatus,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub address: Option<SocketAddr>,
+    pub address: Option<BackendAddr>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub termination: Option<TerminationKind>,
@@ -55,7 +57,7 @@ pub struct BackendState {
     pub exit_code: Option<i32>,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
 pub enum TerminationReason {
     Swept,
     External,
@@ -63,6 +65,10 @@ pub enum TerminationReason {
 }
 
 impl BackendState {
+    pub fn address(&self) -> Option<SocketAddr> {
+        self.address.as_ref().map(|BackendAddr(addr)| *addr)
+    }
+
     pub fn to_loading(&self) -> BackendState {
         BackendState {
             status: BackendStatus::Loading,
@@ -80,7 +86,7 @@ impl BackendState {
     pub fn to_waiting(&self, address: SocketAddr) -> BackendState {
         BackendState {
             status: BackendStatus::Waiting,
-            address: Some(address),
+            address: Some(BackendAddr(address)),
             ..self.clone()
         }
     }

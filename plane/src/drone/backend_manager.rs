@@ -21,6 +21,7 @@ use std::{
     net::IpAddr,
     sync::{Arc, Mutex, RwLock},
 };
+use valuable::Valuable;
 
 /// The backend manager uses a state machine internally to manage the state of the backend.
 /// Each time we enter a state, we can do one of three things:
@@ -246,7 +247,7 @@ impl BackendManager {
                 })
             }
             BackendStatus::Waiting => StepStatusResult::future_status(async move {
-                let address = match state.address {
+                let address = match state.address() {
                     Some(address) => address,
                     None => {
                         tracing::error!("State is waiting, but no associated address.");
@@ -291,29 +292,36 @@ impl BackendManager {
         }
     }
 
-    pub fn set_state(self: &Arc<Self>, status: BackendState) {
-        tracing::info!(?self.backend_id, ?status, "Updating backend state");
-        let mut state = self.state.lock().expect("State lock is poisoned");
+    pub fn set_state(self: &Arc<Self>, state: BackendState) {
+        tracing::info!(?self.backend_id, ?state, "Updating backend state");
+        let mut lock = self.state.lock().expect("State lock is poisoned");
+
+        tracing::info!(
+            backend_id = self.backend_id.as_value(),
+            state = state.as_value(),
+            "Updating backend state"
+        );
+
         // Cancel any existing task.
-        state.handle.take();
+        lock.handle.take();
 
         // Call the callback.
-        if let Err(err) = (self.state_callback)(&status) {
+        if let Err(err) = (self.state_callback)(&state) {
             tracing::error!(?err, "Error calling state callback.");
             return;
         }
 
-        let result = self.step_state(status);
+        let result = self.step_state(state);
         match result {
             StepStatusResult::DoNothing => {}
             StepStatusResult::SetState(status) => {
                 // We need to drop the lock before we call ourselves recursively!
-                drop(state);
+                drop(lock);
                 self.set_state(status);
             }
             StepStatusResult::FutureSetState(future) => {
                 let self_clone = self.clone();
-                state.handle = Some(GuardHandle::new(async move {
+                lock.handle = Some(GuardHandle::new(async move {
                     let status = future.await;
                     self_clone.set_state(status);
                 }));

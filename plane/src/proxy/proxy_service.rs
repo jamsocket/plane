@@ -129,7 +129,7 @@ impl RequestHandler {
         };
 
         let backend_id = route_info.backend_id.clone();
-        request_rewriter.set_authority(route_info.address);
+        request_rewriter.set_authority(route_info.address.0);
 
         let mut response = if request_rewriter.should_upgrade() {
             let (req, req_clone) = request_rewriter.into_request_pair(&route_info);

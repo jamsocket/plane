@@ -12,6 +12,7 @@ pub mod dns;
 pub mod drone;
 pub mod heartbeat_consts;
 pub mod init_tracing;
+pub mod log_types;
 pub mod names;
 pub mod protocol;
 pub mod proxy;

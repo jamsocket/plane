@@ -9,6 +9,7 @@ use std::{
     sync::{Mutex, RwLock},
 };
 use tokio::sync::broadcast::Sender;
+use valuable::Valuable;
 
 const CACHE_SIZE: usize = 1_000;
 
@@ -94,7 +95,11 @@ impl RouteMap {
     }
 
     fn insert(&self, token: BearerToken, route_info: Option<RouteInfo>) {
-        tracing::info!(?token, ?route_info, "Inserting route info");
+        tracing::info!(
+            token = token.as_value(),
+            ?route_info,
+            "Inserting route info"
+        );
         self.routes
             .lock()
             .expect("Routes lock was poisoned.")

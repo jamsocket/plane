@@ -113,15 +113,15 @@ impl Handshake {
     pub fn check_compat(&self, other: &Handshake) {
         if self.version.version != other.version.version {
             tracing::warn!(
-                "Client and server have different Plane versions: {} (local) != {} (remote).",
-                self.version.version,
-                other.version.version
+                local_version = self.version.version,
+                remote_version = other.version.version,
+                "Client and server have different Plane versions."
             );
         } else if self.version.git_hash != other.version.git_hash {
             tracing::warn!(
-                "Client and server have different Plane git hashes: {} (local) != {} (remote).",
-                self.version.git_hash,
-                other.version.git_hash
+                local_version = self.version.git_hash,
+                remote_version = other.version.git_hash,
+                "Client and server have different Plane git hashes.",
             );
         }
     }

@@ -1,5 +1,6 @@
 use crate::{
-    heartbeat_consts::HEARTBEAT_INTERVAL, protocol::Heartbeat, typed_socket::TypedSocketSender,
+    heartbeat_consts::HEARTBEAT_INTERVAL, log_types::LoggableTime, protocol::Heartbeat,
+    typed_socket::TypedSocketSender,
 };
 use chrono::Utc;
 use tokio::task::JoinHandle;
@@ -13,7 +14,7 @@ impl HeartbeatLoop {
     pub fn start(sender: TypedSocketSender<Heartbeat>) -> Self {
         let handle = tokio::spawn(async move {
             loop {
-                let local_time = Utc::now();
+                let local_time = LoggableTime(Utc::now());
                 if let Err(err) = sender.send(Heartbeat { local_time }) {
                     tracing::error!(?err, "failed to send heartbeat");
                 }

@@ -1,8 +1,9 @@
+use crate::log_types::LoggableTime;
 use anyhow::{anyhow, Result};
 use pem::Pem;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs1KeyDer};
 use serde::{Deserialize, Serialize};
-use std::{fs::Permissions, io, os::unix::fs::PermissionsExt, path::Path, time::SystemTime};
+use std::{fs::Permissions, io, os::unix::fs::PermissionsExt, path::Path};
 use tokio_rustls::rustls::{
     sign::{any_supported_type, CertifiedKey},
     Certificate, PrivateKey,
@@ -42,8 +43,8 @@ pub struct CertificatePair {
     pub certified_key: CertifiedKey,
     pub private_key_der: Vec<u8>,
     pub common_name: String,
-    pub validity_start: SystemTime,
-    pub validity_end: SystemTime,
+    pub validity_start: LoggableTime,
+    pub validity_end: LoggableTime,
 }
 
 impl CertificatePair {

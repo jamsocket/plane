@@ -1,17 +1,16 @@
 use super::executor::Executor;
 use crate::{
+    log_types::LoggableTime,
     names::BackendName,
     protocol::{AcquiredKey, BackendAction, KeyDeadlines, RenewKeyRequest},
     typed_socket::TypedSocketSender,
     types::{backend_state::TerminationReason, TerminationKind},
     util::GuardHandle,
 };
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
+use chrono::Utc;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::sleep;
+use valuable::Valuable;
 
 pub struct KeyManager {
     executor: Arc<Executor>,
@@ -31,9 +30,9 @@ async fn renew_key_loop(
     executor: Arc<Executor>,
 ) {
     loop {
-        let now = SystemTime::now();
+        let now = Utc::now();
         let deadlines = &key.deadlines;
-        if now >= deadlines.hard_terminate_at {
+        if now >= deadlines.hard_terminate_at.0 {
             tracing::warn!("Key {:?} has expired, hard-terminating.", key.key);
             if let Err(err) = executor
                 .apply_action(
@@ -52,7 +51,7 @@ async fn renew_key_loop(
             break;
         }
 
-        if now >= deadlines.soft_terminate_at {
+        if now >= deadlines.soft_terminate_at.0 {
             tracing::warn!("Key {:?} has expired, soft-terminating.", key.key);
             if let Err(err) = executor
                 .apply_action(
@@ -69,20 +68,25 @@ async fn renew_key_loop(
                 continue;
             }
 
-            if let Ok(time_to_sleep) = deadlines.hard_terminate_at.duration_since(now) {
+            if let Ok(time_to_sleep) = deadlines
+                .hard_terminate_at
+                .0
+                .signed_duration_since(now)
+                .to_std()
+            {
                 sleep(time_to_sleep).await;
             }
 
             continue;
         }
 
-        if now >= deadlines.renew_at {
-            tracing::info!("Renewing key {:?}.", key.key);
+        if now >= deadlines.renew_at.0 {
+            tracing::info!(key = key.key.as_value(), "Renewing key.");
 
             if let Some(ref sender) = sender {
                 let request = RenewKeyRequest {
                     backend: backend.clone(),
-                    local_time: SystemTime::now(),
+                    local_time: LoggableTime(Utc::now()),
                 };
 
                 if let Err(err) = sender.send(request) {
@@ -90,13 +94,18 @@ async fn renew_key_loop(
                 }
             }
 
-            if let Ok(time_to_sleep) = deadlines.soft_terminate_at.duration_since(now) {
+            if let Ok(time_to_sleep) = deadlines
+                .soft_terminate_at
+                .0
+                .signed_duration_since(now)
+                .to_std()
+            {
                 sleep(time_to_sleep).await;
             }
             continue;
         }
 
-        if let Ok(time_to_sleep) = deadlines.renew_at.duration_since(now) {
+        if let Ok(time_to_sleep) = deadlines.renew_at.0.signed_duration_since(now).to_std() {
             sleep(time_to_sleep).await;
         }
     }

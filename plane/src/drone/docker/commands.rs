@@ -149,7 +149,7 @@ fn get_container_config_from_executor_config(
                 .resource_limits
                 .cpu_time_limit
                 .map(|cpu_time_limit| {
-                    let Ok(secs) = cpu_time_limit.as_secs().try_into() else {
+                    let Ok(secs) = cpu_time_limit.0.as_secs().try_into() else {
                         tracing::warn!(
                             "unable to convert cpu_time_limit: {:?} to i64 for use in ulimit",
                             cpu_time_limit

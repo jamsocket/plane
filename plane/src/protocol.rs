@@ -1,5 +1,6 @@
 use crate::{
     database::backend::BackendActionMessage,
+    log_types::{BackendAddr, LoggableTime},
     names::{BackendActionName, BackendName},
     typed_socket::ChannelMessage,
     types::{
@@ -7,23 +8,21 @@ use crate::{
         KeyConfig, SecretToken, TerminationKind,
     },
 };
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, time::SystemTime};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub struct KeyDeadlines {
     /// When the key should be renewed.
-    pub renew_at: SystemTime,
+    pub renew_at: LoggableTime,
 
     /// When the backend should be soft-terminated if the key could not be renewed.
-    pub soft_terminate_at: SystemTime,
+    pub soft_terminate_at: LoggableTime,
 
     /// When the backend should be hard-terminated if the key could not be renewed.
-    pub hard_terminate_at: SystemTime,
+    pub hard_terminate_at: LoggableTime,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub struct AcquiredKey {
     /// Details of the key itself.
     pub key: KeyConfig,
@@ -39,7 +38,7 @@ pub struct AcquiredKey {
     pub token: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub enum BackendAction {
     Spawn {
         executable: Box<ExecutorConfig>,
@@ -51,22 +50,22 @@ pub enum BackendAction {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub struct BackendStateMessage {
     pub event_id: BackendEventId,
     pub backend_id: BackendName,
     pub status: BackendStatus,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub address: Option<SocketAddr>,
+    pub address: Option<BackendAddr>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
 
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: LoggableTime,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, valuable::Valuable)]
 pub struct BackendEventId(i64);
 
 impl From<i64> for BackendEventId {
@@ -85,12 +84,12 @@ impl From<BackendEventId> for i64 {
 pub struct RenewKeyRequest {
     pub backend: BackendName,
 
-    pub local_time: SystemTime,
+    pub local_time: LoggableTime,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Heartbeat {
-    pub local_time: DateTime<Utc>,
+    pub local_time: LoggableTime,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -154,7 +153,7 @@ impl ChannelMessage for MessageToDrone {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct RouteInfo {
     pub backend_id: BackendName,
-    pub address: SocketAddr,
+    pub address: BackendAddr,
     pub secret_token: SecretToken,
     pub user: Option<String>,
     pub user_data: Option<serde_json::Value>,
@@ -178,7 +177,7 @@ impl ChannelMessage for CertManagerRequest {
     type Reply = CertManagerResponse;
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, valuable::Valuable)]
 pub enum CertManagerResponse {
     /// Acknowledge a lease request and indicate whether it was accepted.
     CertLeaseResponse { accepted: bool },
@@ -231,7 +230,7 @@ impl ChannelMessage for MessageToProxy {
     type Reply = MessageFromProxy;
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, valuable::Valuable)]
 pub enum MessageFromDns {
     TxtRecordRequest { cluster: ClusterName },
 }
