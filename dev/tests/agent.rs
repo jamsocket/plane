@@ -26,7 +26,6 @@ use plane_dev::{
 };
 use plane_drone::{agent::AgentOptions, database::DroneDatabase, ip::IpSource};
 use plane_drone::{agent::AgentSupervisors, config::DockerConfig};
-use serde_json::json;
 use std::net::IpAddr;
 use std::time::Duration;
 use tokio::time::Instant;
@@ -766,10 +765,7 @@ async fn attempt_to_spawn_with_disallowed_volume_mount() {
 
     let mut request = base_spawn_request().await;
     request.drone_id = drone_id.clone();
-    request.executable.volume_mounts = vec![json!({
-        "source": "/foo",
-        "target": "/bar",
-    })];
+    request.executable.volume_mounts = vec!["foo:bar".to_string()];
 
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
@@ -806,10 +802,7 @@ async fn attempt_to_spawn_with_allowed_volume_mount() {
 
     let mut request = base_spawn_request().await;
     request.drone_id = drone_id.clone();
-    request.executable.volume_mounts = vec![json!({
-        "Type": "tmpfs",
-        "Target": "/bar",
-    })];
+    request.executable.volume_mounts = vec!["/tmp/foo:/bar".to_string()];
 
     let mut state_subscription = BackendStateSubscription::new(&connection, &request.backend_id)
         .await
