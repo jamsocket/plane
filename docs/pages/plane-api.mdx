@@ -57,7 +57,7 @@ The connect request is a `POST` request that takes a JSON body. An example paylo
   (forcing a new backend to start).
 - `spawn_config`: Optional configuration that is used to start a new backend if necessary.
 - `user`: Optional string to associate with the user on whose behalf this request is being made.
-- `auth`: Optional key-value map of unforgable data (such as claims) that you would like to pass to the
+- `auth`: Optional key-value map of unforgeable data (such as claims) that you would like to pass to the
   backend about this user.
 
 At least one of `key` or `spawn_config` must be provided. If only `spawn_config` is provided, the connect call
