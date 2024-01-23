@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::Utc;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane_core::{
@@ -7,6 +8,7 @@ use plane_core::{
             BackendState, BackendStateMessage, DockerExecutableConfig, ResourceLimits,
             TerminationRequest,
         },
+        drone_state::UpdateBackendStateMessage,
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
         state::{
             BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
@@ -523,16 +525,32 @@ async fn main() -> Result<()> {
 
                 let mut confirmation = String::new();
                 stdin.read_line(&mut confirmation)?;
+                let confirmation = confirmation.trim();
                 if confirmation != "y" {
                     println!("skipping backend: {backend}, not marking as lost");
                     continue;
                 }
 
-                let lost_state_message =
-                    BackendStateMessage::new(BackendState::Lost, cluster.clone(), backend.clone());
+                let drone = backend_state.drone.clone().unwrap();
+                let message = UpdateBackendStateMessage {
+                    state: BackendState::Lost,
+                    cluster: cluster.clone(),
+                    backend: backend.clone(),
+                    time: Utc::now(),
+                    drone: drone.clone(),
+                };
 
-                nats.publish_jetstream(&lost_state_message).await?;
                 println!("marking backend: {backend} as lost");
+                if let Err(error) = nats.request(&message).await {
+                    tracing::error!(
+                        ?error,
+                        ?state,
+                        ?cluster,
+                        ?backend,
+                        ?drone,
+                        "Failed to update backend state."
+                    );
+                }
             }
         }
     }
