@@ -23,6 +23,7 @@ RUN touch /work/plane/plane-dynamic/src/lib.rs
 
 RUN cargo build -p plane --release --locked
 
+COPY .cargo .cargo
 COPY plane plane
 RUN cargo build -p plane --release --locked
 
