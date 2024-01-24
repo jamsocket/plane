@@ -13,8 +13,8 @@ use crate::{
     names::{BackendName, Name},
     protocol::{AcquiredKey, BackendAction, KeyDeadlines},
     types::{
-        BackendStatus, BearerToken, ClusterName, ConnectRequest, ConnectResponse, KeyConfig,
-        SecretToken, SpawnConfig,
+        BackendState, BackendStatus, BearerToken, ClusterName, ConnectRequest, ConnectResponse,
+        KeyConfig, SecretToken, SpawnConfig,
     },
     util::random_token,
 };
@@ -95,9 +95,10 @@ async fn create_backend_with_key(
                 drone_id,
                 expiration_time,
                 allowed_idle_seconds,
-                last_keepalive
+                last_keepalive,
+                state
             )
-            values ($1, $2, $3, now(), $4, now() + $5, $6, now())
+            values ($1, $2, $3, now(), $4, now() + $5, $6, now(), $11)
             returning id
         )
         insert into backend_key (id, key_name, namespace, tag, expires_at, fencing_token)
@@ -119,6 +120,7 @@ async fn create_backend_with_key(
         key.namespace,
         key.tag,
         PgInterval::try_from(KEY_LEASE_EXPIRATION).expect("valid constant interval"),
+        serde_json::to_value(&BackendState::Scheduled).expect("valid json"),
     )
     .fetch_optional(&mut *txn)
     .await?;
