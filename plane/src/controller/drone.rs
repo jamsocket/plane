@@ -47,12 +47,7 @@ pub async fn handle_message_from_drone(
             controller
                 .db
                 .backend()
-                .update_status(
-                    &backend_event.backend_id,
-                    backend_event.status,
-                    backend_event.address,
-                    backend_event.exit_code,
-                )
+                .update_state(&backend_event.backend_id, backend_event.state)
                 .await?;
 
             sender

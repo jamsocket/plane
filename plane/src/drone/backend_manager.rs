@@ -7,8 +7,7 @@ use crate::{
     protocol::BackendMetricsMessage,
     typed_socket::TypedSocketSender,
     types::{
-        backend_state::TerminationReason, BackendState, BackendStatus, ExecutorConfig, PullPolicy,
-        TerminationKind,
+        backend_state::TerminationReason, BackendState, ExecutorConfig, PullPolicy, TerminationKind,
     },
     util::{ExponentialBackoff, GuardHandle},
 };
@@ -193,9 +192,9 @@ impl BackendManager {
     }
 
     fn step_state(&self, state: BackendState) -> StepStatusResult {
-        match state.status {
-            BackendStatus::Scheduled => StepStatusResult::SetState(state.to_loading()),
-            BackendStatus::Loading => {
+        match state {
+            BackendState::Scheduled => StepStatusResult::SetState(state.to_loading()),
+            BackendState::Loading => {
                 let force_pull = match self.executor_config.pull_policy.unwrap_or_default() {
                     PullPolicy::IfNotPresent => false,
                     PullPolicy::Always => true,
@@ -221,7 +220,7 @@ impl BackendManager {
                     }
                 })
             }
-            BackendStatus::Starting => {
+            BackendState::Starting => {
                 let backend_id = self.backend_id.clone();
                 let container_id = self.container_id.clone();
                 let docker = self.docker.clone();
@@ -246,21 +245,13 @@ impl BackendManager {
                     state.to_waiting(address)
                 })
             }
-            BackendStatus::Waiting => StepStatusResult::future_status(async move {
-                let address = match state.address() {
-                    Some(address) => address,
-                    None => {
-                        tracing::error!("State is waiting, but no associated address.");
-                        return state.to_terminated(None);
-                    }
-                };
-
-                wait_for_backend(address).await;
+            BackendState::Waiting { address } => StepStatusResult::future_status(async move {
+                wait_for_backend(address.0).await;
 
                 state.to_ready()
             }),
-            BackendStatus::Ready => StepStatusResult::DoNothing,
-            BackendStatus::Terminating => {
+            BackendState::Ready { .. } => StepStatusResult::DoNothing,
+            BackendState::Terminating { termination, .. } => {
                 let docker = self.docker.clone();
                 let container_id = self.container_id.clone();
 
@@ -269,10 +260,7 @@ impl BackendManager {
 
                     loop {
                         match docker
-                            .terminate_backend(
-                                &container_id,
-                                state.termination == Some(TerminationKind::Hard),
-                            )
+                            .terminate_backend(&container_id, termination == TerminationKind::Hard)
                             .await
                         {
                             Ok(()) => break,
@@ -288,7 +276,7 @@ impl BackendManager {
                     pending().await
                 })
             }
-            BackendStatus::Terminated => StepStatusResult::DoNothing,
+            BackendState::Terminated { .. } => StepStatusResult::DoNothing,
         }
     }
 

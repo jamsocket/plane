@@ -9,7 +9,7 @@ use crate::{
     protocol::{BackendAction, MessageFromDrone, MessageToDrone, RenewKeyResponse},
     signals::wait_for_shutdown_signal,
     typed_socket::client::TypedSocketConnector,
-    types::{BackendStatus, ClusterName},
+    types::{BackendState, ClusterName},
     util::get_internal_host_ip,
 };
 use anyhow::Result;
@@ -59,7 +59,7 @@ pub async fn drone_loop(
             let sender = socket.sender(MessageFromDrone::BackendEvent);
             let key_manager = key_manager.clone();
             if let Err(err) = executor.register_listener(move |message| {
-                if message.status == BackendStatus::Terminated {
+                if matches!(message.state, BackendState::Terminated { .. }) {
                     key_manager
                         .lock()
                         .expect("Key manager lock poisoned.")

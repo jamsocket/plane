@@ -2,7 +2,7 @@ use super::{core::Controller, error::IntoApiError};
 use crate::{
     log_types::LoggableTime,
     names::BackendName,
-    types::{BackendStatus, TimestampedBackendStatus},
+    types::{backend_state::TimestampedBackendStatus, BackendStatus},
 };
 use axum::{
     extract::{Path, State},

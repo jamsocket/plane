@@ -101,11 +101,11 @@ CREATE TABLE public.backend (
     last_status character varying(255) NOT NULL,
     last_status_time timestamp with time zone NOT NULL,
     cluster_address character varying(255),
-    exit_code integer,
     drone_id integer NOT NULL,
     expiration_time timestamp with time zone,
     last_keepalive timestamp with time zone NOT NULL,
-    allowed_idle_seconds integer
+    allowed_idle_seconds integer,
+    state jsonb NOT NULL
 );
 
 
@@ -147,13 +147,6 @@ COMMENT ON COLUMN public.backend.cluster_address IS 'The address (IP:PORT) of th
 
 
 --
--- Name: COLUMN backend.exit_code; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.backend.exit_code IS 'The exit code of the backend (null if it has not exited; may remain null if exit is forced).';
-
-
---
 -- Name: COLUMN backend.drone_id; Type: COMMENT; Schema: public; Owner: postgres
 --
 
@@ -179,6 +172,13 @@ COMMENT ON COLUMN public.backend.last_keepalive IS 'The last time a proxy sent a
 --
 
 COMMENT ON COLUMN public.backend.allowed_idle_seconds IS 'The number of seconds the backend is allowed to be idle (no inbound connections alive) before it is terminated.';
+
+
+--
+-- Name: COLUMN backend.state; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend.state IS 'The most recent state of the backend.';
 
 
 --

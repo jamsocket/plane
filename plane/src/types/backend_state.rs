@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{fmt::Display, net::SocketAddr};
 
-use crate::log_types::BackendAddr;
+use crate::log_types::{BackendAddr, LoggableTime};
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd, valuable::Valuable)]
 pub enum BackendStatus {
@@ -38,23 +38,27 @@ pub enum TerminationKind {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
-pub struct BackendState {
-    pub status: BackendStatus,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub address: Option<BackendAddr>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub termination: Option<TerminationKind>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reason: Option<TerminationReason>,
-
-    /// The last status before the backend entered Terminating or Terminated.
-    pub last_status: Option<BackendStatus>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub exit_code: Option<i32>,
+pub enum BackendState {
+    Scheduled,
+    Loading,
+    Starting,
+    Waiting {
+        address: BackendAddr,
+    },
+    Ready {
+        address: Option<BackendAddr>,
+    },
+    Terminating {
+        last_status: BackendStatus,
+        termination: TerminationKind,
+        reason: TerminationReason,
+    },
+    Terminated {
+        last_status: BackendStatus,
+        termination: Option<TerminationKind>,
+        reason: Option<TerminationReason>,
+        exit_code: Option<i32>,
+    },
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
@@ -65,36 +69,49 @@ pub enum TerminationReason {
 }
 
 impl BackendState {
-    pub fn address(&self) -> Option<SocketAddr> {
-        self.address.as_ref().map(|BackendAddr(addr)| *addr)
+    pub fn address(&self) -> Option<BackendAddr> {
+        match self {
+            BackendState::Waiting { address } => Some(*address),
+            BackendState::Ready { address } => *address,
+            _ => None,
+        }
+    }
+
+    pub fn status(&self) -> BackendStatus {
+        match self {
+            BackendState::Scheduled => BackendStatus::Scheduled,
+            BackendState::Loading => BackendStatus::Loading,
+            BackendState::Starting => BackendStatus::Starting,
+            BackendState::Waiting { .. } => BackendStatus::Waiting,
+            BackendState::Ready { .. } => BackendStatus::Ready,
+            BackendState::Terminating { .. } => BackendStatus::Terminating,
+            BackendState::Terminated { .. } => BackendStatus::Terminated,
+        }
     }
 
     pub fn to_loading(&self) -> BackendState {
-        BackendState {
-            status: BackendStatus::Loading,
-            ..self.clone()
-        }
+        BackendState::Loading
     }
 
     pub fn to_starting(&self) -> BackendState {
-        BackendState {
-            status: BackendStatus::Starting,
-            ..self.clone()
-        }
+        BackendState::Starting
     }
 
     pub fn to_waiting(&self, address: SocketAddr) -> BackendState {
-        BackendState {
-            status: BackendStatus::Waiting,
-            address: Some(BackendAddr(address)),
-            ..self.clone()
+        BackendState::Waiting {
+            address: BackendAddr(address),
         }
     }
 
     pub fn to_ready(&self) -> BackendState {
-        BackendState {
-            status: BackendStatus::Ready,
-            ..self.clone()
+        match self {
+            BackendState::Waiting { address } => BackendState::Ready {
+                address: Some(*address),
+            },
+            _ => {
+                tracing::warn!("to_ready called on non-waiting backend");
+                BackendState::Ready { address: None }
+            }
         }
     }
 
@@ -103,37 +120,38 @@ impl BackendState {
         termination: TerminationKind,
         reason: TerminationReason,
     ) -> BackendState {
-        BackendState {
-            status: BackendStatus::Terminating,
-            termination: Some(termination),
-            reason: Some(reason),
-            last_status: Some(self.status),
-            address: None,
-            exit_code: None,
+        BackendState::Terminating {
+            last_status: self.status(),
+            termination,
+            reason,
         }
     }
 
     pub fn to_terminated(&self, exit_code: Option<i32>) -> BackendState {
-        BackendState {
-            status: BackendStatus::Terminated,
-            address: None,
-            last_status: self.last_status.or(Some(self.status)),
-            exit_code,
-            ..self.clone()
+        match self {
+            BackendState::Terminating {
+                last_status,
+                termination,
+                reason,
+            } => BackendState::Terminated {
+                last_status: *last_status,
+                termination: Some(*termination),
+                reason: Some(*reason),
+                exit_code,
+            },
+            _ => BackendState::Terminated {
+                last_status: self.status(),
+                termination: None,
+                reason: None,
+                exit_code,
+            },
         }
     }
 }
 
 impl Default for BackendState {
     fn default() -> Self {
-        Self {
-            status: BackendStatus::Scheduled,
-            address: None,
-            termination: None,
-            reason: None,
-            last_status: None,
-            exit_code: None,
-        }
+        Self::Scheduled
     }
 }
 
@@ -153,4 +171,11 @@ impl Display for BackendStatus {
             _ => unreachable!(),
         }
     }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct TimestampedBackendStatus {
+    pub status: BackendStatus,
+
+    pub time: LoggableTime,
 }

@@ -1,4 +1,3 @@
-use crate::log_types::LoggableTime;
 use crate::{client::PlaneClient, names::BackendName, util::random_prefixed_string};
 pub use backend_state::{BackendState, BackendStatus, TerminationKind, TerminationReason};
 use bollard::auth::DockerCredentials;
@@ -356,11 +355,4 @@ impl TryFrom<String> for NodeKind {
     fn try_from(s: String) -> Result<Self, Self::Error> {
         serde_json::from_value(Value::String(s))
     }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct TimestampedBackendStatus {
-    pub status: BackendStatus,
-
-    pub time: LoggableTime,
 }
