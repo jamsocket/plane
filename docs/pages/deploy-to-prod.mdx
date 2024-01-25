@@ -50,7 +50,7 @@ machine.
 If you are exposing the controller to the public internet, you should configure a reverse proxy to restrict traffic to the `/pub/*`
 path prefix.
 
-Here’s an example of what this could look like if you use nginx as a revese proxy:
+Here’s an example of what this could look like if you use nginx as a reverse proxy:
 
 ```text filename="nginx.conf"
 http {
@@ -102,7 +102,7 @@ configuration that allows them to connect to arbitrary ports on the drones in th
 Proxies also need to be able to accept incoming connections from the public internet on port 443, and forward them to the drones.
 If a network is called `c1.mysite.com`, either the `A` record or an equivalent `CNAME` record for `c1.mysite.com` should point to
 the proxy. Additionally, if subdomains are used, the `A` record or `CNAME` record for `*.c1.mysite.com` should also point to the
-proxys for that cluster.
+proxies for that cluster.
 
 The way you will configure this depends on whether you have more than one proxy, and whether you are using a managed load balancer.
 
