@@ -209,13 +209,12 @@ pub struct SpawnConfig {
 )]
 pub struct KeyConfig {
     /// If provided, and a running backend was created with the same key,
-    /// cluster, namespace, and tag, we will connect to that backend instead
+    /// namespace, and tag, we will connect to that backend instead
     /// of creating a new one.
     pub name: String,
 
     /// Namespace of the key. If not specified, the default namespace (empty string)
-    /// is used. Namespaces are scoped to a cluster, so two namespaces of the same name
-    /// on different clusters are distinct.
+    /// is used.
     #[serde(default)]
     pub namespace: String,
 

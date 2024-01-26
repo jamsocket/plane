@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
+use colored::Colorize;
 use plane::admin::AdminOpts;
 use plane::client::PlaneClient;
 use plane::controller::run_controller;
@@ -13,6 +14,7 @@ use plane::init_tracing::init_tracing;
 use plane::names::{AcmeDnsServerName, ControllerName, DroneName, Name, OrRandom, ProxyName};
 use plane::proxy::{run_proxy, AcmeConfig, ServerPortConfig};
 use plane::types::ClusterName;
+use plane::{PLANE_GIT_HASH, PLANE_VERSION};
 use std::net::IpAddr;
 use std::path::PathBuf;
 use url::Url;
@@ -119,6 +121,7 @@ enum Command {
         db: String,
     },
     Admin(AdminOpts),
+    Version,
 }
 
 async fn run(opts: Opts) -> Result<()> {
@@ -256,6 +259,10 @@ async fn run(opts: Opts) -> Result<()> {
         }
         Command::Admin(admin_opts) => {
             plane::admin::run_admin_command(admin_opts).await;
+        }
+        Command::Version => {
+            println!("Client version: {}", PLANE_VERSION.bright_white());
+            println!("Client hash: {}", PLANE_GIT_HASH.bright_white());
         }
     }
 
