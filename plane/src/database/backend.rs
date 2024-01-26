@@ -3,7 +3,10 @@ use crate::{
     log_types::{BackendAddr, LoggableTime},
     names::{BackendActionName, BackendName},
     protocol::{BackendAction, RouteInfo},
-    types::{BackendStatus, BearerToken, NodeId, SecretToken, TimestampedBackendStatus},
+    types::{
+        backend_state::TimestampedBackendStatus, BackendState, BackendStatus, BearerToken, NodeId,
+        SecretToken,
+    },
 };
 use chrono::{DateTime, Utc};
 use futures_util::Stream;
@@ -28,7 +31,7 @@ impl super::subscribe::NotificationPayload for BackendActionMessage {
     }
 }
 
-impl super::subscribe::NotificationPayload for BackendStatus {
+impl super::subscribe::NotificationPayload for BackendState {
     fn kind() -> &'static str {
         "backend_state"
     }
@@ -45,7 +48,7 @@ impl<'a> BackendDatabase<'a> {
     ) -> sqlx::Result<impl Stream<Item = TimestampedBackendStatus>> {
         let mut sub = self
             .db
-            .subscribe_with_key::<BackendStatus>(&backend.to_string());
+            .subscribe_with_key::<BackendState>(&backend.to_string());
 
         let result = sqlx::query!(
             r#"
@@ -81,17 +84,17 @@ impl<'a> BackendDatabase<'a> {
             }
 
             while let Some(item) = sub.next().await {
+                let status = item.payload.status();
                 // In order to missing events that occur when we read the DB and when we subscribe to updates,
                 // we subscribe to updates before we read from the DB. But this means we might get duplicate
                 // events, so we keep track of the last status we saw and ignore events that have a status
                 // less than or equal to it.
                 if let Some(last_status) = last_status {
-                    if item.payload <= last_status {
+                    if status <= last_status {
                         continue;
                     }
                 }
 
-                let status = item.payload;
                 let time = item.timestamp;
 
                 let item = TimestampedBackendStatus {
@@ -145,16 +148,14 @@ impl<'a> BackendDatabase<'a> {
         }))
     }
 
-    pub async fn update_status(
+    pub async fn update_state(
         &self,
         backend: &BackendName,
-        status: BackendStatus,
-        address: Option<BackendAddr>,
-        exit_code: Option<i32>,
+        state: BackendState,
     ) -> sqlx::Result<()> {
         let mut txn = self.db.pool.begin().await?;
 
-        emit_with_key(&mut *txn, &backend.to_string(), &status).await?;
+        emit_with_key(&mut *txn, &backend.to_string(), &state).await?;
 
         sqlx::query!(
             r#"
@@ -163,13 +164,13 @@ impl<'a> BackendDatabase<'a> {
                 last_status = $2,
                 last_status_time = now(),
                 cluster_address = $3,
-                exit_code = $4
+                state = $4
             where id = $1
             "#,
             backend.to_string(),
-            status.to_string(),
-            address.map(|a| a.0.to_string()),
-            exit_code,
+            state.status().to_string(),
+            state.address().map(|d| d.0.to_string()),
+            serde_json::to_value(&state).expect("BackendState should always be JSON-serializable."),
         )
         .execute(&mut *txn)
         .await?;
@@ -180,13 +181,13 @@ impl<'a> BackendDatabase<'a> {
             values ($1, $2)
             "#,
             backend.to_string(),
-            status.to_string(),
+            state.status().to_string(),
         )
         .execute(&mut *txn)
         .await?;
 
         // If the backend is terminated, we can delete its associated key.
-        if status == BackendStatus::Terminated {
+        if matches!(state, BackendState::Terminated { .. }) {
             sqlx::query!(
                 r#"
                 delete from backend_key

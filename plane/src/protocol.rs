@@ -4,8 +4,8 @@ use crate::{
     names::{BackendActionName, BackendName},
     typed_socket::ChannelMessage,
     types::{
-        BackendStatus, BearerToken, ClusterName, ExecutorConfig, KeyConfig, SecretToken,
-        TerminationKind,
+        backend_state::TerminationReason, BackendState, BearerToken, ClusterName, ExecutorConfig,
+        KeyConfig, SecretToken, TerminationKind,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -46,6 +46,7 @@ pub enum BackendAction {
     },
     Terminate {
         kind: TerminationKind,
+        reason: TerminationReason,
     },
 }
 
@@ -53,14 +54,10 @@ pub enum BackendAction {
 pub struct BackendStateMessage {
     pub event_id: BackendEventId,
     pub backend_id: BackendName,
-    pub status: BackendStatus,
+    pub state: BackendState,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub address: Option<BackendAddr>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub exit_code: Option<i32>,
-
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // pub address: Option<BackendAddr>,
     pub timestamp: LoggableTime,
 }
 

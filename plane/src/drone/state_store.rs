@@ -106,10 +106,8 @@ impl StateStore {
             let event_message = BackendStateMessage {
                 event_id,
                 backend_id: backend_id.clone(),
-                status: state.status,
-                address: state.address,
-                exit_code: state.exit_code,
                 timestamp: LoggableTime(timestamp),
+                state: state.clone(),
             };
 
             listener(event_message);
@@ -170,9 +168,7 @@ impl StateStore {
             let event = BackendStateMessage {
                 event_id: BackendEventId::from(event_id),
                 backend_id: BackendName::try_from(backend_id)?,
-                status: state.status,
-                address: state.address,
-                exit_code: state.exit_code,
+                state: state.clone(),
                 timestamp: LoggableTime(
                     DateTime::UNIX_EPOCH + chrono::Duration::milliseconds(timestamp),
                 ),
@@ -234,18 +230,20 @@ impl StateStore {
 mod test {
     use super::*;
     use crate::{
+        log_types::BackendAddr,
         names::Name,
-        types::{BackendState, BackendStatus, TerminationKind},
+        types::{BackendStatus, TerminationKind, TerminationReason},
     };
-    use std::sync::mpsc;
+    use std::{
+        net::{SocketAddr, SocketAddrV4},
+        sync::mpsc,
+    };
 
-    fn simple_backend_state(status: BackendStatus) -> BackendState {
-        BackendState {
-            status,
-            address: None,
-            exit_code: None,
-            termination: None,
-        }
+    fn dummy_addr() -> BackendAddr {
+        BackendAddr(SocketAddr::V4(SocketAddrV4::new(
+            "12.34.12.34".parse().unwrap(),
+            1234,
+        )))
     }
 
     #[test]
@@ -257,13 +255,20 @@ mod test {
         state_store
             .register_event(
                 &backend_id,
-                &simple_backend_state(BackendStatus::Ready),
+                &BackendState::Ready {
+                    address: Some(dummy_addr()),
+                },
                 Utc::now(),
             )
             .unwrap();
 
         let result = state_store.backend_state(&backend_id).unwrap();
-        assert_eq!(result, simple_backend_state(BackendStatus::Ready));
+        assert_eq!(
+            result,
+            BackendState::Ready {
+                address: Some(dummy_addr())
+            }
+        );
     }
 
     #[test]
@@ -272,30 +277,41 @@ mod test {
         let mut state_store = StateStore::new(conn).unwrap();
         let backend_id = BackendName::new_random();
 
+        let ready_state = BackendState::Ready {
+            address: Some(dummy_addr()),
+        };
         {
             state_store
-                .register_event(
-                    &backend_id,
-                    &simple_backend_state(BackendStatus::Ready),
-                    Utc::now(),
-                )
+                .register_event(&backend_id, &ready_state, Utc::now())
                 .unwrap();
 
             let result = state_store.backend_state(&backend_id).unwrap();
-            assert_eq!(result, simple_backend_state(BackendStatus::Ready));
+            assert_eq!(
+                result,
+                BackendState::Ready {
+                    address: Some(dummy_addr())
+                }
+            );
         }
 
         {
             state_store
                 .register_event(
                     &backend_id,
-                    &BackendState::terminating(TerminationKind::Hard),
+                    &ready_state.to_terminating(TerminationKind::Hard, TerminationReason::External),
                     Utc::now(),
                 )
                 .unwrap();
 
             let result = state_store.backend_state(&backend_id).unwrap();
-            assert_eq!(result, BackendState::terminating(TerminationKind::Hard));
+            assert_eq!(
+                result,
+                BackendState::Terminating {
+                    last_status: BackendStatus::Ready,
+                    termination: TerminationKind::Hard,
+                    reason: TerminationReason::External,
+                }
+            );
         }
     }
 
@@ -314,38 +330,52 @@ mod test {
 
         let backend_id = BackendName::new_random();
 
+        let ready_state = BackendState::Ready {
+            address: Some(dummy_addr()),
+        };
         state_store
-            .register_event(
-                &backend_id,
-                &simple_backend_state(BackendStatus::Ready),
-                Utc::now(),
-            )
+            .register_event(&backend_id, &ready_state, Utc::now())
             .unwrap();
 
         {
             let result = state_store.backend_state(&backend_id).unwrap();
-            assert_eq!(result, simple_backend_state(BackendStatus::Ready));
+            assert_eq!(result, ready_state);
 
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
-            assert_eq!(event.status, BackendStatus::Ready);
+            assert_eq!(
+                event.state,
+                BackendState::Ready {
+                    address: Some(dummy_addr())
+                }
+            );
         }
 
         {
             state_store
                 .register_event(
                     &backend_id,
-                    &BackendState::terminating(TerminationKind::Hard),
+                    &ready_state.to_terminating(TerminationKind::Hard, TerminationReason::Swept),
                     Utc::now(),
                 )
                 .unwrap();
 
             let result = state_store.backend_state(&backend_id).unwrap();
-            assert_eq!(result, BackendState::terminating(TerminationKind::Hard));
+            assert_eq!(
+                result,
+                ready_state.to_terminating(TerminationKind::Hard, TerminationReason::Swept)
+            );
 
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
-            assert_eq!(event.status, BackendStatus::Terminating,);
+            assert_eq!(
+                event.state,
+                BackendState::Terminating {
+                    last_status: BackendStatus::Ready,
+                    termination: TerminationKind::Hard,
+                    reason: TerminationReason::Swept,
+                }
+            );
         }
     }
 
@@ -358,18 +388,17 @@ mod test {
 
         let backend_id = BackendName::new_random();
 
+        let ready_state = BackendState::Ready {
+            address: Some(dummy_addr()),
+        };
         state_store
-            .register_event(
-                &backend_id,
-                &simple_backend_state(BackendStatus::Ready),
-                Utc::now(),
-            )
+            .register_event(&backend_id, &ready_state, Utc::now())
             .unwrap();
 
         state_store
             .register_event(
                 &backend_id,
-                &BackendState::terminating(TerminationKind::Hard),
+                &ready_state.to_terminating(TerminationKind::Hard, TerminationReason::Swept),
                 Utc::now(),
             )
             .unwrap();
@@ -384,14 +413,26 @@ mod test {
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
             assert_eq!(event.event_id, BackendEventId::from(1));
-            assert_eq!(event.status, BackendStatus::Ready);
+            assert_eq!(
+                event.state,
+                BackendState::Ready {
+                    address: Some(dummy_addr())
+                }
+            );
         }
 
         {
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
             assert_eq!(event.event_id, BackendEventId::from(2));
-            assert_eq!(event.status, BackendStatus::Terminating,);
+            assert_eq!(
+                event.state,
+                BackendState::Terminating {
+                    last_status: BackendStatus::Ready,
+                    termination: TerminationKind::Hard,
+                    reason: TerminationReason::Swept,
+                }
+            );
         }
 
         assert!(recv.try_recv().is_err());
@@ -407,13 +448,25 @@ mod test {
         {
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
-            assert_eq!(event.status, BackendStatus::Ready);
+            assert_eq!(
+                event.state,
+                BackendState::Ready {
+                    address: Some(dummy_addr())
+                }
+            );
         }
 
         {
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
-            assert_eq!(event.status, BackendStatus::Terminating,);
+            assert_eq!(
+                event.state,
+                BackendState::Terminating {
+                    last_status: BackendStatus::Ready,
+                    termination: TerminationKind::Hard,
+                    reason: TerminationReason::Swept,
+                }
+            );
         }
 
         assert!(recv.try_recv().is_err());
@@ -432,7 +485,14 @@ mod test {
         {
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
-            assert_eq!(event.status, BackendStatus::Terminating,);
+            assert_eq!(
+                event.state,
+                BackendState::Terminating {
+                    last_status: BackendStatus::Ready,
+                    termination: TerminationKind::Hard,
+                    reason: TerminationReason::Swept,
+                }
+            );
         }
 
         assert!(recv.try_recv().is_err());

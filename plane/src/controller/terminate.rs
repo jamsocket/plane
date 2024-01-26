@@ -1,5 +1,9 @@
 use super::{core::Controller, error::IntoApiError};
-use crate::{names::BackendName, protocol::BackendAction, types::TerminationKind};
+use crate::{
+    names::BackendName,
+    protocol::BackendAction,
+    types::{backend_state::TerminationReason, TerminationKind},
+};
 use axum::{
     extract::{Path, State},
     response::Response,
@@ -30,7 +34,10 @@ async fn terminate(
         .create_pending_action(
             backend_id,
             backend.drone_id,
-            &BackendAction::Terminate { kind },
+            &BackendAction::Terminate {
+                kind,
+                reason: TerminationReason::External,
+            },
         )
         .await
         .or_internal_error("Database error")?;

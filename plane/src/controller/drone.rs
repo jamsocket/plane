@@ -14,7 +14,7 @@ use crate::{
         BackendAction, Heartbeat, KeyDeadlines, MessageFromDrone, MessageToDrone, RenewKeyResponse,
     },
     typed_socket::{server::new_server, TypedSocket},
-    types::{ClusterName, NodeId, TerminationKind},
+    types::{backend_state::TerminationReason, ClusterName, NodeId, TerminationKind},
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},
@@ -47,12 +47,7 @@ pub async fn handle_message_from_drone(
             controller
                 .db
                 .backend()
-                .update_status(
-                    &backend_event.backend_id,
-                    backend_event.status,
-                    backend_event.address,
-                    backend_event.exit_code,
-                )
+                .update_state(&backend_event.backend_id, backend_event.state)
                 .await?;
 
             sender
@@ -128,6 +123,7 @@ pub async fn sweep_loop(db: PlaneDatabase, drone_id: NodeId) {
                     drone_id,
                     &BackendAction::Terminate {
                         kind: TerminationKind::Soft,
+                        reason: TerminationReason::Swept,
                     },
                 )
                 .await

@@ -4,7 +4,9 @@ use crate::{
     names::{BackendName, DroneName},
     protocol::{MessageFromDns, MessageFromDrone, MessageFromProxy},
     typed_socket::client::TypedSocketConnector,
-    types::{ClusterName, ConnectRequest, ConnectResponse, TimestampedBackendStatus},
+    types::{
+        backend_state::TimestampedBackendStatus, ClusterName, ConnectRequest, ConnectResponse,
+    },
 };
 use reqwest::{Response, StatusCode};
 use serde::de::DeserializeOwned;
