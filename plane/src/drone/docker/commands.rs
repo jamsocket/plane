@@ -1,5 +1,5 @@
 use super::types::ContainerId;
-use crate::{names::BackendName, types::ExecutorConfig};
+use crate::{names::BackendName, protocol::AcquiredKey, types::ExecutorConfig};
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials,
@@ -112,11 +112,21 @@ pub async fn get_port(docker: &Docker, container_id: &ContainerId) -> Result<u16
 fn get_container_config_from_executor_config(
     backend_id: &BackendName,
     exec_config: ExecutorConfig,
-    runtime: &Option<String>,
+    runtime: Option<&str>,
+    key: Option<&AcquiredKey>,
 ) -> Result<bollard::container::Config<String>> {
     let mut env = exec_config.env;
     env.insert("PORT".to_string(), CONTAINER_PORT.to_string());
-    env.insert("PLANE_BACKEND_ID".to_string(), backend_id.to_string());
+    env.insert("SESSION_BACKEND_ID".to_string(), backend_id.to_string());
+
+    if let Some(key) = key {
+        env.insert(
+            "SESSION_BACKEND_FENCING_TOKEN".to_string(),
+            key.token.to_string(),
+        );
+        env.insert("SESSION_BACKEND_KEY".to_string(), key.key.name.to_string());
+    }
+
     // TODO: set PLANE_LOCK and PLANE_FENCING_TOKEN.
     let env: Vec<String> = env
         .into_iter()
@@ -134,7 +144,7 @@ fn get_container_config_from_executor_config(
         ),
         host_config: Some(HostConfig {
             port_bindings: Some(create_port_bindings()),
-            runtime: runtime.clone(),
+            runtime: runtime.map(|s| s.to_string()),
             memory: exec_config.resource_limits.memory_limit_bytes,
             cpu_period: exec_config
                 .resource_limits
@@ -178,14 +188,16 @@ pub async fn run_container(
     backend_id: &BackendName,
     container_id: &ContainerId,
     exec_config: ExecutorConfig,
-    runtime: &Option<String>,
+    runtime: Option<&str>,
+    acquired_key: Option<&AcquiredKey>,
 ) -> Result<()> {
     let options = bollard::container::CreateContainerOptions {
         name: container_id.to_string(),
         ..Default::default()
     };
 
-    let config = get_container_config_from_executor_config(backend_id, exec_config, runtime)?;
+    let config =
+        get_container_config_from_executor_config(backend_id, exec_config, runtime, acquired_key)?;
 
     docker.create_container(Some(options), config).await?;
 
@@ -301,7 +313,8 @@ mod tests {
         let mut config = get_container_config_from_executor_config(
             &backend_name,
             executor_config.clone(),
-            &None,
+            None,
+            None,
         )
         .unwrap();
         config.cmd = Some(vec!["echo".into(), "hello world".into()]);

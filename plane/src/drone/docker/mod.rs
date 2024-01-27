@@ -2,7 +2,11 @@ use self::{
     commands::{get_port, run_container},
     types::ContainerId,
 };
-use crate::{names::BackendName, protocol::BackendMetricsMessage, types::ExecutorConfig};
+use crate::{
+    names::BackendName,
+    protocol::{AcquiredKey, BackendMetricsMessage},
+    types::ExecutorConfig,
+};
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials, container::StatsOptions, errors::Error, service::EventMessage,
@@ -115,13 +119,15 @@ impl PlaneDocker {
         backend_id: &BackendName,
         container_id: &ContainerId,
         executable: ExecutorConfig,
+        acquired_key: Option<&AcquiredKey>,
     ) -> Result<SpawnResult> {
         run_container(
             &self.docker,
             backend_id,
             container_id,
             executable,
-            &self.runtime,
+            self.runtime.as_deref(),
+            acquired_key,
         )
         .await?;
         let port = get_port(&self.docker, container_id).await?;
@@ -276,9 +282,8 @@ pub fn get_metrics_message_from_container_stats(
 
 #[cfg(test)]
 mod tests {
-    use crate::names::Name;
-
     use super::*;
+    use crate::names::Name;
 
     #[tokio::test]
     async fn test_get_metrics() -> anyhow::Result<()> {
@@ -300,7 +305,7 @@ mod tests {
             "ghcr.io/drifting-in-space/demo-image-drop-four",
         );
         plane_docker
-            .spawn_backend(&backend_name, &container_id, executor_config)
+            .spawn_backend(&backend_name, &container_id, executor_config, None)
             .await?;
 
         let metrics = plane_docker.get_metrics(&container_id).await;
