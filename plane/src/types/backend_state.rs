@@ -42,6 +42,7 @@ pub enum TerminationKind {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
+#[serde(tag = "status")]
 pub enum BackendState {
     Scheduled,
     Loading,
@@ -191,8 +192,10 @@ pub struct BackendStatusStreamEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub termination_kind: Option<TerminationKind>,
 
+    /// Whether the process exited with an error. None if the process
+    /// is still running.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub exit_code: Option<i32>,
+    pub exit_error: Option<bool>,
 
     pub time: LoggableTime,
 }
@@ -211,8 +214,11 @@ impl BackendStatusStreamEntry {
             _ => None,
         };
 
-        let exit_code = match state {
-            BackendState::Terminated { exit_code, .. } => exit_code,
+        let exit_error = match state {
+            BackendState::Terminated {
+                exit_code: Some(d), ..
+            } if d != 0 => Some(true),
+            BackendState::Terminated { .. } => Some(false),
             _ => None,
         };
 
@@ -220,7 +226,7 @@ impl BackendStatusStreamEntry {
             status: state.status(),
             termination_reason,
             termination_kind,
-            exit_code,
+            exit_error,
             time: LoggableTime(timestamp),
         }
     }
