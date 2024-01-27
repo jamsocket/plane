@@ -1,8 +1,7 @@
 use super::{core::Controller, error::IntoApiError};
 use crate::{
-    log_types::LoggableTime,
     names::BackendName,
-    types::{backend_state::TimestampedBackendStatus, BackendStatus},
+    types::{backend_state::BackendStatusStreamEntry, BackendStatus},
 };
 use axum::{
     extract::{Path, State},
@@ -19,7 +18,7 @@ use std::convert::Infallible;
 async fn backend_status(
     controller: &Controller,
     backend_id: &BackendName,
-) -> Result<TimestampedBackendStatus, Response> {
+) -> Result<BackendStatusStreamEntry, Response> {
     let backend = controller
         .db
         .backend()
@@ -28,18 +27,13 @@ async fn backend_status(
         .or_internal_error("Database error")?
         .or_not_found("Backend does not exist")?;
 
-    let result = TimestampedBackendStatus {
-        status: backend.last_status,
-        time: LoggableTime(backend.last_status_time),
-    };
-
-    Ok(result)
+    Ok(backend.into())
 }
 
 pub async fn handle_backend_status(
     Path(backend_id): Path<BackendName>,
     State(controller): State<Controller>,
-) -> Result<Json<TimestampedBackendStatus>, Response> {
+) -> Result<Json<BackendStatusStreamEntry>, Response> {
     let status = backend_status(&controller, &backend_id).await?;
     Ok(Json(status))
 }

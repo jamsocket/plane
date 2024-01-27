@@ -5,7 +5,7 @@ use crate::{
     protocol::{MessageFromDns, MessageFromDrone, MessageFromProxy},
     typed_socket::client::TypedSocketConnector,
     types::{
-        backend_state::TimestampedBackendStatus, ClusterName, ConnectRequest, ConnectResponse,
+        backend_state::BackendStatusStreamEntry, ClusterName, ConnectRequest, ConnectResponse,
     },
 };
 use reqwest::{Response, StatusCode};
@@ -147,11 +147,11 @@ impl PlaneClient {
     pub async fn backend_status(
         &self,
         backend_id: &BackendName,
-    ) -> Result<TimestampedBackendStatus, PlaneClientError> {
+    ) -> Result<BackendStatusStreamEntry, PlaneClientError> {
         let url = self.backend_status_url(backend_id);
 
         let response = self.client.get(url).send().await?;
-        let status: TimestampedBackendStatus = get_response(response).await?;
+        let status: BackendStatusStreamEntry = get_response(response).await?;
         Ok(status)
     }
 
@@ -164,7 +164,7 @@ impl PlaneClient {
     pub async fn backend_status_stream(
         &self,
         backend_id: &BackendName,
-    ) -> Result<sse::SseStream<TimestampedBackendStatus>, PlaneClientError> {
+    ) -> Result<sse::SseStream<BackendStatusStreamEntry>, PlaneClientError> {
         let url = self.backend_status_stream_url(backend_id);
 
         let stream = sse::sse_request(url, self.client.clone()).await?;

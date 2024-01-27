@@ -1,5 +1,5 @@
 use self::{
-    backend_status::{handle_backend_status, handle_backend_status_stream},
+    backend_state::{handle_backend_status, handle_backend_status_stream},
     dns::handle_dns_socket,
     drain::handle_drain,
     proxy::handle_proxy_socket,
@@ -31,7 +31,7 @@ use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, Tr
 use tracing::Level;
 use url::Url;
 
-mod backend_status;
+mod backend_state;
 mod connect;
 mod core;
 mod dns;

@@ -109,7 +109,7 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                     "{} {} {} {} {}",
                     backend.id.to_string().blue(),
                     backend.cluster.green(),
-                    backend.last_status.to_string().yellow(),
+                    backend.state.status().to_string().yellow(),
                     backend.last_status_time.to_string().white(),
                     backend.drone_id.to_string().green(),
                 );
