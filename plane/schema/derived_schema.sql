@@ -313,52 +313,52 @@ COMMENT ON COLUMN public.backend_key.allow_renew IS 'If false, the key cannot be
 
 
 --
--- Name: backend_status; Type: TABLE; Schema: public; Owner: postgres
+-- Name: backend_state; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.backend_status (
+CREATE TABLE public.backend_state (
     id integer NOT NULL,
     backend_id character varying(255) NOT NULL,
-    status character varying(255) NOT NULL,
+    state jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
-ALTER TABLE public.backend_status OWNER TO postgres;
+ALTER TABLE public.backend_state OWNER TO postgres;
 
 --
--- Name: TABLE backend_status; Type: COMMENT; Schema: public; Owner: postgres
+-- Name: TABLE backend_state; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON TABLE public.backend_status IS 'A history of status changes across all backends.';
-
-
---
--- Name: COLUMN backend_status.backend_id; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.backend_status.backend_id IS 'The backend the status change refers to.';
+COMMENT ON TABLE public.backend_state IS 'A history of state changes across all backends.';
 
 
 --
--- Name: COLUMN backend_status.status; Type: COMMENT; Schema: public; Owner: postgres
+-- Name: COLUMN backend_state.backend_id; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.backend_status.status IS 'The status of the backend.';
-
-
---
--- Name: COLUMN backend_status.created_at; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.backend_status.created_at IS 'The time the status change was received.';
+COMMENT ON COLUMN public.backend_state.backend_id IS 'The backend the state change refers to.';
 
 
 --
--- Name: backend_status_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: COLUMN backend_state.state; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE SEQUENCE public.backend_status_id_seq
+COMMENT ON COLUMN public.backend_state.state IS 'The state of the backend.';
+
+
+--
+-- Name: COLUMN backend_state.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend_state.created_at IS 'The time the state change was received.';
+
+
+--
+-- Name: backend_state_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.backend_state_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -367,13 +367,13 @@ CREATE SEQUENCE public.backend_status_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.backend_status_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.backend_state_id_seq OWNER TO postgres;
 
 --
--- Name: backend_status_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: backend_state_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
-ALTER SEQUENCE public.backend_status_id_seq OWNED BY public.backend_status.id;
+ALTER SEQUENCE public.backend_state_id_seq OWNED BY public.backend_state.id;
 
 
 --
@@ -755,10 +755,10 @@ COMMENT ON COLUMN public.token.secret_token IS 'A secret token optionally used f
 
 
 --
--- Name: backend_status id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: backend_state id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.backend_status ALTER COLUMN id SET DEFAULT nextval('public.backend_status_id_seq'::regclass);
+ALTER TABLE ONLY public.backend_state ALTER COLUMN id SET DEFAULT nextval('public.backend_state_id_seq'::regclass);
 
 
 --
@@ -823,11 +823,11 @@ ALTER TABLE ONLY public.backend
 
 
 --
--- Name: backend_status backend_status_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: backend_state backend_state_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.backend_status
-    ADD CONSTRAINT backend_status_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.backend_state
+    ADD CONSTRAINT backend_state_pkey PRIMARY KEY (id);
 
 
 --
@@ -899,10 +899,10 @@ COMMENT ON INDEX public.idx_backend_drone_id IS 'An index for identifying runnin
 
 
 --
--- Name: idx_backend_status_created_at; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_backend_state_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_backend_status_created_at ON public.backend_status USING btree (backend_id, created_at);
+CREATE INDEX idx_backend_state_created_at ON public.backend_state USING btree (backend_id, created_at);
 
 
 --
@@ -967,11 +967,11 @@ ALTER TABLE ONLY public.backend_key
 
 
 --
--- Name: backend_status backend_status_backend_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: backend_state backend_state_backend_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.backend_status
-    ADD CONSTRAINT backend_status_backend_id_fkey FOREIGN KEY (backend_id) REFERENCES public.backend(id);
+ALTER TABLE ONLY public.backend_state
+    ADD CONSTRAINT backend_state_backend_id_fkey FOREIGN KEY (backend_id) REFERENCES public.backend(id);
 
 
 --

@@ -1,8 +1,12 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{fmt::Display, net::SocketAddr};
 
-use crate::log_types::{BackendAddr, LoggableTime};
+use crate::{
+    database::backend::BackendRow,
+    log_types::{BackendAddr, LoggableTime},
+};
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd, valuable::Valuable)]
 #[serde(rename_all = "lowercase")]
@@ -40,7 +44,7 @@ pub enum TerminationKind {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
-#[serde(rename_all = "lowercase")]
+#[serde(tag = "status", rename_all = "lowercase")]
 pub enum BackendState {
     Scheduled,
     Loading,
@@ -177,9 +181,62 @@ impl Display for BackendStatus {
     }
 }
 
+/// A timestamped representation of a backend's status, along with
+/// termination information. This is used for public-facing endpoints.
+/// It does not include the backend's address, which is only available
+/// to the controller.
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct TimestampedBackendStatus {
+pub struct BackendStatusStreamEntry {
     pub status: BackendStatus,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub termination_reason: Option<TerminationReason>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub termination_kind: Option<TerminationKind>,
+
+    /// Whether the process exited with an error. None if the process
+    /// is still running.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exit_error: Option<bool>,
+
     pub time: LoggableTime,
+}
+
+impl BackendStatusStreamEntry {
+    pub fn from_state(state: BackendState, timestamp: DateTime<Utc>) -> Self {
+        let termination_reason = match state {
+            BackendState::Terminated { reason, .. } => reason,
+            BackendState::Terminating { reason, .. } => Some(reason),
+            _ => None,
+        };
+
+        let termination_kind = match state {
+            BackendState::Terminated { termination, .. } => termination,
+            BackendState::Terminating { termination, .. } => Some(termination),
+            _ => None,
+        };
+
+        let exit_error = match state {
+            BackendState::Terminated {
+                exit_code: Some(d), ..
+            } if d != 0 => Some(true),
+            BackendState::Terminated { .. } => Some(false),
+            _ => None,
+        };
+
+        Self {
+            status: state.status(),
+            termination_reason,
+            termination_kind,
+            exit_error,
+            time: LoggableTime(timestamp),
+        }
+    }
+}
+
+impl From<BackendRow> for BackendStatusStreamEntry {
+    fn from(row: BackendRow) -> Self {
+        Self::from_state(row.state, row.last_status_time)
+    }
 }

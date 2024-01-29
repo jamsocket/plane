@@ -301,6 +301,8 @@ impl BackendManager {
             "Updating backend state"
         );
 
+        lock.state = state.clone();
+
         // Cancel any existing task.
         lock.handle.take();
 
@@ -351,6 +353,7 @@ impl BackendManager {
             .expect("State lock is poisoned")
             .state
             .clone();
+        tracing::info!(?self.backend_id, ?state, "Marking backend as terminated");
         self.set_state(state.to_terminated(exit_code));
 
         Ok(())
