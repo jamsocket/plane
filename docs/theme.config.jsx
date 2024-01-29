@@ -46,5 +46,8 @@ export default {
             }
         }
     },
+    nextThemes: {
+        defaultTheme: 'dark',
+    },
     docsRepositoryBase: 'https://github.com/drifting-in-space/plane/tree/main/docs',
 }
