@@ -159,10 +159,17 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
 
             let response = client.connect(&spawn_request).await?;
 
-            println!(
-                "Created backend: {}",
-                response.backend_id.to_string().bright_green()
-            );
+            if response.spawned {
+                println!(
+                    "Created backend: {}",
+                    response.backend_id.to_string().bright_green()
+                );
+            } else {
+                println!(
+                    "Reusing backend: {}",
+                    response.backend_id.to_string().bright_green()
+                );
+            }
 
             println!("URL: {}", response.url.bright_white());
             println!("Status URL: {}", response.status_url.bright_white());

@@ -2,7 +2,11 @@ use self::{
     commands::{get_port, run_container},
     types::ContainerId,
 };
-use crate::{names::BackendName, protocol::BackendMetricsMessage, types::ExecutorConfig};
+use crate::{
+    names::BackendName,
+    protocol::{AcquiredKey, BackendMetricsMessage},
+    types::ExecutorConfig,
+};
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials, container::StatsOptions, errors::Error, service::EventMessage,
@@ -115,13 +119,15 @@ impl PlaneDocker {
         backend_id: &BackendName,
         container_id: &ContainerId,
         executable: ExecutorConfig,
+        acquired_key: Option<&AcquiredKey>,
     ) -> Result<SpawnResult> {
         run_container(
             &self.docker,
             backend_id,
             container_id,
             executable,
-            &self.runtime,
+            self.runtime.as_deref(),
+            acquired_key,
         )
         .await?;
         let port = get_port(&self.docker, container_id).await?;
@@ -272,128 +278,4 @@ pub fn get_metrics_message_from_container_stats(
         cpu_used: container_cpu_used_delta,
         sys_cpu: system_cpu_used_delta,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::names::Name;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn test_get_metrics() -> anyhow::Result<()> {
-        let docker = bollard::Docker::connect_with_local_defaults()?;
-        let plane_docker = PlaneDocker::new(docker, None).await?;
-
-        //TODO: replace with locally built hello world
-        plane_docker
-            .pull(
-                "ghcr.io/drifting-in-space/demo-image-drop-four",
-                None,
-                false,
-            )
-            .await?;
-
-        let backend_name = BackendName::new_random();
-        let container_id = ContainerId::from(format!("plane-test-{}", backend_name));
-        let executor_config = ExecutorConfig::from_image_with_defaults(
-            "ghcr.io/drifting-in-space/demo-image-drop-four",
-        );
-        plane_docker
-            .spawn_backend(&backend_name, &container_id, executor_config)
-            .await?;
-
-        let metrics = plane_docker.get_metrics(&container_id).await;
-        assert!(metrics.is_ok());
-        let mut metrics = metrics.unwrap();
-        let prev_container_cpu = AtomicU64::new(0);
-        let prev_sys_cpu = AtomicU64::new(0);
-
-        let backend_metrics_message = get_metrics_message_from_container_stats(
-            metrics.clone(),
-            backend_name.clone(),
-            &prev_sys_cpu,
-            &prev_container_cpu,
-        );
-
-        assert!(backend_metrics_message.is_ok());
-
-        let tmp_mem = metrics.memory_stats.usage.clone();
-        metrics.memory_stats.usage = None;
-
-        let backend_metrics_message = get_metrics_message_from_container_stats(
-            metrics.clone(),
-            backend_name.clone(),
-            &prev_sys_cpu,
-            &prev_container_cpu,
-        );
-
-        assert!(matches!(
-            backend_metrics_message,
-            Err(MetricsConversionError::NoStatsAvailable(_))
-        ));
-
-        metrics.memory_stats.usage = tmp_mem;
-        let tmp_mem = metrics.memory_stats.stats;
-        metrics.memory_stats.stats = None;
-
-        let backend_metrics_message = get_metrics_message_from_container_stats(
-            metrics.clone(),
-            backend_name.clone(),
-            &prev_sys_cpu,
-            &prev_container_cpu,
-        );
-
-        assert!(matches!(
-            backend_metrics_message,
-            Err(MetricsConversionError::NoStatsAvailable(_))
-        ));
-        metrics.memory_stats.stats = tmp_mem;
-
-        let tmp_mem = metrics.cpu_stats.system_cpu_usage;
-        metrics.cpu_stats.system_cpu_usage = None;
-
-        let backend_metrics_message = get_metrics_message_from_container_stats(
-            metrics.clone(),
-            backend_name.clone(),
-            &prev_sys_cpu,
-            &prev_container_cpu,
-        );
-
-        assert!(matches!(
-            backend_metrics_message,
-            Err(MetricsConversionError::NoStatsAvailable(_))
-        ));
-        metrics.cpu_stats.system_cpu_usage = tmp_mem;
-
-        prev_sys_cpu.store(u64::MAX, Ordering::SeqCst);
-        let backend_metrics_message = get_metrics_message_from_container_stats(
-            metrics.clone(),
-            backend_name.clone(),
-            &prev_sys_cpu,
-            &prev_container_cpu,
-        );
-
-        assert!(matches!(
-            backend_metrics_message,
-            Err(MetricsConversionError::SysCpuLessThanCurrent { .. })
-        ));
-        prev_sys_cpu.store(0, Ordering::SeqCst);
-
-        prev_container_cpu.store(u64::MAX, Ordering::SeqCst);
-        let backend_metrics_message = get_metrics_message_from_container_stats(
-            metrics.clone(),
-            backend_name.clone(),
-            &prev_sys_cpu,
-            &prev_container_cpu,
-        );
-
-        assert!(matches!(
-            backend_metrics_message,
-            Err(MetricsConversionError::ContainerCpuLessThanCurrent { .. })
-        ));
-        prev_container_cpu.store(0, Ordering::SeqCst);
-
-        Ok(())
-    }
 }

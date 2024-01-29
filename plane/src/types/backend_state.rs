@@ -9,6 +9,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd, valuable::Valuable)]
+#[serde(rename_all = "lowercase")]
 pub enum BackendStatus {
     /// The backend has been scheduled to a drone, but has not yet been acknowledged.
     /// This status is only assigned by the controller; the drone will never assign it by definition.
@@ -36,13 +37,14 @@ pub enum BackendStatus {
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
+#[serde(rename_all = "lowercase")]
 pub enum TerminationKind {
     Soft,
     Hard,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
-#[serde(tag = "status")]
+#[serde(tag = "status", rename_all = "lowercase")]
 pub enum BackendState {
     Scheduled,
     Loading,
@@ -67,6 +69,7 @@ pub enum BackendState {
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
+#[serde(rename_all = "lowercase")]
 pub enum TerminationReason {
     Swept,
     External,
