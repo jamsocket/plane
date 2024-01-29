@@ -32,7 +32,7 @@ async fn test_get_metrics(_: TestEnvironment) {
     let executor_config =
         ExecutorConfig::from_image_with_defaults("ghcr.io/drifting-in-space/demo-image-drop-four");
     plane_docker
-        .spawn_backend(&backend_name, &container_id, executor_config)
+        .spawn_backend(&backend_name, &container_id, executor_config, None)
         .await
         .unwrap();
 
