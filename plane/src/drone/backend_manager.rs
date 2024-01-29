@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     names::BackendName,
-    protocol::BackendMetricsMessage,
+    protocol::{AcquiredKey, BackendMetricsMessage},
     typed_socket::TypedSocketSender,
     types::{
         backend_state::TerminationReason, BackendState, ExecutorConfig, PullPolicy, TerminationKind,
@@ -145,6 +145,9 @@ pub struct BackendManager {
 
     /// IP address of the drone.
     ip: IpAddr,
+
+    /// Key acquired by the backend.
+    acquired_key: AcquiredKey,
 }
 
 impl Debug for BackendManager {
@@ -165,6 +168,7 @@ impl BackendManager {
         state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
         metrics_sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
         ip: IpAddr,
+        acquired_key: AcquiredKey,
     ) -> Arc<Self> {
         let container_id = ContainerId::from(format!("plane-{}", backend_id));
 
@@ -185,6 +189,7 @@ impl BackendManager {
             state_callback: Box::new(state_callback),
             container_id,
             ip,
+            acquired_key,
         });
 
         manager.set_state(state);
@@ -228,9 +233,15 @@ impl BackendManager {
                 let ip = self.ip;
                 self.metrics_manager.start_gathering_metrics();
 
+                let acquired_key = self.acquired_key.clone();
                 StepStatusResult::future_status(async move {
                     let spawn_result = docker
-                        .spawn_backend(&backend_id, &container_id, executor_config)
+                        .spawn_backend(
+                            &backend_id,
+                            &container_id,
+                            executor_config,
+                            Some(&acquired_key),
+                        )
                         .await;
 
                     let spawn_result = match spawn_result {
@@ -290,6 +301,8 @@ impl BackendManager {
             "Updating backend state"
         );
 
+        lock.state = state.clone();
+
         // Cancel any existing task.
         lock.handle.take();
 
@@ -340,6 +353,7 @@ impl BackendManager {
             .expect("State lock is poisoned")
             .state
             .clone();
+        tracing::info!(?self.backend_id, ?state, "Marking backend as terminated");
         self.set_state(state.to_terminated(exit_code));
 
         Ok(())

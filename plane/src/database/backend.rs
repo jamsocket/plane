@@ -1,10 +1,10 @@
-use super::{subscribe::emit_with_key, util::MapSqlxError, PlaneDatabase};
+use super::{subscribe::emit_with_key, PlaneDatabase};
 use crate::{
-    log_types::{BackendAddr, LoggableTime},
+    log_types::BackendAddr,
     names::{BackendActionName, BackendName},
     protocol::{BackendAction, RouteInfo},
     types::{
-        backend_state::TimestampedBackendStatus, BackendState, BackendStatus, BearerToken, NodeId,
+        backend_state::BackendStatusStreamEntry, BackendState, BackendStatus, BearerToken, NodeId,
         SecretToken,
     },
 };
@@ -45,7 +45,7 @@ impl<'a> BackendDatabase<'a> {
     pub async fn status_stream(
         &self,
         backend: &BackendName,
-    ) -> sqlx::Result<impl Stream<Item = TimestampedBackendStatus>> {
+    ) -> sqlx::Result<impl Stream<Item = BackendStatusStreamEntry>> {
         let mut sub = self
             .db
             .subscribe_with_key::<BackendState>(&backend.to_string());
@@ -55,8 +55,8 @@ impl<'a> BackendDatabase<'a> {
             select
                 id,
                 created_at,
-                status
-            from backend_status
+                state
+            from backend_state
             where backend_id = $1
             order by id asc
             "#,
@@ -68,14 +68,11 @@ impl<'a> BackendDatabase<'a> {
         let stream = async_stream::stream! {
             let mut last_status = None;
             for row in result {
-                let status = BackendStatus::try_from(row.status);
-                match status {
-                    Ok(status) => {
-                        yield TimestampedBackendStatus {
-                            time: LoggableTime(row.created_at),
-                            status,
-                        };
-                        last_status = Some(status);
+                let state: Result<BackendState, _> = serde_json::from_value(row.state);
+                match state {
+                    Ok(state) => {
+                        yield BackendStatusStreamEntry::from_state(state.clone(), row.created_at);
+                        last_status = Some(state.status());
                     }
                     Err(e) => {
                         tracing::warn!(?e, "Invalid backend status");
@@ -84,23 +81,21 @@ impl<'a> BackendDatabase<'a> {
             }
 
             while let Some(item) = sub.next().await {
-                let status = item.payload.status();
+                let state = item.payload;
                 // In order to missing events that occur when we read the DB and when we subscribe to updates,
                 // we subscribe to updates before we read from the DB. But this means we might get duplicate
                 // events, so we keep track of the last status we saw and ignore events that have a status
                 // less than or equal to it.
                 if let Some(last_status) = last_status {
-                    if status <= last_status {
+                    if state.status() <= last_status {
                         continue;
                     }
                 }
 
                 let time = item.timestamp;
+                let item = BackendStatusStreamEntry::from_state(state.clone(), time);
 
-                let item = TimestampedBackendStatus {
-                    status,
-                    time: LoggableTime(time),
-                };
+                last_status = Some(state.status());
 
                 yield item;
             }
@@ -117,6 +112,7 @@ impl<'a> BackendDatabase<'a> {
                 cluster,
                 last_status,
                 last_status_time,
+                state,
                 drone_id,
                 expiration_time,
                 allowed_idle_seconds,
@@ -138,9 +134,10 @@ impl<'a> BackendDatabase<'a> {
             id: BackendName::try_from(result.id)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?,
             cluster: result.cluster,
-            last_status: BackendStatus::try_from(result.last_status).map_sqlx_error()?,
             last_status_time: result.last_status_time,
             last_keepalive: result.last_keepalive,
+            state: serde_json::from_value(result.state)
+                .map_err(|_| sqlx::Error::Decode("Failed to decode backend state.".into()))?,
             drone_id: NodeId::from(result.drone_id),
             expiration_time: result.expiration_time,
             allowed_idle_seconds: result.allowed_idle_seconds,
@@ -177,11 +174,11 @@ impl<'a> BackendDatabase<'a> {
 
         sqlx::query!(
             r#"
-            insert into backend_status (backend_id, status)
+            insert into backend_state (backend_id, state)
             values ($1, $2)
             "#,
             backend.to_string(),
-            state.status().to_string(),
+            serde_json::to_value(&state).expect("BackendState should always be JSON-serializable."),
         )
         .execute(&mut *txn)
         .await?;
@@ -212,6 +209,7 @@ impl<'a> BackendDatabase<'a> {
                 cluster,
                 last_status,
                 last_status_time,
+                state,
                 drone_id,
                 expiration_time,
                 allowed_idle_seconds,
@@ -230,8 +228,9 @@ impl<'a> BackendDatabase<'a> {
                 id: BackendName::try_from(row.id)
                     .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?,
                 cluster: row.cluster,
-                last_status: BackendStatus::try_from(row.last_status).map_sqlx_error()?,
                 last_status_time: row.last_status_time,
+                state: serde_json::from_value(row.state)
+                    .map_err(|_| sqlx::Error::Decode("Failed to decode backend state.".into()))?,
                 last_keepalive: row.last_keepalive,
                 drone_id: NodeId::from(row.drone_id),
                 expiration_time: row.expiration_time,
@@ -365,8 +364,8 @@ pub struct TerminationCandidate {
 pub struct BackendRow {
     pub id: BackendName,
     pub cluster: String,
-    pub last_status: BackendStatus,
     pub last_status_time: DateTime<Utc>,
+    pub state: BackendState,
     pub last_keepalive: DateTime<Utc>,
     pub drone_id: NodeId,
     pub expiration_time: Option<DateTime<Utc>>,

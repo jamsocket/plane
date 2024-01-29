@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            select\n                id,\n                cluster,\n                last_status,\n                last_status_time,\n                drone_id,\n                expiration_time,\n                allowed_idle_seconds,\n                last_keepalive,\n                now() as \"as_of!\"\n            from backend\n            where id = $1\n            ",
+  "query": "\n            select\n                id,\n                cluster,\n                last_status,\n                last_status_time,\n                state,\n                drone_id,\n                expiration_time,\n                allowed_idle_seconds,\n                last_keepalive,\n                now() as \"as_of!\"\n            from backend\n            ",
   "describe": {
     "columns": [
       {
@@ -25,36 +25,40 @@
       },
       {
         "ordinal": 4,
+        "name": "state",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
         "name": "drone_id",
         "type_info": "Int4"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "expiration_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "allowed_idle_seconds",
         "type_info": "Int4"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "last_keepalive",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "as_of!",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
-      "Left": [
-        "Text"
-      ]
+      "Left": []
     },
     "nullable": [
+      false,
       false,
       false,
       false,
@@ -66,5 +70,5 @@
       null
     ]
   },
-  "hash": "a42e8f2278997853dbef5b514de8c7404084d3fe383d5cfe4016f63e0705fa3e"
+  "hash": "d0df9e37397ac95a754dc60ced95cbc43cce456bdb267d448ba9d80845665a1b"
 }
