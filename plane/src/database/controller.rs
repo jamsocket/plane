@@ -1,27 +1,13 @@
-use super::subscribe::emit;
 use crate::names::ControllerName;
 use crate::PLANE_GIT_HASH;
 use crate::PLANE_VERSION;
 use anyhow::Result;
 use chrono::DateTime;
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
 pub struct ControllerDatabase<'a> {
     pool: &'a PgPool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ControllerHeartbeatNotification {
-    pub id: ControllerName,
-    pub is_online: bool,
-}
-
-impl super::subscribe::NotificationPayload for ControllerHeartbeatNotification {
-    fn kind() -> &'static str {
-        "controller_heartbeat"
-    }
 }
 
 impl<'a> ControllerDatabase<'a> {
@@ -52,15 +38,6 @@ impl<'a> ControllerDatabase<'a> {
             PLANE_GIT_HASH,
         )
         .execute(&mut *transaction)
-        .await?;
-
-        emit(
-            &mut *transaction,
-            &ControllerHeartbeatNotification {
-                id: name.clone(),
-                is_online,
-            },
-        )
         .await?;
 
         transaction.commit().await?;
