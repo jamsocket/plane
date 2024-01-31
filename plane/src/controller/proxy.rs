@@ -1,4 +1,4 @@
-use super::Controller;
+use super::{error::ApiErrorKind, Controller};
 use crate::{
     controller::error::IntoApiError,
     protocol::{
@@ -132,10 +132,11 @@ pub async fn handle_proxy_socket(
     connect_info: ConnectInfo<SocketAddr>,
     ws: WebSocketUpgrade,
 ) -> Result<impl IntoResponse, Response> {
-    let cluster: ClusterName = cluster
-        .parse()
-        .ok()
-        .or_status(StatusCode::BAD_REQUEST, "Invalid cluster name")?;
+    let cluster: ClusterName = cluster.parse().ok().or_status(
+        StatusCode::BAD_REQUEST,
+        "Invalid cluster name",
+        ApiErrorKind::InvalidClusterName,
+    )?;
     let ip = connect_info.ip();
     Ok(ws.on_upgrade(move |socket| proxy_socket(cluster, socket, controller, ip)))
 }

@@ -50,7 +50,7 @@ pub enum ConnectError {
     FailedToAcquireKey,
 
     #[error("SQL error: {0}")]
-    Sql(#[from] sqlx::Error),
+    DatabaseError(#[from] sqlx::Error),
 
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
