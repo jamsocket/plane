@@ -29,7 +29,7 @@ export default {
             <meta property="og:image" content={ogImageUrl} />
             <meta name="twitter:image" content={ogImageUrl} />
             <meta name="twitter:card" content="summary_large_image" />
-            <meta name="twitter:site" content="@drifting_corp" />
+            <meta name="twitter:site" content="@JamsocketHQ" />
             <meta name="twitter:title" content="Plane" />
             <meta name="twitter:description" content="An open-source distributed system for scaling WebSocket backends." />
         </>
