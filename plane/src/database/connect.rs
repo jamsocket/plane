@@ -224,6 +224,7 @@ async fn attempt_connect(
                     token,
                     secret_token,
                     client,
+                    None,
                 );
 
                 return Ok(connect_response);
@@ -284,6 +285,7 @@ async fn attempt_connect(
         token,
         secret_token,
         client,
+        Some(drone.drone),
     );
 
     Ok(connect_response)

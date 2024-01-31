@@ -1,4 +1,8 @@
-use crate::{client::PlaneClient, names::BackendName, util::random_prefixed_string};
+use crate::{
+    client::PlaneClient,
+    names::{BackendName, DroneName},
+    util::random_prefixed_string,
+};
 pub use backend_state::{BackendState, BackendStatus, TerminationKind, TerminationReason};
 use bollard::auth::DockerCredentials;
 use serde::{Deserialize, Serialize};
@@ -305,6 +309,9 @@ pub struct ConnectResponse {
     pub secret_token: SecretToken,
 
     pub status_url: String,
+
+    /// The drone that spawned this backend, if the request resulted in a spawn.
+    pub drone: Option<DroneName>,
 }
 
 impl ConnectResponse {
@@ -316,6 +323,7 @@ impl ConnectResponse {
         token: BearerToken,
         secret_token: SecretToken,
         client: &PlaneClient,
+        drone: Option<DroneName>,
     ) -> Self {
         let url = if cluster.is_https() {
             format!("https://{}/{}/", cluster, token)
@@ -333,6 +341,7 @@ impl ConnectResponse {
             url,
             secret_token,
             status_url,
+            drone,
         }
     }
 }
