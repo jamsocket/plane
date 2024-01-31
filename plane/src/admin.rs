@@ -103,7 +103,7 @@ enum AdminCommand {
         #[clap(long)]
         max_idle_seconds: Option<i32>,
 
-        /// An optional backend to assign the string (not recommended and may be removed. Omitto allow Plane to auto-assign
+        /// An optional backend to assign the string (not recommended and may be removed. Omit to allow Plane to auto-assign
         /// one instead).
         #[clap(long)]
         id: Option<BackendName>,
