@@ -187,6 +187,10 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             println!("URL: {}", response.url.bright_white());
             println!("Status URL: {}", response.status_url.bright_white());
 
+            if let Some(drone) = response.drone {
+                println!("Drone: {}", drone.to_string().bright_green());
+            }
+
             if wait {
                 let mut stream = client.backend_status_stream(&response.backend_id).await?;
 
