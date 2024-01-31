@@ -1,9 +1,10 @@
 use crate::{
     heartbeat_consts::UNHEALTHY_SECONDS,
+    names::DroneName,
     types::{ClusterName, NodeId},
 };
 use chrono::{DateTime, Utc};
-use sqlx::{postgres::types::PgInterval, query, query_as, PgPool};
+use sqlx::{postgres::types::PgInterval, query, PgPool};
 use std::time::Duration;
 
 pub struct DroneDatabase<'a> {
@@ -72,11 +73,11 @@ impl<'a> DroneDatabase<'a> {
         &self,
         cluster: &ClusterName,
     ) -> sqlx::Result<Option<DroneForSpawn>> {
-        let result = query_as!(
-            DroneForSpawn,
+        let result = query!(
             r#"
             select
                 drone.id,
+                node.name,
                 drone.last_local_time as "last_local_time!"
             from node
             left join drone
@@ -108,11 +109,27 @@ impl<'a> DroneDatabase<'a> {
         .fetch_optional(self.pool)
         .await?;
 
+        let result = match result {
+            Some(result) => {
+                let id = NodeId::from(result.id);
+                let drone = DroneName::try_from(result.name).expect("valid drone name");
+                let last_local_time = result.last_local_time;
+
+                Some(DroneForSpawn {
+                    id,
+                    drone,
+                    last_local_time,
+                })
+            }
+            None => return Ok(None),
+        };
+
         Ok(result)
     }
 }
 
 pub struct DroneForSpawn {
     pub id: NodeId,
+    pub drone: DroneName,
     pub last_local_time: DateTime<Utc>,
 }
