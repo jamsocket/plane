@@ -189,6 +189,12 @@ impl ExecutorConfig {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SpawnConfig {
+    /// ID to assign to the new backend. Must be unique.
+    /// This should only be used if you really need it, otherwise you can leave it blank
+    /// and let Plane assign a unique ID automatically. This may be removed from
+    /// future versions of Plane.
+    pub id: Option<BackendName>,
+
     /// Cluster to spawn to. Uses the controller default if not provided.
     pub cluster: Option<ClusterName>,
 

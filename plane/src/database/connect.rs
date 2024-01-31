@@ -10,7 +10,7 @@ use crate::{
         drone::DroneDatabase,
     },
     log_types::LoggableTime,
-    names::{BackendName, Name},
+    names::{BackendName, OrRandom},
     protocol::{AcquiredKey, BackendAction, KeyDeadlines},
     types::{
         BackendState, BackendStatus, BearerToken, ClusterName, ConnectRequest, ConnectResponse,
@@ -81,7 +81,7 @@ async fn create_backend_with_key(
     cluster: &ClusterName,
     drone_for_spawn: &DroneForSpawn,
 ) -> Result<Option<BackendName>> {
-    let backend_id = BackendName::new_random();
+    let backend_id = spawn_config.id.clone().or_random();
     let mut txn = pool.begin().await?;
 
     let result = sqlx::query!(
