@@ -22,6 +22,7 @@ async fn reuse_key(env: TestEnvironment) {
     tracing::info!("Requesting backend.");
     let connect_request = ConnectRequest {
         spawn_config: Some(SpawnConfig {
+            id: None,
             cluster: Some(env.cluster.clone()),
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),

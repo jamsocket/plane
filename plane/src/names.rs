@@ -29,11 +29,11 @@ pub trait Name:
 
     fn new_random() -> Self;
 
-    fn prefix() -> &'static str;
+    fn prefix() -> Option<&'static str>;
 }
 
 macro_rules! entity_name {
-    ($name:ident, $prefix:literal) => {
+    ($name:ident, $prefix:expr) => {
         #[derive(
             Debug,
             Clone,
@@ -52,11 +52,14 @@ macro_rules! entity_name {
             }
 
             fn new_random() -> Self {
-                let st = crate::util::random_prefixed_string($prefix);
-                Self(st)
+                if let Some(prefix) = $prefix {
+                    Self(crate::util::random_prefixed_string(prefix))
+                } else {
+                    Self(crate::util::random_string())
+                }
             }
 
-            fn prefix() -> &'static str {
+            fn prefix() -> Option<&'static str> {
                 $prefix
             }
         }
@@ -71,8 +74,10 @@ macro_rules! entity_name {
             type Error = NameError;
 
             fn try_from(s: String) -> Result<Self, NameError> {
-                if !s.starts_with($prefix) {
-                    return Err(NameError::InvalidPrefix(s, $prefix.to_string()));
+                if let Some(prefix) = $prefix {
+                    if !s.starts_with(prefix) {
+                        return Err(NameError::InvalidPrefix(s, prefix.to_string()));
+                    }
                 }
 
                 if s.len() > MAX_NAME_LENGTH {
@@ -146,12 +151,12 @@ impl<T: Name> clap::builder::TypedValueParser for NameParser<T> {
     }
 }
 
-entity_name!(ControllerName, "co");
-entity_name!(BackendName, "ba");
-entity_name!(ProxyName, "pr");
-entity_name!(DroneName, "dr");
-entity_name!(AcmeDnsServerName, "ns");
-entity_name!(BackendActionName, "ak");
+entity_name!(ControllerName, Some("co"));
+entity_name!(BackendName, None::<&'static str>);
+entity_name!(ProxyName, Some("pr"));
+entity_name!(DroneName, Some("dr"));
+entity_name!(AcmeDnsServerName, Some("ns"));
+entity_name!(BackendActionName, Some("ak"));
 
 pub trait NodeName: Name {
     fn kind(&self) -> NodeKind;
@@ -195,11 +200,11 @@ impl TryFrom<String> for AnyNodeName {
     type Error = NameError;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
-        if s.starts_with(ProxyName::prefix()) {
+        if s.starts_with(ProxyName::prefix().expect("has prefix")) {
             Ok(AnyNodeName::Proxy(ProxyName::try_from(s)?))
-        } else if s.starts_with(DroneName::prefix()) {
+        } else if s.starts_with(DroneName::prefix().expect("has prefix")) {
             Ok(AnyNodeName::Drone(DroneName::try_from(s)?))
-        } else if s.starts_with(AcmeDnsServerName::prefix()) {
+        } else if s.starts_with(AcmeDnsServerName::prefix().expect("has prefix")) {
             Ok(AnyNodeName::AcmeDnsServer(AcmeDnsServerName::try_from(s)?))
         } else {
             Err(NameError::InvalidAnyPrefix(s))

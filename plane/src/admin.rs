@@ -102,6 +102,11 @@ enum AdminCommand {
         /// The number of seconds without any connected clients to wait before terminating the backend.
         #[clap(long)]
         max_idle_seconds: Option<i32>,
+
+        /// An optional backend to assign the string (not recommended and may be removed. Omit to allow Plane to auto-assign
+        /// one instead).
+        #[clap(long)]
+        id: Option<BackendName>,
     },
     Terminate {
         #[clap(long)]
@@ -144,10 +149,12 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             key,
             wait,
             max_idle_seconds,
+            id,
         } => {
             let executor_config = ExecutorConfig::from_image_with_defaults(image);
             let max_idle_seconds = max_idle_seconds.unwrap_or(500);
             let spawn_config = SpawnConfig {
+                id,
                 cluster: cluster.clone(),
                 executable: executor_config.clone(),
                 lifetime_limit_seconds: None,
