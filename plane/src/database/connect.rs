@@ -191,6 +191,20 @@ async fn create_token(
     Ok((BearerToken::from(token), SecretToken::from(secret_token)))
 }
 
+pub async fn revoke_token(pool: &PgPool, backend: &BackendName, username: &str) -> Result<()> {
+    sqlx::query!(
+        r#"
+        DELETE FROM token
+        WHERE backend_id = $1 AND username = $2
+        "#,
+        backend.to_string(),
+        username,
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 async fn attempt_connect(
     pool: &PgPool,
     default_cluster: Option<&ClusterName>,

@@ -119,7 +119,6 @@ impl PlaneClient {
         authed_post(&self.client, &addr, &()).await?;
         Ok(())
     }
-
     pub async fn soft_terminate(&self, backend_id: &BackendName) -> Result<(), PlaneClientError> {
         let addr = self
             .controller_address
@@ -133,6 +132,19 @@ impl PlaneClient {
         let addr = self
             .controller_address
             .join(&format!("/ctrl/b/{}/hard-terminate", backend_id));
+
+        authed_post(&self.client, &addr, &()).await?;
+        Ok(())
+    }
+
+    pub async fn revoke_token(
+        &self,
+        backend_id: &BackendName,
+        username: &str,
+    ) -> Result<(), PlaneClientError> {
+        let addr = self
+            .controller_address
+            .join(&format!("/ctrl/b/{}/{}/revoke-token", backend_id, username));
 
         authed_post(&self.client, &addr, &()).await?;
         Ok(())

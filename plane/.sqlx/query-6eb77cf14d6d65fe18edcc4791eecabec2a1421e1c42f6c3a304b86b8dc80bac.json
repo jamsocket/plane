@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM token\n        WHERE backend_id = $1 AND username = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6eb77cf14d6d65fe18edcc4791eecabec2a1421e1c42f6c3a304b86b8dc80bac"
+}

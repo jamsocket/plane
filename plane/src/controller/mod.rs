@@ -1,5 +1,6 @@
 use self::{
     backend_state::{handle_backend_status, handle_backend_status_stream},
+    connect::handle_token_revocation,
     dns::handle_dns_socket,
     drain::handle_drain,
     proxy::handle_proxy_socket,
@@ -163,8 +164,11 @@ impl ControllerServer {
             .route(
                 "/b/:backend/hard-terminate",
                 post(terminate::handle_hard_terminate),
+            )
+            .route(
+                "/b/:backend/:user/revoke-token",
+                post(handle_token_revocation), // (TODO) does not notify proxies, see handler function for details
             );
-
         let cors_public = CorsLayer::new()
             .allow_methods(vec![Method::GET, Method::POST])
             .allow_headers(vec![header::CONTENT_TYPE])
