@@ -97,7 +97,7 @@ enum AdminCommand {
         key: Option<String>,
 
         #[clap(long)]
-        wait: bool,
+        immediate: bool,
 
         /// The number of seconds without any connected clients to wait before terminating the backend.
         #[clap(long)]
@@ -116,7 +116,7 @@ enum AdminCommand {
         hard: bool,
 
         #[clap(long)]
-        wait: bool,
+        immediate: bool,
     },
     Drain {
         #[clap(long)]
@@ -147,7 +147,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             cluster,
             image,
             key,
-            wait,
+            immediate,
             max_idle_seconds,
             id,
         } => {
@@ -191,7 +191,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                 println!("Drone: {}", drone.to_string().bright_green());
             }
 
-            if wait {
+            if !immediate {
                 let mut stream = client.backend_status_stream(&response.backend_id).await?;
 
                 while let Some(status) = stream.next().await {
@@ -210,7 +210,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
         AdminCommand::Terminate {
             backend,
             hard,
-            wait,
+            immediate,
         } => {
             if hard {
                 client.hard_terminate(&backend).await?
@@ -223,7 +223,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                 backend.to_string().bright_green()
             );
 
-            if wait {
+            if !immediate {
                 let mut stream = client.backend_status_stream(&backend).await?;
 
                 while let Some(status) = stream.next().await {
