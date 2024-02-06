@@ -346,7 +346,7 @@ impl ConnectResponse {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub enum NodeKind {
     Proxy,
     Drone,
