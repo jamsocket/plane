@@ -15,8 +15,8 @@ pub async fn handle_messages<T: ChannelMessage>(
                 match msg {
                     SocketAction::Send(msg) => {
                         let msg = Message::Text(serde_json::to_string(&msg).expect("Always serializable."));
-                        if let Err(err) = socket.send(msg).await {
-                            tracing::error!(?err, "Failed to send message on websocket.");
+                        if let Err(err) = socket.send(msg.clone()).await {
+                            tracing::error!(?err, message=?msg, "Failed to send message on websocket.");
                         }
                     }
                     SocketAction::Close => {
