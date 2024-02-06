@@ -888,14 +888,7 @@ CREATE INDEX idx_backend_action_pending ON public.backend_action USING btree (dr
 -- Name: idx_backend_drone_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_backend_drone_id ON public.backend USING btree (cluster, drone_id) WHERE ((last_status)::text <> 'Terminated'::text);
-
-
---
--- Name: INDEX idx_backend_drone_id; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON INDEX public.idx_backend_drone_id IS 'An index for identifying running backends on a particular drone.';
+CREATE INDEX idx_backend_drone_id ON public.backend USING btree (cluster, drone_id) WHERE ((last_status)::text <> 'terminated'::text);
 
 
 --
