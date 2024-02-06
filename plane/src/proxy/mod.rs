@@ -88,6 +88,7 @@ pub async fn run_proxy(
     cert_path: Option<&Path>,
     port_config: ServerPortConfig,
     acme_config: Option<AcmeConfig>,
+    root_redirect_url: Option<Url>,
 ) -> Result<()> {
     let (cert_watcher, cert_manager) =
         watcher_manager_pair(cluster.clone(), cert_path, acme_config)?;
@@ -100,6 +101,7 @@ pub async fn run_proxy(
     let http_handle = ProxyMakeService {
         state: proxy_connection.state(),
         https_redirect,
+        root_redirect_url: root_redirect_url.clone(),
     }
     .serve_http(port_config.http_port, shutdown_signal.subscribe())?;
 
@@ -107,6 +109,7 @@ pub async fn run_proxy(
         let https_handle = ProxyMakeService {
             state: proxy_connection.state(),
             https_redirect: false,
+            root_redirect_url,
         }
         .serve_https(https_port, cert_watcher, shutdown_signal.subscribe())?;
 
