@@ -95,6 +95,10 @@ enum Command {
 
         #[clap(long)]
         acme_email: Option<String>,
+
+        /// URL to redirect the root path to.
+        #[clap(long)]
+        root_redirect_url: Option<Url>,
     },
     Dns {
         #[clap(long)]
@@ -188,6 +192,7 @@ async fn run(opts: Opts) -> Result<()> {
             cert_path,
             acme_endpoint,
             acme_email,
+            root_redirect_url,
         } => {
             let name = name.or_random();
             tracing::info!(?name, "Starting proxy");
@@ -243,6 +248,7 @@ async fn run(opts: Opts) -> Result<()> {
                 cert_path.as_deref(),
                 port_config,
                 acme_config,
+                root_redirect_url,
             )
             .await?;
         }

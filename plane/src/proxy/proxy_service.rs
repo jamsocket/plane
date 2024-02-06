@@ -22,6 +22,7 @@ use std::{
 use tokio::io::copy_bidirectional;
 use tokio::task::JoinHandle;
 use tokio_rustls::rustls::ServerConfig;
+use url::Url;
 
 const PLANE_BACKEND_ID_HEADER: &str = "x-plane-backend-id";
 
@@ -62,6 +63,7 @@ struct RequestHandler {
     state: Arc<ProxyState>,
     https_redirect: bool,
     remote_meta: ForwardableRequestInfo,
+    root_redirect_url: Option<Url>,
 }
 
 impl RequestHandler {
@@ -101,6 +103,15 @@ impl RequestHandler {
                 .status(hyper::StatusCode::MOVED_PERMANENTLY)
                 .header(hyper::header::LOCATION, uri.to_string())
                 .body(hyper::Body::empty())?);
+        }
+
+        if req.uri().path() == "/" {
+            if let Some(root_redirect_url) = &self.root_redirect_url {
+                return Ok(hyper::Response::builder()
+                    .status(hyper::StatusCode::MOVED_PERMANENTLY)
+                    .header(hyper::header::LOCATION, root_redirect_url.to_string())
+                    .body(hyper::Body::empty())?);
+            }
         }
 
         self.handle_proxy_request(req).await
@@ -230,6 +241,7 @@ impl Service<Request<Body>> for ProxyService {
 pub struct ProxyMakeService {
     pub state: Arc<ProxyState>,
     pub https_redirect: bool,
+    pub root_redirect_url: Option<Url>,
 }
 
 impl ProxyMakeService {
@@ -298,6 +310,7 @@ impl<'a> Service<&'a AddrStream> for ProxyMakeService {
                 ip: remote_ip,
                 protocol: Protocol::Http,
             },
+            root_redirect_url: self.root_redirect_url.clone(),
         });
         ready(Ok(ProxyService { handler })).boxed()
     }
@@ -321,6 +334,7 @@ impl<'a> Service<&'a TlsStream> for ProxyMakeService {
                 ip: remote_ip,
                 protocol: Protocol::Https,
             },
+            root_redirect_url: self.root_redirect_url.clone(),
         });
         ready(Ok(ProxyService { handler })).boxed()
     }
