@@ -17,11 +17,11 @@ Tags are useful for sharing a key space between non-interchangeable backends. Fo
 
 Every backend has an associated key. If one is not provided when calling `connect`, Plane will generate one at random. This key is returned as part of the `connect` response.
 
-Plane attempts to guarantee that if a backend is in the `Starting`, `Waiting`, or `Ready` state, the drone running the backend holds the key. It also attempts to guarantee that if a backend is in the `Terminating` state, the key may be expired but is within a termination grace period (N.B. this is unrelated to the idle backend grace period).
+Plane attempts to guarantee that if a backend is in the `starting`, `waiting`, or `ready` state, the drone running the backend holds the key. It also attempts to guarantee that if a backend is in the `terminating` state, the key may be expired but is within a termination grace period (N.B. this is unrelated to the idle backend grace period).
 
 If the drone *can't* renew the key, the drone is responsible for terminating the backend on a fixed timeline. The drone will first attempt to shut down the backend gracefully, but will then terminate it with a hard deadline.
 
-The current implementation also happens to ensure that the key is held during the `Loading` state, but this is not guaranteed to be the case in the future (this is to accomedate potential “pre-warming” behavior in a future release).
+The current implementation also happens to ensure that the key is held during the `loading` state, but this is not guaranteed to be the case in the future (this is to accomedate potential “pre-warming” behavior in a future release).
 
 ## Key acquisition and renewal
 
