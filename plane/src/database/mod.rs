@@ -30,13 +30,13 @@ pub mod subscribe;
 pub mod util;
 
 pub async fn connect_and_migrate(db: &str) -> sqlx::Result<PlaneDatabase> {
-    let db_pool = PgPoolOptions::new().max_connections(5).connect(db).await?;
+    let db_pool = PgPoolOptions::new().connect(db).await?;
     sqlx::migrate!("schema/migrations").run(&db_pool).await?;
     Ok(PlaneDatabase::new(db_pool))
 }
 
 pub async fn connect(db: &str) -> sqlx::Result<PlaneDatabase> {
-    let db_pool = PgPoolOptions::new().max_connections(1).connect(db).await?;
+    let db_pool = PgPoolOptions::new().connect(db).await?;
     Ok(PlaneDatabase::new(db_pool))
 }
 
