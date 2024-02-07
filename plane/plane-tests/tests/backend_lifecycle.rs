@@ -36,6 +36,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
             },
             lifetime_limit_seconds: None,
             max_idle_seconds: None,
+            use_static_token: false,
         }),
         key: None,
         user: None,
@@ -149,7 +150,10 @@ async fn backend_lifecycle(env: TestEnvironment) {
     };
 
     assert_eq!(token, response.token);
-    assert_eq!(route_info.unwrap().secret_token, response.secret_token);
+    assert_eq!(
+        route_info.unwrap().secret_token,
+        response.secret_token.unwrap()
+    );
 
     tracing::info!("Getting last keepalive time.");
     let initial_keepalive = {

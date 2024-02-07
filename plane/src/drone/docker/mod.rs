@@ -5,7 +5,7 @@ use self::{
 use crate::{
     names::BackendName,
     protocol::{AcquiredKey, BackendMetricsMessage},
-    types::ExecutorConfig,
+    types::{BearerToken, ExecutorConfig},
 };
 use anyhow::Result;
 use bollard::{
@@ -120,6 +120,7 @@ impl PlaneDocker {
         container_id: &ContainerId,
         executable: ExecutorConfig,
         acquired_key: Option<&AcquiredKey>,
+        static_token: Option<&BearerToken>,
     ) -> Result<SpawnResult> {
         run_container(
             &self.docker,
@@ -128,6 +129,7 @@ impl PlaneDocker {
             executable,
             self.runtime.as_deref(),
             acquired_key,
+            static_token,
         )
         .await?;
         let port = get_port(&self.docker, container_id).await?;

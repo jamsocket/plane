@@ -107,6 +107,10 @@ enum AdminCommand {
         /// one instead).
         #[clap(long)]
         id: Option<BackendName>,
+
+        /// Use a static connection token for this backend instead of generating them dynamically for each user.
+        #[clap(long)]
+        static_token: bool,
     },
     Terminate {
         #[clap(long)]
@@ -150,6 +154,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             immediate,
             max_idle_seconds,
             id,
+            static_token,
         } => {
             let executor_config = ExecutorConfig::from_image_with_defaults(image);
             let max_idle_seconds = max_idle_seconds.unwrap_or(500);
@@ -159,6 +164,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                 executable: executor_config.clone(),
                 lifetime_limit_seconds: None,
                 max_idle_seconds: Some(max_idle_seconds),
+                use_static_token: static_token,
             };
             let key_config = key.map(|name| KeyConfig {
                 name,

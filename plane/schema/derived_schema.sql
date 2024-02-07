@@ -105,7 +105,8 @@ CREATE TABLE public.backend (
     expiration_time timestamp with time zone,
     last_keepalive timestamp with time zone NOT NULL,
     allowed_idle_seconds integer,
-    state jsonb NOT NULL
+    state jsonb NOT NULL,
+    static_token character varying(256)
 );
 
 
@@ -896,6 +897,13 @@ CREATE INDEX idx_backend_drone_id ON public.backend USING btree (cluster, drone_
 --
 
 CREATE INDEX idx_backend_state_created_at ON public.backend_state USING btree (backend_id, created_at);
+
+
+--
+-- Name: idx_backend_static_token; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_backend_static_token ON public.backend USING btree (static_token);
 
 
 --

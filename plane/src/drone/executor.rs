@@ -89,7 +89,11 @@ impl Executor {
         action: &BackendAction,
     ) -> Result<()> {
         match action {
-            BackendAction::Spawn { executable, key } => {
+            BackendAction::Spawn {
+                executable,
+                key,
+                static_token,
+            } => {
                 let callback = {
                     let state_store = self.state_store.clone();
                     let backend_id = backend_id.clone();
@@ -119,6 +123,7 @@ impl Executor {
                     metrics_sender,
                     self.ip,
                     key.clone(),
+                    static_token.clone(),
                 );
                 tracing::info!("Inserting backend {}.", backend_id);
                 self.backends.insert(backend_id.clone(), manager);

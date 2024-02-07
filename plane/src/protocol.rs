@@ -43,6 +43,7 @@ pub enum BackendAction {
     Spawn {
         executable: Box<ExecutorConfig>,
         key: AcquiredKey,
+        static_token: Option<BearerToken>,
     },
     Terminate {
         kind: TerminationKind,
