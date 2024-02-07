@@ -186,6 +186,7 @@ impl<'a> NodeDatabase<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct NodeRow {
     pub id: NodeId,
     pub cluster: Option<ClusterName>,
