@@ -180,6 +180,7 @@ impl NodeName for AcmeDnsServerName {
     }
 }
 
+#[derive(Debug)]
 pub enum AnyNodeName {
     Proxy(ProxyName),
     Drone(DroneName),
