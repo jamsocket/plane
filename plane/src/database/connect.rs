@@ -80,6 +80,7 @@ async fn create_backend_with_key(
     spawn_config: &SpawnConfig,
     cluster: &ClusterName,
     drone_for_spawn: &DroneForSpawn,
+    static_token: Option<&BearerToken>,
 ) -> Result<Option<BackendName>> {
     let backend_id = spawn_config.id.clone().or_random();
     let mut txn = pool.begin().await?;
@@ -96,9 +97,10 @@ async fn create_backend_with_key(
                 expiration_time,
                 allowed_idle_seconds,
                 last_keepalive,
-                state
+                state,
+                static_token
             )
-            values ($1, $2, $3, now(), $4, now() + $5, $6, now(), $11)
+            values ($1, $2, $3, now(), $4, now() + $5, $6, now(), $11, $12)
             returning id
         )
         insert into backend_key (id, key_name, namespace, tag, expires_at, fencing_token)
@@ -121,6 +123,7 @@ async fn create_backend_with_key(
         key.tag,
         PgInterval::try_from(KEY_LEASE_EXPIRATION).expect("valid constant interval"),
         serde_json::to_value(&BackendState::Scheduled).expect("valid json"),
+        static_token.map(|t| t.to_string()),
     )
     .fetch_optional(&mut *txn)
     .await?;
@@ -146,6 +149,7 @@ async fn create_backend_with_key(
     let pending_action = BackendAction::Spawn {
         executable: Box::new(spawn_config.executable.clone()),
         key: acquired_key,
+        static_token: static_token.cloned(),
     };
 
     // Create an action to spawn the backend. If we succeed in acquiring the key,
@@ -208,13 +212,20 @@ async fn attempt_connect(
                     });
                 }
 
-                let (token, secret_token) = create_token(
-                    pool,
-                    &key_result.id,
-                    request.user.as_deref(),
-                    request.auth.clone(),
-                )
-                .await?;
+                let (token, secret_token) = if let Some(token) = key_result.static_connection_token
+                {
+                    (token, None)
+                } else {
+                    let (token, secret_token) = create_token(
+                        pool,
+                        &key_result.id,
+                        request.user.as_deref(),
+                        request.auth.clone(),
+                    )
+                    .await?;
+
+                    (token, Some(secret_token))
+                };
 
                 let connect_response = ConnectResponse::new(
                     key_result.id,
@@ -262,20 +273,39 @@ async fn attempt_connect(
         .await?
         .ok_or(ConnectError::NoDroneAvailable)?;
 
-    let Some(backend_id) =
-        create_backend_with_key(pool, &key, spawn_config, cluster, &drone).await?
+    // If the spawn config specifies a static token, create one and use it.
+    // Note that if this is non-None, the call to create_token below will be skipped.
+    let bearer_token = spawn_config
+        .use_static_token
+        .then(BearerToken::new_random_static);
+
+    let Some(backend_id) = create_backend_with_key(
+        pool,
+        &key,
+        spawn_config,
+        cluster,
+        &drone,
+        bearer_token.as_ref(),
+    )
+    .await?
     else {
         return Err(ConnectError::FailedToAcquireKey);
     };
     tracing::info!(backend_id = ?backend_id, "Created backend");
 
-    let (token, secret_token) = create_token(
-        pool,
-        &backend_id,
-        request.user.as_deref(),
-        request.auth.clone(),
-    )
-    .await?;
+    let (token, secret_token) = if let Some(token) = bearer_token {
+        (token, None)
+    } else {
+        let (token, secret_token) = create_token(
+            pool,
+            &backend_id,
+            request.user.as_deref(),
+            request.auth.clone(),
+        )
+        .await?;
+
+        (token, Some(secret_token))
+    };
 
     let connect_response = ConnectResponse::new(
         backend_id,

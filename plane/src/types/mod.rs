@@ -1,7 +1,7 @@
 use crate::{
     client::PlaneClient,
     names::{BackendName, DroneName},
-    util::random_prefixed_string,
+    util::{random_prefixed_string, random_token},
 };
 pub use backend_state::{BackendState, BackendStatus, TerminationKind, TerminationReason};
 use bollard::auth::DockerCredentials;
@@ -212,6 +212,11 @@ pub struct SpawnConfig {
     /// If provided, the maximum amount of time the backend will be allowed to
     /// stay alive with no inbound connections to it.
     pub max_idle_seconds: Option<i32>,
+
+    /// If true, the backend will have a single connection token associated with it at spawn
+    /// time instead of dynamic tokens for each user.
+    #[serde(default)]
+    pub use_static_token: bool,
 }
 
 #[derive(
@@ -266,6 +271,18 @@ pub struct ConnectRequest {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]
 pub struct BearerToken(String);
 
+const STATIC_TOKEN_PREFIX: &str = "s.";
+
+impl BearerToken {
+    pub fn new_random_static() -> Self {
+        Self(format!("{}{}", STATIC_TOKEN_PREFIX, random_token()))
+    }
+
+    pub fn is_static(&self) -> bool {
+        self.0.starts_with(STATIC_TOKEN_PREFIX)
+    }
+}
+
 impl From<String> for BearerToken {
     fn from(s: String) -> Self {
         Self(s)
@@ -306,7 +323,7 @@ pub struct ConnectResponse {
 
     pub url: String,
 
-    pub secret_token: SecretToken,
+    pub secret_token: Option<SecretToken>,
 
     pub status_url: String,
 
@@ -321,7 +338,7 @@ impl ConnectResponse {
         spawned: bool,
         status: BackendStatus,
         token: BearerToken,
-        secret_token: SecretToken,
+        secret_token: Option<SecretToken>,
         client: &PlaneClient,
         drone: Option<DroneName>,
     ) -> Self {

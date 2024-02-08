@@ -134,7 +134,13 @@ fn extract_bearer_token(parts: &mut uri::Parts) -> Option<BearerToken> {
     };
 
     let (token, path) = path_and_query.path().strip_prefix('/')?.split_once('/')?;
+
     let token = BearerToken::from(token.to_string());
+
+    if token.is_static() {
+        // We don't rewrite the URL if using a static token.
+        return Some(token);
+    }
 
     let query = path_and_query
         .query()

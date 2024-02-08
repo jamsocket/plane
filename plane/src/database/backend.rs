@@ -242,10 +242,56 @@ impl<'a> BackendDatabase<'a> {
         Ok(result)
     }
 
+    pub async fn route_info_for_static_token(
+        &self,
+        token: &BearerToken,
+    ) -> sqlx::Result<Option<RouteInfo>> {
+        let result = sqlx::query!(
+            r#"
+            select
+                id,
+                last_status,
+                cluster_address
+            from backend
+            where backend.static_token = $1
+            limit 1
+            "#,
+            token.to_string(),
+        )
+        .fetch_optional(&self.db.pool)
+        .await?;
+
+        let Some(result) = result else {
+            return Ok(None);
+        };
+
+        let Some(address) = result.cluster_address else {
+            return Ok(None);
+        };
+
+        let Ok(address) = address.parse::<SocketAddr>() else {
+            tracing::warn!("Invalid cluster address: {}", address);
+            return Ok(None);
+        };
+
+        Ok(Some(RouteInfo {
+            backend_id: BackendName::try_from(result.id)
+                .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?,
+            address: BackendAddr(address),
+            secret_token: SecretToken::from("".to_string()),
+            user: None,
+            user_data: None,
+        }))
+    }
+
     pub async fn route_info_for_token(
         &self,
         token: &BearerToken,
     ) -> sqlx::Result<Option<RouteInfo>> {
+        if token.is_static() {
+            return self.route_info_for_static_token(token).await;
+        }
+
         let result = sqlx::query!(
             r#"
             select

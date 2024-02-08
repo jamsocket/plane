@@ -7,7 +7,8 @@ use crate::{
     protocol::{AcquiredKey, BackendMetricsMessage},
     typed_socket::TypedSocketSender,
     types::{
-        backend_state::TerminationReason, BackendState, ExecutorConfig, PullPolicy, TerminationKind,
+        backend_state::TerminationReason, BackendState, BearerToken, ExecutorConfig, PullPolicy,
+        TerminationKind,
     },
     util::{ExponentialBackoff, GuardHandle},
 };
@@ -148,6 +149,9 @@ pub struct BackendManager {
 
     /// Key acquired by the backend.
     acquired_key: AcquiredKey,
+
+    /// Static token to use for the backend.
+    static_token: Option<BearerToken>,
 }
 
 impl Debug for BackendManager {
@@ -169,6 +173,7 @@ impl BackendManager {
         metrics_sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
         ip: IpAddr,
         acquired_key: AcquiredKey,
+        static_token: Option<BearerToken>,
     ) -> Arc<Self> {
         let container_id = ContainerId::from(format!("plane-{}", backend_id));
 
@@ -190,6 +195,7 @@ impl BackendManager {
             container_id,
             ip,
             acquired_key,
+            static_token,
         });
 
         manager.set_state(state);
@@ -234,6 +240,7 @@ impl BackendManager {
                 self.metrics_manager.start_gathering_metrics();
 
                 let acquired_key = self.acquired_key.clone();
+                let static_token = self.static_token.clone();
                 StepStatusResult::future_status(async move {
                     let spawn_result = docker
                         .spawn_backend(
@@ -241,6 +248,7 @@ impl BackendManager {
                             &container_id,
                             executor_config,
                             Some(&acquired_key),
+                            static_token.as_ref(),
                         )
                         .await;
 

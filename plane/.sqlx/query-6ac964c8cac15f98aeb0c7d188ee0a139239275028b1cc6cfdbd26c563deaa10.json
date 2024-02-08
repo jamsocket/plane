@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select\n                id,\n                last_status,\n                cluster_address\n            from backend\n            where backend.static_token = $1\n            limit 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "last_status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "cluster_address",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "6ac964c8cac15f98aeb0c7d188ee0a139239275028b1cc6cfdbd26c563deaa10"
+}

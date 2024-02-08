@@ -1,5 +1,9 @@
 use super::types::ContainerId;
-use crate::{names::BackendName, protocol::AcquiredKey, types::ExecutorConfig};
+use crate::{
+    names::BackendName,
+    protocol::AcquiredKey,
+    types::{BearerToken, ExecutorConfig},
+};
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials,
@@ -114,6 +118,7 @@ fn get_container_config_from_executor_config(
     exec_config: ExecutorConfig,
     runtime: Option<&str>,
     key: Option<&AcquiredKey>,
+    static_token: Option<&BearerToken>,
 ) -> Result<bollard::container::Config<String>> {
     let mut env = exec_config.env;
     env.insert("PORT".to_string(), CONTAINER_PORT.to_string());
@@ -125,6 +130,13 @@ fn get_container_config_from_executor_config(
             key.token.to_string(),
         );
         env.insert("SESSION_BACKEND_KEY".to_string(), key.key.name.to_string());
+    }
+
+    if let Some(static_token) = static_token {
+        env.insert(
+            "SESSION_BACKEND_STATIC_TOKEN".to_string(),
+            static_token.to_string(),
+        );
     }
 
     // TODO: set PLANE_LOCK and PLANE_FENCING_TOKEN.
@@ -190,14 +202,20 @@ pub async fn run_container(
     exec_config: ExecutorConfig,
     runtime: Option<&str>,
     acquired_key: Option<&AcquiredKey>,
+    static_token: Option<&BearerToken>,
 ) -> Result<()> {
     let options = bollard::container::CreateContainerOptions {
         name: container_id.to_string(),
         ..Default::default()
     };
 
-    let config =
-        get_container_config_from_executor_config(backend_id, exec_config, runtime, acquired_key)?;
+    let config = get_container_config_from_executor_config(
+        backend_id,
+        exec_config,
+        runtime,
+        acquired_key,
+        static_token,
+    )?;
 
     docker.create_container(Some(options), config).await?;
 
@@ -313,6 +331,7 @@ mod tests {
         let mut config = get_container_config_from_executor_config(
             &backend_name,
             executor_config.clone(),
+            None,
             None,
             None,
         )

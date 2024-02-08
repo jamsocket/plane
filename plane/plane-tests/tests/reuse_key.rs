@@ -33,6 +33,7 @@ async fn reuse_key(env: TestEnvironment) {
             },
             lifetime_limit_seconds: Some(5),
             max_idle_seconds: None,
+            use_static_token: false,
         }),
         key: Some(KeyConfig {
             name: "reuse-key".to_string(),
