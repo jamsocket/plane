@@ -1,6 +1,5 @@
 use tracing_subscriber::{
-    filter::LevelFilter, fmt::format::FmtSpan, prelude::__tracing_subscriber_SubscriberExt,
-    util::SubscriberInitExt, EnvFilter,
+    filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
 
 pub fn init_tracing() {
@@ -20,7 +19,7 @@ pub fn init_tracing() {
             .with(filter)
             .init();
     } else {
-        let layer = tracing_subscriber::fmt::layer().with_span_events(FmtSpan::FULL);
+        let layer = tracing_subscriber::fmt::layer();
 
         tracing_subscriber::registry()
             .with(layer)

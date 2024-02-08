@@ -7,7 +7,7 @@ use crate::{
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials,
-    service::{HostConfig, PortBinding, ResourcesUlimits},
+    service::{HostConfig, HostConfigLogConfig, PortBinding, ResourcesUlimits},
     Docker,
 };
 use futures_util::StreamExt;
@@ -119,6 +119,7 @@ fn get_container_config_from_executor_config(
     runtime: Option<&str>,
     key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
+    log_config: Option<&HostConfigLogConfig>,
 ) -> Result<bollard::container::Config<String>> {
     let mut env = exec_config.env;
     env.insert("PORT".to_string(), CONTAINER_PORT.to_string());
@@ -158,6 +159,7 @@ fn get_container_config_from_executor_config(
             port_bindings: Some(create_port_bindings()),
             runtime: runtime.map(|s| s.to_string()),
             memory: exec_config.resource_limits.memory_limit_bytes,
+            log_config: log_config.cloned(),
             cpu_period: exec_config
                 .resource_limits
                 .cpu_period
@@ -203,6 +205,7 @@ pub async fn run_container(
     runtime: Option<&str>,
     acquired_key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
+    log_config: Option<&HostConfigLogConfig>,
 ) -> Result<()> {
     let options = bollard::container::CreateContainerOptions {
         name: container_id.to_string(),
@@ -215,6 +218,7 @@ pub async fn run_container(
         runtime,
         acquired_key,
         static_token,
+        log_config,
     )?;
 
     docker.create_container(Some(options), config).await?;
@@ -331,6 +335,7 @@ mod tests {
         let mut config = get_container_config_from_executor_config(
             &backend_name,
             executor_config.clone(),
+            None,
             None,
             None,
             None,
