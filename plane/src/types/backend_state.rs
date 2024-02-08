@@ -128,15 +128,19 @@ impl BackendState {
         termination: TerminationKind,
         reason: TerminationReason,
     ) -> BackendState {
-        BackendState::Terminating {
-            last_status: self.status(),
-            termination,
-            reason,
+        match self {
+            BackendState::Terminating { .. } | BackendState::Terminated { .. } => self.clone(),
+            _ => BackendState::Terminating {
+                last_status: self.status(),
+                termination,
+                reason,
+            },
         }
     }
 
     pub fn to_terminated(&self, exit_code: Option<i32>) -> BackendState {
         match self {
+            BackendState::Terminated { .. } => self.clone(),
             BackendState::Terminating {
                 last_status,
                 termination,
