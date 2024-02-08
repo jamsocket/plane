@@ -128,15 +128,25 @@ impl BackendState {
         termination: TerminationKind,
         reason: TerminationReason,
     ) -> BackendState {
-        BackendState::Terminating {
-            last_status: self.status(),
-            termination,
-            reason,
+        match self {
+            BackendState::Terminating { .. } | BackendState::Terminated { .. } => {
+                tracing::warn!(?reason, ?termination, state=?self, "to_terminating called on terminating/terminated backend");
+                self.clone()
+            }
+            _ => BackendState::Terminating {
+                last_status: self.status(),
+                termination,
+                reason,
+            },
         }
     }
 
     pub fn to_terminated(&self, exit_code: Option<i32>) -> BackendState {
         match self {
+            BackendState::Terminated { .. } => {
+                tracing::warn!(?exit_code, state=?self, "to_terminated called on terminated backend");
+                self.clone()
+            }
             BackendState::Terminating {
                 last_status,
                 termination,
