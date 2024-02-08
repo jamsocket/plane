@@ -13,7 +13,6 @@ use crate::{
     util::get_internal_host_ip,
 };
 use anyhow::Result;
-use bollard::Docker;
 use rusqlite::Connection;
 use std::{
     fs::{set_permissions, File, Permissions},
@@ -148,14 +147,10 @@ impl Drone {
     pub async fn run(
         id: &DroneName,
         connector: TypedSocketConnector<MessageFromDrone>,
-        docker: Docker,
+        docker: PlaneDocker,
         ip: IpAddr,
         db_path: Option<&Path>,
-        docker_runtime: Option<String>,
     ) -> Result<Self> {
-        // Wait until we have loaded initial state from Docker to begin.
-        let docker = PlaneDocker::new(docker, docker_runtime).await?;
-
         let sqlite_connection = if let Some(db_path) = db_path {
             if !db_path.exists() {
                 File::create(db_path)?;
@@ -184,12 +179,11 @@ impl Drone {
 
 pub async fn run_drone(
     client: PlaneClient,
-    docker: Docker,
+    docker: PlaneDocker,
     id: DroneName,
     cluster: ClusterName,
     ip: IpAddr,
     db_path: Option<&Path>,
-    docker_runtime: Option<String>,
 ) -> Result<()> {
     let connection = client.drone_connection(&cluster);
 
@@ -201,7 +195,7 @@ pub async fn run_drone(
         ip
     };
 
-    let drone = Drone::run(&id, connection, docker, ip, db_path, docker_runtime).await?;
+    let drone = Drone::run(&id, connection, docker, ip, db_path).await?;
 
     tracing::info!("Drone started.");
     wait_for_shutdown_signal().await;

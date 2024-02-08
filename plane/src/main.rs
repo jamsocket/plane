@@ -9,6 +9,7 @@ use plane::client::PlaneClient;
 use plane::controller::run_controller;
 use plane::database::connect_and_migrate;
 use plane::dns::run_dns;
+use plane::drone::docker::PlaneDocker;
 use plane::drone::run_drone;
 use plane::init_tracing::init_tracing;
 use plane::names::{AcmeDnsServerName, ControllerName, DroneName, Name, OrRandom, ProxyName};
@@ -67,6 +68,10 @@ enum Command {
 
         #[clap(long)]
         docker_runtime: Option<String>,
+
+        /// Optional log driver configuration, passed to Docker as the `LogConfig` field.
+        #[clap(long)]
+        log_config: Option<String>,
     },
     Proxy {
         #[clap(long)]
@@ -164,6 +169,7 @@ async fn run(opts: Opts) -> Result<()> {
             ip,
             db,
             docker_runtime,
+            log_config,
         } => {
             let name = name.or_random();
             tracing::info!(%name, "Starting drone");
@@ -171,16 +177,11 @@ async fn run(opts: Opts) -> Result<()> {
             let client = PlaneClient::new(controller_url);
             let docker = bollard::Docker::connect_with_local_defaults()?;
 
-            run_drone(
-                client,
-                docker,
-                name,
-                cluster,
-                ip,
-                db.as_deref(),
-                docker_runtime,
-            )
-            .await?;
+            let log_config = log_config.map(|s| serde_json::from_str(&s)).transpose()?;
+
+            let docker = PlaneDocker::new(docker, docker_runtime, log_config).await?;
+
+            run_drone(client, docker, name, cluster, ip, db.as_deref()).await?;
         }
         Command::Proxy {
             name,

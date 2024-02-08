@@ -9,8 +9,12 @@ use crate::{
 };
 use anyhow::Result;
 use bollard::{
-    auth::DockerCredentials, container::StatsOptions, errors::Error, service::EventMessage,
-    system::EventsOptions, Docker,
+    auth::DockerCredentials,
+    container::StatsOptions,
+    errors::Error,
+    service::{EventMessage, HostConfigLogConfig},
+    system::EventsOptions,
+    Docker,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 use thiserror::Error;
@@ -27,6 +31,7 @@ const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 pub struct PlaneDocker {
     docker: Docker,
     runtime: Option<String>,
+    log_config: Option<HostConfigLogConfig>,
 }
 
 #[derive(Clone, Debug)]
@@ -41,8 +46,16 @@ pub struct SpawnResult {
 }
 
 impl PlaneDocker {
-    pub async fn new(docker: Docker, runtime: Option<String>) -> Result<Self> {
-        Ok(Self { docker, runtime })
+    pub async fn new(
+        docker: Docker,
+        runtime: Option<String>,
+        log_config: Option<HostConfigLogConfig>,
+    ) -> Result<Self> {
+        Ok(Self {
+            docker,
+            runtime,
+            log_config,
+        })
     }
 
     pub async fn pull(
@@ -130,6 +143,7 @@ impl PlaneDocker {
             self.runtime.as_deref(),
             acquired_key,
             static_token,
+            self.log_config.as_ref(),
         )
         .await?;
         let port = get_port(&self.docker, container_id).await?;
