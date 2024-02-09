@@ -111,6 +111,10 @@ pub enum AdminCommand {
         /// Use a static connection token for this backend instead of generating them dynamically for each user.
         #[clap(long)]
         static_token: bool,
+
+        /// An optional drone pool (string), used when selecting where to run the backend.
+        #[clap(long)]
+        pool: Option<String>,
     },
     Terminate {
         #[clap(long)]
@@ -155,6 +159,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             max_idle_seconds,
             id,
             static_token,
+            pool,
         } => {
             let executor_config = ExecutorConfig::from_image_with_defaults(image);
             let max_idle_seconds = max_idle_seconds.unwrap_or(500);
@@ -173,6 +178,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             let spawn_request = ConnectRequest {
                 spawn_config: Some(spawn_config),
                 key: key_config,
+                pool,
                 ..Default::default()
             };
 

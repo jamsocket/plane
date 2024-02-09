@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into drone (id, draining, ready, pool)\n            values ($1, false, $2, $3)\n            on conflict (id) do update set\n                ready = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Bool",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6d1c3642cb12e51a524b90940eb37afbc954842e4e2ea7f68563392753f85cac"
+}

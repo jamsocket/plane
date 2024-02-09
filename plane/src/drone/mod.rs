@@ -184,8 +184,9 @@ pub async fn run_drone(
     cluster: ClusterName,
     ip: IpAddr,
     db_path: Option<&Path>,
+    pool: Option<String>,
 ) -> Result<()> {
-    let connection = client.drone_connection(&cluster);
+    let connection = client.drone_connection(&cluster, pool);
 
     let ip = if let Some(ip) = get_internal_host_ip() {
         tracing::info!(%ip, "Found internal host IP.");
