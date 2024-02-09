@@ -11,8 +11,7 @@ use self::{
 };
 use crate::{
     client::PlaneClient,
-    names::BackendName,
-    types::{ClusterName, ConnectRequest, ConnectResponse},
+    types::{ClusterName, ConnectRequest, ConnectResponse, RevokeRequest},
 };
 use serde_json::Value;
 use sqlx::{postgres::PgPoolOptions, PgPool};
@@ -91,12 +90,8 @@ impl PlaneDatabase {
     ) -> Result<ConnectResponse, ConnectError> {
         connect::connect(&self.pool, default_cluster, request, client).await
     }
-    pub async fn revoke_token(
-        &self,
-        backend_id: &BackendName,
-        username: &str,
-    ) -> Result<(), ConnectError> {
-        connect::revoke_token(&self.pool, backend_id, username).await
+    pub async fn revoke(&self, request: &RevokeRequest) -> Result<(), ConnectError> {
+        connect::revoke(&self.pool, request).await
     }
 
     fn subscription_manager(&self) -> &EventSubscriptionManager {

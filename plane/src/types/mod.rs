@@ -387,3 +387,9 @@ impl TryFrom<String> for NodeKind {
         serde_json::from_value(Value::String(s))
     }
 }
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct RevokeRequest {
+    pub backend_id: BackendName,
+    pub user: String,
+}

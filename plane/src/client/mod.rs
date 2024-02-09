@@ -6,6 +6,7 @@ use crate::{
     typed_socket::client::TypedSocketConnector,
     types::{
         backend_state::BackendStatusStreamEntry, ClusterName, ConnectRequest, ConnectResponse,
+        RevokeRequest,
     },
 };
 use reqwest::{Response, StatusCode};
@@ -137,16 +138,10 @@ impl PlaneClient {
         Ok(())
     }
 
-    pub async fn revoke_token(
-        &self,
-        backend_id: &BackendName,
-        username: &str,
-    ) -> Result<(), PlaneClientError> {
-        let addr = self
-            .controller_address
-            .join(&format!("/ctrl/b/{}/{}/revoke-token", backend_id, username));
+    pub async fn revoke(&self, request: &RevokeRequest) -> Result<(), PlaneClientError> {
+        let addr = self.controller_address.join("/ctrl/revoke");
 
-        authed_post(&self.client, &addr, &()).await?;
+        authed_post(&self.client, &addr, &request).await?;
         Ok(())
     }
 
