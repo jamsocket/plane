@@ -233,12 +233,16 @@ async fn main() -> Result<()> {
                         succeeded += 1;
                     }
                     if (failed + succeeded) % 10 == 0 {
-                        tokio::time::sleep(Duration::from_millis(50)).await;
+                        println!(
+                            "Removed {:?} stale lock announce messages so far. ({:?} failed)",
+                            succeeded, failed
+                        );
                     }
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                 }
 
                 println!(
-                    "Successfully removed {:?} stale lock announce messages. ({:?} failed)",
+                    "Finished removing stale lock messages ({:?} succeeded, {:?} failed)",
                     succeeded, failed
                 );
             }
