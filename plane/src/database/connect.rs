@@ -194,8 +194,8 @@ async fn create_token(
 pub async fn revoke_token(pool: &PgPool, backend: &BackendName, username: &str) -> Result<()> {
     sqlx::query!(
         r#"
-        DELETE FROM token
-        WHERE backend_id = $1 AND username = $2
+        delete from token
+        where backend_id = $1 and username = $2
         "#,
         backend.to_string(),
         username,
