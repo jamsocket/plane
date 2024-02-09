@@ -41,6 +41,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
         key: None,
         user: None,
         auth: Map::default(),
+        pool: None,
     };
     let response = client.connect(&connect_request).await.unwrap();
     tracing::info!("Got response.");

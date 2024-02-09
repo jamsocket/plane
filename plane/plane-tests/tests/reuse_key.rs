@@ -42,6 +42,7 @@ async fn reuse_key(env: TestEnvironment) {
         }),
         user: None,
         auth: Map::default(),
+        pool: None,
     };
 
     let response = client.connect(&connect_request).await.unwrap();

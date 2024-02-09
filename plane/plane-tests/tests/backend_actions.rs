@@ -54,7 +54,7 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
     let backend_id = {
         let mut drone_connection = controller
             .client()
-            .drone_connection(&env.cluster)
+            .drone_connection(&env.cluster, env.pool.clone())
             .connect(&drone_id)
             .await
             .unwrap();
@@ -102,7 +102,7 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
         // The message was not acked; a new connection should cause it to be repeated.
         let mut drone_connection = controller
             .client()
-            .drone_connection(&env.cluster)
+            .drone_connection(&env.cluster, env.pool.clone())
             .connect(&drone_id)
             .await
             .unwrap();
@@ -140,7 +140,7 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
         // The message should not be repeated now.
         let mut drone_connection = controller
             .client()
-            .drone_connection(&env.cluster)
+            .drone_connection(&env.cluster, env.pool.clone())
             .connect(&drone_id)
             .await
             .unwrap();
