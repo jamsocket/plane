@@ -11,10 +11,11 @@ use plane_core::{
         drone_state::UpdateBackendStateMessage,
         scheduler::{DrainDrone, ScheduleRequest, ScheduleResponse},
         state::{
-            BackendMessage, BackendMessageType, ClusterStateMessage, DroneMessage,
-            DroneMessageType, WorldStateMessage,
+            BackendMessage, BackendMessageType, ClusterLockMessage, ClusterLockMessageType,
+            ClusterStateMessage, DroneMessage, DroneMessageType, WorldStateMessage,
         },
     },
+    nats::MessageMeta,
     nats_connection::NatsConnectionSpec,
     state::get_world_state,
     types::{BackendId, ClusterName, DroneId},
@@ -174,6 +175,72 @@ async fn main() -> Result<()> {
                         tokio::time::sleep(Duration::from_millis(50)).await;
                     }
                 }
+            }
+
+            println!("Collecting stale Lock Announce messages");
+            let mut stale_lock_msgs: Vec<MessageMeta> = vec![];
+            let threshold = chrono::Utc::now() - chrono::Duration::hours(1);
+
+            let mut sub = nats
+                .subscribe_jetstream_subject(WorldStateMessage::subscribe_subject())
+                .await?;
+
+            while let Some((message, meta)) = sub.next().await {
+                if !sub.has_pending() {
+                    break;
+                }
+
+                if meta.timestamp.unix_timestamp() > threshold.timestamp() {
+                    continue;
+                }
+
+                let WorldStateMessage::ClusterMessage { message, .. } = message else {
+                    continue;
+                };
+
+                if let ClusterStateMessage::LockMessage(ClusterLockMessage {
+                    message: ClusterLockMessageType::Announce,
+                    ..
+                }) = message
+                {
+                    stale_lock_msgs.push(meta);
+                } else {
+                    continue;
+                }
+            }
+
+            if dry_run {
+                println!(
+                    "Would remove {:?} stale lock announce messages",
+                    stale_lock_msgs.len()
+                );
+            } else {
+                println!(
+                    "Removing {:?} stale lock announce messages",
+                    stale_lock_msgs.len()
+                );
+
+                let mut succeeded = 0;
+                let mut failed = 0;
+                for meta in stale_lock_msgs {
+                    if let Err(err) = stream.delete_message(meta.sequence).await {
+                        println!(
+                            "Error deleting message (seq {:?}): {:?}",
+                            meta.sequence, err
+                        );
+                        failed += 1;
+                    } else {
+                        succeeded += 1;
+                    }
+                    if (failed + succeeded) % 10 == 0 {
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
+                }
+
+                println!(
+                    "Successfully removed {:?} stale lock announce messages. ({:?} failed)",
+                    succeeded, failed
+                );
             }
         }
         Command::DumpState => {
