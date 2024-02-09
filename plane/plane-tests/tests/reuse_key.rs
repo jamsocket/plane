@@ -1,7 +1,7 @@
-use crate::common::timeout::WithTimeout;
+use crate::common::wait_until_backend_terminated;
 use common::test_env::TestEnvironment;
 use plane::{
-    types::{BackendStatus, ConnectRequest, ExecutorConfig, PullPolicy, SpawnConfig},
+    types::{ConnectRequest, ExecutorConfig, PullPolicy, SpawnConfig},
     types::{KeyConfig, ResourceLimits},
 };
 use plane_test_macro::plane_test;
@@ -50,31 +50,10 @@ async fn reuse_key(env: TestEnvironment) {
 
     assert!(response.spawned);
 
-    let backend_id = response.backend_id.clone();
-
-    let mut backend_status_stream = client
-        .backend_status_stream(&backend_id)
-        .with_timeout(10)
-        .await
-        .unwrap()
-        .unwrap();
-
     let response2 = client.connect(&connect_request).await.unwrap();
 
     assert!(!response2.spawned);
-    assert_eq!(response2.backend_id, backend_id);
+    assert_eq!(response2.backend_id, response.backend_id);
 
-    loop {
-        let message = backend_status_stream
-            .next()
-            .with_timeout(10)
-            .await
-            .unwrap()
-            .unwrap();
-
-        tracing::info!("Got status: {:?}", message);
-        if message.status == BackendStatus::Terminated {
-            break;
-        }
-    }
+    wait_until_backend_terminated(&client, &response.backend_id).await;
 }

@@ -1,34 +1,13 @@
-use crate::common::timeout::WithTimeout;
+use crate::common::wait_until_backend_terminated;
 use common::test_env::TestEnvironment;
-use plane::{
-    client::PlaneClient,
-    names::BackendName,
-    types::{
-        BackendStatus, ConnectRequest, ExecutorConfig, KeyConfig, PullPolicy, ResourceLimits,
-        SpawnConfig,
-    },
+use plane::types::{
+    ConnectRequest, ExecutorConfig, KeyConfig, PullPolicy, ResourceLimits, SpawnConfig,
 };
 use plane_test_macro::plane_test;
 use serde_json::Map;
 use std::collections::HashMap;
 
 mod common;
-
-async fn wait_until_terminated(client: &PlaneClient, backend_id: &BackendName) {
-    let mut backend_status_stream = client
-        .backend_status_stream(backend_id)
-        .with_timeout(10)
-        .await
-        .unwrap()
-        .unwrap();
-
-    while let Ok(Some(message)) = backend_status_stream.next().with_timeout(10).await {
-        tracing::info!("Got status: {:?}", message);
-        if message.status == BackendStatus::Terminated {
-            break;
-        }
-    }
-}
 
 #[plane_test]
 async fn drone_pools(env: TestEnvironment) {
@@ -107,8 +86,8 @@ async fn drone_pools(env: TestEnvironment) {
     );
 
     tracing::info!("Waiting for all backends to terminate.");
-    wait_until_terminated(&client, &response.backend_id).await;
-    wait_until_terminated(&client, &response_from_pool.backend_id).await;
-    wait_until_terminated(&client, &response_from_pool_different_key.backend_id).await;
+    wait_until_backend_terminated(&client, &response.backend_id).await;
+    wait_until_backend_terminated(&client, &response_from_pool.backend_id).await;
+    wait_until_backend_terminated(&client, &response_from_pool_different_key.backend_id).await;
     tracing::info!("All backends terminated.");
 }
