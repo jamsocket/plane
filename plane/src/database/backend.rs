@@ -49,6 +49,8 @@ pub struct BackendMetricsMessage {
     pub mem_inactive: u64,
     /// Unevictable memory (mlock etc)
     pub mem_unevictable: u64,
+    /// The backend's memory limit
+    pub mem_limit: u64,
     /// Nanoseconds of CPU used by backend since last message
     pub cpu_used: u64,
     /// Total CPU nanoseconds for system since last message
