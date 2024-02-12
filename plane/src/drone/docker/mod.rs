@@ -225,6 +225,12 @@ pub fn get_metrics_message_from_container_stats(
         ));
     };
 
+    let Some(mem_limit) = stats.memory_stats.limit else {
+        return Err(MetricsConversionError::NoStatsAvailable(
+            "memory_stats.limit".into(),
+        ));
+    };
+
     let container_cpu_used = stats.cpu_stats.cpu_usage.total_usage;
     let prev_sys_cpu_ns_load = prev_sys_cpu_ns.load(Ordering::SeqCst);
     let prev_container_cpu_ns_load = prev_container_cpu_ns.load(Ordering::SeqCst);
@@ -292,6 +298,7 @@ pub fn get_metrics_message_from_container_stats(
         mem_active,
         mem_inactive,
         mem_unevictable,
+        mem_limit,
         cpu_used: container_cpu_used_delta,
         sys_cpu: system_cpu_used_delta,
     })
