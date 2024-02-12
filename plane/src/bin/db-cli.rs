@@ -54,7 +54,11 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                 println!(
                     "{} {} {} {} {}",
                     event.timestamp.to_string().white(),
-                    event.id.to_string().red(),
+                    event
+                        .id
+                        .map(|id| id.to_string())
+                        .unwrap_or("<None>".to_string())
+                        .red(),
                     event.key.unwrap_or_else(|| "<global>".to_string()).yellow(),
                     event.kind.magenta(),
                     serde_json::to_string(&event.payload)?.blue()

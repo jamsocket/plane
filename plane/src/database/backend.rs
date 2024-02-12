@@ -1,4 +1,7 @@
-use super::{subscribe::emit_with_key, PlaneDatabase};
+use super::{
+    subscribe::{emit_ephemeral_with_key, emit_with_key},
+    PlaneDatabase,
+};
 use crate::{
     log_types::BackendAddr,
     names::{BackendActionName, BackendName},
@@ -383,7 +386,7 @@ impl<'a> BackendDatabase<'a> {
     }
 
     pub async fn publish_metrics(&self, metrics: BackendMetricsMessage) -> sqlx::Result<()> {
-        emit_with_key(
+        emit_ephemeral_with_key(
             &mut *self.db.pool.acquire().await?,
             &metrics.backend_id.to_string(),
             &metrics,
