@@ -453,7 +453,7 @@ CREATE TABLE public.drone (
     draining boolean DEFAULT false NOT NULL,
     last_heartbeat timestamp with time zone,
     last_local_time timestamp with time zone,
-    pool text DEFAULT ''::text NOT NULL
+    pool character varying(255) DEFAULT ''::character varying NOT NULL
 );
 
 

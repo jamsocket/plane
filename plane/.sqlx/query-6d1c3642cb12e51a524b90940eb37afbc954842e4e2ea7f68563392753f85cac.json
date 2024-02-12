@@ -7,7 +7,7 @@
       "Left": [
         "Int4",
         "Bool",
-        "Text"
+        "Varchar"
       ]
     },
     "nullable": []
