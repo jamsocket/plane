@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        delete from token\n        where expiration_time < now()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "ca6e40ee9cea913e0d6691eb375de7b7e4afe57f64fb00ae6d6bab3a6d2a6634"
+}

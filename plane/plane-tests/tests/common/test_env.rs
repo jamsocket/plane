@@ -96,6 +96,7 @@ impl TestEnvironment {
             ControllerName::new_random(),
             url,
             None,
+            None,
         )
         .await
         .expect("Unable to construct controller.");
