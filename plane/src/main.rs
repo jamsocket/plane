@@ -47,6 +47,9 @@ enum Command {
 
         #[clap(long)]
         default_cluster: Option<ClusterName>,
+
+        #[clap(long)]
+        cleanup_min_age_days: Option<i32>,
     },
     Drone {
         #[clap(long)]
@@ -141,6 +144,7 @@ async fn run(opts: Opts) -> Result<()> {
             db,
             controller_url,
             default_cluster,
+            cleanup_min_age_days,
         } => {
             let name = ControllerName::new_random();
 
@@ -157,7 +161,15 @@ async fn run(opts: Opts) -> Result<()> {
 
             let addr = (host, port).into();
 
-            run_controller(db, addr, name, controller_url, default_cluster).await?
+            run_controller(
+                db,
+                addr,
+                name,
+                controller_url,
+                default_cluster,
+                cleanup_min_age_days,
+            )
+            .await?
         }
         Command::Migrate { db } => {
             let _ = connect_and_migrate(&db).await?;

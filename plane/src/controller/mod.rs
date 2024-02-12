@@ -5,6 +5,7 @@ use self::{
     proxy::handle_proxy_socket,
 };
 use crate::{
+    cleanup,
     client::PlaneClient,
     controller::{connect::handle_connect, core::Controller, drone::handle_drone_socket},
     database::PlaneDatabase,
@@ -12,6 +13,7 @@ use crate::{
     names::ControllerName,
     signals::wait_for_shutdown_signal,
     types::ClusterName,
+    util::GuardHandle,
     PLANE_GIT_HASH, PLANE_VERSION,
 };
 use anyhow::Result;
@@ -107,6 +109,7 @@ pub struct ControllerServer {
     // server_handle is wrapped in an Option<> because we need to take ownership of it to join it
     // when gracefully terminating.
     server_handle: Option<JoinHandle<hyper::Result<()>>>,
+    _cleanup_handle: GuardHandle,
 }
 
 impl ControllerServer {
@@ -116,10 +119,19 @@ impl ControllerServer {
         id: ControllerName,
         controller_url: Url,
         default_cluster: Option<ClusterName>,
+        cleanup_min_age_days: Option<i32>,
     ) -> Result<Self> {
         let listener = TcpListener::bind(bind_addr)?;
 
-        Self::run_with_listener(db, listener, id, controller_url, default_cluster).await
+        Self::run_with_listener(
+            db,
+            listener,
+            id,
+            controller_url,
+            default_cluster,
+            cleanup_min_age_days,
+        )
+        .await
     }
 
     pub async fn run_with_listener(
@@ -128,8 +140,16 @@ impl ControllerServer {
         id: ControllerName,
         controller_url: Url,
         default_cluster: Option<ClusterName>,
+        cleanup_min_age_days: Option<i32>,
     ) -> Result<Self> {
         let bind_addr = listener.local_addr()?;
+
+        let cleanup_handle = {
+            let db = db.clone();
+            GuardHandle::new(async move {
+                cleanup::run_cleanup_loop(db.clone(), cleanup_min_age_days).await
+            })
+        };
 
         let (graceful_terminate_sender, graceful_terminate_receiver) =
             tokio::sync::oneshot::channel::<()>();
@@ -201,6 +221,7 @@ impl ControllerServer {
             server_handle: Some(server_handle),
             controller_id: id,
             bind_addr,
+            _cleanup_handle: cleanup_handle,
         })
     }
 
@@ -253,9 +274,17 @@ pub async fn run_controller(
     id: ControllerName,
     controller_url: Url,
     default_cluster: Option<ClusterName>,
+    cleanup_min_age_days: Option<i32>,
 ) -> Result<()> {
-    let mut server =
-        ControllerServer::run(db, bind_addr, id, controller_url, default_cluster).await?;
+    let mut server = ControllerServer::run(
+        db,
+        bind_addr,
+        id,
+        controller_url,
+        default_cluster,
+        cleanup_min_age_days,
+    )
+    .await?;
 
     wait_for_shutdown_signal().await;
 

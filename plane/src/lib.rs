@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod admin;
+pub mod cleanup;
 pub mod client;
 pub mod controller;
 pub mod database;

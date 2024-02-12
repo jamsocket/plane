@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            delete from backend\n            where\n                last_status = $1\n                and now() - last_status_time > make_interval(days => $2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7d4c92420e542e7086f81e00e16087bf8c2b29a618d7eab3cc7956a9ee456573"
+}

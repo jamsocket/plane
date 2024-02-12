@@ -396,6 +396,26 @@ impl<'a> BackendDatabase<'a> {
 
         Ok(candidates)
     }
+
+    pub async fn cleanup(&self, min_age_days: i32) -> sqlx::Result<()> {
+        let result = sqlx::query!(
+            r#"
+            delete from backend
+            where
+                last_status = $1
+                and now() - last_status_time > make_interval(days => $2)
+            "#,
+            BackendStatus::Terminated.to_string(),
+            min_age_days,
+        )
+        .execute(&self.db.pool)
+        .await?;
+
+        let row_count = result.rows_affected();
+        tracing::info!(row_count, "Cleaned up terminated backends.");
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]

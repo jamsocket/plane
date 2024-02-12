@@ -91,6 +91,10 @@ impl PlaneDatabase {
         connect::connect(&self.pool, default_cluster, request, client).await
     }
 
+    pub async fn clean_up_tokens(&self) -> Result<(), sqlx::Error> {
+        connect::clean_up_tokens(&self.pool).await
+    }
+
     fn subscription_manager(&self) -> &EventSubscriptionManager {
         self.subscription_manager
             .get_or_init(|| EventSubscriptionManager::new(&self.pool))
