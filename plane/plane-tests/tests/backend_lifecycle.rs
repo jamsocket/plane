@@ -33,6 +33,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
                 env: HashMap::default(),
                 resource_limits: ResourceLimits::default(),
                 credentials: None,
+                mount: None,
             },
             lifetime_limit_seconds: None,
             max_idle_seconds: None,

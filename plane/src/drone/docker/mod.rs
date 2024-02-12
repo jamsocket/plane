@@ -18,7 +18,10 @@ use bollard::{
     Docker,
 };
 use chrono::{DateTime, LocalResult, TimeZone, Utc};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    path::PathBuf,
+    sync::atomic::{AtomicU64, Ordering},
+};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 
@@ -34,6 +37,7 @@ pub struct PlaneDocker {
     docker: Docker,
     runtime: Option<String>,
     log_config: Option<HostConfigLogConfig>,
+    mount_base: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug)]
@@ -52,11 +56,13 @@ impl PlaneDocker {
         docker: Docker,
         runtime: Option<String>,
         log_config: Option<HostConfigLogConfig>,
+        mount_base: Option<PathBuf>,
     ) -> Result<Self> {
         Ok(Self {
             docker,
             runtime,
             log_config,
+            mount_base,
         })
     }
 
@@ -144,6 +150,7 @@ impl PlaneDocker {
             executable,
             acquired_key,
             static_token,
+            self.mount_base.as_ref(),
         )
         .await?;
         let port = get_port(&self.docker, container_id).await?;

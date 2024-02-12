@@ -113,7 +113,7 @@ impl TestEnvironment {
         let docker = Docker::connect_with_local_defaults().unwrap();
         let db_path = self.scratch_dir.join("drone.db");
 
-        let docker = PlaneDocker::new(docker, None, None).await.unwrap();
+        let docker = PlaneDocker::new(docker, None, None, None).await.unwrap();
 
         let drone_config = DroneConfig {
             id: DroneName::new_random(),

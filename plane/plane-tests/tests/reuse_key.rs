@@ -30,6 +30,7 @@ async fn reuse_key(env: TestEnvironment) {
                 env: HashMap::default(),
                 resource_limits: ResourceLimits::default(),
                 credentials: None,
+                mount: None,
             },
             lifetime_limit_seconds: Some(5),
             max_idle_seconds: None,
