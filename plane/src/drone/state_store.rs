@@ -1,7 +1,8 @@
 use crate::{
+    database::backend::BackendMetricsMessage,
     log_types::LoggableTime,
     names::BackendName,
-    protocol::{BackendEventId, BackendMetricsMessage, BackendStateMessage},
+    protocol::{BackendEventId, BackendStateMessage},
     typed_socket::TypedSocketSender,
     types::BackendState,
 };

@@ -120,7 +120,10 @@ impl Drop for EventSubscriptionManager {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Notification<T> {
-    pub id: i32,
+    /// Optional id. If not present, the notification is ephemeral.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
     pub timestamp: DateTime<Utc>,
 
     /// Rust type of the payload.
@@ -210,7 +213,7 @@ impl EventSubscriptionManager {
 
                         for message in messages {
                             let notification = Notification {
-                                id: message.id,
+                                id: Some(message.id),
                                 timestamp: message.created_at,
                                 kind: message.kind,
                                 key: message.key,
@@ -236,14 +239,16 @@ impl EventSubscriptionManager {
 
                         // It could happen that a message happens between when we open the listener
                         // and when we request messages from the DB. In that case, we don't want to
-                        // send the message twice.
-                        if let Some(last_message) = last_message {
-                            if notification.id <= last_message {
-                                continue;
+                        // send the message twice. If the message has no id, it's ephemeral and we
+                        // should send it since it wouldn't have been in the DB anyway.
+                        if let Some(notification_id) = notification.id {
+                            if let Some(last_message) = last_message {
+                                if notification_id <= last_message {
+                                    continue;
+                                }
                             }
+                            last_message = Some(notification_id);
                         }
-
-                        last_message = Some(notification.id);
                         send_message(notification);
                     }
 
@@ -337,6 +342,38 @@ where
     Ok(())
 }
 
+pub async fn emit_ephemeral_impl<'c, T, E>(
+    db: E,
+    key: Option<&str>,
+    payload: &T,
+) -> Result<(), sqlx::Error>
+where
+    T: NotificationPayload,
+    E: PgExecutor<'c>,
+{
+    let kind = T::kind().to_string();
+    sqlx::query!(
+        r#"
+        select pg_notify(
+            $4,
+            json_build_object(
+                'payload', $3::jsonb,
+                'timestamp', now(),
+                'kind', $1::text,
+                'key', $2::text
+            )::text
+        )"#,
+        kind,
+        key,
+        serde_json::to_value(&payload).map_sqlx_error()?,
+        EVENT_CHANNEL,
+    )
+    .execute(db)
+    .await?;
+
+    Ok(())
+}
+
 pub async fn emit<'c, T, E>(db: E, payload: &T) -> Result<(), sqlx::Error>
 where
     T: NotificationPayload,
@@ -351,4 +388,24 @@ where
     E: PgExecutor<'c>,
 {
     emit_impl(db, Some(key), payload).await
+}
+
+pub async fn emit_ephemeral<'c, T, E>(db: E, payload: &T) -> Result<(), sqlx::Error>
+where
+    T: NotificationPayload,
+    E: PgExecutor<'c>,
+{
+    emit_ephemeral_impl(db, None, payload).await
+}
+
+pub async fn emit_ephemeral_with_key<'c, T, E>(
+    db: E,
+    key: &str,
+    payload: &T,
+) -> Result<(), sqlx::Error>
+where
+    T: NotificationPayload,
+    E: PgExecutor<'c>,
+{
+    emit_ephemeral_impl(db, Some(key), payload).await
 }

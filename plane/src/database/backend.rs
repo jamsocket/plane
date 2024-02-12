@@ -1,4 +1,7 @@
-use super::{subscribe::emit_with_key, PlaneDatabase};
+use super::{
+    subscribe::{emit_ephemeral_with_key, emit_with_key},
+    PlaneDatabase,
+};
 use crate::{
     log_types::BackendAddr,
     names::{BackendActionName, BackendName},
@@ -28,6 +31,33 @@ pub struct BackendActionMessage {
 impl super::subscribe::NotificationPayload for BackendActionMessage {
     fn kind() -> &'static str {
         "backend_action"
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BackendMetricsMessage {
+    pub backend_id: BackendName,
+    /// Memory used by backend excluding inactive file cache, same as use shown by docker stats
+    /// ref: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go#L227C45-L227C45
+    pub mem_used: u64,
+    /// Memory used by backend in bytes
+    /// (calculated using kernel memory used by cgroup + page cache memory used by cgroup)
+    pub mem_total: u64,
+    /// Active memory (non reclaimable)
+    pub mem_active: u64,
+    /// Inactive memory (reclaimable)
+    pub mem_inactive: u64,
+    /// Unevictable memory (mlock etc)
+    pub mem_unevictable: u64,
+    /// Nanoseconds of CPU used by backend since last message
+    pub cpu_used: u64,
+    /// Total CPU nanoseconds for system since last message
+    pub sys_cpu: u64,
+}
+
+impl super::subscribe::NotificationPayload for BackendMetricsMessage {
+    fn kind() -> &'static str {
+        "backend_metrics"
     }
 }
 
@@ -353,6 +383,15 @@ impl<'a> BackendDatabase<'a> {
         }
 
         Ok(())
+    }
+
+    pub async fn publish_metrics(&self, metrics: BackendMetricsMessage) -> sqlx::Result<()> {
+        emit_ephemeral_with_key(
+            &mut *self.db.pool.acquire().await?,
+            &metrics.backend_id.to_string(),
+            &metrics,
+        )
+        .await
     }
 
     pub async fn termination_candidates(

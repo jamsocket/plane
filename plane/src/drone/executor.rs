@@ -1,7 +1,8 @@
 use super::{backend_manager::BackendManager, docker::PlaneDocker, state_store::StateStore};
 use crate::{
+    database::backend::BackendMetricsMessage,
     names::BackendName,
-    protocol::{BackendAction, BackendEventId, BackendMetricsMessage, BackendStateMessage},
+    protocol::{BackendAction, BackendEventId, BackendStateMessage},
     typed_socket::TypedSocketSender,
     types::BackendState,
     util::GuardHandle,

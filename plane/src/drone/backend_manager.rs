@@ -3,8 +3,9 @@ use super::{
     wait_backend::wait_for_backend,
 };
 use crate::{
+    database::backend::BackendMetricsMessage,
     names::BackendName,
-    protocol::{AcquiredKey, BackendMetricsMessage},
+    protocol::AcquiredKey,
     typed_socket::TypedSocketSender,
     types::{
         backend_state::TerminationReason, BackendState, BearerToken, ExecutorConfig, PullPolicy,
