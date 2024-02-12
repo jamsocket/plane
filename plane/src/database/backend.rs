@@ -40,13 +40,13 @@ pub struct BackendMetricsMessage {
     /// Memory used by backend in bytes
     /// (calculated using kernel memory used by cgroup + page cache memory used by cgroup)
     pub mem_total: u64,
-    /// Active memory ( non reclaimable )
+    /// Active memory (non reclaimable)
     pub mem_active: u64,
-    /// Inactive memory ( reclaimable )
+    /// Inactive memory (reclaimable)
     pub mem_inactive: u64,
-    /// unevictable memory (mlock etc)
+    /// Unevictable memory (mlock etc)
     pub mem_unevictable: u64,
-    /// nanoseconds of CPU used by backend since last message
+    /// Nanoseconds of CPU used by backend since last message
     pub cpu_used: u64,
     /// Total CPU nanoseconds for system since last message
     pub sys_cpu: u64,
