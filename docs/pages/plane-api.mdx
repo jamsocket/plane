@@ -25,10 +25,8 @@ implement (such as [`setdefault`](https://docs.python.org/3.8/library/stdtypes.h
 
 The `connect` API is the endpoint that implements this behavior.
 
-The connect request is located at the path `/ctrl/c/:cluster/connect` where `:cluster` is the name of the cluster you want to spawn a
-backend on if a new backend needs to be spawned.
-
-The connect request is a `POST` request that takes a JSON body. An example payload might look like this:
+The connect request is located at the path `/ctrl/connect`. The connect request is a `POST` request that takes a JSON body. An
+example payload might look like this:
 
 ```json
 {
@@ -44,7 +42,7 @@ The connect request is a `POST` request that takes a JSON body. An example paylo
         "lifetime_limit_seconds": 3600,
         "max_idle_seconds": 60,
     },
-    "name": "user-123",
+    "user": "user-123",
     "auth": {
         "any arbitrary JSON object": "can go here",
         "Plane does not read it": "it is just passed through to your backend",

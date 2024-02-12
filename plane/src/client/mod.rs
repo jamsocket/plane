@@ -6,6 +6,7 @@ use crate::{
     typed_socket::client::TypedSocketConnector,
     types::{
         backend_state::BackendStatusStreamEntry, ClusterName, ConnectRequest, ConnectResponse,
+        RevokeRequest,
     },
 };
 use reqwest::{Response, StatusCode};
@@ -119,7 +120,6 @@ impl PlaneClient {
         authed_post(&self.client, &addr, &()).await?;
         Ok(())
     }
-
     pub async fn soft_terminate(&self, backend_id: &BackendName) -> Result<(), PlaneClientError> {
         let addr = self
             .controller_address
@@ -135,6 +135,13 @@ impl PlaneClient {
             .join(&format!("/ctrl/b/{}/hard-terminate", backend_id));
 
         authed_post(&self.client, &addr, &()).await?;
+        Ok(())
+    }
+
+    pub async fn revoke(&self, request: &RevokeRequest) -> Result<(), PlaneClientError> {
+        let addr = self.controller_address.join("/ctrl/revoke");
+
+        authed_post(&self.client, &addr, &request).await?;
         Ok(())
     }
 

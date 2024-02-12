@@ -14,7 +14,7 @@ use crate::{
     protocol::{AcquiredKey, BackendAction, KeyDeadlines},
     types::{
         BackendState, BackendStatus, BearerToken, ClusterName, ConnectRequest, ConnectResponse,
-        KeyConfig, SecretToken, SpawnConfig,
+        KeyConfig, RevokeRequest, SecretToken, SpawnConfig,
     },
     util::random_token,
 };
@@ -189,6 +189,20 @@ async fn create_token(
     .await?;
 
     Ok((BearerToken::from(token), SecretToken::from(secret_token)))
+}
+
+pub async fn revoke(pool: &PgPool, request: &RevokeRequest) -> Result<()> {
+    sqlx::query!(
+        r#"
+        delete from token
+        where backend_id = $1 and username = $2
+        "#,
+        request.backend_id.to_string(),
+        request.user,
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
 }
 
 async fn attempt_connect(
