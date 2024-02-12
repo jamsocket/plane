@@ -172,6 +172,7 @@ impl ControllerServer {
         // barrier (such as a reverse proxy) in front.
         let control_routes = Router::new()
             .route("/status", get(status))
+            .route("/c/:cluster/p/:pool/drone-socket", get(handle_drone_socket))
             .route("/c/:cluster/drone-socket", get(handle_drone_socket))
             .route("/c/:cluster/proxy-socket", get(handle_proxy_socket))
             .route("/dns-socket", get(handle_dns_socket))
