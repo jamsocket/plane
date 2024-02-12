@@ -355,3 +355,19 @@ pub async fn connect(
         }
     }
 }
+
+pub async fn clean_up_tokens(pool: &PgPool) -> std::result::Result<(), sqlx::Error> {
+    let result = sqlx::query!(
+        r#"
+        delete from token
+        where expiration_time < now()
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    let row_count = result.rows_affected();
+    tracing::info!(row_count, "Cleaned up expired tokens");
+
+    Ok(())
+}

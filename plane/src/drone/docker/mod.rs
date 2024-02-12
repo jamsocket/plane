@@ -3,8 +3,9 @@ use self::{
     types::ContainerId,
 };
 use crate::{
+    database::backend::BackendMetricsMessage,
     names::BackendName,
-    protocol::{AcquiredKey, BackendMetricsMessage},
+    protocol::AcquiredKey,
     types::{BearerToken, ExecutorConfig},
 };
 use anyhow::Result;

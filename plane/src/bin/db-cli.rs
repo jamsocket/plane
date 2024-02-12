@@ -1,6 +1,11 @@
 use clap::{Parser, Subcommand};
 use colored::{self, Colorize};
-use plane::{database::connect, names::BackendName, names::DroneName, types::ClusterName};
+use plane::{
+    database::connect,
+    init_tracing::init_tracing,
+    names::{BackendName, DroneName},
+    types::ClusterName,
+};
 
 #[derive(Parser)]
 struct Opts {
@@ -32,6 +37,12 @@ enum Command {
     PreventRenew {
         backend: BackendName,
     },
+    Cleanup {
+        /// The minimum amount of time that a data row can be obsolete before it is deleted.
+        /// If not provided, only expired tokens will be removed, and other data will be retained.
+        #[clap(long)]
+        min_age_days: Option<i32>,
+    },
 }
 
 async fn main_inner(opts: Opts) -> anyhow::Result<()> {
@@ -54,7 +65,11 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                 println!(
                     "{} {} {} {} {}",
                     event.timestamp.to_string().white(),
-                    event.id.to_string().red(),
+                    event
+                        .id
+                        .map(|id| id.to_string())
+                        .unwrap_or("<None>".to_string())
+                        .red(),
                     event.key.unwrap_or_else(|| "<global>".to_string()).yellow(),
                     event.kind.magenta(),
                     serde_json::to_string(&event.payload)?.blue()
@@ -158,6 +173,9 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                 println!("No such drone: {} on {}", drone, cluster);
             }
         }
+        Command::Cleanup { min_age_days } => {
+            plane::cleanup::run_cleanup(&db, min_age_days).await?;
+        }
     };
 
     Ok(())
@@ -165,6 +183,8 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
 
 #[tokio::main]
 async fn main() {
+    init_tracing();
+
     let opts = Opts::parse();
 
     if let Err(e) = main_inner(opts).await {

@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select pg_notify(\n            $4,\n            json_build_object(\n                'payload', $3::jsonb,\n                'timestamp', now(),\n                'kind', $1::text,\n                'key', $2::text\n            )::text\n        )",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pg_notify",
+        "type_info": "Void"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "52001c1ecaae8c31bff153499a04cd26437b5734ebde665939d7970c640f8b42"
+}
