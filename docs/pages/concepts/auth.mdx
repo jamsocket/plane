@@ -80,3 +80,25 @@ Here’s how it works:
 Note that as far as Plane is concerned, the secret token is just a random string associated with a connection
 token. It is meant to provide a way for you to optionally do extra validation, but Plane itself does not
 implement that validation.
+
+## Static tokens
+
+By default, every unique connection request will receive a unique connection
+token. This is the recommended approach when you are deploying your own code
+to the session backend, because it allows you to revoke tokens independently and
+attach optional metadata to them, as described above.
+
+The downside of this approach is that it requires special care if your
+application generates URLs that point in to the session backend, because
+those URLs will need to take the dynamic path into account.
+
+In those cases, you may want to have a single static token which is available
+to the backend at spawn time, instead of a different connection token for each
+user. This can be accomplished by setting `use_static_token` to `true` in the
+spawn configuration. This will cause Plane to generate a single token for the
+backend, which is passed to the backend as the `SESSION_BACKEND_STATIC_TOKEN`
+environment variable.
+
+Note that when using static tokens, since every client shares the token, each
+client has the same level of access to the backend. This means that static
+tokens can't be provided with `user` or `auth` data.
