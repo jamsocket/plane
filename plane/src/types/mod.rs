@@ -332,6 +332,7 @@ pub struct ConnectResponse {
 }
 
 impl ConnectResponse {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         backend_id: BackendName,
         cluster: &ClusterName,

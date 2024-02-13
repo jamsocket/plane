@@ -165,6 +165,7 @@ impl Debug for BackendManager {
 }
 
 impl BackendManager {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         backend_id: BackendName,
         executor_config: ExecutorConfig,
