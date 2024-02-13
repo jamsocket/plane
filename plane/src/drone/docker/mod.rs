@@ -137,14 +137,12 @@ impl PlaneDocker {
         static_token: Option<&BearerToken>,
     ) -> Result<SpawnResult> {
         run_container(
-            &self.docker,
+            self,
             backend_id,
             container_id,
             executable,
-            self.runtime.as_deref(),
             acquired_key,
             static_token,
-            self.log_config.as_ref(),
         )
         .await?;
         let port = get_port(&self.docker, container_id).await?;

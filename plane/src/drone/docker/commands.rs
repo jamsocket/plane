@@ -1,4 +1,4 @@
-use super::types::ContainerId;
+use super::{types::ContainerId, PlaneDocker};
 use crate::{
     names::BackendName,
     protocol::AcquiredKey,
@@ -198,14 +198,12 @@ fn get_container_config_from_executor_config(
 }
 
 pub async fn run_container(
-    docker: &Docker,
+    docker: &PlaneDocker,
     backend_id: &BackendName,
     container_id: &ContainerId,
     exec_config: ExecutorConfig,
-    runtime: Option<&str>,
     acquired_key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
-    log_config: Option<&HostConfigLogConfig>,
 ) -> Result<()> {
     let options = bollard::container::CreateContainerOptions {
         name: container_id.to_string(),
@@ -215,15 +213,19 @@ pub async fn run_container(
     let config = get_container_config_from_executor_config(
         backend_id,
         exec_config,
-        runtime,
+        docker.runtime.as_deref(),
         acquired_key,
         static_token,
-        log_config,
+        docker.log_config.as_ref(),
     )?;
 
-    docker.create_container(Some(options), config).await?;
+    docker
+        .docker
+        .create_container(Some(options), config)
+        .await?;
 
     docker
+        .docker
         .start_container::<String>(&container_id.to_string(), None)
         .await?;
 
