@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 
-mod commands;
+pub mod commands;
 pub mod types;
 
 /// The label used to identify containers managed by Plane.
