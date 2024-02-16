@@ -135,12 +135,16 @@ impl AcmeDnsServer {
                     });
                 };
 
+                tracing::info!(?cluster, "TXT query for cluster.");
+
                 let result = self
                     .request(cluster)
                     .await
                     .or_dns_error(ResponseCode::ServFail, || {
                         format!("No TXT record found for {}", name)
                     })?;
+
+                tracing::info!(?request, ?name, ?result, "TXT query result.");
 
                 let result: Vec<Record> = result
                     .map(|result| {

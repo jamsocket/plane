@@ -36,10 +36,10 @@ pub async fn dns_socket_inner(
                     }
                 };
 
-                if let Err(err) = socket
-                    .send(MessageToDns::TxtRecordResponse { cluster, txt_value })
-                    .await
-                {
+                let message = MessageToDns::TxtRecordResponse { cluster, txt_value };
+                tracing::info!(?message, "Sending txt record response to drone.");
+
+                if let Err(err) = socket.send(message).await {
                     tracing::error!(?err, "Error sending txt record response to drone.");
                 }
             }
