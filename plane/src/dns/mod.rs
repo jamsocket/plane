@@ -142,6 +142,8 @@ impl AcmeDnsServer {
                         format!("No TXT record found for {}", name)
                     })?;
 
+                tracing::info!(?request, ?name, ?result, "TXT query result.");
+
                 let result: Vec<Record> = result
                     .map(|result| {
                         Record::from_rdata(
