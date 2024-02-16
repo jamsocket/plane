@@ -135,6 +135,8 @@ impl AcmeDnsServer {
                     });
                 };
 
+                tracing::info!(?cluster, "TXT query for cluster.");
+
                 let result = self
                     .request(cluster)
                     .await
