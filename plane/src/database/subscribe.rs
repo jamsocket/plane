@@ -191,16 +191,10 @@ impl EventSubscriptionManager {
                     }
 
                     if let Some(prev_last_message) = last_message {
-                        let messages = match sqlx::query!(
-                            r#"
-                            select id, kind, key, data, created_at
-                            from event
-                            where id > $1
-                            order by id asc
-                            "#,
-                            prev_last_message as _,
+                        let messages = match EventSubscriptionManager::get_events_since(
+                            &db,
+                            prev_last_message,
                         )
-                        .fetch_all(&db)
                         .await
                         {
                             Ok(messages) => messages,
@@ -212,16 +206,8 @@ impl EventSubscriptionManager {
                         };
 
                         for message in messages {
-                            let notification = Notification {
-                                id: Some(message.id),
-                                timestamp: message.created_at,
-                                kind: message.kind,
-                                key: message.key,
-                                payload: message.data,
-                            };
-
-                            send_message(notification);
-                            last_message = Some(message.id);
+                            send_message(message.clone());
+                            last_message = message.id;
                         }
                     }
 
@@ -263,6 +249,35 @@ impl EventSubscriptionManager {
             handle,
             listeners,
         }
+    }
+
+    pub async fn get_events_since(
+        db: &PgPool,
+        since: i32,
+    ) -> Result<Vec<Notification<Value>>, sqlx::Error> {
+        let messages = sqlx::query!(
+            r#"
+            select id, kind, key, data, created_at
+            from event
+            where id > $1
+            order by id asc
+            limit 100
+            "#,
+            since,
+        )
+        .fetch_all(db)
+        .await?;
+
+        Ok(messages
+            .into_iter()
+            .map(|message| Notification {
+                id: Some(message.id),
+                timestamp: message.created_at,
+                kind: message.kind,
+                key: message.key,
+                payload: message.data,
+            })
+            .collect())
     }
 
     pub fn subscribe_all_events(&self) -> Receiver<Notification<Value>> {
