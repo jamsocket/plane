@@ -98,6 +98,15 @@ impl PlaneDatabase {
         connect::clean_up_tokens(&self.pool).await
     }
 
+    /// this limits the number of events returned, so it may be necessary
+    /// to call this function multiple times to get all events since a given id
+    pub async fn get_events_since(
+        &self,
+        since: i32,
+    ) -> Result<Vec<Notification<Value>>, sqlx::Error> {
+        EventSubscriptionManager::get_events_since(&self.pool, since).await
+    }
+
     fn subscription_manager(&self) -> &EventSubscriptionManager {
         self.subscription_manager
             .get_or_init(|| EventSubscriptionManager::new(&self.pool))
