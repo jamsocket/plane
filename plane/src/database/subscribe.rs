@@ -174,7 +174,7 @@ impl EventSubscriptionManager {
                     }
                 };
 
-                loop {
+                'outer: loop {
                     let mut listener = match PgListener::connect_with(&db).await {
                         Ok(listener) => listener,
                         Err(err) => {
@@ -190,24 +190,36 @@ impl EventSubscriptionManager {
                         continue;
                     }
 
-                    if let Some(prev_last_message) = last_message {
-                        let messages = match EventSubscriptionManager::get_events_since(
-                            &db,
-                            prev_last_message,
-                        )
-                        .await
-                        {
-                            Ok(messages) => messages,
-                            Err(err) => {
-                                tracing::error!(?err, "Failed to fetch messages from database.");
-                                backoff.wait().await;
-                                continue;
-                            }
-                        };
+                    if let Some(mut prev_last_message) = last_message {
+                        'inner: loop {
+                            let messages = match EventSubscriptionManager::get_events_since(
+                                &db,
+                                prev_last_message,
+                            )
+                            .await
+                            {
+                                Ok(messages) => messages,
+                                Err(err) => {
+                                    tracing::error!(
+                                        ?err,
+                                        "Failed to fetch messages from database."
+                                    );
+                                    backoff.wait().await;
+                                    continue 'outer;
+                                }
+                            };
 
-                        for message in messages {
-                            send_message(message.clone());
-                            last_message = message.id;
+                            if messages.is_empty() {
+                                break 'inner;
+                            }
+
+                            for message in messages {
+                                send_message(message.clone());
+                                last_message = message.id;
+                                prev_last_message = message
+                                    .id
+                                    .expect("Expected message from database to have id.");
+                            }
                         }
                     }
 
