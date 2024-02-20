@@ -85,7 +85,7 @@ pub struct AdminOpts {
 }
 
 #[derive(Subcommand)]
-enum AdminCommand {
+pub enum AdminCommand {
     Connect {
         #[clap(long)]
         cluster: Option<ClusterName>,
