@@ -78,14 +78,14 @@ fn show_error(error: &PlaneClientError) {
 #[derive(Parser)]
 pub struct AdminOpts {
     #[clap(long)]
-    controller: Url,
+    pub controller: Url,
 
     #[clap(subcommand)]
-    command: AdminCommand,
+    pub command: AdminCommand,
 }
 
 #[derive(Subcommand)]
-enum AdminCommand {
+pub enum AdminCommand {
     Connect {
         #[clap(long)]
         cluster: Option<ClusterName>,
