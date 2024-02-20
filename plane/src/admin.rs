@@ -78,10 +78,10 @@ fn show_error(error: &PlaneClientError) {
 #[derive(Parser)]
 pub struct AdminOpts {
     #[clap(long)]
-    controller: Url,
+    pub controller: Url,
 
     #[clap(subcommand)]
-    command: AdminCommand,
+    pub command: AdminCommand,
 }
 
 #[derive(Subcommand)]
