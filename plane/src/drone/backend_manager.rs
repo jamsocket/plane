@@ -14,7 +14,7 @@ use crate::{
     util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
-use bollard::auth::DockerCredentials;
+use bollard::{auth::DockerCredentials, errors::Error::DockerResponseServerError};
 use futures_util::Future;
 use std::{error::Error, fmt::Debug, sync::atomic::AtomicU64, time::Duration};
 use std::{future::pending, pin::Pin};
@@ -285,6 +285,13 @@ impl BackendManager {
                             .await
                         {
                             Ok(()) => break,
+                            Err(DockerResponseServerError {
+                                status_code: 404,
+                                message,
+                            }) => {
+                                tracing::warn!(err_msg=?message, "attempted to terminate backend that is already gone");
+                                break;
+                            }
                             Err(err) => {
                                 tracing::error!(?err, "failed to terminate backend");
                                 backoff.wait().await;
