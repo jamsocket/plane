@@ -104,8 +104,7 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                     println!(
                         "{} {} {} Plane={}@{}",
                         connected_string,
-                        node
-                            .cluster
+                        node.cluster
                             .as_ref()
                             .map(|d| d.to_string().purple())
                             .unwrap_or_default(),
