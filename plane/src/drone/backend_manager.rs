@@ -302,7 +302,6 @@ impl BackendManager {
     }
 
     pub fn set_state(self: &Arc<Self>, state: BackendState) {
-        tracing::info!(?self.backend_id, ?state, "Updating backend state");
         let mut lock = self.state.lock().expect("State lock is poisoned");
 
         tracing::info!(
