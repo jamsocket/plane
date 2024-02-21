@@ -26,6 +26,21 @@ const TOKEN_LIFETIME_SECONDS: u64 = 3600;
 
 type Result<T> = std::result::Result<T, ConnectError>;
 
+/// Unique violation error code in Postgres.
+/// NOTE: typically we should use "on conflict do nothing", but that only
+/// works with insert queries, not update queries.
+/// From: https://www.postgresql.org/docs/9.2/errcodes-appendix.html
+pub const PG_UNIQUE_VIOLATION_ERROR: &str = "23505";
+
+fn violates_uniqueness(err: &sqlx::Error) -> bool {
+    if let sqlx::Error::Database(err) = &err {
+        if let Some(code) = err.code() {
+            return code == PG_UNIQUE_VIOLATION_ERROR;
+        }
+    }
+    false
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ConnectError {
     #[error("No active drone available.")]
@@ -125,11 +140,17 @@ async fn create_backend_with_key(
         serde_json::to_value(&BackendState::Scheduled).expect("valid json"),
         static_token.map(|t| t.to_string()),
     )
-    .fetch_optional(&mut *txn)
-    .await?;
+    .fetch_one(&mut *txn)
+    .await;
 
-    let Some(result) = result else {
-        return Ok(None);
+    let result = match result {
+        Ok(result) => result,
+        Err(err) => {
+            if violates_uniqueness(&err) {
+                return Err(ConnectError::FailedToAcquireKey);
+            }
+            return Err(err.into());
+        }
     };
 
     let acquired_key = AcquiredKey {
