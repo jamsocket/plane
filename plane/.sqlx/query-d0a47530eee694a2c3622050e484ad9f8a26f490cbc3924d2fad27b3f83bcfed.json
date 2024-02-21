@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            select\n                id as backend_id,\n                expiration_time,\n                allowed_idle_seconds,\n                last_keepalive,\n                now() as \"as_of!\"\n            from backend\n            where\n                drone_id = $1\n                and last_status != $2\n                and (\n                    now() - last_keepalive > make_interval(secs => allowed_idle_seconds)\n                    or now() > expiration_time\n                )\n            ",
+  "query": "\n            select\n                id as backend_id,\n                expiration_time,\n                allowed_idle_seconds,\n                last_keepalive,\n                now() as \"as_of!\"\n            from backend\n            where\n                drone_id = $1\n                and last_status not in ($2, $3)\n                and (\n                    now() - last_keepalive > make_interval(secs => allowed_idle_seconds)\n                    or now() > expiration_time\n                )\n            ",
   "describe": {
     "columns": [
       {
@@ -32,7 +32,8 @@
     "parameters": {
       "Left": [
         "Int4",
-        "Text"
+        "Varchar",
+        "Varchar"
       ]
     },
     "nullable": [
@@ -43,5 +44,5 @@
       null
     ]
   },
-  "hash": "44fe63d1578436e1b78fb40b499d5a0794441d8a8859bf43f31d6493aac7fded"
+  "hash": "d0a47530eee694a2c3622050e484ad9f8a26f490cbc3924d2fad27b3f83bcfed"
 }
