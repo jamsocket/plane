@@ -1,20 +1,26 @@
 use crate::{heartbeat_consts::HEARTBEAT_INTERVAL, names::BackendName};
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
-    sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
     time::SystemTime,
 };
 use tokio::task::JoinHandle;
 
 type BackendNameListener = Box<dyn Fn(&BackendName) + Send + Sync + 'static>;
 
+#[derive(Debug)]
+pub struct BackendEntry {
+    /// The current number of active connections to the backend.
+    active_connections: u32,
+
+    /// Whether the backend has had a recent connection (since this value was last checked).
+    had_recent_connection: bool,
+}
+
 #[derive(Default)]
 pub struct ConnectionMonitor {
     visit_queue: VecDeque<(SystemTime, BackendName)>,
-    backends: HashMap<BackendName, (AtomicU32, AtomicBool)>,
+    backends: HashMap<BackendName, BackendEntry>,
     listener: Option<BackendNameListener>,
 }
 
@@ -28,8 +34,8 @@ impl ConnectionMonitor {
 
     pub fn touch_backend(&mut self, backend_id: &BackendName) {
         match self.backends.entry(backend_id.clone()) {
-            Entry::Occupied(entry) => {
-                entry.get().1.store(true, Ordering::Relaxed);
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().had_recent_connection = true;
             }
             Entry::Vacant(entry) => {
                 if let Some(listener) = &self.listener {
@@ -37,17 +43,20 @@ impl ConnectionMonitor {
                 }
                 self.visit_queue
                     .push_back((SystemTime::now() + HEARTBEAT_INTERVAL, backend_id.clone()));
-                entry.insert((AtomicU32::new(0), AtomicBool::new(false)));
+                entry.insert(BackendEntry {
+                    active_connections: 0,
+                    had_recent_connection: true,
+                });
             }
         }
     }
 
     pub fn inc_connection(&mut self, backend_id: &BackendName) {
         match self.backends.entry(backend_id.clone()) {
-            Entry::Occupied(entry) => {
-                let (active_connections, had_recent_connection) = entry.get();
-                active_connections.fetch_add(1, Ordering::SeqCst);
-                had_recent_connection.store(true, Ordering::SeqCst);
+            Entry::Occupied(mut entry) => {
+                let backend_entry = entry.get_mut();
+                backend_entry.active_connections += 1;
+                backend_entry.had_recent_connection = true;
             }
             Entry::Vacant(entry) => {
                 if let Some(listener) = &self.listener {
@@ -56,15 +65,18 @@ impl ConnectionMonitor {
 
                 self.visit_queue
                     .push_back((SystemTime::now() + HEARTBEAT_INTERVAL, backend_id.clone()));
-                entry.insert((AtomicU32::new(1), AtomicBool::new(false)));
+                entry.insert(BackendEntry {
+                    active_connections: 1,
+                    had_recent_connection: true,
+                });
             }
         }
     }
 
     pub fn dec_connection(&mut self, backend_id: &BackendName) {
         match self.backends.entry(backend_id.clone()) {
-            Entry::Occupied(entry) => {
-                entry.get().0.fetch_sub(1, Ordering::SeqCst);
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().active_connections -= 1;
             }
             Entry::Vacant(_) => {
                 tracing::warn!(
@@ -112,20 +124,16 @@ impl ConnectionMonitorHandle {
 
                     let mut monitor_lock = monitor.lock().expect("Monitor lock was poisoned.");
 
-                    let Some((connection_count, recent_connection)) =
-                        monitor_lock.backends.get(&backend)
-                    else {
+                    let Some(backend_entry) = monitor_lock.backends.get_mut(&backend) else {
                         // This shouldn't happen.
                         continue;
                     };
 
-                    if connection_count.load(Ordering::SeqCst) == 0
-                        && !recent_connection.load(Ordering::Relaxed)
-                    {
-                        // The backend has no connections and has not been touched recently, so we can remove it.
-                        monitor_lock.backends.remove(&backend);
-                    } else {
-                        recent_connection.store(false, Ordering::Relaxed);
+                    if backend_entry.active_connections > 0 || backend_entry.had_recent_connection {
+                        // TODO: this is likely to be noisy, we should remove it once we're a bit more confident in the monitor.
+                        tracing::info!(?backend_entry, ?backend, "Heartbeat for backend.");
+
+                        backend_entry.had_recent_connection = false;
 
                         if let Some(listener) = &monitor_lock.listener {
                             listener(&backend);
@@ -134,6 +142,9 @@ impl ConnectionMonitorHandle {
                         monitor_lock
                             .visit_queue
                             .push_back((SystemTime::now() + HEARTBEAT_INTERVAL, backend));
+                    } else {
+                        // The backend has no connections and has not been touched recently, so we can remove it.
+                        monitor_lock.backends.remove(&backend);
                     }
                 }
             })
