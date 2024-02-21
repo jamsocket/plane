@@ -19,7 +19,7 @@ struct Opts {
 #[derive(Subcommand)]
 enum Command {
     Events,
-    ListDrones {
+    ListNodes {
         #[clap(long)]
         all: bool,
 
@@ -76,21 +76,21 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                 );
             }
         }
-        Command::ListDrones { all, cluster } => {
-            let drones = db.node().list().await?;
+        Command::ListNodes { all, cluster } => {
+            let nodes = db.node().list().await?;
 
-            for drone in drones {
+            for node in nodes {
                 if let Some(cluster) = &cluster {
-                    if drone.cluster.as_ref() != Some(cluster) {
+                    if node.cluster.as_ref() != Some(cluster) {
                         continue;
                     }
                 }
 
-                if !all && !drone.active() {
+                if !all && !node.active() {
                     continue;
                 }
 
-                let connected_string = if let Some(controller) = &drone.controller {
+                let connected_string = if let Some(controller) = &node.controller {
                     format!(
                         "{} to {}",
                         "Connected".green(),
@@ -100,18 +100,18 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                     "Disconnected".yellow().to_string()
                 };
 
-                if drone.active() || all {
+                if node.active() || all {
                     println!(
                         "{} {} {} Plane={}@{}",
                         connected_string,
-                        drone
+                        node
                             .cluster
                             .as_ref()
                             .map(|d| d.to_string().purple())
                             .unwrap_or_default(),
-                        drone.name.to_string().green(),
-                        drone.plane_version.yellow(),
-                        drone.plane_hash.yellow(),
+                        node.name.to_string().green(),
+                        node.plane_version.yellow(),
+                        node.plane_hash.yellow(),
                     );
                 }
             }
