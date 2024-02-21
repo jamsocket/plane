@@ -411,13 +411,14 @@ impl<'a> BackendDatabase<'a> {
             from backend
             where
                 drone_id = $1
-                and last_status != $2
+                and last_status not in ($2, $3)
                 and (
                     now() - last_keepalive > make_interval(secs => allowed_idle_seconds)
                     or now() > expiration_time
                 )
             "#,
             drone_id.as_i32(),
+            BackendStatus::Scheduled.to_string(),
             BackendStatus::Terminated.to_string(),
         )
         .fetch_all(&self.db.pool)
