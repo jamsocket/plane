@@ -24,6 +24,20 @@ use std::time::Duration;
 
 const TOKEN_LIFETIME_SECONDS: u64 = 3600;
 
+/// Unique violation error code in Postgres.
+/// NOTE: typically we should use "on conflict do nothing", but that only
+/// works with insert queries, not update queries.
+/// From: https://www.postgresql.org/docs/9.2/errcodes-appendix.html
+pub const PG_UNIQUE_VIOLATION_ERROR: &str = "23505";
+fn violates_uniqueness(err: &sqlx::Error) -> bool {
+    if let sqlx::Error::Database(err) = &err {
+        if let Some(code) = err.code() {
+            return code == PG_UNIQUE_VIOLATION_ERROR;
+        }
+    }
+    false
+}
+
 type Result<T> = std::result::Result<T, ConnectError>;
 
 #[derive(thiserror::Error, Debug)]
@@ -73,7 +87,8 @@ impl ConnectError {
 }
 
 /// Attempts to create a new backend that owns the given key. If the key is already held, returns
-/// Ok(None). If the key is not held, creates a new backend and returns Ok(Some(backend_id)).
+/// Err(ConnectError::FailedToAcquireKey). If the key is not held, creates a new backend and
+/// returns Ok(backend_id).
 async fn create_backend_with_key(
     pool: &PgPool,
     key: &KeyConfig,
@@ -81,7 +96,7 @@ async fn create_backend_with_key(
     cluster: &ClusterName,
     drone_for_spawn: &DroneForSpawn,
     static_token: Option<&BearerToken>,
-) -> Result<Option<BackendName>> {
+) -> Result<BackendName> {
     let backend_id = spawn_config.id.clone().or_random();
     let mut txn = pool.begin().await?;
 
@@ -125,11 +140,17 @@ async fn create_backend_with_key(
         serde_json::to_value(&BackendState::Scheduled).expect("valid json"),
         static_token.map(|t| t.to_string()),
     )
-    .fetch_optional(&mut *txn)
-    .await?;
+    .fetch_one(&mut *txn)
+    .await;
 
-    let Some(result) = result else {
-        return Ok(None);
+    let result = match result {
+        Ok(result) => result,
+        Err(err) => {
+            if violates_uniqueness(&err) {
+                return Err(ConnectError::FailedToAcquireKey);
+            }
+            return Err(err.into());
+        }
     };
 
     let acquired_key = AcquiredKey {
@@ -161,7 +182,7 @@ async fn create_backend_with_key(
 
     txn.commit().await?;
 
-    Ok(Some(backend_id))
+    Ok(backend_id)
 }
 
 async fn create_token(
@@ -293,7 +314,7 @@ async fn attempt_connect(
         .use_static_token
         .then(BearerToken::new_random_static);
 
-    let Some(backend_id) = create_backend_with_key(
+    let backend_id = create_backend_with_key(
         pool,
         &key,
         spawn_config,
@@ -301,10 +322,7 @@ async fn attempt_connect(
         &drone,
         bearer_token.as_ref(),
     )
-    .await?
-    else {
-        return Err(ConnectError::FailedToAcquireKey);
-    };
+    .await?;
     tracing::info!(backend_id = ?backend_id, "Created backend");
 
     let (token, secret_token) = if let Some(token) = bearer_token {
