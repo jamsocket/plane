@@ -153,7 +153,7 @@ impl<T: Name> clap::builder::TypedValueParser for NameParser<T> {
 
 entity_name!(ControllerName, Some("co"));
 entity_name!(BackendName, None::<&'static str>);
-entity_name!(ProxyName, Some("pr"));
+entity_name!(ProxyName, Some("px"));
 entity_name!(DroneName, Some("dr"));
 entity_name!(AcmeDnsServerName, Some("ns"));
 entity_name!(BackendActionName, Some("ak"));
