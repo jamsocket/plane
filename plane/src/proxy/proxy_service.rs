@@ -6,6 +6,7 @@ use crate::proxy::cert_manager::CertWatcher;
 use crate::proxy::rewriter::RequestRewriter;
 use crate::proxy::tls::TlsAcceptor;
 use anyhow::Result;
+use axum::http::uri::PathAndQuery;
 use futures_util::{Future, FutureExt};
 use hyper::server::conn::AddrIncoming;
 use hyper::{
@@ -98,6 +99,7 @@ impl RequestHandler {
             let mut uri_parts = req.uri().clone().into_parts();
             uri_parts.scheme = Some("https".parse().expect("https is a valid scheme."));
             uri_parts.authority = Some(host.parse().expect("HOST header is a valid authority."));
+            uri_parts.path_and_query = uri_parts.path_and_query.or_else(|| Some(PathAndQuery::from_static("")));
             let uri = hyper::Uri::from_parts(uri_parts).expect("URI parts are valid.");
             return Ok(hyper::Response::builder()
                 .status(hyper::StatusCode::MOVED_PERMANENTLY)
