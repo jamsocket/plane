@@ -99,7 +99,9 @@ impl RequestHandler {
             let mut uri_parts = req.uri().clone().into_parts();
             uri_parts.scheme = Some("https".parse().expect("https is a valid scheme."));
             uri_parts.authority = Some(host.parse().expect("HOST header is a valid authority."));
-            uri_parts.path_and_query = uri_parts.path_and_query.or_else(|| Some(PathAndQuery::from_static("")));
+            uri_parts.path_and_query = uri_parts
+                .path_and_query
+                .or_else(|| Some(PathAndQuery::from_static("")));
             let uri = hyper::Uri::from_parts(uri_parts).expect("URI parts are valid.");
             return Ok(hyper::Response::builder()
                 .status(hyper::StatusCode::MOVED_PERMANENTLY)
