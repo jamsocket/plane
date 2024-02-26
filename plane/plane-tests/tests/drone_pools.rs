@@ -14,8 +14,9 @@ async fn drone_pools(env: TestEnvironment) {
     let controller = env.controller().await;
     let client = controller.client();
     let pool = "test".to_string();
-    let _drone = env.drone(&controller).await;
-    let _drone_in_pool = env.drone_in_pool(&controller, &pool).await;
+    let drone = env.drone(&controller).await;
+    let drone_in_pool = env.drone_in_pool(&controller, &pool).await;
+    assert_ne!(drone.id, drone_in_pool.id);
 
     // Wait for the drone to register. TODO: this seems long.
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
@@ -50,6 +51,8 @@ async fn drone_pools(env: TestEnvironment) {
     tracing::info!("Got response.");
 
     assert!(response.spawned);
+    let response_drone = response.drone.unwrap().clone();
+    assert_eq!(response_drone, drone.id);
 
     tracing::info!("Requesting backend from pool.");
     let mut connect_request_with_pool = connect_request.clone();
@@ -63,8 +66,8 @@ async fn drone_pools(env: TestEnvironment) {
     tracing::info!("Got response from pool.");
 
     assert!(response_from_pool.spawned);
-    let response_from_pool_drone = response_from_pool.drone.clone().unwrap();
-    assert_ne!(response_from_pool_drone, response.drone.unwrap());
+    let response_from_pool_drone = response_from_pool.drone.unwrap().clone();
+    assert_eq!(response_from_pool_drone, drone_in_pool.id);
 
     tracing::info!("Requesting backend from pool with different key.");
     let mut connect_request_with_pool_different_key = connect_request_with_pool.clone();
@@ -80,10 +83,13 @@ async fn drone_pools(env: TestEnvironment) {
     tracing::info!("Got response from pool with different key.");
 
     assert!(response_from_pool_different_key.spawned);
-    assert_eq!(
-        response_from_pool_different_key.drone.unwrap(),
-        response_from_pool_drone
-    );
+    let response_from_pool_different_key_drone =
+        response_from_pool_different_key.drone.unwrap().clone();
+    assert_eq!(response_from_pool_different_key_drone, drone_in_pool.id);
+
+    // Additional sanity
+    assert_ne!(response_from_pool_drone, response_drone);
+    assert_ne!(response_from_pool_different_key_drone, response_drone);
 
     tracing::info!("Waiting for all backends to terminate.");
     wait_until_backend_terminated(&client, &response.backend_id).await;
