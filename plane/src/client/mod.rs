@@ -72,15 +72,17 @@ impl PlaneClient {
         cluster: &ClusterName,
         pool: Option<String>,
     ) -> TypedSocketConnector<MessageFromDrone> {
-        let path = match pool {
+        let base_path = format!("/ctrl/c/{}/drone-socket", cluster);
+        let addr = match pool {
             Some(pool) => {
                 let encoded_pool: String =
                     form_urlencoded::byte_serialize(pool.as_bytes()).collect();
-                format!("/ctrl/c/{}/p/{}/drone-socket", cluster, encoded_pool)
+                self.controller_address
+                    .join(&format!("{}?pool={}", base_path, encoded_pool))
             }
-            None => format!("/ctrl/c/{}/drone-socket", cluster),
-        };
-        let addr = self.controller_address.join(&path).to_websocket_address();
+            None => self.controller_address.join(&base_path),
+        }
+        .to_websocket_address();
         TypedSocketConnector::new(addr)
     }
 

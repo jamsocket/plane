@@ -17,15 +17,18 @@ use crate::{
     types::{backend_state::TerminationReason, ClusterName, NodeId, TerminationKind},
 };
 use axum::{
-    extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},
+    extract::{ws::WebSocket, ConnectInfo, Path, Query, State, WebSocketUpgrade},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
-};
+use serde::Deserialize;
+use std::net::{IpAddr, SocketAddr};
 use valuable::Valuable;
+
+#[derive(Deserialize)]
+pub struct DroneSocketQuery {
+    pool: Option<String>,
+}
 
 pub async fn handle_message_from_drone(
     msg: MessageFromDrone,
@@ -222,40 +225,19 @@ pub async fn drone_socket(
     }
 }
 
-// Here we handle two possible routes, `/c/:cluster/p/:pool/drone-socket` or
-// `/c/:cluster/drone-socket`. To keep the logic in one place while handling
-// both possible routes, we manually extract the `cluster` and `pool` parameters
-// from the path. Note: `pool` is optional, while `cluster` is required.
 pub async fn handle_drone_socket(
-    Path(path): Path<HashMap<String, String>>,
+    Path(cluster): Path<String>,
+    Query(query): Query<DroneSocketQuery>,
     State(controller): State<Controller>,
     connect_info: ConnectInfo<SocketAddr>,
     ws: WebSocketUpgrade,
 ) -> Result<impl IntoResponse, Response> {
-    let cluster: ClusterName = path
-        .get("cluster")
-        .or_status(
-            StatusCode::BAD_REQUEST,
-            "No cluster provided",
-            ApiErrorKind::NoClusterProvided,
-        )?
-        .parse()
-        .ok()
-        .or_status(
-            StatusCode::BAD_REQUEST,
-            "Invalid cluster name",
-            ApiErrorKind::InvalidClusterName,
-        )?;
-
-    // If the pool Option is provided, attempt to parse. Otherwise pass along None.
-    let pool = match path.get("pool") {
-        Some(pool) => Some(pool.parse().or_status(
-            StatusCode::BAD_REQUEST,
-            "Invalid pool name",
-            ApiErrorKind::InvalidPoolName,
-        )?),
-        None => None,
-    };
+    let cluster: ClusterName = cluster.parse().ok().or_status(
+        StatusCode::BAD_REQUEST,
+        "Invalid cluster name",
+        ApiErrorKind::InvalidClusterName,
+    )?;
+    let pool = query.pool;
     let ip = connect_info.0.ip();
     Ok(ws.on_upgrade(move |socket| drone_socket(cluster, socket, controller, ip, pool)))
 }

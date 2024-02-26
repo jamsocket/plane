@@ -22,7 +22,6 @@ pub enum ApiErrorKind {
     NoClusterProvided,
     NotFound,
     InvalidClusterName,
-    InvalidPoolName,
     Other,
 }
 
