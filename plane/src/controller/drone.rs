@@ -145,7 +145,7 @@ pub async fn drone_socket_inner(
     ws: WebSocket,
     controller: Controller,
     ip: IpAddr,
-    pool: Option<String>,
+    pool: &str,
 ) -> anyhow::Result<()> {
     let mut socket = new_server(ws, controller.id.to_string()).await?;
 
@@ -160,7 +160,7 @@ pub async fn drone_socket_inner(
     controller
         .db
         .drone()
-        .register_drone(drone_id, true, pool.as_deref().unwrap_or_default())
+        .register_drone(drone_id, true, pool)
         .await?;
 
     let mut backend_actions: Subscription<BackendActionMessage> =
@@ -218,9 +218,9 @@ pub async fn drone_socket(
     ws: WebSocket,
     controller: Controller,
     ip: IpAddr,
-    pool: Option<String>,
+    pool: String,
 ) {
-    if let Err(err) = drone_socket_inner(cluster, ws, controller, ip, pool).await {
+    if let Err(err) = drone_socket_inner(cluster, ws, controller, ip, &pool).await {
         tracing::error!(?err, "Drone socket error");
     }
 }
@@ -237,7 +237,7 @@ pub async fn handle_drone_socket(
         "Invalid cluster name",
         ApiErrorKind::InvalidClusterName,
     )?;
-    let pool = query.pool;
+    let pool = query.pool.unwrap_or_default();
     let ip = connect_info.0.ip();
     Ok(ws.on_upgrade(move |socket| drone_socket(cluster, socket, controller, ip, pool)))
 }
