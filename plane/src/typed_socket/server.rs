@@ -30,6 +30,10 @@ pub async fn handle_messages<T: ChannelMessage>(
             Some(msg) = socket.recv() => {
                 let msg = match msg {
                     Ok(Message::Text(msg)) => msg,
+                    Err(err) => {
+                        tracing::error!(?err, "Failed to receive message from websocket.");
+                        break;
+                    }
                     msg => {
                         tracing::warn!("Received ignored message: {:?}", msg);
                         continue;
