@@ -11,8 +11,7 @@ use crate::{
 };
 use reqwest::{Response, StatusCode};
 use serde::de::DeserializeOwned;
-use url::Url;
-
+use url::{form_urlencoded, Url};
 pub mod controller_address;
 mod sse;
 
@@ -71,11 +70,17 @@ impl PlaneClient {
     pub fn drone_connection(
         &self,
         cluster: &ClusterName,
+        pool: &str,
     ) -> TypedSocketConnector<MessageFromDrone> {
-        let addr = self
-            .controller_address
-            .join(&format!("/ctrl/c/{}/drone-socket", cluster))
-            .to_websocket_address();
+        let base_path = format!("/ctrl/c/{}/drone-socket", cluster);
+        let addr = if pool.is_empty() {
+            self.controller_address.join(&base_path)
+        } else {
+            let encoded_pool: String = form_urlencoded::byte_serialize(pool.as_bytes()).collect();
+            self.controller_address
+                .join(&format!("{}?pool={}", base_path, encoded_pool))
+        }
+        .to_websocket_address();
         TypedSocketConnector::new(addr)
     }
 

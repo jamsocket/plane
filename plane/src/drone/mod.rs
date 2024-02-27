@@ -141,6 +141,7 @@ pub async fn drone_loop(
 
 pub struct Drone {
     drone_loop: JoinHandle<()>,
+    pub id: DroneName,
 }
 
 impl Drone {
@@ -167,9 +168,9 @@ impl Drone {
         let executor = Executor::new(docker, state_store, ip);
 
         let id = id.clone();
-        let drone_loop = tokio::spawn(drone_loop(id, connector, executor));
+        let drone_loop = tokio::spawn(drone_loop(id.clone(), connector, executor));
 
-        Ok(Self { drone_loop })
+        Ok(Self { drone_loop, id })
     }
 
     pub async fn terminate(self) {
@@ -184,8 +185,9 @@ pub async fn run_drone(
     cluster: ClusterName,
     ip: IpAddr,
     db_path: Option<&Path>,
+    pool: &str,
 ) -> Result<()> {
-    let connection = client.drone_connection(&cluster);
+    let connection = client.drone_connection(&cluster, pool);
 
     let ip = if let Some(ip) = get_internal_host_ip() {
         tracing::info!(%ip, "Found internal host IP.");

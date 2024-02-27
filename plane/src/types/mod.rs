@@ -266,6 +266,10 @@ pub struct ConnectRequest {
     /// Passed to the backend through the X-Plane-Auth header.
     #[serde(default)]
     pub auth: Map<String, Value>,
+
+    /// The drone pool to use for the connect request.
+    #[serde(default)]
+    pub pool: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]

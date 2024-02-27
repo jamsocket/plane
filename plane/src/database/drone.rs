@@ -16,16 +16,17 @@ impl<'a> DroneDatabase<'a> {
         Self { pool }
     }
 
-    pub async fn register_drone(&self, id: NodeId, ready: bool) -> sqlx::Result<()> {
+    pub async fn register_drone(&self, id: NodeId, ready: bool, pool: &str) -> sqlx::Result<()> {
         query!(
             r#"
-            insert into drone (id, draining, ready)
-            values ($1, false, $2)
+            insert into drone (id, draining, ready, pool)
+            values ($1, false, $2, $3)
             on conflict (id) do update set
                 ready = $2
             "#,
             id.as_i32(),
             ready,
+            pool,
         )
         .execute(self.pool)
         .await?;
@@ -72,6 +73,7 @@ impl<'a> DroneDatabase<'a> {
     pub async fn pick_drone_for_spawn(
         &self,
         cluster: &ClusterName,
+        pool: &str,
     ) -> sqlx::Result<Option<DroneForSpawn>> {
         let result = query!(
             r#"
@@ -93,6 +95,7 @@ impl<'a> DroneDatabase<'a> {
                 and controller.is_online = true
                 and draining = false
                 and last_local_time is not null
+                and pool = $3
             order by (
                 select
                     count(*)
@@ -105,6 +108,7 @@ impl<'a> DroneDatabase<'a> {
             cluster.to_string(),
             PgInterval::try_from(Duration::from_secs(UNHEALTHY_SECONDS as _))
                 .expect("valid interval"),
+            pool,
         )
         .fetch_optional(self.pool)
         .await?;

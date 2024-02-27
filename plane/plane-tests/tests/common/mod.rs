@@ -1,5 +1,6 @@
-use self::test_env::TestEnvironment;
+use self::{test_env::TestEnvironment, timeout::WithTimeout};
 use futures_util::Future;
+use plane::{client::PlaneClient, names::BackendName, types::BackendStatus};
 use std::{panic::AssertUnwindSafe, time::Duration};
 use tokio::time::timeout;
 
@@ -47,6 +48,24 @@ where
         if let Err(err) = result {
             tracing::error!("Test panicked: {:?}", err);
             std::panic::resume_unwind(err);
+        }
+    }
+}
+
+// For some reason Rust doesn't see that this function is used
+#[allow(dead_code)]
+pub async fn wait_until_backend_terminated(client: &PlaneClient, backend_id: &BackendName) {
+    let mut backend_status_stream = client
+        .backend_status_stream(backend_id)
+        .with_timeout(10)
+        .await
+        .unwrap()
+        .unwrap();
+
+    while let Ok(Some(message)) = backend_status_stream.next().with_timeout(10).await {
+        tracing::info!("Got status: {:?}", message);
+        if message.status == BackendStatus::Terminated {
+            break;
         }
     }
 }
