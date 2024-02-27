@@ -130,6 +130,61 @@ impl<'a> NodeDatabase<'a> {
         Ok(())
     }
 
+    pub async fn get_by_id(&self, node_id: NodeId) -> sqlx::Result<Option<NodeRow>> {
+        let record = query!(
+            r#"
+            select
+                node.id as "id!",
+                kind as "kind!",
+                cluster,
+                (case when
+                    controller.is_online and controller.last_heartbeat - now() < $1
+                    then controller.id
+                    else null end
+                ) as controller,
+                name as "name!",
+                node.plane_version as "plane_version!",
+                node.plane_hash as "plane_hash!"
+            from node
+            left join controller on controller.id = node.controller
+            where node.id = $2
+            "#,
+            PgInterval::try_from(Duration::from_secs(UNHEALTHY_SECONDS as _))
+                .expect("valid interval"),
+            node_id.as_i32(),
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        let Some(row) = record else {
+            return Ok(None);
+        };
+
+        Ok(Some(NodeRow {
+            id: NodeId::from(row.id),
+            cluster: row
+                .cluster
+                .map(|s| {
+                    s.parse()
+                        .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))
+                })
+                .transpose()?,
+            kind: NodeKind::try_from(row.kind).map_sqlx_error()?,
+            controller: row
+                .controller
+                .map(|t| {
+                    ControllerName::try_from(t).map_err(|_| {
+                        sqlx::Error::Decode("Failed to decode controller name.".into())
+                    })
+                })
+                .transpose()?,
+            name: AnyNodeName::try_from(row.name)
+                .map_err(|_| sqlx::Error::Decode("Failed to decode node name.".into()))?,
+            plane_version: row.plane_version,
+            plane_hash: row.plane_hash,
+        }))
+    }
+
     pub async fn list(&self) -> sqlx::Result<Vec<NodeRow>> {
         let record = query!(
             r#"
