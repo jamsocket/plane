@@ -185,7 +185,7 @@ pub async fn run_drone(
     cluster: ClusterName,
     ip: IpAddr,
     db_path: Option<&Path>,
-    pool: Option<String>,
+    pool: &str,
 ) -> Result<()> {
     let connection = client.drone_connection(&cluster, pool);
 

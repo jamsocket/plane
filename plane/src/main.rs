@@ -198,7 +198,16 @@ async fn run(opts: Opts) -> Result<()> {
 
             let docker = PlaneDocker::new(docker, docker_runtime, log_config).await?;
 
-            run_drone(client, docker, name, cluster, ip, db.as_deref(), pool).await?;
+            run_drone(
+                client,
+                docker,
+                name,
+                cluster,
+                ip,
+                db.as_deref(),
+                &pool.unwrap_or_default(),
+            )
+            .await?;
         }
         Command::Proxy {
             name,
