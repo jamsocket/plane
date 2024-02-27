@@ -42,6 +42,7 @@ async fn backend_status_in_response(env: TestEnvironment) {
         }),
         user: None,
         auth: Map::default(),
+        pool: None,
     };
 
     let response = client.connect(&connect_request).await.unwrap();

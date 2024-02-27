@@ -452,7 +452,8 @@ CREATE TABLE public.drone (
     ready boolean NOT NULL,
     draining boolean DEFAULT false NOT NULL,
     last_heartbeat timestamp with time zone,
-    last_local_time timestamp with time zone
+    last_local_time timestamp with time zone,
+    pool character varying(255) DEFAULT ''::character varying NOT NULL
 );
 
 
@@ -498,6 +499,13 @@ COMMENT ON COLUMN public.drone.last_heartbeat IS 'The last time local_epoch_mill
 --
 
 COMMENT ON COLUMN public.drone.last_local_time IS 'The last reported local timestamp on the drone, used to assign initial key leases when spawning.';
+
+
+--
+-- Name: COLUMN drone.pool; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.drone.pool IS 'The pool to which the drone is assigned (default pool is an empty string).';
 
 
 --

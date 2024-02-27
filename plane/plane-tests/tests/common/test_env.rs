@@ -23,6 +23,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 use url::Url;
 
 const TEST_CLUSTER: &str = "plane.test";
+const DEFAULT_POOL: String = String::new();
 
 #[derive(Clone)]
 pub struct TestEnvironment {
@@ -32,6 +33,7 @@ pub struct TestEnvironment {
     log_subscription: Arc<Mutex<Option<LogSubscription>>>,
     pub run_name: String,
     pub cluster: ClusterName,
+    pub pool: String,
 }
 
 #[allow(dead_code)]
@@ -49,6 +51,7 @@ impl TestEnvironment {
             log_subscription: Arc::new(Mutex::new(Some(log_subscription))),
             cluster: TEST_CLUSTER.parse().unwrap(),
             run_name,
+            pool: DEFAULT_POOL,
         }
     }
 
@@ -103,9 +106,9 @@ impl TestEnvironment {
         controller
     }
 
-    pub async fn drone(&mut self, controller: &ControllerServer) -> Drone {
+    pub async fn drone_internal(&mut self, controller: &ControllerServer, pool: &str) -> Drone {
         let client = controller.client();
-        let connector = client.drone_connection(&TEST_CLUSTER.parse().unwrap());
+        let connector = client.drone_connection(&TEST_CLUSTER.parse().unwrap(), pool);
         let docker = Docker::connect_with_local_defaults().unwrap();
         let db_path = self.scratch_dir.join("drone.db");
 
@@ -120,6 +123,14 @@ impl TestEnvironment {
         )
         .await
         .unwrap()
+    }
+
+    pub async fn drone(&mut self, controller: &ControllerServer) -> Drone {
+        self.drone_internal(controller, &self.pool.clone()).await
+    }
+
+    pub async fn drone_in_pool(&mut self, controller: &ControllerServer, pool: &str) -> Drone {
+        self.drone_internal(controller, pool).await
     }
 
     pub async fn dns(&mut self, controller: &ControllerServer) -> DnsServer {

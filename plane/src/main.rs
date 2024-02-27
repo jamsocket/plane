@@ -75,6 +75,10 @@ enum Command {
         /// Optional log driver configuration, passed to Docker as the `LogConfig` field.
         #[clap(long)]
         log_config: Option<String>,
+
+        /// Optional pool identifier. If present, will only schedule workloads with a matching `pool` tag on this drone.
+        #[clap(long)]
+        pool: Option<String>,
     },
     Proxy {
         #[clap(long)]
@@ -182,6 +186,7 @@ async fn run(opts: Opts) -> Result<()> {
             db,
             docker_runtime,
             log_config,
+            pool,
         } => {
             let name = name.or_random();
             tracing::info!(%name, "Starting drone");
@@ -193,7 +198,16 @@ async fn run(opts: Opts) -> Result<()> {
 
             let docker = PlaneDocker::new(docker, docker_runtime, log_config).await?;
 
-            run_drone(client, docker, name, cluster, ip, db.as_deref()).await?;
+            run_drone(
+                client,
+                docker,
+                name,
+                cluster,
+                ip,
+                db.as_deref(),
+                &pool.unwrap_or_default(),
+            )
+            .await?;
         }
         Command::Proxy {
             name,
