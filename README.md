@@ -1,5 +1,3 @@
-**Note:** This branch represents a recent rewrite of Plane. Feel free to poke around, but we recommend [talking to us](https://discord.gg/N5sEpsuhh9) before using it in production. See the [0.3.x branch](https://github.com/drifting-in-space/Plane/tree/plane-0.3.x) for the previous version.
-
 <div style="postion: relative; width: 337px; height: 110px;">
     <a href="https://plane.dev#gh-light-mode-only" style="position: absolute;">
         <img src="./resources/plane-logo-light.svg" alt="Plane logo" />
