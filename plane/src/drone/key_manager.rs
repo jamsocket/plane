@@ -135,7 +135,14 @@ impl KeyManager {
         }
     }
 
-    pub fn register_key(&mut self, backend: BackendName, key: AcquiredKey) {
+    /// Register a key with the key manager, ensuring that it will be renewed.
+    /// Returns true if the key was registered, and false if it was already registered (this
+    /// should be considered an error.)
+    pub fn register_key(&mut self, backend: BackendName, key: AcquiredKey) -> bool {
+        if self.handles.contains_key(&backend) {
+            return false;
+        }
+
         let handle = GuardHandle::new(renew_key_loop(
             key.clone(),
             backend.clone(),
@@ -144,6 +151,8 @@ impl KeyManager {
         ));
 
         self.handles.insert(backend, (key, handle));
+
+        true
     }
 
     pub fn update_deadlines(&mut self, backend: &BackendName, deadlines: KeyDeadlines) {

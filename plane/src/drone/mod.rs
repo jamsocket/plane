@@ -95,10 +95,18 @@ pub async fn drone_loop(
 
                     if let BackendAction::Spawn { key, .. } = &action {
                         // Register the key with the key manager, ensuring that it will be refreshed.
-                        key_manager
+                        let result = key_manager
                             .lock()
                             .expect("Key manager lock poisoned.")
                             .register_key(backend_id.clone(), key.clone());
+
+                        if !result {
+                            tracing::error!(
+                                backend = backend_id.as_value(),
+                                "Key already registered for backend. Ignoring spawn request."
+                            );
+                            continue;
+                        }
                     }
 
                     if let Err(err) = executor.apply_action(&backend_id, &action).await {
