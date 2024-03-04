@@ -180,6 +180,9 @@ impl RequestHandler {
                     Err(error) if error.kind() == ErrorKind::ConnectionReset => {
                         tracing::info!("Connection reset by peer.");
                     }
+                    Err(error) if error.kind() == ErrorKind::BrokenPipe => {
+                        tracing::info!("Broken pipe.");
+                    }
                     Err(error) => {
                         tracing::error!(?error, "Error with upgraded connection.");
                     }
