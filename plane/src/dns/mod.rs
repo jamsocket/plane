@@ -167,12 +167,10 @@ impl AcmeDnsServer {
 
                 Ok(result)
             }
-            _ => {
-                Err(error::DnsError {
-                    code: ResponseCode::NotImp,
-                    message: format!("Unsupported query type: {:?}", request.query().query_type()),
-                })
-            }
+            _ => Err(error::DnsError {
+                code: ResponseCode::NotImp,
+                message: format!("Unsupported query type: {:?}", request.query().query_type()),
+            }),
         }
     }
 }
