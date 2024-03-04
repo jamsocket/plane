@@ -158,9 +158,10 @@ impl Drop for GuardHandle {
     }
 }
 
-pub fn get_internal_host_ip() -> Option<IpAddr> {
+/// Resolve a hostname to an IP address.
+pub fn resolve_hostname(hostname: &str) -> Option<IpAddr> {
     // The port is arbitrary, but needs to be provided.
-    let socket_addrs = "host.docker.internal:0".to_socket_addrs().ok()?;
+    let socket_addrs = format!("{}:0", hostname).to_socket_addrs().ok()?;
 
     for socket_addr in socket_addrs {
         if let IpAddr::V4(ip) = socket_addr.ip() {

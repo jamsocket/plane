@@ -10,15 +10,15 @@ use crate::{
     signals::wait_for_shutdown_signal,
     typed_socket::client::TypedSocketConnector,
     types::{BackendState, ClusterName},
-    util::get_internal_host_ip,
 };
 use anyhow::Result;
+use chrono::Duration;
 use rusqlite::Connection;
 use std::{
     fs::{set_permissions, File, Permissions},
     net::IpAddr,
     os::unix::fs::PermissionsExt,
-    path::Path,
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 use tokio::task::JoinHandle;
@@ -154,13 +154,11 @@ pub struct Drone {
 
 impl Drone {
     pub async fn run(
-        id: &DroneName,
-        connector: TypedSocketConnector<MessageFromDrone>,
+        config: &DroneConfig,
         docker: PlaneDocker,
-        ip: IpAddr,
-        db_path: Option<&Path>,
+        connector: TypedSocketConnector<MessageFromDrone>,
     ) -> Result<Self> {
-        let sqlite_connection = if let Some(db_path) = db_path {
+        let sqlite_connection = if let Some(db_path) = config.db_path.as_ref() {
             if !db_path.exists() {
                 File::create(db_path)?;
                 let permissions = Permissions::from_mode(0o600);
@@ -173,9 +171,15 @@ impl Drone {
         };
 
         let state_store = StateStore::new(sqlite_connection)?;
-        let executor = Executor::new(docker, state_store, ip);
+        let executor = Executor::new(
+            docker,
+            state_store,
+            config.ip,
+            config.auto_prune,
+            config.cleanup_min_age,
+        );
 
-        let id = id.clone();
+        let id = config.id.clone();
         let drone_loop = tokio::spawn(drone_loop(id.clone(), connector, executor));
 
         Ok(Self { drone_loop, id })
@@ -186,26 +190,23 @@ impl Drone {
     }
 }
 
+pub struct DroneConfig {
+    pub id: DroneName,
+    pub cluster: ClusterName,
+    pub ip: IpAddr,
+    pub db_path: Option<PathBuf>,
+    pub pool: String,
+    pub auto_prune: bool,
+    pub cleanup_min_age: Duration,
+}
+
 pub async fn run_drone(
     client: PlaneClient,
     docker: PlaneDocker,
-    id: DroneName,
-    cluster: ClusterName,
-    ip: IpAddr,
-    db_path: Option<&Path>,
-    pool: &str,
+    config: &DroneConfig,
 ) -> Result<()> {
-    let connection = client.drone_connection(&cluster, pool);
-
-    let ip = if let Some(ip) = get_internal_host_ip() {
-        tracing::info!(%ip, "Found internal host IP.");
-        ip
-    } else {
-        tracing::warn!("Could not find internal host IP.");
-        ip
-    };
-
-    let drone = Drone::run(&id, connection, docker, ip, db_path).await?;
+    let connection = client.drone_connection(&config.cluster, &config.pool);
+    let drone = Drone::run(config, docker, connection).await?;
 
     tracing::info!("Drone started.");
     wait_for_shutdown_signal().await;
