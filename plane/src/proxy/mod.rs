@@ -90,7 +90,7 @@ pub async fn run_proxy(
     acme_config: Option<AcmeConfig>,
     root_redirect_url: Option<Url>,
 ) -> Result<()> {
-    let (cert_watcher, cert_manager) =
+    let (mut cert_watcher, cert_manager) =
         watcher_manager_pair(cluster.clone(), cert_path, acme_config)?;
 
     let proxy_connection = ProxyConnection::new(name, client, cluster, cert_manager);
@@ -106,6 +106,9 @@ pub async fn run_proxy(
     .serve_http(port_config.http_port, shutdown_signal.subscribe())?;
 
     let https_handle = if let Some(https_port) = port_config.https_port {
+        tracing::info!("Waiting for initial certificate.");
+        cert_watcher.wait_for_initial_cert().await?;
+
         let https_handle = ProxyMakeService {
             state: proxy_connection.state(),
             https_redirect: false,
