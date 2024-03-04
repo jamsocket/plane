@@ -103,7 +103,14 @@ impl AcmeDnsServer {
 
     async fn request(&self, cluster: ClusterName) -> anyhow::Result<Option<String>> {
         let mut receiver = match self.request_map.entry(cluster.clone()) {
-            dashmap::mapref::entry::Entry::Occupied(entry) => entry.get().subscribe(),
+            dashmap::mapref::entry::Entry::Occupied(entry) => {
+                // TODO: this is a bit inefficient, we should only send the request once, but it's
+                // the best way to protect against the request failing for now.
+                self.send
+                    .send(MessageFromDns::TxtRecordRequest { cluster })?;
+
+                entry.get().subscribe()
+            },
             dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
                 let (sender, receiver) = channel(1);
                 vacant_entry.insert(sender);
