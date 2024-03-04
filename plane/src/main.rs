@@ -85,13 +85,13 @@ enum Command {
         /// Automatically prune stopped images.
         /// This prunes *all* unused container images, not just ones that Plane has loaded, so it is disabled by default.
         #[clap(long)]
-        auto_prune: bool,
+        auto_prune_images: bool,
 
-        /// Minimum age (in seconds) of backends to prune.
+        /// Minimum age (in seconds) of backend containers to prune.
         /// By default, all stopped backends are pruned, but you can set this to a positive number of seconds to prune
         /// only backends that were created more than this many seconds ago.
         #[clap(long, default_value = "0")]
-        cleanup_min_age_seconds: i32,
+        auto_prune_containers_older_than_seconds: i32,
     },
     Proxy {
         #[clap(long)]
@@ -200,8 +200,8 @@ async fn run(opts: Opts) -> Result<()> {
             docker_runtime,
             log_config,
             pool,
-            auto_prune,
-            cleanup_min_age_seconds,
+            auto_prune_images: auto_prune,
+            auto_prune_containers_older_than_seconds: cleanup_min_age_seconds,
         } => {
             let name = name.or_random();
             tracing::info!(%name, "Starting drone");
