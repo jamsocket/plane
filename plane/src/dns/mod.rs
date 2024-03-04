@@ -168,7 +168,6 @@ impl AcmeDnsServer {
                 Ok(result)
             }
             _ => {
-                tracing::warn!(?request, ?name, "Unsupported query type.");
                 Err(error::DnsError {
                     code: ResponseCode::NotImp,
                     message: format!("Unsupported query type: {:?}", request.query().query_type()),
