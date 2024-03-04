@@ -65,10 +65,23 @@ impl CertWatcher {
         }
     }
 
-    pub async fn next(&mut self) -> Option<CertificatePair> {
-        self.receiver.changed().await.ok()?;
-        self.update_certified_key();
-        self.receiver.borrow().as_ref().cloned()
+    pub async fn wait_for_initial_cert(&mut self) -> Result<()> {
+        loop {
+            if self
+                .certified_key
+                .lock()
+                .expect("Certified key lock poisoned")
+                .is_some()
+            {
+                return Ok(());
+            }
+
+            self.receiver
+                .changed()
+                .await
+                .expect("Failed to receive from channel.");
+            self.update_certified_key();
+        }
     }
 }
 
@@ -98,9 +111,7 @@ pub struct CertManager {
     refresh_loop: Option<tokio::task::JoinHandle<()>>,
 
     /// Sender for forwarding responses from the controller to the refresh loop
-    /// task. This technically doesn't need to be a broadcast channel, since there's
-    /// only one instance of the refresh loop task running at a time,
-    /// This doesn't need to be a broadcast channel, since there's only one
+    /// task.
     response_sender: broadcast::Sender<CertManagerResponse>,
 
     /// Configuration used for the ACME certificate request.
