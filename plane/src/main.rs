@@ -2,6 +2,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 use anyhow::{anyhow, Context, Result};
+use chrono::Duration;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane::admin::AdminOpts;
@@ -10,11 +11,12 @@ use plane::controller::run_controller;
 use plane::database::connect_and_migrate;
 use plane::dns::run_dns;
 use plane::drone::docker::PlaneDocker;
-use plane::drone::run_drone;
+use plane::drone::{run_drone, DroneConfig};
 use plane::init_tracing::init_tracing;
 use plane::names::{AcmeDnsServerName, ControllerName, DroneName, Name, OrRandom, ProxyName};
 use plane::proxy::{run_proxy, AcmeConfig, ServerPortConfig};
 use plane::types::ClusterName;
+use plane::util::resolve_hostname;
 use plane::{PLANE_GIT_HASH, PLANE_VERSION};
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -63,7 +65,7 @@ enum Command {
 
         /// IP address for this drone that proxies can connect to.
         #[clap(long, default_value = "127.0.0.1")]
-        ip: IpAddr,
+        ip: String,
 
         /// Path to the database file. If omitted, an in-memory database will be used.
         #[clap(long)]
@@ -79,6 +81,17 @@ enum Command {
         /// Optional pool identifier. If present, will only schedule workloads with a matching `pool` tag on this drone.
         #[clap(long)]
         pool: Option<String>,
+
+        /// Automatically prune stopped images.
+        /// This prunes *all* unused container images, not just ones that Plane has loaded, so it is disabled by default.
+        #[clap(long)]
+        auto_prune_images: bool,
+
+        /// Minimum age (in seconds) of backend containers to prune.
+        /// By default, all stopped backends are pruned, but you can set this to a positive number of seconds to prune
+        /// only backends that were created more than this many seconds ago.
+        #[clap(long, default_value = "0")]
+        auto_prune_containers_older_than_seconds: i32,
     },
     Proxy {
         #[clap(long)]
@@ -187,6 +200,8 @@ async fn run(opts: Opts) -> Result<()> {
             docker_runtime,
             log_config,
             pool,
+            auto_prune_images: auto_prune,
+            auto_prune_containers_older_than_seconds: cleanup_min_age_seconds,
         } => {
             let name = name.or_random();
             tracing::info!(%name, "Starting drone");
@@ -198,16 +213,22 @@ async fn run(opts: Opts) -> Result<()> {
 
             let docker = PlaneDocker::new(docker, docker_runtime, log_config).await?;
 
-            run_drone(
-                client,
-                docker,
-                name,
-                cluster,
+            let ip: IpAddr = resolve_hostname(&ip)
+                .ok_or_else(|| anyhow::anyhow!("Failed to resolve hostname to IP address."))?;
+
+            let cleanup_min_age = Duration::seconds(cleanup_min_age_seconds as i64);
+
+            let drone_config = DroneConfig {
+                id: name.clone(),
+                cluster: cluster.clone(),
                 ip,
-                db.as_deref(),
-                &pool.unwrap_or_default(),
-            )
-            .await?;
+                db_path: db,
+                pool: pool.unwrap_or_default(),
+                auto_prune,
+                cleanup_min_age,
+            };
+
+            run_drone(client, docker, &drone_config).await?;
         }
         Command::Proxy {
             name,

@@ -3,18 +3,19 @@ use super::{
     resources::{database::DevDatabase, pebble::Pebble},
 };
 use bollard::Docker;
+use chrono::Duration;
 use plane::{
     controller::ControllerServer,
     database::PlaneDatabase,
     dns::run_dns_with_listener,
-    drone::{docker::PlaneDocker, Drone},
+    drone::{docker::PlaneDocker, Drone, DroneConfig},
     names::{AcmeDnsServerName, ControllerName, DroneName, Name},
     proxy::AcmeEabConfiguration,
     types::ClusterName,
     util::random_string,
 };
 use std::{
-    net::Ipv4Addr,
+    net::{IpAddr, Ipv4Addr},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -114,15 +115,17 @@ impl TestEnvironment {
 
         let docker = PlaneDocker::new(docker, None, None).await.unwrap();
 
-        Drone::run(
-            &DroneName::new_random(),
-            connector,
-            docker,
-            Ipv4Addr::LOCALHOST.into(),
-            Some(&db_path),
-        )
-        .await
-        .unwrap()
+        let drone_config = DroneConfig {
+            id: DroneName::new_random(),
+            cluster: TEST_CLUSTER.parse().unwrap(),
+            ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            db_path: Some(db_path),
+            pool: pool.to_string(),
+            auto_prune: false,
+            cleanup_min_age: Duration::seconds(0),
+        };
+
+        Drone::run(&drone_config, docker, connector).await.unwrap()
     }
 
     pub async fn drone(&mut self, controller: &ControllerServer) -> Drone {
