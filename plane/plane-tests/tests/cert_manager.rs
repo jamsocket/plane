@@ -45,7 +45,12 @@ async fn cert_manager_does_refresh(env: TestEnvironment) {
         env.cluster.clone(),
         cert_manager,
     );
-    let _cert = cert_watcher.next().with_timeout(60).await.unwrap().unwrap();
+    let _cert = cert_watcher
+        .wait_for_initial_cert()
+        .with_timeout(60)
+        .await
+        .unwrap()
+        .unwrap();
 }
 
 #[plane_test]
@@ -86,5 +91,10 @@ async fn cert_manager_does_refresh_eab(env: TestEnvironment) {
         env.cluster.clone(),
         cert_manager,
     );
-    let _cert = cert_watcher.next().with_timeout(60).await.unwrap().unwrap();
+    let _cert = cert_watcher
+        .wait_for_initial_cert()
+        .with_timeout(60)
+        .await
+        .unwrap()
+        .unwrap();
 }
