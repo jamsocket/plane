@@ -28,9 +28,11 @@ use valuable::Valuable;
 
 const DNS_01: &str = "dns-01";
 
-/// How long to sleep after failing to acquire the certificate lease, or after
-/// acquiring the lease but failing to get a certificate.
+/// How long to sleep after failing to acquire the certificate lease.
 const LOCK_SLEEP_TIME: Duration = Duration::from_secs(60); // 1 minute
+
+/// How long to sleep after failing to renew the certificate.
+const FAILURE_SLEEP_TIME: Duration = Duration::from_secs(60 * 5); // 5 minutes
 
 /// How long in advance of the certificate expiring to renew it.
 const RENEWAL_WINDOW: Duration = Duration::from_secs(24 * 60 * 60 * 30); // 30 days
@@ -273,7 +275,7 @@ async fn refresh_loop_step(
         }
         Err(err) => {
             tracing::error!(?err, "Error getting certificate.");
-            tokio::time::sleep(LOCK_SLEEP_TIME).await;
+            tokio::time::sleep(FAILURE_SLEEP_TIME).await;
         }
     }
 
