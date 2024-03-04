@@ -110,7 +110,7 @@ impl AcmeDnsServer {
                     .send(MessageFromDns::TxtRecordRequest { cluster })?;
 
                 entry.get().subscribe()
-            },
+            }
             dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
                 let (sender, receiver) = channel(1);
                 vacant_entry.insert(sender);
