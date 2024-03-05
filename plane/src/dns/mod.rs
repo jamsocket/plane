@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use dashmap::DashMap;
-use std::{net::Ipv4Addr, sync::Arc};
+use std::{net::Ipv4Addr, sync::Arc, time::Duration};
 use tokio::{
     net::{TcpListener, UdpSocket},
     select,
@@ -60,6 +60,7 @@ impl AcmeDnsServer {
                             inbound = socket.recv() => {
                                 match inbound {
                                     Some(MessageToDns::TxtRecordResponse { cluster, txt_value }) => {
+                                        tracing::info!(%cluster, txt_value, "Received TXT record response.");
                                         if let Some((_, sender)) = request_map.remove(&cluster) {
                                             if let Err(err) = sender.send(txt_value) {
                                                 tracing::warn!(?err, "Error sending TXT record response.");
@@ -102,7 +103,14 @@ impl AcmeDnsServer {
 
     async fn request(&self, cluster: ClusterName) -> anyhow::Result<Option<String>> {
         let mut receiver = match self.request_map.entry(cluster.clone()) {
-            dashmap::mapref::entry::Entry::Occupied(entry) => entry.get().subscribe(),
+            dashmap::mapref::entry::Entry::Occupied(entry) => {
+                // TODO: this is a bit inefficient, we should only send the request once, but it's
+                // the best way to protect against the request failing for now.
+                self.send
+                    .send(MessageFromDns::TxtRecordRequest { cluster })?;
+
+                entry.get().subscribe()
+            }
             dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
                 let (sender, receiver) = channel(1);
                 vacant_entry.insert(sender);
@@ -121,8 +129,6 @@ impl AcmeDnsServer {
 
         match request.query().query_type() {
             RecordType::TXT => {
-                tracing::info!(?request, ?name, "TXT query.");
-
                 let Some(cluster) = self.name_to_cluster.cluster_name(&name) else {
                     tracing::warn!(
                         ?request,
@@ -137,9 +143,11 @@ impl AcmeDnsServer {
 
                 tracing::info!(?cluster, "TXT query for cluster.");
 
-                let result = self
-                    .request(cluster)
+                let result = tokio::time::timeout(Duration::from_secs(5), self.request(cluster))
                     .await
+                    .or_dns_error(ResponseCode::ServFail, || {
+                        format!("Request timed out for {}", name)
+                    })?
                     .or_dns_error(ResponseCode::ServFail, || {
                         format!("No TXT record found for {}", name)
                     })?;
@@ -159,13 +167,10 @@ impl AcmeDnsServer {
 
                 Ok(result)
             }
-            _ => {
-                tracing::warn!(?request, ?name, "Unsupported query type.");
-                Err(error::DnsError {
-                    code: ResponseCode::NotImp,
-                    message: format!("Unsupported query type: {:?}", request.query().query_type()),
-                })
-            }
+            _ => Err(error::DnsError {
+                code: ResponseCode::NotImp,
+                message: format!("Unsupported query type: {:?}", request.query().query_type()),
+            }),
         }
     }
 }
