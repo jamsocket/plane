@@ -137,20 +137,19 @@ pub struct Notification<T> {
     pub payload: T,
 }
 
-async fn subscription_manager_inner(
+struct MessageSender {
     all_events: Sender<Notification<Value>>,
     listeners: ListenerMap,
-    db: PgPool,
-) {
-    let mut backoff = ExponentialBackoff::default();
-    let mut last_message: Option<i32> = None;
+}
 
-    let send_message = move |notification: Notification<Value>| {
-        if all_events.receiver_count() > 0 {
-            let _ = all_events.send(notification.clone());
+impl MessageSender {
+    fn send(&self, notification: Notification<Value>) {
+        // Only bother cloning if there is an "all messages" subscriber, because there often isn't, and clones aren't free.
+        if self.all_events.receiver_count() > 0 {
+            let _ = self.all_events.send(notification.clone());
         }
 
-        let listeners = listeners.read().expect("Listener map is poisoned.");
+        let listeners = self.listeners.read().expect("Listener map is poisoned.");
 
         // If the notification has a key, we send it both to the global listeners and
         // the listeners for the specific key.
@@ -164,6 +163,20 @@ async fn subscription_manager_inner(
         if let Some(sender) = listeners.get(&(notification.kind.clone(), None)) {
             sender.send(notification);
         }
+    }
+}
+
+async fn subscription_manager_inner(
+    all_events: Sender<Notification<Value>>,
+    listeners: ListenerMap,
+    db: PgPool,
+) {
+    let mut backoff = ExponentialBackoff::default();
+    let mut last_message: Option<i32> = None;
+
+    let sender = MessageSender {
+        all_events,
+        listeners,
     };
 
     'outer: loop {
@@ -203,7 +216,7 @@ async fn subscription_manager_inner(
                 }
 
                 for message in messages {
-                    send_message(message.clone());
+                    sender.send(message.clone());
                     last_message = message.id;
                     prev_last_message = message
                         .id
@@ -236,7 +249,7 @@ async fn subscription_manager_inner(
                 }
                 last_message = Some(notification_id);
             }
-            send_message(notification);
+            sender.send(notification);
         }
 
         tracing::error!("Lost connection to database, reconnecting after wait.");
