@@ -14,7 +14,7 @@ use plane::drone::docker::PlaneDocker;
 use plane::drone::{run_drone, DroneConfig};
 use plane::init_tracing::init_tracing;
 use plane::names::{AcmeDnsServerName, ControllerName, DroneName, Name, OrRandom, ProxyName};
-use plane::proxy::{run_proxy, AcmeConfig, ServerPortConfig};
+use plane::proxy::{run_proxy, AcmeConfig, AcmeEabConfiguration, ServerPortConfig};
 use plane::types::ClusterName;
 use plane::util::resolve_hostname;
 use plane::{PLANE_GIT_HASH, PLANE_VERSION};
@@ -120,6 +120,14 @@ enum Command {
 
         #[clap(long)]
         acme_email: Option<String>,
+
+        /// Key identifier when using ACME External Account Binding.
+        #[clap(long)]
+        acme_eab_kid: Option<String>,
+
+        /// HMAC key when using ACME External Account Binding.
+        #[clap(long)]
+        acme_eab_hmac_key: Option<String>,
 
         /// URL to redirect the root path to.
         #[clap(long)]
@@ -240,6 +248,8 @@ async fn run(opts: Opts) -> Result<()> {
             cert_path,
             acme_endpoint,
             acme_email,
+            acme_eab_hmac_key,
+            acme_eab_kid,
             root_redirect_url,
         } => {
             let name = name.or_random();
@@ -269,6 +279,16 @@ async fn run(opts: Opts) -> Result<()> {
                 },
             };
 
+            let acme_eab_keypair = match (acme_eab_hmac_key, acme_eab_kid) {
+                (Some(hmac_key), Some(kid)) => Some(AcmeEabConfiguration::new(&kid, &hmac_key)?),
+                (None, Some(_)) | (Some(_), None) => {
+                    return Err(anyhow!(
+                        "Must specify both --acme-eab-hmac-key and --acme-eab-kid or neither."
+                    ))
+                }
+                _ => None,
+            };
+
             let acme_config = match (acme_endpoint, acme_email) {
                 (Some(_), None) => {
                     return Err(anyhow!(
@@ -283,7 +303,7 @@ async fn run(opts: Opts) -> Result<()> {
                 (Some(endpoint), Some(email)) => Some(AcmeConfig {
                     endpoint,
                     mailto_email: email,
-                    acme_eab_keypair: None,
+                    acme_eab_keypair,
                     client: reqwest::Client::new(),
                 }),
                 (None, None) => None,
