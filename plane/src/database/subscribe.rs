@@ -166,18 +166,9 @@ impl MessageSender {
     }
 }
 
-async fn subscription_manager_inner(
-    all_events: Sender<Notification<Value>>,
-    listeners: ListenerMap,
-    db: PgPool,
-) {
+async fn subscription_manager_inner(sender: MessageSender, db: PgPool) {
     let mut backoff = ExponentialBackoff::default();
     let mut last_message: Option<i32> = None;
-
-    let sender = MessageSender {
-        all_events,
-        listeners,
-    };
 
     'outer: loop {
         let mut listener = match PgListener::connect_with(&db).await {
@@ -265,15 +256,14 @@ impl EventSubscriptionManager {
         let all_events = Sender::new(100);
 
         let handle = {
-            let all_events = all_events.clone();
-            let listeners = listeners.clone();
+            let sender = MessageSender {
+                all_events: all_events.clone(),
+                listeners: listeners.clone(),
+            };
+
             let db = db.clone();
 
-            // tokio::spawn(async move {
-            //     subscription_manager_inner().await;
-            // })
-
-            tokio::spawn(subscription_manager_inner(all_events, listeners, db))
+            tokio::spawn(subscription_manager_inner(sender, db))
         };
 
         Self {
