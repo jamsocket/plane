@@ -137,9 +137,118 @@ pub struct Notification<T> {
     pub payload: T,
 }
 
+async fn subscription_manager_inner(
+    all_events: Sender<Notification<Value>>,
+    listeners: ListenerMap,
+    db: PgPool,
+) {
+    let mut backoff = ExponentialBackoff::default();
+    let mut last_message: Option<i32> = None;
+
+    let send_message = move |notification: Notification<Value>| {
+        if all_events.receiver_count() > 0 {
+            let _ = all_events.send(notification.clone());
+        }
+
+        let listeners = listeners.read().expect("Listener map is poisoned.");
+
+        // If the notification has a key, we send it both to the global listeners and
+        // the listeners for the specific key.
+        if let Some(key) = notification.key.as_ref() {
+            if let Some(sender) = listeners.get(&(notification.kind.clone(), Some(key.clone()))) {
+                sender.send(notification.clone());
+            }
+        }
+
+        // Send the notification to the global listeners.
+        if let Some(sender) = listeners.get(&(notification.kind.clone(), None)) {
+            sender.send(notification);
+        }
+    };
+
+    'outer: loop {
+        let mut listener = match PgListener::connect_with(&db).await {
+            Ok(listener) => listener,
+            Err(err) => {
+                tracing::error!(?err, "Failed to connect to database.");
+                backoff.wait().await;
+                continue;
+            }
+        };
+
+        if let Err(err) = listener.listen(EVENT_CHANNEL).await {
+            tracing::error!(?err, "Failed to listen to event channel.");
+            backoff.wait().await;
+            continue;
+        }
+
+        if let Some(mut prev_last_message) = last_message {
+            'inner: loop {
+                let messages = match EventSubscriptionManager::get_events_since(
+                    &db,
+                    prev_last_message,
+                )
+                .await
+                {
+                    Ok(messages) => messages,
+                    Err(err) => {
+                        tracing::error!(?err, "Failed to fetch messages from database.");
+                        backoff.wait().await;
+                        continue 'outer;
+                    }
+                };
+
+                if messages.is_empty() {
+                    break 'inner;
+                }
+
+                for message in messages {
+                    send_message(message.clone());
+                    last_message = message.id;
+                    prev_last_message = message
+                        .id
+                        .expect("Expected message from database to have id.");
+                }
+            }
+        }
+
+        backoff.defer_reset();
+
+        while let Ok(Some(notification)) = listener.try_recv().await {
+            let notification: Notification<Value> =
+                match serde_json::from_str(notification.payload()) {
+                    Ok(notification) => notification,
+                    Err(err) => {
+                        tracing::error!(?err, "Failed to deserialize notification.");
+                        continue;
+                    }
+                };
+
+            // It could happen that a message happens between when we open the listener
+            // and when we request messages from the DB. In that case, we don't want to
+            // send the message twice. If the message has no id, it's ephemeral and we
+            // should send it since it wouldn't have been in the DB anyway.
+            if let Some(notification_id) = notification.id {
+                if let Some(last_message) = last_message {
+                    if notification_id <= last_message {
+                        continue;
+                    }
+                }
+                last_message = Some(notification_id);
+            }
+            send_message(notification);
+        }
+
+        tracing::error!("Lost connection to database, reconnecting after wait.");
+        backoff.wait().await;
+    }
+}
+
 impl EventSubscriptionManager {
     pub fn new(db: &PgPool) -> Self {
+        // A map from (kind, optional_key) to broadcast senders subscribed to those messages.
         let listeners: ListenerMap = Arc::new(RwLock::new(HashMap::new()));
+        // A broadcast channel to send _all_ events to.
         let all_events = Sender::new(100);
 
         let handle = {
@@ -147,113 +256,11 @@ impl EventSubscriptionManager {
             let listeners = listeners.clone();
             let db = db.clone();
 
-            tokio::spawn(async move {
-                let mut backoff = ExponentialBackoff::default();
-                let mut last_message: Option<i32> = None;
+            // tokio::spawn(async move {
+            //     subscription_manager_inner().await;
+            // })
 
-                let send_message = move |notification: Notification<Value>| {
-                    if all_events.receiver_count() > 0 {
-                        let _ = all_events.send(notification.clone());
-                    }
-
-                    let listeners = listeners.read().expect("Listener map is poisoned.");
-
-                    // If the notification has a key, we send it both to the global listeners and
-                    // the listeners for the specific key.
-                    if let Some(key) = notification.key.as_ref() {
-                        if let Some(sender) =
-                            listeners.get(&(notification.kind.clone(), Some(key.clone())))
-                        {
-                            sender.send(notification.clone());
-                        }
-                    }
-
-                    // Send the notification to the global listeners.
-                    if let Some(sender) = listeners.get(&(notification.kind.clone(), None)) {
-                        sender.send(notification);
-                    }
-                };
-
-                'outer: loop {
-                    let mut listener = match PgListener::connect_with(&db).await {
-                        Ok(listener) => listener,
-                        Err(err) => {
-                            tracing::error!(?err, "Failed to connect to database.");
-                            backoff.wait().await;
-                            continue;
-                        }
-                    };
-
-                    if let Err(err) = listener.listen(EVENT_CHANNEL).await {
-                        tracing::error!(?err, "Failed to listen to event channel.");
-                        backoff.wait().await;
-                        continue;
-                    }
-
-                    if let Some(mut prev_last_message) = last_message {
-                        'inner: loop {
-                            let messages = match EventSubscriptionManager::get_events_since(
-                                &db,
-                                prev_last_message,
-                            )
-                            .await
-                            {
-                                Ok(messages) => messages,
-                                Err(err) => {
-                                    tracing::error!(
-                                        ?err,
-                                        "Failed to fetch messages from database."
-                                    );
-                                    backoff.wait().await;
-                                    continue 'outer;
-                                }
-                            };
-
-                            if messages.is_empty() {
-                                break 'inner;
-                            }
-
-                            for message in messages {
-                                send_message(message.clone());
-                                last_message = message.id;
-                                prev_last_message = message
-                                    .id
-                                    .expect("Expected message from database to have id.");
-                            }
-                        }
-                    }
-
-                    backoff.defer_reset();
-
-                    while let Ok(Some(notification)) = listener.try_recv().await {
-                        let notification: Notification<Value> =
-                            match serde_json::from_str(notification.payload()) {
-                                Ok(notification) => notification,
-                                Err(err) => {
-                                    tracing::error!(?err, "Failed to deserialize notification.");
-                                    continue;
-                                }
-                            };
-
-                        // It could happen that a message happens between when we open the listener
-                        // and when we request messages from the DB. In that case, we don't want to
-                        // send the message twice. If the message has no id, it's ephemeral and we
-                        // should send it since it wouldn't have been in the DB anyway.
-                        if let Some(notification_id) = notification.id {
-                            if let Some(last_message) = last_message {
-                                if notification_id <= last_message {
-                                    continue;
-                                }
-                            }
-                            last_message = Some(notification_id);
-                        }
-                        send_message(notification);
-                    }
-
-                    tracing::error!("Lost connection to database, reconnecting after wait.");
-                    backoff.wait().await;
-                }
-            })
+            tokio::spawn(subscription_manager_inner(all_events, listeners, db))
         };
 
         Self {
