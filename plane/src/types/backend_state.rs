@@ -74,6 +74,7 @@ pub enum TerminationReason {
     Swept,
     External,
     KeyExpired,
+    Lost,
 }
 
 impl BackendState {
