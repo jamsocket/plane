@@ -98,6 +98,10 @@ pub async fn run_proxy(
 
     let https_redirect = port_config.https_port.is_some();
 
+    if port_config.https_port.is_some() {
+        cert_watcher.wait_for_initial_cert().await?;
+    }
+
     let http_handle = ProxyMakeService {
         state: proxy_connection.state(),
         https_redirect,
@@ -107,7 +111,6 @@ pub async fn run_proxy(
 
     let https_handle = if let Some(https_port) = port_config.https_port {
         tracing::info!("Waiting for initial certificate.");
-        cert_watcher.wait_for_initial_cert().await?;
 
         let https_handle = ProxyMakeService {
             state: proxy_connection.state(),
