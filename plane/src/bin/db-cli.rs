@@ -4,7 +4,7 @@ use plane::{
     database::connect,
     init_tracing::init_tracing,
     names::{BackendName, DroneName},
-    types::ClusterName,
+    types::{BackendState, BackendStatus, ClusterName, TerminationReason},
 };
 
 #[derive(Parser)]
@@ -42,6 +42,10 @@ enum Command {
         /// If not provided, only expired tokens will be removed, and other data will be retained.
         #[clap(long)]
         min_age_days: Option<i32>,
+    },
+    MarkBackendLost {
+        #[arg(required = true)]
+        backends: Vec<BackendName>,
     },
 }
 
@@ -127,6 +131,61 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                     backend.last_status_time.to_string().white(),
                     backend.drone_id.to_string().green(),
                 );
+            }
+        }
+        Command::MarkBackendLost { backends } => {
+            let stdin = std::io::stdin();
+
+            for backend in backends {
+                let Some(backend) = db.backend().backend(&backend).await? else {
+                    println!("Could not find backend: {}, skipping...", backend);
+                    continue;
+                };
+                if backend.state.status() == BackendStatus::Terminated {
+                    println!("{} is already terminated, skipping...", backend.id);
+                    continue;
+                }
+
+                let terminated_state = BackendState::Terminated {
+                    last_status: backend.state.status(),
+                    termination: None,
+                    reason: Some(TerminationReason::Lost),
+                    exit_code: None,
+                };
+
+                println!("");
+                println!("Backend {}:", backend.id);
+                println!("  Cluster: {}", backend.cluster);
+                println!("  Last status time: {}", backend.last_status_time);
+                println!("  Last status: {}", backend.state.status());
+                println!("  Last keepalive: {}", backend.last_keepalive);
+                println!(
+                    "  Expiration time: {}",
+                    backend
+                        .expiration_time
+                        .map(|t| t.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!("");
+                println!("Are you sure you want to mark this backend as lost?");
+                println!(
+                    "(Type y and end line to continue, any other input will cancel the action)"
+                );
+                println!("");
+
+                let mut confirmation = String::new();
+                stdin.read_line(&mut confirmation)?;
+                let confirmation = confirmation.trim();
+                if confirmation != "y" {
+                    println!("Skipping backend: {}, not marking as lost", backend.id);
+                    continue;
+                }
+
+                db.backend()
+                    .update_state(&backend.id, terminated_state)
+                    .await?;
+
+                println!("Marked {} as lost.", backend.id);
             }
         }
         Command::TerminationCandidates { cluster, drone } => {
