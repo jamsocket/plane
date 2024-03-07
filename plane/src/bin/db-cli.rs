@@ -1,3 +1,5 @@
+#![allow(clippy::println_empty_string)]
+
 use clap::{Parser, Subcommand};
 use colored::{self, Colorize};
 use plane::{
