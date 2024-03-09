@@ -205,7 +205,7 @@ pub fn get_container_config_from_executor_config(
                     }
                 }
                 Mount::Path(path) => base.join(path),
-                _ => return Err(anyhow::anyhow!("Invalid mount option")),
+                Mount::Bool(false) => unreachable!(),
             };
             let canonical_mount_path = normalize_path(&mount_path);
             if !canonical_mount_path.starts_with(base) {
@@ -222,7 +222,13 @@ pub fn get_container_config_from_executor_config(
                 PLANE_DATA_DIR
             )])
         }
-        _ => None,
+        (None, Some(mount)) => {
+            tracing::warn!(
+                "Spawn request included a mount: {:?}, but drone has no mount base. Mounting will not be performed.",
+                mount
+            );
+            None
+        }
     };
 
     Ok(bollard::container::Config {
@@ -316,8 +322,6 @@ pub async fn run_container(
 
 #[cfg(test)]
 mod tests {
-    use std::time::UNIX_EPOCH;
-
     use super::*;
     use crate::{
         log_types::LoggableTime,
@@ -325,6 +329,7 @@ mod tests {
         protocol::{AcquiredKey, KeyDeadlines},
         types::{ExecutorConfig, KeyConfig, Mount},
     };
+    use std::time::UNIX_EPOCH;
 
     fn get_container_config_from_mount(
         mount_base: &str,
