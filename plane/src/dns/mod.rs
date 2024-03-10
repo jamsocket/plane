@@ -10,6 +10,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 use std::{net::Ipv4Addr, sync::Arc, time::Duration};
 use tokio::{
     net::{TcpListener, UdpSocket},
@@ -26,7 +27,9 @@ use trust_dns_server::{
     server::{Request, RequestHandler, ResponseHandler, ResponseInfo},
     ServerFuture,
 };
+use url::Url;
 
+pub mod command;
 mod error;
 mod name_to_cluster;
 
@@ -246,15 +249,19 @@ pub async fn run_dns_with_listener(
     Ok(())
 }
 
-pub async fn run_dns(
-    name: AcmeDnsServerName,
-    client: PlaneClient,
-    port: u16,
-    zone: Option<String>,
-) -> anyhow::Result<()> {
-    let ip_port_pair = (Ipv4Addr::UNSPECIFIED, port);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DnsConfig {
+    pub name: AcmeDnsServerName,
+    pub controller_url: Url,
+    pub port: u16,
+    pub zone: Option<String>,
+}
+
+pub async fn run_dns(config: DnsConfig) -> anyhow::Result<()> {
+    let client = PlaneClient::new(config.controller_url);
+    let ip_port_pair = (Ipv4Addr::UNSPECIFIED, config.port);
     let listener = TcpListener::bind(ip_port_pair).await?;
-    run_dns_with_listener(name, client, listener, zone)
+    run_dns_with_listener(config.name, client, listener, config.zone)
         .await
         .map_err(|err| anyhow!("Error running DNS server {:?}", err))
 }
