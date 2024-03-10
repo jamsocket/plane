@@ -55,7 +55,7 @@ pub struct ServerPortConfig {
     pub https_port: Option<u16>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcmeEabConfiguration {
     pub key_id: String,
     pub key: Vec<u8>,
@@ -79,7 +79,6 @@ impl AcmeEabConfiguration {
 pub struct AcmeConfig {
     pub endpoint: Url,
     pub mailto_email: String,
-    pub client: reqwest::Client,
     pub acme_eab_keypair: Option<AcmeEabConfiguration>,
 }
 

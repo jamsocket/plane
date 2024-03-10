@@ -108,7 +108,6 @@ impl ProxyOpts {
                 endpoint,
                 mailto_email: email,
                 acme_eab_keypair,
-                client: reqwest::Client::new(),
             }),
             (None, None) => None,
         };

@@ -324,8 +324,10 @@ async fn get_certificate(
     request_sender: &(impl Fn(CertManagerRequest) + Send + Sync + 'static),
     response_receiver: &mut broadcast::Receiver<CertManagerResponse>,
 ) -> anyhow::Result<CertificatePair> {
+    let client = reqwest::Client::new();
+
     let dir = DirectoryBuilder::new(acme_config.endpoint.to_string())
-        .http_client(acme_config.client.clone())
+        .http_client(client)
         .build()
         .await
         .context("Building directory")?;
