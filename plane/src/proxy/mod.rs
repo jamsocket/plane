@@ -11,6 +11,7 @@ use url::Url;
 
 pub mod cert_manager;
 mod cert_pair;
+pub mod command;
 mod connection_monitor;
 pub mod proxy_connection;
 mod proxy_service;
