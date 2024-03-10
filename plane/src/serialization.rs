@@ -6,7 +6,7 @@ pub mod serialize_duration_as_seconds {
     where
         S: Serializer,
     {
-        serializer.serialize_i64(duration.num_seconds() as i64)
+        serializer.serialize_i64(duration.num_seconds())
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
