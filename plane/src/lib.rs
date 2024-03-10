@@ -2,6 +2,10 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 #![doc = include_str!("../README.md")]
 
+use controller::ControllerConfig;
+use dns::DnsConfig;
+use drone::DroneConfig;
+use proxy::ProxyConfig;
 use serde::{Deserialize, Serialize};
 
 pub mod admin;
@@ -40,4 +44,12 @@ pub fn plane_version_info() -> PlaneVersionInfo {
         version: PLANE_VERSION.to_string(),
         git_hash: PLANE_GIT_HASH.to_string(),
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Plan {
+    Controller(ControllerConfig),
+    Dns(DnsConfig),
+    Proxy(ProxyConfig),
+    Drone(DroneConfig),
 }
