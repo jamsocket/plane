@@ -17,6 +17,7 @@ pub mod log_types;
 pub mod names;
 pub mod protocol;
 pub mod proxy;
+pub mod serialization;
 pub mod signals;
 pub mod typed_socket;
 pub mod types;

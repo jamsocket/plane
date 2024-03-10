@@ -16,6 +16,7 @@ use anyhow::Result;
 use bollard::Docker;
 use chrono::Duration;
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{set_permissions, File, Permissions},
     net::IpAddr,
@@ -195,6 +196,7 @@ impl Drone {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DronePlan {
     pub id: DroneName,
     pub docker_config: PlaneDockerConfig,
@@ -204,6 +206,7 @@ pub struct DronePlan {
     pub db_path: Option<PathBuf>,
     pub pool: String,
     pub auto_prune: bool,
+    #[serde(with = "crate::serialization::serialize_duration_as_seconds")]
     pub cleanup_min_age: Duration,
 }
 

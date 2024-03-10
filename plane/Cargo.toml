@@ -33,7 +33,7 @@ rusqlite = { version = "0.30.0", features = ["bundled", "serde_json"] }
 rustls-pemfile = "2.0.0"
 rustls-pki-types = "1.0.0"
 serde = { version = "1.0.190", features = ["derive"] }
-serde_with = "3.4.0"
+serde_with = { version = "3.4.0", features = ["chrono"] }
 serde_json = "1.0.107"
 sqlx = { version = "0.7.3", features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "migrate", "json", "ipnetwork"] }
 thiserror = "1.0.50"

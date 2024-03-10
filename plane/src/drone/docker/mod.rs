@@ -18,6 +18,7 @@ use bollard::{
     Docker,
 };
 use chrono::{DateTime, LocalResult, TimeZone, Utc};
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
@@ -29,7 +30,7 @@ pub mod types;
 /// The existence of this label is used to determine whether a container is managed by Plane.
 const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PlaneDockerConfig {
     pub runtime: Option<String>,
     pub log_config: Option<HostConfigLogConfig>,
