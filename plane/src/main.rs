@@ -31,7 +31,7 @@ enum Command {
     Proxy(ProxyOpts),
     Dns(DnsOpts),
     /// Run a Plane instance from a JSON configuration file.
-    Plan {
+    RunConfig {
         config_file: PathBuf,
     },
     Migrate {
@@ -58,7 +58,7 @@ async fn run(opts: Opts) -> Result<()> {
             println!("Client version: {}", PLANE_VERSION.bright_white());
             println!("Client hash: {}", PLANE_GIT_HASH.bright_white());
         }
-        Command::Plan { config_file } => {
+        Command::RunConfig { config_file } => {
             if !config_file.ends_with(".json") {
                 // This check is so that we can potentially support other formats in the future
                 // without breaking backwards compatibility.
