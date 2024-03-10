@@ -1,13 +1,13 @@
 use crate::{
-    controller::run_controller,
-    database::connect_and_migrate,
     names::{ControllerName, Name},
     types::ClusterName,
 };
-use anyhow::Context;
+use anyhow::Result;
 use clap::Parser;
 use std::net::IpAddr;
 use url::Url;
+
+use super::ControllerConfig;
 
 #[derive(Parser)]
 pub struct ControllerOpts {
@@ -30,29 +30,24 @@ pub struct ControllerOpts {
     cleanup_min_age_days: Option<i32>,
 }
 
-pub async fn controller_command(opts: ControllerOpts) -> anyhow::Result<()> {
-    let name = ControllerName::new_random();
+impl ControllerOpts {
+    pub fn into_config(self) -> Result<ControllerConfig> {
+        let name = ControllerName::new_random();
 
-    let controller_url = match opts.controller_url {
-        Some(url) => url,
-        None => Url::parse(&format!("http://{}:{}", opts.host, opts.port))?,
-    };
+        let controller_url = match self.controller_url {
+            Some(url) => url,
+            None => Url::parse(&format!("http://{}:{}", self.host, self.port))?,
+        };
 
-    tracing::info!(%name, "Starting controller. Attempting to connect to database...");
-    let db = connect_and_migrate(&opts.db)
-        .await
-        .context("Failed to connect to database and run migrations.")?;
-    tracing::info!("Connected to database.");
+        let addr = (self.host, self.port).into();
 
-    let addr = (opts.host, opts.port).into();
-
-    run_controller(
-        db,
-        addr,
-        name,
-        controller_url,
-        opts.default_cluster,
-        opts.cleanup_min_age_days,
-    )
-    .await
+        Ok(ControllerConfig {
+            db_url: self.db,
+            bind_addr: addr,
+            id: name,
+            controller_url,
+            default_cluster: self.default_cluster,
+            cleanup_min_age_days: self.cleanup_min_age_days,
+        })
+    }
 }

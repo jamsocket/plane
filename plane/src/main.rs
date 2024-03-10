@@ -6,7 +6,8 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane::admin::AdminOpts;
 use plane::client::PlaneClient;
-use plane::controller::command::{controller_command, ControllerOpts};
+use plane::controller::command::ControllerOpts;
+use plane::controller::run_controller;
 use plane::database::connect_and_migrate;
 use plane::dns::run_dns;
 use plane::drone::command::DroneOpts;
@@ -59,7 +60,7 @@ enum Command {
 
 async fn run(opts: Opts) -> Result<()> {
     match opts.command {
-        Command::Controller(opts) => controller_command(opts).await?,
+        Command::Controller(opts) => run_controller(opts.into_config()?).await?,
         Command::Drone(opts) => run_drone(opts.into_config()?).await?,
         Command::Proxy(opts) => run_proxy(opts.into_config()?).await?,
         Command::Migrate { db } => {
