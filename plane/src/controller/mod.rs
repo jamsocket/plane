@@ -35,6 +35,7 @@ use tracing::Level;
 use url::Url;
 
 mod backend_state;
+pub mod command;
 mod connect;
 mod core;
 mod dns;

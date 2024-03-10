@@ -1,19 +1,19 @@
 #![warn(clippy::unwrap_used)]
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use chrono::Duration;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane::admin::AdminOpts;
 use plane::client::PlaneClient;
-use plane::controller::run_controller;
+use plane::controller::command::{controller_command, ControllerOpts};
 use plane::database::connect_and_migrate;
 use plane::dns::run_dns;
 use plane::drone::docker::PlaneDocker;
 use plane::drone::{run_drone, DroneConfig};
 use plane::init_tracing::init_tracing;
-use plane::names::{AcmeDnsServerName, ControllerName, DroneName, Name, OrRandom, ProxyName};
+use plane::names::{AcmeDnsServerName, DroneName, OrRandom, ProxyName};
 use plane::proxy::{run_proxy, AcmeConfig, AcmeEabConfiguration, ServerPortConfig};
 use plane::types::ClusterName;
 use plane::util::resolve_hostname;
@@ -34,25 +34,7 @@ struct Opts {
 
 #[derive(Subcommand)]
 enum Command {
-    Controller {
-        #[clap(long)]
-        db: String,
-
-        #[clap(long, default_value = "8080")]
-        port: u16,
-
-        #[clap(long, default_value = "127.0.0.1")]
-        host: IpAddr,
-
-        #[clap(long)]
-        controller_url: Option<Url>,
-
-        #[clap(long)]
-        default_cluster: Option<ClusterName>,
-
-        #[clap(long)]
-        cleanup_min_age_days: Option<i32>,
-    },
+    Controller(ControllerOpts),
     Drone {
         #[clap(long)]
         name: Option<DroneName>,
@@ -163,39 +145,7 @@ enum Command {
 
 async fn run(opts: Opts) -> Result<()> {
     match opts.command {
-        Command::Controller {
-            host,
-            port,
-            db,
-            controller_url,
-            default_cluster,
-            cleanup_min_age_days,
-        } => {
-            let name = ControllerName::new_random();
-
-            let controller_url = match controller_url {
-                Some(url) => url,
-                None => Url::parse(&format!("http://{}:{}", host, port))?,
-            };
-
-            tracing::info!(%name, "Starting controller. Attempting to connect to database...");
-            let db = connect_and_migrate(&db)
-                .await
-                .context("Failed to connect to database and run migrations.")?;
-            tracing::info!("Connected to database.");
-
-            let addr = (host, port).into();
-
-            run_controller(
-                db,
-                addr,
-                name,
-                controller_url,
-                default_cluster,
-                cleanup_min_age_days,
-            )
-            .await?
-        }
+        Command::Controller(opts) => controller_command(opts).await?,
         Command::Migrate { db } => {
             let _ = connect_and_migrate(&db).await?;
         }
