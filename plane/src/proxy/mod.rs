@@ -91,7 +91,7 @@ fn is_false(value: &bool) -> bool {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProxyPlan {
+pub struct ProxyConfig {
     pub name: ProxyName,
     pub controller_url: Url,
     pub cluster: ClusterName,
@@ -101,37 +101,37 @@ pub struct ProxyPlan {
     pub root_redirect_url: Option<Url>,
 }
 
-pub async fn run_proxy(plan: ProxyPlan) -> Result<()> {
-    let client = PlaneClient::new(plan.controller_url);
+pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
+    let client = PlaneClient::new(config.controller_url);
     let (mut cert_watcher, cert_manager) = watcher_manager_pair(
-        plan.cluster.clone(),
-        plan.cert_path.as_deref(),
-        plan.acme_config,
+        config.cluster.clone(),
+        config.cert_path.as_deref(),
+        config.acme_config,
     )?;
 
-    let proxy_connection = ProxyConnection::new(plan.name, client, plan.cluster, cert_manager);
+    let proxy_connection = ProxyConnection::new(config.name, client, config.cluster, cert_manager);
     let shutdown_signal = ShutdownSignal::new();
 
-    let https_redirect = plan.port_config.https_port.is_some();
+    let https_redirect = config.port_config.https_port.is_some();
 
-    if plan.port_config.https_port.is_some() {
+    if config.port_config.https_port.is_some() {
         cert_watcher.wait_for_initial_cert().await?;
     }
 
     let http_handle = ProxyMakeService {
         state: proxy_connection.state(),
         https_redirect,
-        root_redirect_url: plan.root_redirect_url.clone(),
+        root_redirect_url: config.root_redirect_url.clone(),
     }
-    .serve_http(plan.port_config.http_port, shutdown_signal.subscribe())?;
+    .serve_http(config.port_config.http_port, shutdown_signal.subscribe())?;
 
-    let https_handle = if let Some(https_port) = plan.port_config.https_port {
+    let https_handle = if let Some(https_port) = config.port_config.https_port {
         tracing::info!("Waiting for initial certificate.");
 
         let https_handle = ProxyMakeService {
             state: proxy_connection.state(),
             https_redirect: false,
-            root_redirect_url: plan.root_redirect_url,
+            root_redirect_url: config.root_redirect_url,
         }
         .serve_https(https_port, cert_watcher, shutdown_signal.subscribe())?;
 

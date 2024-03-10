@@ -7,7 +7,7 @@ use plane::{
     controller::ControllerServer,
     database::PlaneDatabase,
     dns::run_dns_with_listener,
-    drone::{docker::PlaneDockerConfig, Drone, DronePlan},
+    drone::{docker::PlaneDockerConfig, Drone, DroneConfig},
     names::{AcmeDnsServerName, ControllerName, DroneName, Name},
     proxy::AcmeEabConfiguration,
     types::ClusterName,
@@ -109,7 +109,7 @@ impl TestEnvironment {
     pub async fn drone_internal(&mut self, controller: &ControllerServer, pool: &str) -> Drone {
         let db_path = self.scratch_dir.join("drone.db");
 
-        let drone_config = DronePlan {
+        let drone_config = DroneConfig {
             id: DroneName::new_random(),
             cluster: TEST_CLUSTER.parse().unwrap(),
             ip: IpAddr::V4(Ipv4Addr::LOCALHOST),

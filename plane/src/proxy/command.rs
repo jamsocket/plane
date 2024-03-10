@@ -8,7 +8,7 @@ use clap::Parser;
 use std::path::PathBuf;
 use url::Url;
 
-use super::ProxyPlan;
+use super::ProxyConfig;
 
 const LOCAL_HTTP_PORT: u16 = 9090;
 const PROD_HTTP_PORT: u16 = 80;
@@ -57,7 +57,7 @@ pub struct ProxyOpts {
 }
 
 impl ProxyOpts {
-    pub fn into_plan(self) -> Result<ProxyPlan> {
+    pub fn into_config(self) -> Result<ProxyConfig> {
         let name = self.name.or_random();
 
         let port_config = match (self.https, self.http_port, self.https_port) {
@@ -113,7 +113,7 @@ impl ProxyOpts {
             (None, None) => None,
         };
 
-        Ok(ProxyPlan {
+        Ok(ProxyConfig {
             name,
             controller_url: self.controller_url,
             cluster: self.cluster,

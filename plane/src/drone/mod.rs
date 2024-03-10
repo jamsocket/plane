@@ -158,7 +158,7 @@ pub struct Drone {
 }
 
 impl Drone {
-    pub async fn run(config: DronePlan) -> Result<Self> {
+    pub async fn run(config: DroneConfig) -> Result<Self> {
         let client = PlaneClient::new(config.controller_url);
         let docker =
             PlaneDocker::new(Docker::connect_with_local_defaults()?, config.docker_config).await?;
@@ -197,7 +197,7 @@ impl Drone {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DronePlan {
+pub struct DroneConfig {
     pub id: DroneName,
     pub docker_config: PlaneDockerConfig,
     pub controller_url: Url,
@@ -210,8 +210,8 @@ pub struct DronePlan {
     pub cleanup_min_age: Duration,
 }
 
-pub async fn run_drone(plan: DronePlan) -> Result<()> {
-    let drone = Drone::run(plan).await?;
+pub async fn run_drone(config: DroneConfig) -> Result<()> {
+    let drone = Drone::run(config).await?;
 
     tracing::info!("Drone started.");
     wait_for_shutdown_signal().await;

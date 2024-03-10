@@ -60,8 +60,8 @@ enum Command {
 async fn run(opts: Opts) -> Result<()> {
     match opts.command {
         Command::Controller(opts) => controller_command(opts).await?,
-        Command::Drone(opts) => run_drone(opts.into_plan()?).await?,
-        Command::Proxy(opts) => run_proxy(opts.into_plan()?).await?,
+        Command::Drone(opts) => run_drone(opts.into_config()?).await?,
+        Command::Proxy(opts) => run_proxy(opts.into_config()?).await?,
         Command::Migrate { db } => {
             let _ = connect_and_migrate(&db).await?;
         }

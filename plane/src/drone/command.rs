@@ -1,5 +1,5 @@
 use crate::{
-    drone::{docker::PlaneDockerConfig, DronePlan},
+    drone::{docker::PlaneDockerConfig, DroneConfig},
     names::{DroneName, OrRandom},
     types::ClusterName,
     util::resolve_hostname,
@@ -53,7 +53,7 @@ pub struct DroneOpts {
 }
 
 impl DroneOpts {
-    pub fn into_plan(self) -> Result<DronePlan> {
+    pub fn into_config(self) -> Result<DroneConfig> {
         let name = self.name.or_random();
         tracing::info!(%name, "Starting drone");
 
@@ -73,7 +73,7 @@ impl DroneOpts {
         let cleanup_min_age =
             Duration::seconds(self.auto_prune_containers_older_than_seconds as i64);
 
-        let drone_plan = DronePlan {
+        let drone_config = DroneConfig {
             controller_url: self.controller_url,
             id: name.clone(),
             cluster: self.cluster.clone(),
@@ -85,6 +85,6 @@ impl DroneOpts {
             docker_config,
         };
 
-        Ok(drone_plan)
+        Ok(drone_config)
     }
 }
