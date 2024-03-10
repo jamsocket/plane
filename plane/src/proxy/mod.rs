@@ -80,6 +80,14 @@ pub struct AcmeConfig {
     pub endpoint: Url,
     pub mailto_email: String,
     pub acme_eab_keypair: Option<AcmeEabConfiguration>,
+    /// Don't validate the ACME server's certificate chain. This is ONLY for testing,
+    /// and should not be used otherwise.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub accept_insecure_certs_for_testing: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

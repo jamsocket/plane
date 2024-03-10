@@ -2,7 +2,7 @@ use common::test_env::TestEnvironment;
 use plane::{
     drone::docker::{
         get_metrics_message_from_container_stats, types::ContainerId, MetricsConversionError,
-        PlaneDocker,
+        PlaneDocker, PlaneDockerConfig,
     },
     names::{BackendName, Name},
     types::ExecutorConfig,
@@ -15,7 +15,9 @@ mod common;
 #[plane_test]
 async fn test_get_metrics(_: TestEnvironment) {
     let docker = bollard::Docker::connect_with_local_defaults().unwrap();
-    let plane_docker = PlaneDocker::new(docker, None, None).await.unwrap();
+    let plane_docker = PlaneDocker::new(docker, PlaneDockerConfig::default())
+        .await
+        .unwrap();
 
     // TODO: replace with locally built hello world
     plane_docker

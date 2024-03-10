@@ -108,6 +108,7 @@ impl ProxyOpts {
                 endpoint,
                 mailto_email: email,
                 acme_eab_keypair,
+                accept_insecure_certs_for_testing: false,
             }),
             (None, None) => None,
         };

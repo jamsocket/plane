@@ -324,7 +324,14 @@ async fn get_certificate(
     request_sender: &(impl Fn(CertManagerRequest) + Send + Sync + 'static),
     response_receiver: &mut broadcast::Receiver<CertManagerResponse>,
 ) -> anyhow::Result<CertificatePair> {
-    let client = reqwest::Client::new();
+    let client = if acme_config.accept_insecure_certs_for_testing {
+        tracing::warn!("ACME server certificate chain will not be validated! This is ONLY for testing, and should not be used otherwise.");
+        reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()?
+    } else {
+        reqwest::Client::new()
+    };
 
     let dir = DirectoryBuilder::new(acme_config.endpoint.to_string())
         .http_client(client)

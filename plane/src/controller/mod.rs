@@ -265,10 +265,15 @@ impl ControllerServer {
         &self.controller_id
     }
 
-    pub fn client(&self) -> PlaneClient {
+    pub fn url(&self) -> Url {
         let base_url: Url = format!("http://{}", self.bind_addr)
             .parse()
             .expect("Generated URI is always valid.");
+        base_url
+    }
+
+    pub fn client(&self) -> PlaneClient {
+        let base_url: Url = self.url();
         PlaneClient::new(base_url)
     }
 }

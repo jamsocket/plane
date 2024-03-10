@@ -29,7 +29,7 @@ pub mod types;
 /// The existence of this label is used to determine whether a container is managed by Plane.
 const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PlaneDockerConfig {
     pub runtime: Option<String>,
     pub log_config: Option<HostConfigLogConfig>,

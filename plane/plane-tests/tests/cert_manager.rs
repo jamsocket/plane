@@ -1,4 +1,3 @@
-use crate::common::resources::pebble::Pebble;
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
 use plane::{
@@ -25,7 +24,7 @@ async fn cert_manager_does_refresh(env: TestEnvironment) {
     let acme_config = AcmeConfig {
         endpoint: pebble.directory_url.clone(),
         mailto_email: "test-cert@jamsocket.com".to_string(),
-        client: Pebble::client().unwrap(),
+        accept_insecure_certs_for_testing: true,
         acme_eab_keypair: None,
     };
 
@@ -71,7 +70,7 @@ async fn cert_manager_does_refresh_eab(env: TestEnvironment) {
     let acme_config = AcmeConfig {
         endpoint: pebble.directory_url.clone(),
         mailto_email: "test-cert@jamsocket.com".to_string(),
-        client: Pebble::client().unwrap(),
+        accept_insecure_certs_for_testing: true,
         acme_eab_keypair: Some(eab_keypair),
     };
 

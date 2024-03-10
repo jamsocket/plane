@@ -2,13 +2,12 @@ use super::{
     async_drop::AsyncDrop,
     resources::{database::DevDatabase, pebble::Pebble},
 };
-use bollard::Docker;
 use chrono::Duration;
 use plane::{
     controller::ControllerServer,
     database::PlaneDatabase,
     dns::run_dns_with_listener,
-    drone::{docker::PlaneDocker, Drone, DronePlan},
+    drone::{docker::PlaneDockerConfig, Drone, DronePlan},
     names::{AcmeDnsServerName, ControllerName, DroneName, Name},
     proxy::AcmeEabConfiguration,
     types::ClusterName,
@@ -108,12 +107,7 @@ impl TestEnvironment {
     }
 
     pub async fn drone_internal(&mut self, controller: &ControllerServer, pool: &str) -> Drone {
-        let client = controller.client();
-        let connector = client.drone_connection(&TEST_CLUSTER.parse().unwrap(), pool);
-        let docker = Docker::connect_with_local_defaults().unwrap();
         let db_path = self.scratch_dir.join("drone.db");
-
-        let docker = PlaneDocker::new(docker, None, None).await.unwrap();
 
         let drone_config = DronePlan {
             id: DroneName::new_random(),
@@ -123,9 +117,11 @@ impl TestEnvironment {
             pool: pool.to_string(),
             auto_prune: false,
             cleanup_min_age: Duration::seconds(0),
+            docker_config: PlaneDockerConfig::default(),
+            controller_url: controller.url().clone(),
         };
 
-        Drone::run(&drone_config, docker, connector).await.unwrap()
+        Drone::run(drone_config).await.unwrap()
     }
 
     pub async fn drone(&mut self, controller: &ControllerServer) -> Drone {
