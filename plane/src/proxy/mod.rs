@@ -6,7 +6,7 @@ use crate::proxy::shutdown_signal::ShutdownSignal;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
 use std::net::IpAddr;
-use std::path::Path;
+use std::path::PathBuf;
 use url::Url;
 
 pub mod cert_manager;
@@ -82,41 +82,47 @@ pub struct AcmeConfig {
     pub acme_eab_keypair: Option<AcmeEabConfiguration>,
 }
 
-pub async fn run_proxy(
-    name: ProxyName,
-    client: PlaneClient,
-    cluster: ClusterName,
-    cert_path: Option<&Path>,
-    port_config: ServerPortConfig,
-    acme_config: Option<AcmeConfig>,
-    root_redirect_url: Option<Url>,
-) -> Result<()> {
-    let (mut cert_watcher, cert_manager) =
-        watcher_manager_pair(cluster.clone(), cert_path, acme_config)?;
+pub struct ProxyPlan {
+    pub name: ProxyName,
+    pub controller_url: Url,
+    pub cluster: ClusterName,
+    pub cert_path: Option<PathBuf>,
+    pub port_config: ServerPortConfig,
+    pub acme_config: Option<AcmeConfig>,
+    pub root_redirect_url: Option<Url>,
+}
 
-    let proxy_connection = ProxyConnection::new(name, client, cluster, cert_manager);
+pub async fn run_proxy(plan: ProxyPlan) -> Result<()> {
+    let client = PlaneClient::new(plan.controller_url);
+    let (mut cert_watcher, cert_manager) = watcher_manager_pair(
+        plan.cluster.clone(),
+        plan.cert_path.as_deref(),
+        plan.acme_config,
+    )?;
+
+    let proxy_connection = ProxyConnection::new(plan.name, client, plan.cluster, cert_manager);
     let shutdown_signal = ShutdownSignal::new();
 
-    let https_redirect = port_config.https_port.is_some();
+    let https_redirect = plan.port_config.https_port.is_some();
 
-    if port_config.https_port.is_some() {
+    if plan.port_config.https_port.is_some() {
         cert_watcher.wait_for_initial_cert().await?;
     }
 
     let http_handle = ProxyMakeService {
         state: proxy_connection.state(),
         https_redirect,
-        root_redirect_url: root_redirect_url.clone(),
+        root_redirect_url: plan.root_redirect_url.clone(),
     }
-    .serve_http(port_config.http_port, shutdown_signal.subscribe())?;
+    .serve_http(plan.port_config.http_port, shutdown_signal.subscribe())?;
 
-    let https_handle = if let Some(https_port) = port_config.https_port {
+    let https_handle = if let Some(https_port) = plan.port_config.https_port {
         tracing::info!("Waiting for initial certificate.");
 
         let https_handle = ProxyMakeService {
             state: proxy_connection.state(),
             https_redirect: false,
-            root_redirect_url,
+            root_redirect_url: plan.root_redirect_url,
         }
         .serve_https(https_port, cert_watcher, shutdown_signal.subscribe())?;
 

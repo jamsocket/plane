@@ -12,7 +12,8 @@ use plane::dns::run_dns;
 use plane::drone::command::{drone_command, DroneOpts};
 use plane::init_tracing::init_tracing;
 use plane::names::{AcmeDnsServerName, OrRandom};
-use plane::proxy::command::{proxy_command, ProxyOpts};
+use plane::proxy::command::ProxyOpts;
+use plane::proxy::run_proxy;
 use plane::{PLANE_GIT_HASH, PLANE_VERSION};
 use url::Url;
 
@@ -59,7 +60,7 @@ async fn run(opts: Opts) -> Result<()> {
     match opts.command {
         Command::Controller(opts) => controller_command(opts).await?,
         Command::Drone(opts) => drone_command(opts).await?,
-        Command::Proxy(opts) => proxy_command(opts).await?,
+        Command::Proxy(opts) => run_proxy(opts.into_plan()?).await?,
         Command::Migrate { db } => {
             let _ = connect_and_migrate(&db).await?;
         }
