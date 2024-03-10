@@ -1,5 +1,6 @@
 use self::{
-    executor::Executor, heartbeat::HeartbeatLoop, key_manager::KeyManager, state_store::StateStore,
+    docker::PlaneDockerConfig, executor::Executor, heartbeat::HeartbeatLoop,
+    key_manager::KeyManager, state_store::StateStore,
 };
 use crate::{
     client::PlaneClient,
@@ -12,6 +13,7 @@ use crate::{
     types::{BackendState, ClusterName},
 };
 use anyhow::Result;
+use bollard::Docker;
 use chrono::Duration;
 use rusqlite::Connection;
 use std::{
@@ -22,6 +24,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::task::JoinHandle;
+use url::Url;
 use valuable::Valuable;
 
 mod backend_manager;
@@ -154,11 +157,12 @@ pub struct Drone {
 }
 
 impl Drone {
-    pub async fn run(
-        config: &DroneConfig,
-        docker: PlaneDocker,
-        connector: TypedSocketConnector<MessageFromDrone>,
-    ) -> Result<Self> {
+    pub async fn run(config: DronePlan) -> Result<Self> {
+        let client = PlaneClient::new(config.controller_url);
+        let docker =
+            PlaneDocker::new(Docker::connect_with_local_defaults()?, config.docker_config).await?;
+        let connector = client.drone_connection(&config.cluster, &config.pool);
+
         let sqlite_connection = if let Some(db_path) = config.db_path.as_ref() {
             if !db_path.exists() {
                 File::create(db_path)?;
@@ -191,8 +195,10 @@ impl Drone {
     }
 }
 
-pub struct DroneConfig {
+pub struct DronePlan {
     pub id: DroneName,
+    pub docker_config: PlaneDockerConfig,
+    pub controller_url: Url,
     pub cluster: ClusterName,
     pub ip: IpAddr,
     pub db_path: Option<PathBuf>,
@@ -201,13 +207,8 @@ pub struct DroneConfig {
     pub cleanup_min_age: Duration,
 }
 
-pub async fn run_drone(
-    client: PlaneClient,
-    docker: PlaneDocker,
-    config: &DroneConfig,
-) -> Result<()> {
-    let connection = client.drone_connection(&config.cluster, &config.pool);
-    let drone = Drone::run(config, docker, connection).await?;
+pub async fn run_drone(plan: DronePlan) -> Result<()> {
+    let drone = Drone::run(plan).await?;
 
     tracing::info!("Drone started.");
     wait_for_shutdown_signal().await;

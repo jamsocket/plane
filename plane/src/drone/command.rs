@@ -1,10 +1,10 @@
 use crate::{
-    client::PlaneClient,
-    drone::{docker::PlaneDocker, run_drone, DroneConfig},
+    drone::{docker::PlaneDockerConfig, DronePlan},
     names::{DroneName, OrRandom},
     types::ClusterName,
     util::resolve_hostname,
 };
+use anyhow::Result;
 use chrono::Duration;
 use clap::Parser;
 use std::{net::IpAddr, path::PathBuf};
@@ -52,34 +52,39 @@ pub struct DroneOpts {
     auto_prune_containers_older_than_seconds: i32,
 }
 
-pub async fn drone_command(opts: DroneOpts) -> anyhow::Result<()> {
-    let name = opts.name.or_random();
-    tracing::info!(%name, "Starting drone");
+impl DroneOpts {
+    pub fn into_plan(self) -> Result<DronePlan> {
+        let name = self.name.or_random();
+        tracing::info!(%name, "Starting drone");
 
-    let client = PlaneClient::new(opts.controller_url);
-    let docker = bollard::Docker::connect_with_local_defaults()?;
+        let log_config = self
+            .log_config
+            .map(|s| serde_json::from_str(&s))
+            .transpose()?;
 
-    let log_config = opts
-        .log_config
-        .map(|s| serde_json::from_str(&s))
-        .transpose()?;
+        let docker_config = PlaneDockerConfig {
+            runtime: self.docker_runtime,
+            log_config,
+        };
 
-    let docker = PlaneDocker::new(docker, opts.docker_runtime, log_config).await?;
+        let ip: IpAddr = resolve_hostname(&self.ip)
+            .ok_or_else(|| anyhow::anyhow!("Failed to resolve hostname to IP address."))?;
 
-    let ip: IpAddr = resolve_hostname(&opts.ip)
-        .ok_or_else(|| anyhow::anyhow!("Failed to resolve hostname to IP address."))?;
+        let cleanup_min_age =
+            Duration::seconds(self.auto_prune_containers_older_than_seconds as i64);
 
-    let cleanup_min_age = Duration::seconds(opts.auto_prune_containers_older_than_seconds as i64);
+        let drone_plan = DronePlan {
+            controller_url: self.controller_url,
+            id: name.clone(),
+            cluster: self.cluster.clone(),
+            ip,
+            db_path: self.db,
+            pool: self.pool.unwrap_or_default(),
+            auto_prune: self.auto_prune_images,
+            cleanup_min_age,
+            docker_config,
+        };
 
-    let drone_config = DroneConfig {
-        id: name.clone(),
-        cluster: opts.cluster.clone(),
-        ip,
-        db_path: opts.db,
-        pool: opts.pool.unwrap_or_default(),
-        auto_prune: opts.auto_prune_images,
-        cleanup_min_age,
-    };
-
-    run_drone(client, docker, &drone_config).await
+        Ok(drone_plan)
+    }
 }

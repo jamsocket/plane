@@ -213,10 +213,10 @@ pub async fn run_container(
     let config = get_container_config_from_executor_config(
         backend_id,
         exec_config,
-        docker.runtime.as_deref(),
+        docker.config.runtime.as_deref(),
         acquired_key,
         static_token,
-        docker.log_config.as_ref(),
+        docker.config.log_config.as_ref(),
     )?;
 
     docker

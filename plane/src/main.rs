@@ -9,7 +9,8 @@ use plane::client::PlaneClient;
 use plane::controller::command::{controller_command, ControllerOpts};
 use plane::database::connect_and_migrate;
 use plane::dns::run_dns;
-use plane::drone::command::{drone_command, DroneOpts};
+use plane::drone::command::DroneOpts;
+use plane::drone::run_drone;
 use plane::init_tracing::init_tracing;
 use plane::names::{AcmeDnsServerName, OrRandom};
 use plane::proxy::command::ProxyOpts;
@@ -59,7 +60,7 @@ enum Command {
 async fn run(opts: Opts) -> Result<()> {
     match opts.command {
         Command::Controller(opts) => controller_command(opts).await?,
-        Command::Drone(opts) => drone_command(opts).await?,
+        Command::Drone(opts) => run_drone(opts.into_plan()?).await?,
         Command::Proxy(opts) => run_proxy(opts.into_plan()?).await?,
         Command::Migrate { db } => {
             let _ = connect_and_migrate(&db).await?;

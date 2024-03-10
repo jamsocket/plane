@@ -30,10 +30,15 @@ pub mod types;
 const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
 #[derive(Clone, Debug)]
+pub struct PlaneDockerConfig {
+    pub runtime: Option<String>,
+    pub log_config: Option<HostConfigLogConfig>,
+}
+
+#[derive(Clone, Debug)]
 pub struct PlaneDocker {
     docker: Docker,
-    runtime: Option<String>,
-    log_config: Option<HostConfigLogConfig>,
+    config: PlaneDockerConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -48,16 +53,8 @@ pub struct SpawnResult {
 }
 
 impl PlaneDocker {
-    pub async fn new(
-        docker: Docker,
-        runtime: Option<String>,
-        log_config: Option<HostConfigLogConfig>,
-    ) -> Result<Self> {
-        Ok(Self {
-            docker,
-            runtime,
-            log_config,
-        })
+    pub async fn new(docker: Docker, config: PlaneDockerConfig) -> Result<Self> {
+        Ok(Self { docker, config })
     }
 
     pub async fn pull(
