@@ -25,6 +25,7 @@ use tokio::task::JoinHandle;
 use valuable::Valuable;
 
 mod backend_manager;
+pub mod command;
 pub mod docker;
 mod executor;
 mod heartbeat;

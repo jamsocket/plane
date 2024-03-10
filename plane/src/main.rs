@@ -2,7 +2,6 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 use anyhow::{anyhow, Result};
-use chrono::Duration;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane::admin::AdminOpts;
@@ -10,15 +9,12 @@ use plane::client::PlaneClient;
 use plane::controller::command::{controller_command, ControllerOpts};
 use plane::database::connect_and_migrate;
 use plane::dns::run_dns;
-use plane::drone::docker::PlaneDocker;
-use plane::drone::{run_drone, DroneConfig};
+use plane::drone::command::{drone_command, DroneOpts};
 use plane::init_tracing::init_tracing;
-use plane::names::{AcmeDnsServerName, DroneName, OrRandom, ProxyName};
+use plane::names::{AcmeDnsServerName, OrRandom, ProxyName};
 use plane::proxy::{run_proxy, AcmeConfig, AcmeEabConfiguration, ServerPortConfig};
 use plane::types::ClusterName;
-use plane::util::resolve_hostname;
 use plane::{PLANE_GIT_HASH, PLANE_VERSION};
-use std::net::IpAddr;
 use std::path::PathBuf;
 use url::Url;
 
@@ -35,46 +31,7 @@ struct Opts {
 #[derive(Subcommand)]
 enum Command {
     Controller(ControllerOpts),
-    Drone {
-        #[clap(long)]
-        name: Option<DroneName>,
-
-        #[clap(long)]
-        controller_url: Url,
-
-        #[clap(long)]
-        cluster: ClusterName,
-
-        /// IP address for this drone that proxies can connect to.
-        #[clap(long, default_value = "127.0.0.1")]
-        ip: String,
-
-        /// Path to the database file. If omitted, an in-memory database will be used.
-        #[clap(long)]
-        db: Option<PathBuf>,
-
-        #[clap(long)]
-        docker_runtime: Option<String>,
-
-        /// Optional log driver configuration, passed to Docker as the `LogConfig` field.
-        #[clap(long)]
-        log_config: Option<String>,
-
-        /// Optional pool identifier. If present, will only schedule workloads with a matching `pool` tag on this drone.
-        #[clap(long)]
-        pool: Option<String>,
-
-        /// Automatically prune stopped images.
-        /// This prunes *all* unused container images, not just ones that Plane has loaded, so it is disabled by default.
-        #[clap(long)]
-        auto_prune_images: bool,
-
-        /// Minimum age (in seconds) of backend containers to prune.
-        /// By default, all stopped backends are pruned, but you can set this to a positive number of seconds to prune
-        /// only backends that were created more than this many seconds ago.
-        #[clap(long, default_value = "0")]
-        auto_prune_containers_older_than_seconds: i32,
-    },
+    Drone(DroneOpts),
     Proxy {
         #[clap(long)]
         name: Option<ProxyName>,
@@ -146,47 +103,9 @@ enum Command {
 async fn run(opts: Opts) -> Result<()> {
     match opts.command {
         Command::Controller(opts) => controller_command(opts).await?,
+        Command::Drone(opts) => drone_command(opts).await?,
         Command::Migrate { db } => {
             let _ = connect_and_migrate(&db).await?;
-        }
-        Command::Drone {
-            name,
-            controller_url,
-            cluster,
-            ip,
-            db,
-            docker_runtime,
-            log_config,
-            pool,
-            auto_prune_images: auto_prune,
-            auto_prune_containers_older_than_seconds: cleanup_min_age_seconds,
-        } => {
-            let name = name.or_random();
-            tracing::info!(%name, "Starting drone");
-
-            let client = PlaneClient::new(controller_url);
-            let docker = bollard::Docker::connect_with_local_defaults()?;
-
-            let log_config = log_config.map(|s| serde_json::from_str(&s)).transpose()?;
-
-            let docker = PlaneDocker::new(docker, docker_runtime, log_config).await?;
-
-            let ip: IpAddr = resolve_hostname(&ip)
-                .ok_or_else(|| anyhow::anyhow!("Failed to resolve hostname to IP address."))?;
-
-            let cleanup_min_age = Duration::seconds(cleanup_min_age_seconds as i64);
-
-            let drone_config = DroneConfig {
-                id: name.clone(),
-                cluster: cluster.clone(),
-                ip,
-                db_path: db,
-                pool: pool.unwrap_or_default(),
-                auto_prune,
-                cleanup_min_age,
-            };
-
-            run_drone(client, docker, &drone_config).await?;
         }
         Command::Proxy {
             name,
