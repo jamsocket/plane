@@ -47,10 +47,10 @@ async fn run(opts: Opts) -> Result<()> {
         Command::Controller(opts) => run_controller(opts.into_config()?).await?,
         Command::Drone(opts) => run_drone(opts.into_config()?).await?,
         Command::Proxy(opts) => run_proxy(opts.into_config()?).await?,
+        Command::Dns(opts) => run_dns(opts.into_config()).await?,
         Command::Migrate { db } => {
             let _ = connect_and_migrate(&db).await?;
         }
-        Command::Dns(opts) => run_dns(opts.into_config()).await?,
         Command::Admin(admin_opts) => {
             plane::admin::run_admin_command(admin_opts).await;
         }
