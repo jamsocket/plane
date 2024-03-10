@@ -47,6 +47,6 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "valuable"] }
 trust-dns-server = "0.23.2"
 tungstenite = "0.20.1"
-url = "2.4.1"
+url = { version="2.4.1", features=["serde"] }
 x509-parser = "0.15.1"
 valuable = { version = "0.1.0", features = ["derive"] }

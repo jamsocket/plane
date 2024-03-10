@@ -5,6 +5,7 @@ use crate::proxy::proxy_service::ProxyMakeService;
 use crate::proxy::shutdown_signal::ShutdownSignal;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::path::PathBuf;
 use url::Url;
@@ -48,7 +49,7 @@ pub struct ForwardableRequestInfo {
     protocol: Protocol,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct ServerPortConfig {
     pub http_port: u16,
     pub https_port: Option<u16>,
@@ -74,7 +75,7 @@ impl AcmeEabConfiguration {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcmeConfig {
     pub endpoint: Url,
     pub mailto_email: String,
@@ -82,6 +83,7 @@ pub struct AcmeConfig {
     pub acme_eab_keypair: Option<AcmeEabConfiguration>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProxyPlan {
     pub name: ProxyName,
     pub controller_url: Url,
