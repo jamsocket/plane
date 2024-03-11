@@ -122,7 +122,7 @@ impl TestEnvironment {
             db_path: Some(db_path),
             pool: pool.to_string(),
             auto_prune: false,
-            cleanup_min_age: Duration::seconds(0),
+            cleanup_min_age: Duration::try_seconds(0).unwrap(),
         };
 
         Drone::run(&drone_config, docker, connector).await.unwrap()

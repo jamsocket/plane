@@ -112,7 +112,8 @@ impl ExponentialBackoff {
         }
 
         let duration = self.initial_duration_millis as f64 * self.multiplier.powi(self.step);
-        let duration = Duration::milliseconds(duration as i64);
+        let duration =
+            Duration::try_milliseconds(duration as i64).expect("duration is always valid");
         let duration = duration.min(self.max_duration);
 
         tokio::time::sleep(duration.to_std().expect("duration is always valid")).await;
@@ -129,10 +130,10 @@ impl ExponentialBackoff {
 impl Default for ExponentialBackoff {
     fn default() -> Self {
         Self::new(
-            Duration::seconds(1),
-            Duration::minutes(1),
+            Duration::try_seconds(1).expect("duration is always valid"),
+            Duration::try_minutes(1).expect("duration is always valid"),
             1.1,
-            Duration::minutes(1),
+            Duration::try_minutes(1).expect("duration is always valid"),
         )
     }
 }

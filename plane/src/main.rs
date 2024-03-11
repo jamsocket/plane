@@ -224,7 +224,8 @@ async fn run(opts: Opts) -> Result<()> {
             let ip: IpAddr = resolve_hostname(&ip)
                 .ok_or_else(|| anyhow::anyhow!("Failed to resolve hostname to IP address."))?;
 
-            let cleanup_min_age = Duration::seconds(cleanup_min_age_seconds as i64);
+            let cleanup_min_age = Duration::try_seconds(cleanup_min_age_seconds as i64)
+                .expect("duration is always valid");
 
             let drone_config = DroneConfig {
                 id: name.clone(),

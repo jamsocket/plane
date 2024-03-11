@@ -90,7 +90,7 @@ impl Executor {
                 cleanup_loop(
                     docker.clone(),
                     cleanup_min_age,
-                    Duration::seconds(CLEANUP_INTERVAL_SECS),
+                    Duration::try_seconds(CLEANUP_INTERVAL_SECS).expect("duration is always valid"),
                     auto_prune,
                 )
                 .await;

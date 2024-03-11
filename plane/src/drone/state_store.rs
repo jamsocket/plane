@@ -171,7 +171,9 @@ impl StateStore {
                 backend_id: BackendName::try_from(backend_id)?,
                 state: state.clone(),
                 timestamp: LoggableTime(
-                    DateTime::UNIX_EPOCH + chrono::Duration::milliseconds(timestamp),
+                    DateTime::UNIX_EPOCH
+                        + chrono::Duration::try_milliseconds(timestamp)
+                            .expect("duration is always valid"),
                 ),
             };
 
