@@ -185,7 +185,7 @@ impl Drone {
             config.cleanup_min_age,
         );
 
-        let id = config.id.clone();
+        let id = config.name.clone();
         let drone_loop = tokio::spawn(drone_loop(id.clone(), connector, executor));
 
         Ok(Self { drone_loop, id })
@@ -198,7 +198,7 @@ impl Drone {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DroneConfig {
-    pub id: DroneName,
+    pub name: DroneName,
     pub docker_config: PlaneDockerConfig,
     pub controller_url: Url,
     pub cluster: ClusterName,
@@ -211,6 +211,7 @@ pub struct DroneConfig {
 }
 
 pub async fn run_drone(config: DroneConfig) -> Result<()> {
+    tracing::info!(name=%config.name, "Starting drone");
     let drone = Drone::run(config).await?;
 
     tracing::info!("Drone started.");

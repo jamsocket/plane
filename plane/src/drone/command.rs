@@ -59,7 +59,6 @@ pub struct DroneOpts {
 impl DroneOpts {
     pub fn into_config(self) -> Result<DroneConfig> {
         let name = self.name.or_random();
-        tracing::info!(%name, "Starting drone");
 
         let log_config = self
             .log_config
@@ -81,7 +80,7 @@ impl DroneOpts {
 
         let drone_config = DroneConfig {
             controller_url: self.controller_url,
-            id: name.clone(),
+            name: name.clone(),
             cluster: self.cluster.clone(),
             ip,
             db_path: self.db,

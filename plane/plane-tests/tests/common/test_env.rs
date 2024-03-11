@@ -119,7 +119,7 @@ impl TestEnvironment {
         };
 
         let drone_config = DroneConfig {
-            id: DroneName::new_random(),
+            name: DroneName::new_random(),
             cluster: TEST_CLUSTER.parse().unwrap(),
             ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
             db_path: Some(self.scratch_dir.join("drone.db")),

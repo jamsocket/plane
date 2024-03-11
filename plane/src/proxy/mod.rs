@@ -102,6 +102,7 @@ pub struct ProxyConfig {
 }
 
 pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
+    tracing::info!(name=%config.name, "Starting proxy");
     let client = PlaneClient::new(config.controller_url);
     let (mut cert_watcher, cert_manager) = watcher_manager_pair(
         config.cluster.clone(),
