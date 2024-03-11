@@ -40,6 +40,10 @@ pub struct DroneOpts {
     #[clap(long)]
     pool: Option<String>,
 
+    /// Optional base directory under which backends are allowed to mount directories.
+    #[clap(long)]
+    mount_base: Option<PathBuf>,
+
     /// Automatically prune stopped images.
     /// This prunes *all* unused container images, not just ones that Plane has loaded, so it is disabled by default.
     #[clap(long)]
@@ -65,13 +69,15 @@ impl DroneOpts {
         let docker_config = PlaneDockerConfig {
             runtime: self.docker_runtime,
             log_config,
+            mount_base: self.mount_base,
         };
 
         let ip: IpAddr = resolve_hostname(&self.ip)
             .ok_or_else(|| anyhow::anyhow!("Failed to resolve hostname to IP address."))?;
 
         let cleanup_min_age =
-            Duration::seconds(self.auto_prune_containers_older_than_seconds as i64);
+            Duration::try_seconds(self.auto_prune_containers_older_than_seconds as i64)
+                .expect("valid duration");
 
         let drone_config = DroneConfig {
             controller_url: self.controller_url,

@@ -211,7 +211,8 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                     if let Some(allowed_idle_seconds) = termination_candidate.allowed_idle_seconds {
                         let overage = termination_candidate.as_of
                             - termination_candidate.last_keepalive
-                            - chrono::Duration::seconds(allowed_idle_seconds.into());
+                            - chrono::Duration::try_seconds(allowed_idle_seconds.into())
+                                .expect("duration is always valid");
                         if overage > chrono::Duration::zero() {
                             println!(
                                 "{} is alive past allowed {} seconds past idle time {}",

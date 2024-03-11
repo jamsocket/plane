@@ -110,6 +110,7 @@ async fn test_resource_limits() {
         None,
         None,
         None,
+        None,
     )
     .unwrap();
     config.cmd = Some(vec!["echo".into(), "hello world".into()]);

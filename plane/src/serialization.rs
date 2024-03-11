@@ -14,6 +14,6 @@ pub mod serialize_duration_as_seconds {
         D: Deserializer<'de>,
     {
         let seconds: i64 = Deserialize::deserialize(deserializer)?;
-        Ok(Duration::seconds(seconds))
+        Ok(Duration::try_seconds(seconds).expect("valid duration"))
     }
 }

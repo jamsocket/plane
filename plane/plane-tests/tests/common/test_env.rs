@@ -106,18 +106,27 @@ impl TestEnvironment {
         controller
     }
 
-    pub async fn drone_internal(&mut self, controller: &ControllerServer, pool: &str) -> Drone {
-        let db_path = self.scratch_dir.join("drone.db");
+    pub async fn drone_internal(
+        &mut self,
+        controller: &ControllerServer,
+        pool: &str,
+        mount_base: Option<&PathBuf>,
+    ) -> Drone {
+        let docker_config = PlaneDockerConfig {
+            runtime: None,
+            log_config: None,
+            mount_base: mount_base.map(|p| p.to_owned()),
+        };
 
         let drone_config = DroneConfig {
             id: DroneName::new_random(),
             cluster: TEST_CLUSTER.parse().unwrap(),
             ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
-            db_path: Some(db_path),
+            db_path: Some(self.scratch_dir.join("drone.db")),
             pool: pool.to_string(),
             auto_prune: false,
-            cleanup_min_age: Duration::seconds(0),
-            docker_config: PlaneDockerConfig::default(),
+            cleanup_min_age: Duration::zero(),
+            docker_config,
             controller_url: controller.url().clone(),
         };
 
@@ -125,11 +134,21 @@ impl TestEnvironment {
     }
 
     pub async fn drone(&mut self, controller: &ControllerServer) -> Drone {
-        self.drone_internal(controller, &self.pool.clone()).await
+        self.drone_internal(controller, &self.pool.clone(), None)
+            .await
     }
 
     pub async fn drone_in_pool(&mut self, controller: &ControllerServer, pool: &str) -> Drone {
-        self.drone_internal(controller, pool).await
+        self.drone_internal(controller, pool, None).await
+    }
+
+    pub async fn drone_with_mount_base(
+        &mut self,
+        controller: &ControllerServer,
+        mount_base: &PathBuf,
+    ) -> Drone {
+        self.drone_internal(controller, &self.pool.clone(), Some(mount_base))
+            .await
     }
 
     pub async fn dns(&mut self, controller: &ControllerServer) -> DnsServer {

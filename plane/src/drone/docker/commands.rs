@@ -2,7 +2,7 @@ use super::{types::ContainerId, PlaneDocker};
 use crate::{
     names::BackendName,
     protocol::AcquiredKey,
-    types::{BearerToken, ExecutorConfig},
+    types::{BearerToken, ExecutorConfig, Mount},
 };
 use anyhow::Result;
 use bollard::{
@@ -11,10 +11,16 @@ use bollard::{
     Docker,
 };
 use futures_util::StreamExt;
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    path::{Component, Path, PathBuf},
+    time::Duration,
+};
 
 /// Port inside the container to expose.
 const CONTAINER_PORT: u16 = 8080;
+/// Base directory for any data mounted in the container from the host
+const PLANE_DATA_DIR: &str = "/plane-data";
 
 pub async fn pull_image(
     docker: &Docker,
@@ -113,6 +119,22 @@ pub async fn get_port(docker: &Docker, container_id: &ContainerId) -> Result<u16
     Err(anyhow::anyhow!("Failed to get port after retries."))
 }
 
+// Disallow absolute paths or paths with dots (.. or .)
+pub fn validate_mount_path(path: &Path) -> Result<()> {
+    for component in path.components() {
+        match component {
+            Component::Prefix(..) | Component::Normal(..) => continue,
+            _ => {
+                return Err(anyhow::anyhow!(
+                "Spawn request contains invalid mount path, {:?}, that is not under the mount base",
+                path
+            ))
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn get_container_config_from_executor_config(
     backend_id: &BackendName,
     exec_config: ExecutorConfig,
@@ -120,6 +142,7 @@ pub fn get_container_config_from_executor_config(
     key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
     log_config: Option<&HostConfigLogConfig>,
+    mount_base: Option<&PathBuf>,
 ) -> Result<bollard::container::Config<String>> {
     let mut env = exec_config.env;
     env.insert("PORT".to_string(), CONTAINER_PORT.to_string());
@@ -145,6 +168,40 @@ pub fn get_container_config_from_executor_config(
         .into_iter()
         .map(|(k, v)| format!("{}={}", k, v))
         .collect();
+
+    let binds: Option<Vec<String>> = match (&mount_base, &exec_config.mount) {
+        (_, None) | (_, Some(Mount::Bool(false))) => None,
+        (Some(base), Some(mount_option)) => {
+            let mount_path = match mount_option {
+                Mount::Bool(true) => {
+                    if let Some(key) = key {
+                        base.join(&key.key.name)
+                    } else {
+                        return Err(anyhow::anyhow!(
+                            "Key is required for Bool(true) mount option"
+                        ));
+                    }
+                }
+                Mount::Path(path) => {
+                    validate_mount_path(path)?;
+                    base.join(path)
+                }
+                Mount::Bool(false) => unreachable!(),
+            };
+            Some(vec![format!(
+                "{}:{}",
+                mount_path.to_string_lossy(),
+                PLANE_DATA_DIR
+            )])
+        }
+        (None, Some(mount)) => {
+            tracing::warn!(
+                "Spawn request included a mount: {:?}, but drone has no mount base. Mounting will not be performed.",
+                mount
+            );
+            None
+        }
+    };
 
     Ok(bollard::container::Config {
         image: Some(exec_config.image.clone()),
@@ -191,6 +248,7 @@ pub fn get_container_config_from_executor_config(
                 hm.insert("size".to_string(), lim.to_string());
                 hm
             }),
+            binds,
             ..Default::default()
         }),
         ..Default::default()
@@ -217,6 +275,7 @@ pub async fn run_container(
         acquired_key,
         static_token,
         docker.config.log_config.as_ref(),
+        docker.config.mount_base.as_ref(),
     )?;
 
     docker
@@ -230,4 +289,141 @@ pub async fn run_container(
         .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        log_types::LoggableTime,
+        names::Name,
+        protocol::{AcquiredKey, KeyDeadlines},
+        types::{ExecutorConfig, KeyConfig, Mount},
+    };
+    use std::time::UNIX_EPOCH;
+
+    fn get_container_config_from_mount(
+        mount_base: &str,
+        mount: Option<Mount>,
+    ) -> Result<bollard::container::Config<String>> {
+        let backend_name = BackendName::new_random();
+        let key = "key";
+
+        let acquired_key = Some(AcquiredKey {
+            key: KeyConfig {
+                name: key.to_string(),
+                ..Default::default()
+            },
+            deadlines: KeyDeadlines {
+                renew_at: LoggableTime(UNIX_EPOCH.into()),
+                soft_terminate_at: LoggableTime(UNIX_EPOCH.into()),
+                hard_terminate_at: LoggableTime(UNIX_EPOCH.into()),
+            },
+            token: Default::default(),
+        });
+
+        let mut exec_config = ExecutorConfig::from_image_with_defaults(String::default());
+        exec_config.mount = mount;
+
+        get_container_config_from_executor_config(
+            &backend_name,
+            exec_config,
+            None,
+            acquired_key.as_ref(),
+            None,
+            None,
+            Some(&PathBuf::from(mount_base)),
+        )
+    }
+
+    // Test basic mount options
+
+    #[test]
+    fn test_mount_true() {
+        let mount_base = "/mnt/my-nfs";
+        let mount = Some(Mount::Bool(true));
+        let expected_binds = Some(vec![format!("/mnt/my-nfs/key:{}", PLANE_DATA_DIR)]);
+
+        let config = get_container_config_from_mount(mount_base, mount)
+            .unwrap()
+            .host_config
+            .unwrap()
+            .binds;
+
+        assert_eq!(config, expected_binds);
+    }
+
+    #[test]
+    fn test_mount_path() {
+        let mount_base = "/mnt/my-nfs";
+        let mount = Some(Mount::Path(PathBuf::from("custom-mount")));
+        let expected_binds = Some(vec![format!("/mnt/my-nfs/custom-mount:{}", PLANE_DATA_DIR)]);
+
+        let config = get_container_config_from_mount(mount_base, mount)
+            .unwrap()
+            .host_config
+            .unwrap()
+            .binds;
+
+        assert_eq!(config, expected_binds);
+    }
+
+    #[test]
+    fn test_mount_false() {
+        let mount_base = "/mnt/my-nfs";
+        let mount = Some(Mount::Bool(false));
+        let expected_binds = None;
+
+        let config = get_container_config_from_mount(mount_base, mount)
+            .unwrap()
+            .host_config
+            .unwrap()
+            .binds;
+
+        assert_eq!(config, expected_binds);
+    }
+
+    #[test]
+    fn test_mount_none() {
+        let mount_base = "/mnt/my-nfs";
+        let mount = None;
+        let expected_binds = None;
+
+        let config = get_container_config_from_mount(mount_base, mount)
+            .unwrap()
+            .host_config
+            .unwrap()
+            .binds;
+
+        assert_eq!(config, expected_binds);
+    }
+
+    // Test invalid mount paths
+
+    #[test]
+    fn test_mount_path_invalid_parent() {
+        let mount_base = "/mnt/my-nfs";
+        let mount = Some(Mount::Path(PathBuf::from("..")));
+
+        let err = get_container_config_from_mount(mount_base, mount).unwrap_err();
+        assert!(err.to_string().contains("not under the mount base"));
+    }
+
+    #[test]
+    fn test_mount_path_invalid_sibling() {
+        let mount_base = "/mnt/my-nfs";
+        let mount = Some(Mount::Path(PathBuf::from("../different-folder")));
+
+        let err = get_container_config_from_mount(mount_base, mount).unwrap_err();
+        assert!(err.to_string().contains("not under the mount base"));
+    }
+
+    #[test]
+    fn test_mount_path_invalid_complex_escape() {
+        let mount_base = "/mnt/my-nfs";
+        let mount = Some(Mount::Path(PathBuf::from("hide/under/../../../escape")));
+
+        let err = get_container_config_from_mount(mount_base, mount).unwrap_err();
+        assert!(err.to_string().contains("not under the mount base"));
+    }
 }
