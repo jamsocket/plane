@@ -262,7 +262,6 @@ pub async fn run_container(
     exec_config: ExecutorConfig,
     acquired_key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
-    mount_base: Option<&PathBuf>,
 ) -> Result<()> {
     let options = bollard::container::CreateContainerOptions {
         name: container_id.to_string(),
@@ -272,11 +271,11 @@ pub async fn run_container(
     let config = get_container_config_from_executor_config(
         backend_id,
         exec_config,
-        docker.runtime.as_deref(),
+        docker.config.runtime.as_deref(),
         acquired_key,
         static_token,
-        docker.log_config.as_ref(),
-        mount_base,
+        docker.config.log_config.as_ref(),
+        docker.config.mount_base.as_ref(),
     )?;
 
     docker

@@ -19,11 +19,9 @@ use bollard::{
     Docker,
 };
 use chrono::{DateTime, Utc};
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::{collections::HashMap, path::PathBuf};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 
@@ -34,12 +32,17 @@ pub mod types;
 /// The existence of this label is used to determine whether a container is managed by Plane.
 const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct PlaneDockerConfig {
+    pub runtime: Option<String>,
+    pub log_config: Option<HostConfigLogConfig>,
+    pub mount_base: Option<PathBuf>,
+}
+
 #[derive(Clone, Debug)]
 pub struct PlaneDocker {
     docker: Docker,
-    runtime: Option<String>,
-    log_config: Option<HostConfigLogConfig>,
-    mount_base: Option<PathBuf>,
+    config: PlaneDockerConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -54,18 +57,8 @@ pub struct SpawnResult {
 }
 
 impl PlaneDocker {
-    pub async fn new(
-        docker: Docker,
-        runtime: Option<String>,
-        log_config: Option<HostConfigLogConfig>,
-        mount_base: Option<PathBuf>,
-    ) -> Result<Self> {
-        Ok(Self {
-            docker,
-            runtime,
-            log_config,
-            mount_base,
-        })
+    pub async fn new(docker: Docker, config: PlaneDockerConfig) -> Result<Self> {
+        Ok(Self { docker, config })
     }
 
     pub async fn pull(
@@ -152,7 +145,6 @@ impl PlaneDocker {
             executable,
             acquired_key,
             static_token,
-            self.mount_base.as_ref(),
         )
         .await?;
         let port = get_port(&self.docker, container_id).await?;

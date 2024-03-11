@@ -1,5 +1,6 @@
 use self::{
-    executor::Executor, heartbeat::HeartbeatLoop, key_manager::KeyManager, state_store::StateStore,
+    docker::PlaneDockerConfig, executor::Executor, heartbeat::HeartbeatLoop,
+    key_manager::KeyManager, state_store::StateStore,
 };
 use crate::{
     client::PlaneClient,
@@ -12,8 +13,10 @@ use crate::{
     types::{BackendState, ClusterName},
 };
 use anyhow::Result;
+use bollard::Docker;
 use chrono::Duration;
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{set_permissions, File, Permissions},
     net::IpAddr,
@@ -22,9 +25,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::task::JoinHandle;
+use url::Url;
 use valuable::Valuable;
 
 mod backend_manager;
+pub mod command;
 pub mod docker;
 mod executor;
 mod heartbeat;
@@ -153,11 +158,12 @@ pub struct Drone {
 }
 
 impl Drone {
-    pub async fn run(
-        config: &DroneConfig,
-        docker: PlaneDocker,
-        connector: TypedSocketConnector<MessageFromDrone>,
-    ) -> Result<Self> {
+    pub async fn run(config: DroneConfig) -> Result<Self> {
+        let client = PlaneClient::new(config.controller_url);
+        let docker =
+            PlaneDocker::new(Docker::connect_with_local_defaults()?, config.docker_config).await?;
+        let connector = client.drone_connection(&config.cluster, &config.pool);
+
         let sqlite_connection = if let Some(db_path) = config.db_path.as_ref() {
             if !db_path.exists() {
                 File::create(db_path)?;
@@ -179,7 +185,7 @@ impl Drone {
             config.cleanup_min_age,
         );
 
-        let id = config.id.clone();
+        let id = config.name.clone();
         let drone_loop = tokio::spawn(drone_loop(id.clone(), connector, executor));
 
         Ok(Self { drone_loop, id })
@@ -190,23 +196,23 @@ impl Drone {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DroneConfig {
-    pub id: DroneName,
+    pub name: DroneName,
+    pub docker_config: PlaneDockerConfig,
+    pub controller_url: Url,
     pub cluster: ClusterName,
     pub ip: IpAddr,
     pub db_path: Option<PathBuf>,
     pub pool: String,
     pub auto_prune: bool,
+    #[serde(with = "crate::serialization::serialize_duration_as_seconds")]
     pub cleanup_min_age: Duration,
 }
 
-pub async fn run_drone(
-    client: PlaneClient,
-    docker: PlaneDocker,
-    config: &DroneConfig,
-) -> Result<()> {
-    let connection = client.drone_connection(&config.cluster, &config.pool);
-    let drone = Drone::run(config, docker, connection).await?;
+pub async fn run_drone(config: DroneConfig) -> Result<()> {
+    tracing::info!(name=%config.name, "Starting drone");
+    let drone = Drone::run(config).await?;
 
     tracing::info!("Drone started.");
     wait_for_shutdown_signal().await;

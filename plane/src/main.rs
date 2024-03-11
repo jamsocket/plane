@@ -1,30 +1,22 @@
 #![warn(clippy::unwrap_used)]
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
-use anyhow::{anyhow, Context, Result};
-use chrono::Duration;
+use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use plane::admin::AdminOpts;
-use plane::client::PlaneClient;
+use plane::controller::command::ControllerOpts;
 use plane::controller::run_controller;
 use plane::database::connect_and_migrate;
+use plane::dns::command::DnsOpts;
 use plane::dns::run_dns;
-use plane::drone::docker::PlaneDocker;
-use plane::drone::{run_drone, DroneConfig};
+use plane::drone::command::DroneOpts;
+use plane::drone::run_drone;
 use plane::init_tracing::init_tracing;
-use plane::names::{AcmeDnsServerName, ControllerName, DroneName, Name, OrRandom, ProxyName};
-use plane::proxy::{run_proxy, AcmeConfig, AcmeEabConfiguration, ServerPortConfig};
-use plane::types::ClusterName;
-use plane::util::resolve_hostname;
-use plane::{PLANE_GIT_HASH, PLANE_VERSION};
-use std::net::IpAddr;
+use plane::proxy::command::ProxyOpts;
+use plane::proxy::run_proxy;
+use plane::{Plan, PLANE_GIT_HASH, PLANE_VERSION};
 use std::path::PathBuf;
-use url::Url;
-
-const LOCAL_HTTP_PORT: u16 = 9090;
-const PROD_HTTP_PORT: u16 = 80;
-const PROD_HTTPS_PORT: u16 = 443;
 
 #[derive(Parser)]
 struct Opts {
@@ -34,128 +26,13 @@ struct Opts {
 
 #[derive(Subcommand)]
 enum Command {
-    Controller {
-        #[clap(long)]
-        db: String,
-
-        #[clap(long, default_value = "8080")]
-        port: u16,
-
-        #[clap(long, default_value = "127.0.0.1")]
-        host: IpAddr,
-
-        #[clap(long)]
-        controller_url: Option<Url>,
-
-        #[clap(long)]
-        default_cluster: Option<ClusterName>,
-
-        #[clap(long)]
-        cleanup_min_age_days: Option<i32>,
-    },
-    Drone {
-        #[clap(long)]
-        name: Option<DroneName>,
-
-        #[clap(long)]
-        controller_url: Url,
-
-        #[clap(long)]
-        cluster: ClusterName,
-
-        /// IP address for this drone that proxies can connect to.
-        #[clap(long, default_value = "127.0.0.1")]
-        ip: String,
-
-        /// Path to the database file. If omitted, an in-memory database will be used.
-        #[clap(long)]
-        db: Option<PathBuf>,
-
-        #[clap(long)]
-        docker_runtime: Option<String>,
-
-        /// Optional log driver configuration, passed to Docker as the `LogConfig` field.
-        #[clap(long)]
-        log_config: Option<String>,
-
-        /// Optional pool identifier. If present, will only schedule workloads with a matching `pool` tag on this drone.
-        #[clap(long)]
-        pool: Option<String>,
-
-        /// Optional base directory under which backends are allowed to mount directories.
-        #[clap(long)]
-        mount_base: Option<PathBuf>,
-
-        /// Automatically prune stopped images.
-        /// This prunes *all* unused container images, not just ones that Plane has loaded, so it is disabled by default.
-        #[clap(long)]
-        auto_prune_images: bool,
-
-        /// Minimum age (in seconds) of backend containers to prune.
-        /// By default, all stopped backends are pruned, but you can set this to a positive number of seconds to prune
-        /// only backends that were created more than this many seconds ago.
-        #[clap(long, default_value = "0")]
-        auto_prune_containers_older_than_seconds: i32,
-    },
-    Proxy {
-        #[clap(long)]
-        name: Option<ProxyName>,
-
-        #[clap(long)]
-        controller_url: Url,
-
-        #[clap(long)]
-        cluster: ClusterName,
-
-        #[clap(long)]
-        https: bool,
-
-        #[clap(long)]
-        http_port: Option<u16>,
-
-        #[clap(long)]
-        https_port: Option<u16>,
-
-        #[clap(long)]
-        cert_path: Option<PathBuf>,
-
-        #[clap(long)]
-        acme_endpoint: Option<Url>,
-
-        #[clap(long)]
-        acme_email: Option<String>,
-
-        /// Key identifier when using ACME External Account Binding.
-        #[clap(long)]
-        acme_eab_kid: Option<String>,
-
-        /// HMAC key when using ACME External Account Binding.
-        #[clap(long)]
-        acme_eab_hmac_key: Option<String>,
-
-        /// URL to redirect the root path to.
-        #[clap(long)]
-        root_redirect_url: Option<Url>,
-    },
-    Dns {
-        #[clap(long)]
-        name: Option<AcmeDnsServerName>,
-
-        #[clap(long)]
-        controller_url: Url,
-
-        /// Suffix to strip from requests before looking up TXT records.
-        /// E.g. if the zone is "example.com", a TXT record lookup
-        /// for foo.bar.baz.example.com
-        /// will return the TXT records for the cluster "foo.bar.baz".
-        ///
-        /// The DNS record for _acme-challenge.foo.bar.baz in this case
-        /// should have a CNAME record pointing to foo.bar.baz.example.com.
-        #[clap(long)]
-        zone: String,
-
-        #[clap(long, default_value = "53")]
-        port: u16,
+    Controller(ControllerOpts),
+    Drone(DroneOpts),
+    Proxy(ProxyOpts),
+    Dns(DnsOpts),
+    /// Run a Plane instance from a JSON configuration file.
+    RunConfig {
+        config_file: PathBuf,
     },
     Migrate {
         #[clap(long)]
@@ -167,175 +44,12 @@ enum Command {
 
 async fn run(opts: Opts) -> Result<()> {
     match opts.command {
-        Command::Controller {
-            host,
-            port,
-            db,
-            controller_url,
-            default_cluster,
-            cleanup_min_age_days,
-        } => {
-            let name = ControllerName::new_random();
-
-            let controller_url = match controller_url {
-                Some(url) => url,
-                None => Url::parse(&format!("http://{}:{}", host, port))?,
-            };
-
-            tracing::info!(%name, "Starting controller. Attempting to connect to database...");
-            let db = connect_and_migrate(&db)
-                .await
-                .context("Failed to connect to database and run migrations.")?;
-            tracing::info!("Connected to database.");
-
-            let addr = (host, port).into();
-
-            run_controller(
-                db,
-                addr,
-                name,
-                controller_url,
-                default_cluster,
-                cleanup_min_age_days,
-            )
-            .await?
-        }
+        Command::Controller(opts) => run_controller(opts.into_config()?).await?,
+        Command::Drone(opts) => run_drone(opts.into_config()?).await?,
+        Command::Proxy(opts) => run_proxy(opts.into_config()?).await?,
+        Command::Dns(opts) => run_dns(opts.into_config()).await?,
         Command::Migrate { db } => {
             let _ = connect_and_migrate(&db).await?;
-        }
-        Command::Drone {
-            name,
-            controller_url,
-            cluster,
-            ip,
-            db,
-            docker_runtime,
-            log_config,
-            pool,
-            mount_base,
-            auto_prune_images: auto_prune,
-            auto_prune_containers_older_than_seconds: cleanup_min_age_seconds,
-        } => {
-            let name = name.or_random();
-            tracing::info!(%name, "Starting drone");
-
-            let client = PlaneClient::new(controller_url);
-            let docker = bollard::Docker::connect_with_local_defaults()?;
-
-            let log_config = log_config.map(|s| serde_json::from_str(&s)).transpose()?;
-
-            let docker = PlaneDocker::new(docker, docker_runtime, log_config, mount_base).await?;
-
-            let ip: IpAddr = resolve_hostname(&ip)
-                .ok_or_else(|| anyhow::anyhow!("Failed to resolve hostname to IP address."))?;
-
-            let cleanup_min_age = Duration::try_seconds(cleanup_min_age_seconds as i64)
-                .expect("duration is always valid");
-
-            let drone_config = DroneConfig {
-                id: name.clone(),
-                cluster: cluster.clone(),
-                ip,
-                db_path: db,
-                pool: pool.unwrap_or_default(),
-                auto_prune,
-                cleanup_min_age,
-            };
-
-            run_drone(client, docker, &drone_config).await?;
-        }
-        Command::Proxy {
-            name,
-            controller_url,
-            cluster,
-            https,
-            http_port,
-            https_port,
-            cert_path,
-            acme_endpoint,
-            acme_email,
-            acme_eab_hmac_key,
-            acme_eab_kid,
-            root_redirect_url,
-        } => {
-            let name = name.or_random();
-            tracing::info!(?name, "Starting proxy");
-            let client = PlaneClient::new(controller_url);
-
-            let port_config = match (https, http_port, https_port) {
-                (false, None, None) => ServerPortConfig {
-                    http_port: LOCAL_HTTP_PORT,
-                    https_port: None,
-                },
-                (true, None, None) => ServerPortConfig {
-                    http_port: PROD_HTTP_PORT,
-                    https_port: Some(PROD_HTTPS_PORT),
-                },
-                (true, Some(http_port), None) => ServerPortConfig {
-                    http_port,
-                    https_port: Some(PROD_HTTPS_PORT),
-                },
-                (_, None, Some(https_port)) => ServerPortConfig {
-                    http_port: PROD_HTTP_PORT,
-                    https_port: Some(https_port),
-                },
-                (_, Some(http_port), https_port) => ServerPortConfig {
-                    http_port,
-                    https_port,
-                },
-            };
-
-            let acme_eab_keypair = match (acme_eab_hmac_key, acme_eab_kid) {
-                (Some(hmac_key), Some(kid)) => Some(AcmeEabConfiguration::new(&kid, &hmac_key)?),
-                (None, Some(_)) | (Some(_), None) => {
-                    return Err(anyhow!(
-                        "Must specify both --acme-eab-hmac-key and --acme-eab-kid or neither."
-                    ))
-                }
-                _ => None,
-            };
-
-            let acme_config = match (acme_endpoint, acme_email) {
-                (Some(_), None) => {
-                    return Err(anyhow!(
-                        "Must specify --acme-email when using --acme-endpoint."
-                    ));
-                }
-                (None, Some(_)) => {
-                    return Err(anyhow!(
-                        "Must specify --acme-endpoint when using --acme-email."
-                    ));
-                }
-                (Some(endpoint), Some(email)) => Some(AcmeConfig {
-                    endpoint,
-                    mailto_email: email,
-                    acme_eab_keypair,
-                    client: reqwest::Client::new(),
-                }),
-                (None, None) => None,
-            };
-
-            run_proxy(
-                name,
-                client,
-                cluster,
-                cert_path.as_deref(),
-                port_config,
-                acme_config,
-                root_redirect_url,
-            )
-            .await?;
-        }
-        Command::Dns {
-            name,
-            controller_url,
-            port,
-            zone,
-        } => {
-            let name = name.or_random();
-            tracing::info!("Starting DNS server");
-            let client = PlaneClient::new(controller_url);
-            run_dns(name, client, port, Some(zone)).await?;
         }
         Command::Admin(admin_opts) => {
             plane::admin::run_admin_command(admin_opts).await;
@@ -343,6 +57,22 @@ async fn run(opts: Opts) -> Result<()> {
         Command::Version => {
             println!("Client version: {}", PLANE_VERSION.bright_white());
             println!("Client hash: {}", PLANE_GIT_HASH.bright_white());
+        }
+        Command::RunConfig { config_file } => {
+            if !config_file.ends_with(".json") {
+                // This check is so that we can potentially support other formats in the future
+                // without breaking backwards compatibility.
+                return Err(anyhow!("Config file must end in .json"));
+            }
+
+            let file = std::fs::File::open(config_file)?;
+            let config = serde_json::from_reader(file)?;
+            match config {
+                Plan::Controller(config) => run_controller(config).await?,
+                Plan::Dns(config) => run_dns(config).await?,
+                Plan::Proxy(config) => run_proxy(config).await?,
+                Plan::Drone(config) => run_drone(config).await?,
+            }
         }
     }
 

@@ -9,7 +9,7 @@ use crate::{
     cleanup,
     client::PlaneClient,
     controller::{connect::handle_connect, core::Controller, drone::handle_drone_socket},
-    database::PlaneDatabase,
+    database::{connect_and_migrate, PlaneDatabase},
     heartbeat_consts::HEARTBEAT_INTERVAL,
     names::ControllerName,
     signals::wait_for_shutdown_signal,
@@ -17,7 +17,7 @@ use crate::{
     util::GuardHandle,
     PLANE_GIT_HASH, PLANE_VERSION,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::{
     http::{header, Method},
     routing::{get, post},
@@ -35,6 +35,7 @@ use tracing::Level;
 use url::Url;
 
 mod backend_state;
+pub mod command;
 mod connect;
 mod core;
 mod dns;
@@ -114,23 +115,20 @@ pub struct ControllerServer {
 }
 
 impl ControllerServer {
-    pub async fn run(
-        db: PlaneDatabase,
-        bind_addr: SocketAddr,
-        id: ControllerName,
-        controller_url: Url,
-        default_cluster: Option<ClusterName>,
-        cleanup_min_age_days: Option<i32>,
-    ) -> Result<Self> {
-        let listener = TcpListener::bind(bind_addr)?;
+    pub async fn run(config: ControllerConfig) -> Result<Self> {
+        let listener = TcpListener::bind(config.bind_addr)?;
+
+        let db = connect_and_migrate(&config.db_url)
+            .await
+            .context("Failed to connect to database and run migrations.")?;
 
         Self::run_with_listener(
             db,
             listener,
-            id,
-            controller_url,
-            default_cluster,
-            cleanup_min_age_days,
+            config.id,
+            config.controller_url,
+            config.default_cluster,
+            config.cleanup_min_age_days,
         )
         .await
     }
@@ -264,31 +262,31 @@ impl ControllerServer {
         &self.controller_id
     }
 
-    pub fn client(&self) -> PlaneClient {
+    pub fn url(&self) -> Url {
         let base_url: Url = format!("http://{}", self.bind_addr)
             .parse()
             .expect("Generated URI is always valid.");
+        base_url
+    }
+
+    pub fn client(&self) -> PlaneClient {
+        let base_url: Url = self.url();
         PlaneClient::new(base_url)
     }
 }
 
-pub async fn run_controller(
-    db: PlaneDatabase,
-    bind_addr: SocketAddr,
-    id: ControllerName,
-    controller_url: Url,
-    default_cluster: Option<ClusterName>,
-    cleanup_min_age_days: Option<i32>,
-) -> Result<()> {
-    let mut server = ControllerServer::run(
-        db,
-        bind_addr,
-        id,
-        controller_url,
-        default_cluster,
-        cleanup_min_age_days,
-    )
-    .await?;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControllerConfig {
+    pub db_url: String,
+    pub bind_addr: SocketAddr,
+    pub id: ControllerName,
+    pub controller_url: Url,
+    pub default_cluster: Option<ClusterName>,
+    pub cleanup_min_age_days: Option<i32>,
+}
+
+pub async fn run_controller(config: ControllerConfig) -> Result<()> {
+    let mut server = ControllerServer::run(config).await?;
 
     wait_for_shutdown_signal().await;
 

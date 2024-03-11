@@ -1712,7 +1712,7 @@ dependencies = [
 
 [[package]]
 name = "plane-dynamic"
-version = "0.2.0"
+version = "0.4.7"
 dependencies = [
  "plane",
 ]
@@ -1728,7 +1728,7 @@ dependencies = [
 
 [[package]]
 name = "plane-tests"
-version = "0.2.0"
+version = "0.4.7"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3047,6 +3047,7 @@ dependencies = [
  "form_urlencoded",
  "idna 0.5.0",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

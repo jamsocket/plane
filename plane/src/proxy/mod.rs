@@ -5,12 +5,14 @@ use crate::proxy::proxy_service::ProxyMakeService;
 use crate::proxy::shutdown_signal::ShutdownSignal;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
-use std::path::Path;
+use std::path::PathBuf;
 use url::Url;
 
 pub mod cert_manager;
 mod cert_pair;
+pub mod command;
 mod connection_monitor;
 pub mod proxy_connection;
 mod proxy_service;
@@ -47,13 +49,13 @@ pub struct ForwardableRequestInfo {
     protocol: Protocol,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct ServerPortConfig {
     pub http_port: u16,
     pub https_port: Option<u16>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcmeEabConfiguration {
     pub key_id: String,
     pub key: Vec<u8>,
@@ -73,49 +75,64 @@ impl AcmeEabConfiguration {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcmeConfig {
     pub endpoint: Url,
     pub mailto_email: String,
-    pub client: reqwest::Client,
     pub acme_eab_keypair: Option<AcmeEabConfiguration>,
+    /// Don't validate the ACME server's certificate chain. This is ONLY for testing,
+    /// and should not be used otherwise.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub accept_insecure_certs_for_testing: bool,
 }
 
-pub async fn run_proxy(
-    name: ProxyName,
-    client: PlaneClient,
-    cluster: ClusterName,
-    cert_path: Option<&Path>,
-    port_config: ServerPortConfig,
-    acme_config: Option<AcmeConfig>,
-    root_redirect_url: Option<Url>,
-) -> Result<()> {
-    let (mut cert_watcher, cert_manager) =
-        watcher_manager_pair(cluster.clone(), cert_path, acme_config)?;
+fn is_false(value: &bool) -> bool {
+    !value
+}
 
-    let proxy_connection = ProxyConnection::new(name, client, cluster, cert_manager);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProxyConfig {
+    pub name: ProxyName,
+    pub controller_url: Url,
+    pub cluster: ClusterName,
+    pub cert_path: Option<PathBuf>,
+    pub port_config: ServerPortConfig,
+    pub acme_config: Option<AcmeConfig>,
+    pub root_redirect_url: Option<Url>,
+}
+
+pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
+    tracing::info!(name=%config.name, "Starting proxy");
+    let client = PlaneClient::new(config.controller_url);
+    let (mut cert_watcher, cert_manager) = watcher_manager_pair(
+        config.cluster.clone(),
+        config.cert_path.as_deref(),
+        config.acme_config,
+    )?;
+
+    let proxy_connection = ProxyConnection::new(config.name, client, config.cluster, cert_manager);
     let shutdown_signal = ShutdownSignal::new();
 
-    let https_redirect = port_config.https_port.is_some();
+    let https_redirect = config.port_config.https_port.is_some();
 
-    if port_config.https_port.is_some() {
+    if config.port_config.https_port.is_some() {
         cert_watcher.wait_for_initial_cert().await?;
     }
 
     let http_handle = ProxyMakeService {
         state: proxy_connection.state(),
         https_redirect,
-        root_redirect_url: root_redirect_url.clone(),
+        root_redirect_url: config.root_redirect_url.clone(),
     }
-    .serve_http(port_config.http_port, shutdown_signal.subscribe())?;
+    .serve_http(config.port_config.http_port, shutdown_signal.subscribe())?;
 
-    let https_handle = if let Some(https_port) = port_config.https_port {
+    let https_handle = if let Some(https_port) = config.port_config.https_port {
         tracing::info!("Waiting for initial certificate.");
 
         let https_handle = ProxyMakeService {
             state: proxy_connection.state(),
             https_redirect: false,
-            root_redirect_url,
+            root_redirect_url: config.root_redirect_url,
         }
         .serve_https(https_port, cert_watcher, shutdown_signal.subscribe())?;
 
