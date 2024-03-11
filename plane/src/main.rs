@@ -82,6 +82,10 @@ enum Command {
         #[clap(long)]
         pool: Option<String>,
 
+        /// Optional base directory under which backends are allowed to mount directories.
+        #[clap(long)]
+        mount_base: Option<PathBuf>,
+
         /// Automatically prune stopped images.
         /// This prunes *all* unused container images, not just ones that Plane has loaded, so it is disabled by default.
         #[clap(long)]
@@ -208,6 +212,7 @@ async fn run(opts: Opts) -> Result<()> {
             docker_runtime,
             log_config,
             pool,
+            mount_base,
             auto_prune_images: auto_prune,
             auto_prune_containers_older_than_seconds: cleanup_min_age_seconds,
         } => {
@@ -219,7 +224,7 @@ async fn run(opts: Opts) -> Result<()> {
 
             let log_config = log_config.map(|s| serde_json::from_str(&s)).transpose()?;
 
-            let docker = PlaneDocker::new(docker, docker_runtime, log_config).await?;
+            let docker = PlaneDocker::new(docker, docker_runtime, log_config, mount_base).await?;
 
             let ip: IpAddr = resolve_hostname(&ip)
                 .ok_or_else(|| anyhow::anyhow!("Failed to resolve hostname to IP address."))?;

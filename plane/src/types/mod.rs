@@ -7,7 +7,7 @@ pub use backend_state::{BackendState, BackendStatus, TerminationKind, Terminatio
 use bollard::auth::DockerCredentials;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::{collections::HashMap, fmt::Display, str::FromStr};
+use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr};
 
 pub mod backend_state;
 
@@ -168,6 +168,14 @@ impl From<DockerRegistryAuth> for DockerCredentials {
     }
 }
 
+// A spawn requestor can provide a mount parameter, which can be a string or a boolean.
+#[derive(Debug, Clone, Serialize, Deserialize, valuable::Valuable)]
+#[serde(untagged)]
+pub enum Mount {
+    Bool(bool),
+    Path(PathBuf),
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, valuable::Valuable)]
 pub struct ExecutorConfig {
     pub image: String,
@@ -177,6 +185,7 @@ pub struct ExecutorConfig {
     pub env: HashMap<String, String>,
     #[serde(default)]
     pub resource_limits: ResourceLimits,
+    pub mount: Option<Mount>,
 }
 
 impl ExecutorConfig {
@@ -187,6 +196,7 @@ impl ExecutorConfig {
             env: HashMap::default(),
             resource_limits: ResourceLimits::default(),
             credentials: None,
+            mount: None,
         }
     }
 }
