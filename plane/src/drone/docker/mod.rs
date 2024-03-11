@@ -199,10 +199,12 @@ impl PlaneDocker {
         tracing::info!("Pruning Docker containers and images.");
 
         let since_unixtime = until.timestamp();
-        let filters: HashMap<String, Vec<String>> =
-            vec![("until".to_string(), vec![since_unixtime.to_string()])]
-                .into_iter()
-                .collect();
+        let filters: HashMap<String, Vec<String>> = vec![
+            ("until".to_string(), vec![since_unixtime.to_string()]),
+            ("label".to_string(), vec![PLANE_DOCKER_LABEL.to_string()]),
+        ]
+        .into_iter()
+        .collect();
 
         match self
             .docker
@@ -225,13 +227,18 @@ impl PlaneDocker {
         }
 
         if prune_images {
+            let filters: HashMap<String, Vec<String>> =
+                vec![("until".to_string(), vec![since_unixtime.to_string()])]
+                    .into_iter()
+                    .collect();
             match self
                 .docker
                 .prune_images(Some(PruneImagesOptions { filters }))
                 .await
             {
                 Ok(result) => {
-                    tracing::info!(num_images_deleted = ?result.images_deleted, "Removed dangling images.");
+                    let num_images_deleted = result.images_deleted.map(|d| d.len()).unwrap_or(0);
+                    tracing::info!(num_images_deleted, "Removed dangling images.");
                 }
                 Err(e) => tracing::error!(?e, "Error pruning dangling images."),
             }
