@@ -402,41 +402,29 @@ mod tests {
     // Test invalid mount paths
 
     #[test]
-    #[should_panic(expected = "not under the mount base")]
     fn test_mount_path_invalid_parent() {
         let mount_base = "/mnt/my-nfs";
         let mount = Some(Mount::Path(PathBuf::from("..")));
 
-        let _config = get_container_config_from_mount(mount_base, mount)
-            .unwrap()
-            .host_config
-            .unwrap()
-            .binds;
+        let err = get_container_config_from_mount(mount_base, mount).unwrap_err();
+        assert!(err.to_string().contains("not under the mount base"));
     }
 
     #[test]
-    #[should_panic(expected = "not under the mount base")]
     fn test_mount_path_invalid_sibling() {
         let mount_base = "/mnt/my-nfs";
         let mount = Some(Mount::Path(PathBuf::from("../different-folder")));
 
-        let _config = get_container_config_from_mount(mount_base, mount)
-            .unwrap()
-            .host_config
-            .unwrap()
-            .binds;
+        let err = get_container_config_from_mount(mount_base, mount).unwrap_err();
+        assert!(err.to_string().contains("not under the mount base"));
     }
 
     #[test]
-    #[should_panic(expected = "not under the mount base")]
     fn test_mount_path_invalid_complex_escape() {
         let mount_base = "/mnt/my-nfs";
         let mount = Some(Mount::Path(PathBuf::from("hide/under/../../../escape")));
 
-        let _config = get_container_config_from_mount(mount_base, mount)
-            .unwrap()
-            .host_config
-            .unwrap()
-            .binds;
+        let err = get_container_config_from_mount(mount_base, mount).unwrap_err();
+        assert!(err.to_string().contains("not under the mount base"));
     }
 }
