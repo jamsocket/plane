@@ -119,42 +119,20 @@ pub async fn get_port(docker: &Docker, container_id: &ContainerId) -> Result<u16
     Err(anyhow::anyhow!("Failed to get port after retries."))
 }
 
-// Canonicalize a path without talking to the filesystem.
-//
-// Copy-pasted this function from Cargo.
-// https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61
-//
-// The issue is Path's canonicalize function contacts the filesystem and checks
-// if the path exists. Instead, we effectively want a string-operation.
-//
-// We use this function before passing a directory to Docker's "Binds" field,
-// which works similarly to "Mounts", but Docker also creates the directory if
-// it does not exist.
-pub fn normalize_path(path: &Path) -> PathBuf {
-    let mut components = path.components().peekable();
-    let mut ret = if let Some(c @ Component::Prefix(..)) = components.peek().cloned() {
-        components.next();
-        PathBuf::from(c.as_os_str())
-    } else {
-        PathBuf::new()
-    };
-
-    for component in components {
+// Disallow absolute paths or paths with dots (.. or .)
+pub fn validate_mount_path(path: &Path) -> Result<()> {
+    for component in path.components() {
         match component {
-            Component::Prefix(..) => unreachable!(),
-            Component::RootDir => {
-                ret.push(component.as_os_str());
-            }
-            Component::CurDir => {}
-            Component::ParentDir => {
-                ret.pop();
-            }
-            Component::Normal(c) => {
-                ret.push(c);
+            Component::Prefix(..) | Component::Normal(..) => continue,
+            _ => {
+                return Err(anyhow::anyhow!(
+                "Spawn request contains invalid mount path, {:?}, that is not under the mount base",
+                path
+            ))
             }
         }
     }
-    ret
+    Ok(())
 }
 
 pub fn get_container_config_from_executor_config(
@@ -204,21 +182,15 @@ pub fn get_container_config_from_executor_config(
                         ));
                     }
                 }
-                Mount::Path(path) => base.join(path),
+                Mount::Path(path) => {
+                    validate_mount_path(path)?;
+                    base.join(path)
+                }
                 Mount::Bool(false) => unreachable!(),
             };
-            let canonical_mount_path = normalize_path(&mount_path);
-            if !canonical_mount_path.starts_with(base) {
-                return Err(anyhow::anyhow!(
-                    "Mount path {}, which we canonicalized as {}, is not under the specified mount base {}.",
-                    mount_path.to_string_lossy(),
-                    canonical_mount_path.to_string_lossy(),
-                    base.to_string_lossy()
-                ));
-            }
             Some(vec![format!(
                 "{}:{}",
-                canonical_mount_path.to_string_lossy(),
+                mount_path.to_string_lossy(),
                 PLANE_DATA_DIR
             )])
         }
@@ -427,32 +399,10 @@ mod tests {
         assert_eq!(config, expected_binds);
     }
 
-    // Test tricky mount paths
-
-    #[test]
-    fn test_mount_path_canonicalize() {
-        let mount_base = "/mnt/my-nfs";
-        let mount = Some(Mount::Path(PathBuf::from(
-            "custom-mount/../different-folder/././subfolder/../../actual-folder",
-        )));
-        let expected_binds = Some(vec![format!(
-            "/mnt/my-nfs/actual-folder:{}",
-            PLANE_DATA_DIR
-        )]);
-
-        let config = get_container_config_from_mount(mount_base, mount)
-            .unwrap()
-            .host_config
-            .unwrap()
-            .binds;
-
-        assert_eq!(config, expected_binds);
-    }
-
     // Test invalid mount paths
 
     #[test]
-    #[should_panic(expected = "not under the specified mount base")]
+    #[should_panic(expected = "not under the mount base")]
     fn test_mount_path_invalid_parent() {
         let mount_base = "/mnt/my-nfs";
         let mount = Some(Mount::Path(PathBuf::from("..")));
@@ -465,7 +415,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "not under the specified mount base")]
+    #[should_panic(expected = "not under the mount base")]
     fn test_mount_path_invalid_sibling() {
         let mount_base = "/mnt/my-nfs";
         let mount = Some(Mount::Path(PathBuf::from("../different-folder")));
@@ -478,7 +428,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "not under the specified mount base")]
+    #[should_panic(expected = "not under the mount base")]
     fn test_mount_path_invalid_complex_escape() {
         let mount_base = "/mnt/my-nfs";
         let mount = Some(Mount::Path(PathBuf::from("hide/under/../../../escape")));
