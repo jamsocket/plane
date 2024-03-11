@@ -120,14 +120,18 @@ async fn main() -> Result<()> {
             let state = get_world_state(nats.clone()).await?;
             let stream = nats.jetstream.get_stream("plane_state").await.unwrap();
 
+            let mut removed_backends = 0;
+
             for (cluster_name, cluster) in &state.clusters {
                 for (backend_id, backend) in &cluster.backends {
                     if let Some((timestamp, state)) = backend.state_timestamp() {
                         if state.terminal() {
-                            println!(
-                                "Removing backend {} from cluster {}, {} at {}",
-                                backend_id, cluster_name, state, timestamp
-                            );
+                            if dry_run {
+                                println!(
+                                    "Would remove backend {} from cluster {}, {} at {}",
+                                    backend_id, cluster_name, state, timestamp
+                                );
+                            }
                         } else if timestamp < chrono::Utc::now() - chrono::Duration::hours(24)
                             && (state != BackendState::Ready)
                         {
@@ -162,7 +166,7 @@ async fn main() -> Result<()> {
                     if dry_run {
                         println!("Would purge {:?}", subjects);
                     } else {
-                        println!("Purging {:?}", subjects);
+                        removed_backends += 1;
 
                         for subject in subjects.iter() {
                             stream.purge().filter(subject).await.unwrap();
@@ -174,6 +178,12 @@ async fn main() -> Result<()> {
                         tokio::time::sleep(Duration::from_millis(50)).await;
                     }
                 }
+            }
+
+            if dry_run {
+                println!("Would have removed {} backends", removed_backends);
+            } else {
+                println!("Removed {} backends", removed_backends);
             }
         }
         Command::DumpState => {
