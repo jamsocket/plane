@@ -11,14 +11,14 @@ use crate::{
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials,
-    container::{ListContainersOptions, PruneContainersOptions, StatsOptions},
+    container::{PruneContainersOptions, StatsOptions},
     errors::Error,
     image::PruneImagesOptions,
     service::{EventMessage, HostConfigLogConfig},
     system::EventsOptions,
     Docker,
 };
-use chrono::{DateTime, LocalResult, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use std::{
     collections::HashMap,
     sync::atomic::{AtomicU64, Ordering},
