@@ -15,6 +15,7 @@ docker run \
     -p 8080:8080 \
     -p 9090:9090 \
     -v /var/run/docker.sock:/var/run/docker.sock \
+    --add-host=host.docker.internal:host-gateway \
     plane/quickstart
 ```
 
