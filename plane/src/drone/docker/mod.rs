@@ -11,14 +11,18 @@ use crate::{
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials,
-    container::{ListContainersOptions, StatsOptions},
+    container::{ListContainersOptions, PruneContainersOptions, StatsOptions},
     errors::Error,
+    image::PruneImagesOptions,
     service::{EventMessage, HostConfigLogConfig},
     system::EventsOptions,
     Docker,
 };
 use chrono::{DateTime, LocalResult, TimeZone, Utc};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicU64, Ordering},
+};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 
@@ -190,73 +194,44 @@ impl PlaneDocker {
     }
 
     /// Prune stopped backend containers that are older than the prune threshold.
-    /// Then, remove dangling images.
-    pub async fn prune(&self, since: DateTime<Utc>, auto_prune: bool) -> Result<()> {
+    /// Then, (optionally) remove unused images also older than the prune threshold.
+    pub async fn prune(&self, until: DateTime<Utc>, prune_images: bool) -> Result<()> {
         tracing::info!("Pruning Docker containers and images.");
 
-        // Get a list of stopped containers with the label `dev.plane.backend`.
-        let candidates = self
-            .docker
-            .list_containers::<String>(Some(ListContainersOptions {
-                all: true,
-                filters: vec![
-                    ("label".to_string(), vec![PLANE_DOCKER_LABEL.to_string()]),
-                    ("status".to_string(), vec!["exited".to_string()]),
-                ]
+        let since_unixtime = until.timestamp();
+        let filters: HashMap<String, Vec<String>> =
+            vec![("until".to_string(), vec![since_unixtime.to_string()])]
                 .into_iter()
-                .collect(),
-                ..Default::default()
+                .collect();
+
+        match self
+            .docker
+            .prune_containers(Some(PruneContainersOptions {
+                filters: filters.clone(),
             }))
-            .await?;
-
-        tracing::info!(
-            num_containers = candidates.len(),
-            "Removing stopped backend containers."
-        );
-        let mut skipped = 0;
-        for container in candidates {
-            let Some(container_created) = container.created else {
-                tracing::warn!("Received container without created timestamp.");
-                continue;
-            };
-
-            let LocalResult::Single(container_created) = Utc.timestamp_opt(container_created, 0)
-            else {
-                tracing::warn!(
-                    "Received container created timestamp that is not a valid UTC timestamp."
-                );
-                continue;
-            };
-
-            if container_created >= since {
+            .await
+        {
+            Ok(result) => {
+                let num_containers_deleted =
+                    result.containers_deleted.map(|d| d.len()).unwrap_or(0);
+                let space_reclaimed_bytes = result.space_reclaimed;
                 tracing::info!(
-                    container_id = container.id.as_ref(),
-                    %since,
-                    %container_created,
-                    "Skipping container because it was created before the prune threshold."
+                    num_containers_deleted,
+                    space_reclaimed_bytes,
+                    "Done pruning containers."
                 );
-                skipped += 1;
-                continue;
             }
-
-            let Some(container_id) = container.id else {
-                tracing::warn!("Received container without id.");
-                continue;
-            };
-            tracing::info!(container_id, "Removing container.");
-            if let Err(e) = self.docker.remove_container(&container_id, None).await {
-                tracing::error!(?e, container_id, "Error removing container.");
-            }
+            Err(e) => tracing::error!(?e, "Error pruning containers."),
         }
 
-        if skipped > 0 {
-            tracing::info!(skipped, "Skipped pruning of {} containers.", skipped);
-        }
-
-        if auto_prune {
-            match self.docker.prune_images::<&str>(None).await {
+        if prune_images {
+            match self
+                .docker
+                .prune_images(Some(PruneImagesOptions { filters }))
+                .await
+            {
                 Ok(result) => {
-                    tracing::info!(num_images = ?result.images_deleted, "Removed dangling images.");
+                    tracing::info!(num_images_deleted = ?result.images_deleted, "Removed dangling images.");
                 }
                 Err(e) => tracing::error!(?e, "Error pruning dangling images."),
             }
