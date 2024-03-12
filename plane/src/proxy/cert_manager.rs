@@ -343,7 +343,7 @@ async fn get_certificate(
     // builder.private_key(...);
     builder.contact(vec![format!("mailto:{}", acme_config.mailto_email)]);
     if let Some(acme_eab_keypair) = acme_config.acme_eab_keypair.clone() {
-        let eab_key = openssl::pkey::PKey::hmac(&acme_eab_keypair.key)?;
+        let eab_key = openssl::pkey::PKey::hmac(&acme_eab_keypair.key_bytes()?)?;
         builder.external_account_binding(acme_eab_keypair.key_id.clone(), eab_key);
     }
     builder.terms_of_service_agreed(true);

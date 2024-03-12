@@ -84,7 +84,7 @@ impl ProxyOpts {
         };
 
         let acme_eab_keypair = match (self.acme_eab_hmac_key, self.acme_eab_kid) {
-            (Some(hmac_key), Some(kid)) => Some(AcmeEabConfiguration::new(&kid, &hmac_key)?),
+            (Some(hmac_key), Some(kid)) => Some(AcmeEabConfiguration::new(kid, hmac_key)?),
             (None, Some(_)) | (Some(_), None) => {
                 return Err(anyhow!(
                     "Must specify both --acme-eab-hmac-key and --acme-eab-kid or neither."
