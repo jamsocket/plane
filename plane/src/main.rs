@@ -16,6 +16,7 @@ use plane::init_tracing::init_tracing;
 use plane::proxy::command::ProxyOpts;
 use plane::proxy::run_proxy;
 use plane::{Plan, PLANE_GIT_HASH, PLANE_VERSION};
+use std::ffi::OsStr;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -59,7 +60,7 @@ async fn run(opts: Opts) -> Result<()> {
             println!("Client hash: {}", PLANE_GIT_HASH.bright_white());
         }
         Command::RunConfig { config_file } => {
-            if !config_file.ends_with(".json") {
+            if config_file.extension() != Some(OsStr::new("json")) {
                 // This check is so that we can potentially support other formats in the future
                 // without breaking backwards compatibility.
                 return Err(anyhow!("Config file must end in .json"));
