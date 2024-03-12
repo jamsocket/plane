@@ -115,7 +115,8 @@ pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
         config.cluster.clone(),
         config.cert_path.as_deref(),
         config.acme_config,
-    )?;
+    )
+    .await?;
 
     let proxy_connection = ProxyConnection::new(config.name, client, config.cluster, cert_manager);
     let shutdown_signal = ShutdownSignal::new();
