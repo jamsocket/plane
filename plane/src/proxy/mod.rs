@@ -57,21 +57,29 @@ pub struct ServerPortConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcmeEabConfiguration {
+    /// The key identifier for the ACME EAB key.
     pub key_id: String,
-    pub key: Vec<u8>,
+
+    /// The HMAC key for the ACME EAB key, base64-encoded (URL, no-pad).
+    pub key: String,
 }
 
 impl AcmeEabConfiguration {
     pub fn eab_key_b64(&self) -> String {
-        data_encoding::BASE64URL_NOPAD.encode(&self.key)
+        // data_encoding::BASE64URL_NOPAD.encode(&self.key)
+        self.key.clone()
     }
 
-    pub fn new(key_id: &str, key_b64: &str) -> Result<Self> {
-        let key = data_encoding::BASE64URL_NOPAD.decode(key_b64.as_bytes())?;
+    pub fn new(key_id: String, key_b64: String) -> Result<Self> {
+        let _ = data_encoding::BASE64URL_NOPAD.decode(key_b64.as_bytes())?;
         Ok(Self {
-            key_id: key_id.into(),
-            key,
+            key_id,
+            key: key_b64,
         })
+    }
+
+    pub fn key_bytes(&self) -> Result<Vec<u8>> {
+        Ok(data_encoding::BASE64URL_NOPAD.decode(self.key.as_bytes())?)
     }
 }
 

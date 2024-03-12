@@ -59,8 +59,8 @@ async fn cert_manager_does_refresh_eab(env: TestEnvironment) {
     let dns = env.dns(&controller).await;
 
     let eab_keypair = AcmeEabConfiguration::new(
-        "kid-1",
-        "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W",
+        "kid-1".to_string(),
+        "zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W".to_string(),
     )
     .unwrap();
 
