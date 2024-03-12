@@ -170,7 +170,6 @@ impl CertManager {
                 .context("Building directory")?;
 
             let mut builder = AccountBuilder::new(dir);
-            // builder.private_key(...);
             builder.contact(vec![format!("mailto:{}", acme_config.mailto_email)]);
             if let Some(acme_eab_keypair) = acme_config.acme_eab_keypair.clone() {
                 let eab_key = openssl::pkey::PKey::hmac(&acme_eab_keypair.key_bytes()?)?;
@@ -189,7 +188,6 @@ impl CertManager {
             send_cert: Arc::new(send_cert),
             refresh_loop: None,
             acme_account,
-            // current_cert: Arc::new(RwLock::new(initial_cert)),
             path: cert_path.map(|p| p.to_owned()),
             response_sender,
         })
