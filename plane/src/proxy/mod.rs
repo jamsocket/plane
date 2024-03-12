@@ -66,7 +66,6 @@ pub struct AcmeEabConfiguration {
 
 impl AcmeEabConfiguration {
     pub fn eab_key_b64(&self) -> String {
-        // data_encoding::BASE64URL_NOPAD.encode(&self.key)
         self.key.clone()
     }
 
