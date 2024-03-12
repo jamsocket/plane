@@ -36,6 +36,7 @@ async fn cert_manager_does_refresh(env: TestEnvironment) {
         Some(&certs_dir.join("cert.json")),
         Some(acme_config.clone()),
     )
+    .await
     .unwrap();
 
     let _proxy_connection = ProxyConnection::new(
@@ -82,6 +83,7 @@ async fn cert_manager_does_refresh_eab(env: TestEnvironment) {
         Some(&certs_dir.join("cert.json")),
         Some(acme_config.clone()),
     )
+    .await
     .unwrap();
 
     let _proxy_connection = ProxyConnection::new(

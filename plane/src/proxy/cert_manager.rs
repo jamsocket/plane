@@ -5,7 +5,7 @@ use crate::{
     types::ClusterName,
 };
 use acme2_eab::{
-    gen_rsa_private_key, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
+    gen_rsa_private_key, Account, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
 use anyhow::{anyhow, Context, Result};
@@ -117,14 +117,14 @@ pub struct CertManager {
     response_sender: broadcast::Sender<CertManagerResponse>,
 
     /// Configuration used for the ACME certificate request.
-    acme_config: Option<AcmeConfig>,
+    acme_account: Option<Arc<Account>>,
 
     /// Path to save the certificate to.
     path: Option<PathBuf>,
 }
 
 impl CertManager {
-    pub fn new(
+    pub async fn new(
         cluster: ClusterName,
         send_cert: Sender<Option<CertificatePair>>,
         cert_path: Option<&Path>,
@@ -153,12 +153,41 @@ impl CertManager {
 
         let (response_sender, _) = broadcast::channel(1);
 
+        let acme_account = if let Some(acme_config) = acme_config {
+            let client = if acme_config.accept_insecure_certs_for_testing {
+                tracing::warn!("ACME server certificate chain will not be validated! This is ONLY for testing, and should not be used otherwise.");
+                reqwest::Client::builder()
+                    .danger_accept_invalid_certs(true)
+                    .build()?
+            } else {
+                reqwest::Client::new()
+            };
+
+            let dir = DirectoryBuilder::new(acme_config.endpoint.to_string())
+                .http_client(client)
+                .build()
+                .await
+                .context("Building directory")?;
+
+            let mut builder = AccountBuilder::new(dir);
+            builder.contact(vec![format!("mailto:{}", acme_config.mailto_email)]);
+            if let Some(acme_eab_keypair) = acme_config.acme_eab_keypair.clone() {
+                let eab_key = openssl::pkey::PKey::hmac(&acme_eab_keypair.key_bytes()?)?;
+                builder.external_account_binding(acme_eab_keypair.key_id.clone(), eab_key);
+            }
+            builder.terms_of_service_agreed(true);
+            let account = builder.build().await.context("Building account")?;
+
+            Some(account)
+        } else {
+            None
+        };
+
         Ok(Self {
             cluster,
             send_cert: Arc::new(send_cert),
             refresh_loop: None,
-            acme_config,
-            // current_cert: Arc::new(RwLock::new(initial_cert)),
+            acme_account,
             path: cert_path.map(|p| p.to_owned()),
             response_sender,
         })
@@ -172,14 +201,14 @@ impl CertManager {
             handle.abort();
         }
 
-        if let Some(acme_config) = self.acme_config.as_ref() {
+        if let Some(account) = self.acme_account.as_ref() {
             let send_cert = self.send_cert.clone();
             let response_sender = self.response_sender.subscribe();
             let path = self.path.clone();
 
             let handle = tokio::spawn(refresh_loop(
+                account.clone(),
                 self.cluster.clone(),
-                acme_config.clone(),
                 send_cert,
                 sender,
                 response_sender,
@@ -198,7 +227,7 @@ impl CertManager {
 }
 
 /// Create a CertWatcher and CertManager pair.
-pub fn watcher_manager_pair(
+pub async fn watcher_manager_pair(
     cluster: ClusterName,
     path: Option<&Path>,
     acme_config: Option<AcmeConfig>,
@@ -206,7 +235,7 @@ pub fn watcher_manager_pair(
     let (send_cert, recv_cert) = tokio::sync::watch::channel::<Option<CertificatePair>>(None);
 
     let cert_watcher = CertWatcher::new(recv_cert);
-    let cert_manager = CertManager::new(cluster, send_cert, path, acme_config)?;
+    let cert_manager = CertManager::new(cluster, send_cert, path, acme_config).await?;
 
     Ok((cert_watcher, cert_manager))
 }
@@ -216,8 +245,8 @@ pub fn watcher_manager_pair(
 /// Otherwise, request a certificate lease from the cert manager, and then
 /// request a certificate from the ACME server.
 async fn refresh_loop_step(
+    account: Arc<Account>,
     cluster: &ClusterName,
-    acme_config: &AcmeConfig,
     send_cert: &Arc<Sender<Option<CertificatePair>>>,
     request_sender: &(impl Fn(CertManagerRequest) + Send + Sync + 'static),
     response_receiver: &mut broadcast::Receiver<CertManagerResponse>,
@@ -274,7 +303,7 @@ async fn refresh_loop_step(
 
     tracing::info!("Cert manager accepted cert lease request.");
 
-    let result = get_certificate(cluster, acme_config, request_sender, response_receiver).await;
+    let result = get_certificate(account, cluster, request_sender, response_receiver).await;
 
     match result {
         Ok(cert_pair) => {
@@ -294,8 +323,8 @@ async fn refresh_loop_step(
 }
 
 pub async fn refresh_loop(
+    account: Arc<Account>,
     cluster: ClusterName,
-    acme_config: AcmeConfig,
     send_cert: Arc<Sender<Option<CertificatePair>>>,
     request_sender: impl Fn(CertManagerRequest) + Send + Sync + 'static,
     mut response_receiver: broadcast::Receiver<CertManagerResponse>,
@@ -303,8 +332,8 @@ pub async fn refresh_loop(
 ) {
     loop {
         let result = refresh_loop_step(
+            account.clone(),
             &cluster,
-            &acme_config,
             &send_cert,
             &request_sender,
             &mut response_receiver,
@@ -319,36 +348,11 @@ pub async fn refresh_loop(
 }
 
 async fn get_certificate(
+    account: Arc<Account>,
     cluster: &ClusterName,
-    acme_config: &AcmeConfig,
     request_sender: &(impl Fn(CertManagerRequest) + Send + Sync + 'static),
     response_receiver: &mut broadcast::Receiver<CertManagerResponse>,
 ) -> anyhow::Result<CertificatePair> {
-    let client = if acme_config.accept_insecure_certs_for_testing {
-        tracing::warn!("ACME server certificate chain will not be validated! This is ONLY for testing, and should not be used otherwise.");
-        reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()?
-    } else {
-        reqwest::Client::new()
-    };
-
-    let dir = DirectoryBuilder::new(acme_config.endpoint.to_string())
-        .http_client(client)
-        .build()
-        .await
-        .context("Building directory")?;
-
-    let mut builder = AccountBuilder::new(dir);
-    // builder.private_key(...);
-    builder.contact(vec![format!("mailto:{}", acme_config.mailto_email)]);
-    if let Some(acme_eab_keypair) = acme_config.acme_eab_keypair.clone() {
-        let eab_key = openssl::pkey::PKey::hmac(&acme_eab_keypair.key_bytes()?)?;
-        builder.external_account_binding(acme_eab_keypair.key_id.clone(), eab_key);
-    }
-    builder.terms_of_service_agreed(true);
-    let account = builder.build().await.context("Building account")?;
-
     let mut builder = OrderBuilder::new(account);
     builder.add_dns_identifier(format!("{}", cluster));
     builder.add_dns_identifier(format!("*.{}", cluster)); // wildcard
