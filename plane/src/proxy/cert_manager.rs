@@ -375,7 +375,7 @@ async fn get_certificate(
             .context("Encoding authorization")?
             .context("No authorization value.")?;
 
-        tracing::info!(?txt_value, "Requesting TXT record from platform.");
+        tracing::info!(txt_value, "Requesting TXT record from platform.");
 
         request_sender(CertManagerRequest::SetTxtRecord { txt_value });
         tracing::info!("Waiting for response from cert manager.");
