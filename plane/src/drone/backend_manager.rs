@@ -289,7 +289,10 @@ impl BackendManager {
                                 status_code: 404,
                                 message,
                             }) => {
-                                tracing::warn!(err_msg=?message, "attempted to terminate backend that is already gone");
+                                tracing::warn!(
+                                    err_msg = message,
+                                    "attempted to terminate backend that is already gone"
+                                );
                                 break;
                             }
                             Err(err) => {

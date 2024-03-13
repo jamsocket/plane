@@ -1,12 +1,12 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::{fmt::Display, net::SocketAddr};
-
 use crate::{
     database::backend::BackendRow,
     log_types::{BackendAddr, LoggableTime},
 };
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{fmt::Display, net::SocketAddr};
+use valuable::Valuable;
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd, valuable::Valuable)]
 #[serde(rename_all = "lowercase")]
@@ -131,7 +131,7 @@ impl BackendState {
     ) -> BackendState {
         match self {
             BackendState::Terminating { .. } | BackendState::Terminated { .. } => {
-                tracing::warn!(?reason, ?termination, state=?self, "to_terminating called on terminating/terminated backend");
+                tracing::warn!(?reason, termination=termination.as_value(), state=?self, "to_terminating called on terminating/terminated backend");
                 self.clone()
             }
             _ => BackendState::Terminating {
