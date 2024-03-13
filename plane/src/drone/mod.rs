@@ -125,7 +125,6 @@ pub async fn drone_loop(
                     }
                 }
                 MessageToDrone::AckEvent { event_id } => {
-                    tracing::info!(event_id = event_id.as_value(), "Received status ack.");
                     if let Err(err) = executor.ack_event(event_id) {
                         tracing::error!(?err, "Error acking event.");
                     }

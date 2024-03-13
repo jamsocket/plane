@@ -130,9 +130,6 @@ impl ConnectionMonitorHandle {
                     };
 
                     if backend_entry.active_connections > 0 || backend_entry.had_recent_connection {
-                        // TODO: this is likely to be noisy, we should remove it once we're a bit more confident in the monitor.
-                        tracing::info!(?backend_entry, ?backend, "Heartbeat for backend.");
-
                         backend_entry.had_recent_connection = false;
 
                         if let Some(listener) = &monitor_lock.listener {
