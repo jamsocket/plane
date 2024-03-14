@@ -151,7 +151,7 @@ pub async fn process_pending_actions(
     let mut count = 0;
     for pending_action in db
         .backend_actions()
-        .pending_actions(drone_id.clone())
+        .pending_actions(*drone_id)
         .await?
     {
         let message = MessageToDrone::Action(pending_action);
