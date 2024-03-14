@@ -14,7 +14,7 @@ use crate::{
 };
 use anyhow::Result;
 use bollard::Docker;
-use chrono::Duration;
+use chrono::{Duration, Utc};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -99,6 +99,13 @@ pub async fn drone_loop(
                     );
 
                     if let BackendAction::Spawn { key, .. } = &action {
+                        if key.deadlines.soft_terminate_at.0 < Utc::now() {
+                            tracing::warn!(
+                                backend_id = backend_id.as_value(),
+                                "Received spawn request with deadline in the past. Ignoring."
+                            );
+                        }
+
                         // Register the key with the key manager, ensuring that it will be refreshed.
                         let result = key_manager
                             .lock()
