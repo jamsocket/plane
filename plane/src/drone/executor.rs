@@ -15,6 +15,7 @@ use std::{
     net::IpAddr,
     sync::{Arc, Mutex},
 };
+use valuable::Valuable;
 
 /// Clean up containers and images every minute.
 const CLEANUP_INTERVAL_SECS: i64 = 60;
@@ -183,6 +184,7 @@ impl Executor {
                     // We need to be careful here not to hold the lock when we call terminate, or
                     // else we can deadlock.
                     let Some(manager) = self.backends.get(backend_id) else {
+                        tracing::warn!(backend_id = backend_id.as_value(), "Backend not found when handling terminate action (assumed terminated).");
                         return Ok(());
                     };
                     manager.clone()
