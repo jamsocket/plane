@@ -22,7 +22,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
-use std::net::{IpAddr, SocketAddr};
+use std::{
+    net::{IpAddr, SocketAddr},
+    time::Duration,
+};
 use valuable::Valuable;
 
 #[derive(Deserialize)]
@@ -140,6 +143,29 @@ pub async fn sweep_loop(db: PlaneDatabase, drone_id: NodeId) {
     }
 }
 
+pub async fn process_pending_actions(
+    db: &PlaneDatabase,
+    socket: &mut TypedSocket<MessageToDrone>,
+    drone_id: &NodeId,
+) -> Result<(), anyhow::Error> {
+    let mut count = 0;
+    for pending_action in db
+        .backend_actions()
+        .pending_actions(drone_id.clone())
+        .await?
+    {
+        let message = MessageToDrone::Action(pending_action);
+        socket.send(message).await?;
+        count += 1;
+    }
+
+    if count > 0 {
+        tracing::info!(count, "Sent pending actions to drone.");
+    }
+
+    Ok(())
+}
+
 pub async fn drone_socket_inner(
     cluster: ClusterName,
     ws: WebSocket,
@@ -166,18 +192,16 @@ pub async fn drone_socket_inner(
     let mut backend_actions: Subscription<BackendActionMessage> =
         controller.db.subscribe_with_key(&drone_id.to_string());
 
-    for pending_action in controller
-        .db
-        .backend_actions()
-        .pending_actions(drone_id)
-        .await?
-    {
-        let message = MessageToDrone::Action(pending_action);
-        socket.send(message).await?;
-    }
+    process_pending_actions(&controller.db, &mut socket, &drone_id).await?;
+
+    let mut interval = tokio::time::interval(Duration::from_secs(5));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         tokio::select! {
+            _ = interval.tick() => {
+                process_pending_actions(&controller.db, &mut socket, &drone_id).await?;
+            }
             backend_action_result = backend_actions.next() => {
                 match backend_action_result {
                     Some(backend_action) => {
