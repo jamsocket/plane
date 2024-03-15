@@ -177,13 +177,28 @@ impl valuable::Mappable for BackendState {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum TerminationReason {
     Swept,
     External,
     KeyExpired,
     Lost,
+}
+
+impl valuable::Valuable for TerminationReason {
+    fn as_value(&self) -> valuable::Value {
+        match self {
+            TerminationReason::Swept => valuable::Value::String("swept"),
+            TerminationReason::External => valuable::Value::String("external"),
+            TerminationReason::KeyExpired => valuable::Value::String("key_expired"),
+            TerminationReason::Lost => valuable::Value::String("lost"),
+        }
+    }
+
+    fn visit(&self, visit: &mut dyn valuable::Visit) {
+        visit.visit_value(self.as_value())
+    }
 }
 
 impl BackendState {
