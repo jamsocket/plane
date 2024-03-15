@@ -22,6 +22,7 @@ use std::{
     net::IpAddr,
     sync::{Arc, Mutex, RwLock},
 };
+use tracing::Instrument;
 use valuable::Valuable;
 
 /// The backend manager uses a state machine internally to manage the state of the backend.
@@ -221,16 +222,23 @@ impl BackendManager {
                 let docker = self.docker.clone();
                 StepStatusResult::future_status(async move {
                     let image = &executor_config.image;
+                    let span = tracing::info_span!("pull", image = image.as_str());
                     let credentials: Option<DockerCredentials> =
                         executor_config.credentials.map(|creds| creds.into());
-                    tracing::info!(?image, "pulling...");
-                    if let Err(err) = docker.pull(image, credentials.as_ref(), force_pull).await {
-                        tracing::error!(?err, "failed to pull image");
-                        state.to_terminated(None)
-                    } else {
-                        tracing::info!("done pulling...");
-                        state.to_starting()
+
+                    async move {
+                        tracing::info!("pulling...");
+                        if let Err(err) = docker.pull(image, credentials.as_ref(), force_pull).await
+                        {
+                            tracing::error!(?err, "failed to pull image");
+                            state.to_terminated(None)
+                        } else {
+                            tracing::info!("done pulling...");
+                            state.to_starting()
+                        }
                     }
+                    .instrument(span)
+                    .await
                 })
             }
             BackendState::Starting => {
