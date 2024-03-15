@@ -389,7 +389,7 @@ impl<'a> BackendDatabase<'a> {
 
     pub async fn publish_metrics(&self, metrics: BackendMetricsMessage) -> sqlx::Result<()> {
         emit_ephemeral_with_key(
-            &mut *self.db.pool.acquire().await?,
+            &self.db.pool,
             &metrics.backend_id.to_string(),
             &metrics,
         )
