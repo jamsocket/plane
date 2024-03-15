@@ -70,9 +70,9 @@ impl Executor {
                 while let Some(event) = events.next().await {
                     if let Some((_, manager)) = backends.remove(&event.backend_id) {
                         tracing::info!(
-                            "Backend {} terminated with exit code {}.",
-                            event.backend_id,
-                            event.exit_code.unwrap_or(-1)
+                            backend_id = event.backend_id.as_value(),
+                            exit_code = event.exit_code.unwrap_or(-1),
+                            "Backend terminated.",
                         );
 
                         if let Err(err) = manager.mark_terminated(event.exit_code) {
