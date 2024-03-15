@@ -24,6 +24,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashMap, path::PathBuf};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
+use valuable::Valuable;
 
 pub mod commands;
 pub mod types;
@@ -116,12 +117,20 @@ impl PlaneDocker {
             let backend_id = match BackendName::try_from(backend_id.to_string()) {
                 Ok(backend_id) => backend_id,
                 Err(err) => {
-                    tracing::warn!(?err, backend_id, "Ignoring event with invalid backend ID.");
+                    tracing::warn!(
+                        ?err,
+                        backend_id = backend_id.as_value(),
+                        "Ignoring event with invalid backend ID."
+                    );
                     return None;
                 }
             };
 
-            tracing::info!(exit_code, "Received exit code");
+            tracing::info!(
+                exit_code,
+                backend_id = backend_id.as_value(),
+                "Received exit code"
+            );
 
             Some(TerminateEvent {
                 backend_id,

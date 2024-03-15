@@ -43,7 +43,7 @@ pub async fn pull_image(
     while let Some(next) = result.next().await {
         let info = next?;
         if let Some(progress) = info.progress_detail {
-            tracing::info!(?progress, "Image pull progress.");
+            tracing::debug!(?progress, "Image pull progress.");
         }
     }
 
