@@ -29,8 +29,11 @@ use tokio::{
     sync::oneshot::{self},
     task::JoinHandle,
 };
-use tower_http::{cors::{Any, CorsLayer}, trace::DefaultOnFailure};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::DefaultOnFailure,
+};
 use tracing::Level;
 use url::Url;
 
