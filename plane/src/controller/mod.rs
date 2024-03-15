@@ -29,8 +29,11 @@ use tokio::{
     sync::oneshot::{self},
     task::JoinHandle,
 };
-use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::DefaultOnFailure,
+};
 use tracing::Level;
 use url::Url;
 
@@ -158,8 +161,9 @@ impl ControllerServer {
 
         let trace_layer = TraceLayer::new_for_http()
             .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-            .on_request(DefaultOnRequest::new().level(Level::INFO))
-            .on_response(DefaultOnResponse::new().level(Level::INFO));
+            .on_request(DefaultOnRequest::new().level(Level::DEBUG))
+            .on_failure(DefaultOnFailure::new().level(Level::WARN))
+            .on_response(DefaultOnResponse::new().level(Level::DEBUG));
 
         let heartbeat_handle = HeartbeatSender::start(db.clone(), id.clone()).await?;
 

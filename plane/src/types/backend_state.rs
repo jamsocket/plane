@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::{fmt::Display, net::SocketAddr};
 use valuable::Valuable;
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd, valuable::Valuable)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd)]
 #[serde(rename_all = "lowercase")]
 pub enum BackendStatus {
     /// The backend has been scheduled to a drone, but has not yet been acknowledged.
@@ -36,6 +36,24 @@ pub enum BackendStatus {
     Terminated,
 }
 
+impl valuable::Valuable for BackendStatus {
+    fn as_value(&self) -> valuable::Value {
+        match self {
+            BackendStatus::Scheduled => valuable::Value::String("scheduled"),
+            BackendStatus::Loading => valuable::Value::String("loading"),
+            BackendStatus::Starting => valuable::Value::String("starting"),
+            BackendStatus::Waiting => valuable::Value::String("waiting"),
+            BackendStatus::Ready => valuable::Value::String("ready"),
+            BackendStatus::Terminating => valuable::Value::String("terminating"),
+            BackendStatus::Terminated => valuable::Value::String("terminated"),
+        }
+    }
+
+    fn visit(&self, visit: &mut dyn valuable::Visit) {
+        visit.visit_value(self.as_value())
+    }
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
 #[serde(rename_all = "lowercase")]
 pub enum TerminationKind {
@@ -43,7 +61,7 @@ pub enum TerminationKind {
     Hard,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "status", rename_all = "lowercase")]
 pub enum BackendState {
     Scheduled,
@@ -68,13 +86,119 @@ pub enum BackendState {
     },
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, valuable::Valuable)]
+impl valuable::Valuable for BackendState {
+    fn as_value(&self) -> valuable::Value {
+        valuable::Value::Mappable(self)
+    }
+
+    fn visit(&self, visit: &mut dyn valuable::Visit) {
+        match self {
+            BackendState::Scheduled => visit.visit_entry(
+                valuable::Value::String("status"),
+                valuable::Value::String("scheduled"),
+            ),
+            BackendState::Loading => visit.visit_entry(
+                valuable::Value::String("status"),
+                valuable::Value::String("loading"),
+            ),
+            BackendState::Starting => visit.visit_entry(
+                valuable::Value::String("status"),
+                valuable::Value::String("starting"),
+            ),
+            BackendState::Waiting { address } => {
+                visit.visit_entry(
+                    valuable::Value::String("status"),
+                    valuable::Value::String("waiting"),
+                );
+                visit.visit_entry(valuable::Value::String("address"), address.as_value());
+            }
+            BackendState::Ready { address } => {
+                visit.visit_entry(
+                    valuable::Value::String("status"),
+                    valuable::Value::String("ready"),
+                );
+                visit.visit_entry(valuable::Value::String("address"), address.as_value());
+            }
+            BackendState::Terminating {
+                last_status,
+                termination,
+                reason,
+            } => {
+                visit.visit_entry(
+                    valuable::Value::String("status"),
+                    valuable::Value::String("terminating"),
+                );
+                visit.visit_entry(
+                    valuable::Value::String("last_status"),
+                    last_status.as_value(),
+                );
+                visit.visit_entry(
+                    valuable::Value::String("termination"),
+                    termination.as_value(),
+                );
+                visit.visit_entry(valuable::Value::String("reason"), reason.as_value());
+            }
+            BackendState::Terminated {
+                last_status,
+                termination,
+                reason,
+                exit_code,
+            } => {
+                visit.visit_entry(
+                    valuable::Value::String("status"),
+                    valuable::Value::String("terminated"),
+                );
+                visit.visit_entry(
+                    valuable::Value::String("last_status"),
+                    last_status.as_value(),
+                );
+                visit.visit_entry(
+                    valuable::Value::String("termination"),
+                    termination.as_value(),
+                );
+                visit.visit_entry(valuable::Value::String("reason"), reason.as_value());
+                visit.visit_entry(valuable::Value::String("exit_code"), exit_code.as_value());
+            }
+        }
+    }
+}
+
+impl valuable::Mappable for BackendState {
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            BackendState::Scheduled => (1, Some(1)),
+            BackendState::Loading => (1, Some(1)),
+            BackendState::Starting => (1, Some(1)),
+            BackendState::Waiting { .. } => (2, Some(2)),
+            BackendState::Ready { .. } => (1, Some(2)),
+            BackendState::Terminating { .. } => (1, Some(4)),
+            BackendState::Terminated { .. } => (2, Some(5)),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum TerminationReason {
     Swept,
     External,
     KeyExpired,
     Lost,
+}
+
+impl valuable::Valuable for TerminationReason {
+    fn as_value(&self) -> valuable::Value {
+        match self {
+            TerminationReason::Swept => valuable::Value::String("swept"),
+            TerminationReason::External => valuable::Value::String("external"),
+            TerminationReason::KeyExpired => valuable::Value::String("key_expired"),
+            TerminationReason::Lost => valuable::Value::String("lost"),
+        }
+    }
+
+    fn visit(&self, visit: &mut dyn valuable::Visit) {
+        visit.visit_value(self.as_value())
+    }
 }
 
 impl BackendState {
