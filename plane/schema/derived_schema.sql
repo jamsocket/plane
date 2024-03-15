@@ -887,6 +887,13 @@ CREATE INDEX idx_backend_action_backend ON public.backend_action USING btree (ba
 
 
 --
+-- Name: idx_backend_action_created_at; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_backend_action_created_at ON public.backend_action USING btree (created_at);
+
+
+--
 -- Name: idx_backend_action_pending; Type: INDEX; Schema: public; Owner: postgres
 --
 
