@@ -244,9 +244,9 @@ impl PlaneDocker {
             {
                 Ok(result) => {
                     let num_images_deleted = result.images_deleted.map(|d| d.len()).unwrap_or(0);
-                    tracing::info!(num_images_deleted, "Removed dangling images.");
+                    tracing::info!(num_images_deleted, "Pruning images.");
                 }
-                Err(e) => tracing::error!(?e, "Error pruning dangling images."),
+                Err(e) => tracing::error!(?e, "Error pruning images."),
             }
         }
 
