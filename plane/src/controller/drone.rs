@@ -118,6 +118,7 @@ pub async fn sweep_loop(db: PlaneDatabase, drone_id: NodeId) {
         for candidate in candidates {
             tracing::info!(
                 backend_id = %candidate.backend_id,
+                drone_id = %drone_id,
                 expiration_time = ?candidate.expiration_time,
                 allowed_idle_seconds = ?candidate.allowed_idle_seconds,
                 as_of = ?candidate.as_of,
