@@ -3,6 +3,7 @@ use self::{
     backend::BackendDatabase,
     backend_actions::BackendActionDatabase,
     backend_key::KeysDatabase,
+    cluster::ClusterDatabase,
     connect::ConnectError,
     controller::ControllerDatabase,
     drone::DroneDatabase,
@@ -22,6 +23,7 @@ pub mod acme;
 pub mod backend;
 pub mod backend_actions;
 pub mod backend_key;
+pub mod cluster;
 pub mod connect;
 pub mod controller;
 pub mod drone;
@@ -60,6 +62,10 @@ impl PlaneDatabase {
 
     pub fn drone(&self) -> DroneDatabase {
         DroneDatabase::new(&self.pool)
+    }
+
+    pub fn cluster(&self) -> ClusterDatabase {
+        ClusterDatabase::new(&self.pool)
     }
 
     pub fn node(&self) -> NodeDatabase {
