@@ -174,7 +174,7 @@ impl Executor {
                     key.clone(),
                     static_token.clone(),
                 );
-                tracing::info!("Inserting backend {}.", backend_id);
+                tracing::info!(backend_id = backend_id.as_value(), "Inserting backend.");
                 self.backends.insert(backend_id.clone(), manager);
             }
             BackendAction::Terminate { kind, reason } => {
