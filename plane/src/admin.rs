@@ -264,8 +264,18 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             }
         }
         AdminCommand::Drain { cluster, drone } => {
-            client.drain(&cluster, &drone).await?;
-            println!("Sent drain signal to {}", drone.to_string().bright_green());
+            let result = client.drain(&cluster, &drone).await?;
+            if result.updated {
+                println!(
+                    "Drone {} draining initiated.",
+                    drone.to_string().bright_green()
+                );
+            } else {
+                println!(
+                    "Drone {} was already draining.",
+                    drone.to_string().bright_green()
+                );
+            }
         }
         AdminCommand::Status => {
             let status = client.status().await?;

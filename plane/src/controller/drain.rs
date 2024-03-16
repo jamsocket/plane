@@ -1,5 +1,8 @@
 use super::{core::Controller, error::IntoApiError};
-use crate::{names::DroneName, types::ClusterName};
+use crate::{
+    names::DroneName,
+    types::{ClusterName, DrainResult},
+};
 use axum::{
     extract::{Path, State},
     response::Response,
@@ -10,7 +13,7 @@ async fn drain(
     controller: &Controller,
     cluster: &ClusterName,
     drone: &DroneName,
-) -> Result<(), Response> {
+) -> Result<DrainResult, Response> {
     let drone_id = controller
         .db
         .node()
@@ -21,7 +24,7 @@ async fn drain(
 
     println!("Draining drone with id {}", drone_id);
 
-    controller
+    let updated = controller
         .db
         .drone()
         .drain(drone_id)
@@ -30,13 +33,13 @@ async fn drain(
 
     println!("Done");
 
-    Ok(())
+    Ok(DrainResult { updated })
 }
 
 pub async fn handle_drain(
     Path((cluster, drone)): Path<(ClusterName, DroneName)>,
     State(controller): State<Controller>,
-) -> Result<Json<()>, Response> {
-    drain(&controller, &cluster, &drone).await?;
-    Ok(Json(()))
+) -> Result<Json<DrainResult>, Response> {
+    let result = drain(&controller, &cluster, &drone).await?;
+    Ok(Json(result))
 }

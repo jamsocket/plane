@@ -408,3 +408,8 @@ pub struct RevokeRequest {
     pub backend_id: BackendName,
     pub user: String,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DrainResult {
+    pub updated: bool,
+}
