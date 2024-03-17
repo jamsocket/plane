@@ -23,6 +23,7 @@ use axum::{
     routing::{get, post},
     Json, Router, Server,
 };
+use futures_util::never::Never;
 use serde::{Deserialize, Serialize};
 use std::net::{SocketAddr, TcpListener};
 use tokio::{
@@ -64,7 +65,7 @@ pub async fn status() -> Json<StatusResponse> {
 }
 
 struct HeartbeatSender {
-    handle: JoinHandle<Result<()>>,
+    handle: JoinHandle<Never>,
     db: PlaneDatabase,
     controller_id: ControllerName,
 }
@@ -76,13 +77,16 @@ impl HeartbeatSender {
 
         let db_clone = db.clone();
         let controller_id_clone = controller_id.clone();
-        let handle = tokio::spawn(async move {
+        let handle: JoinHandle<Never> = tokio::spawn(async move {
             loop {
                 tokio::time::sleep(HEARTBEAT_INTERVAL).await;
-                db_clone
+                if let Err(err) = db_clone
                     .controller()
                     .heartbeat(&controller_id_clone, true)
-                    .await?;
+                    .await
+                {
+                    tracing::error!(?err, "Failed to send heartbeat");
+                }
             }
         });
 
