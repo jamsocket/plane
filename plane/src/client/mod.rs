@@ -5,8 +5,8 @@ use crate::{
     protocol::{MessageFromDns, MessageFromDrone, MessageFromProxy},
     typed_socket::client::TypedSocketConnector,
     types::{
-        backend_state::BackendStatusStreamEntry, ClusterName, ConnectRequest, ConnectResponse,
-        RevokeRequest,
+        backend_state::BackendStatusStreamEntry, ClusterName, ClusterState, ConnectRequest,
+        ConnectResponse, RevokeRequest,
     },
 };
 use reqwest::{Response, StatusCode};
@@ -181,6 +181,19 @@ impl PlaneClient {
 
         let stream = sse::sse_request(url, self.client.clone()).await?;
         Ok(stream)
+    }
+
+    pub async fn cluster_state_url(
+        &self,
+        cluster: &ClusterName,
+    ) -> Result<ClusterState, PlaneClientError> {
+        let url = self
+            .controller_address
+            .join(&format!("/ctrl/c/{}/state", cluster))
+            .url;
+        let response = self.client.get(url).send().await?;
+        let cluster_state: ClusterState = get_response(response).await?;
+        Ok(cluster_state)
     }
 }
 

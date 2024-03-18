@@ -1,5 +1,6 @@
 use self::{
     backend_state::{handle_backend_status, handle_backend_status_stream},
+    cluster_state::handle_cluster_state,
     connect::handle_revoke,
     dns::handle_dns_socket,
     drain::handle_drain,
@@ -39,6 +40,7 @@ use tracing::Level;
 use url::Url;
 
 mod backend_state;
+mod cluster_state;
 pub mod command;
 mod connect;
 mod core;
@@ -178,6 +180,7 @@ impl ControllerServer {
         // barrier (such as a reverse proxy) in front.
         let control_routes = Router::new()
             .route("/status", get(status))
+            .route("/c/:cluster/state", get(handle_cluster_state))
             .route("/c/:cluster/drone-socket", get(handle_drone_socket))
             .route("/c/:cluster/proxy-socket", get(handle_proxy_socket))
             .route("/dns-socket", get(handle_dns_socket))

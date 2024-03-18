@@ -1,5 +1,6 @@
 use crate::types::NodeKind;
 use clap::error::ErrorKind;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 
 const MAX_NAME_LENGTH: usize = 45;
@@ -180,7 +181,7 @@ impl NodeName for AcmeDnsServerName {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AnyNodeName {
     Proxy(ProxyName),
     Drone(DroneName),
