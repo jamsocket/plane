@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select\n                node.name as \"name!\",\n                node.kind as \"node_kind!\",\n                node.plane_version as \"plane_version!\",\n                node.plane_hash as \"plane_hash!\",\n                node.controller as \"controller!\",\n                drone.ready as \"ready?\",\n                drone.draining as \"draining?\",\n                drone.last_heartbeat as \"last_drone_heartbeat\",\n                controller.last_heartbeat as \"last_controller_heartbeat!\",\n                now() as \"as_of!\",\n                (\n                    select count(1)\n                    from backend\n                    where backend.drone_id = drone.id\n                    and backend.last_status != 'terminated'\n                ) as \"backend_count\"\n            from node\n            left join drone on node.id = drone.id\n            left join controller on node.controller = controller.id\n            where node.cluster = $1\n            and node.controller is not null\n            order by node.id asc\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "node_kind!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "plane_version!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "plane_hash!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "controller!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "ready?",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "draining?",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "last_drone_heartbeat",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "last_controller_heartbeat!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "as_of!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "backend_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "e6993a776946e0ab0208e6f82662dbbc9de363bbfd2709df114b6aaf4d32d3ef"
+}

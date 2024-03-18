@@ -5,10 +5,12 @@ use crate::{
     names::{BackendName, DroneName, Name, ProxyName},
     protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
     types::{
-        BackendStatus, ClusterName, ConnectRequest, ExecutorConfig, KeyConfig, Mount, SpawnConfig,
+        BackendStatus, ClusterName, ClusterState, ConnectRequest, ExecutorConfig, KeyConfig, Mount,
+        NodeState, SpawnConfig,
     },
     PLANE_GIT_HASH, PLANE_VERSION,
 };
+use chrono::Duration;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use url::Url;
@@ -148,6 +150,9 @@ pub enum AdminCommand {
         cluster: ClusterName,
     },
     Status,
+    ClusterState {
+        cluster: ClusterName,
+    },
 }
 
 pub async fn run_admin_command(opts: AdminOpts) {
@@ -353,7 +358,58 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                 _ => panic!("Unexpected response"),
             }
         }
+        AdminCommand::ClusterState { cluster } => {
+            let cluster_state = client.cluster_state_url(&cluster).await?;
+            show_cluster_state(&cluster_state);
+        }
     };
 
     Ok(())
+}
+
+pub fn show_node_state(node: &NodeState) {
+    println!("  {}", node.name.to_string().bright_magenta());
+    println!("    Plane version: {}", node.plane_version);
+    println!("    Plane hash: {}", node.plane_hash);
+    println!("    Controller: {}", node.controller);
+    println!(
+        "    Controller heartbeat age: {}",
+        friendly_duration(node.controller_heartbeat_age)
+    );
+}
+
+pub fn show_cluster_state(cluster_state: &ClusterState) {
+    println!("{}", "Drones:".bright_yellow());
+    for drone in &cluster_state.drones {
+        show_node_state(&drone.node);
+        println!("    Ready: {}", drone.ready);
+        println!("    Draining: {}", drone.draining);
+        println!("    Backend count: {}", drone.backend_count);
+        println!(
+            "    Last heartbeat age: {}",
+            friendly_duration(drone.last_heartbeat_age)
+        );
+    }
+
+    println!("{}", "Proxies:".bright_yellow());
+    for proxy in &cluster_state.proxies {
+        show_node_state(&proxy);
+    }
+}
+
+pub fn friendly_duration(duration: Duration) -> String {
+    let seconds = duration.num_seconds();
+    let minutes = seconds / 60;
+    let hours = minutes / 60;
+    let days = hours / 24;
+
+    if days > 0 {
+        format!("{}d", days)
+    } else if hours > 0 {
+        format!("{}h", hours)
+    } else if minutes > 0 {
+        format!("{}m", minutes)
+    } else {
+        format!("{}s", seconds)
+    }
 }

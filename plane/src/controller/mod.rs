@@ -1,5 +1,6 @@
 use self::{
     backend_state::{handle_backend_status, handle_backend_status_stream},
+    cluster_state::handle_cluster_state,
     connect::handle_revoke,
     dns::handle_dns_socket,
     drain::handle_drain,
@@ -23,6 +24,7 @@ use axum::{
     routing::{get, post},
     Json, Router, Server,
 };
+use futures_util::never::Never;
 use serde::{Deserialize, Serialize};
 use std::net::{SocketAddr, TcpListener};
 use tokio::{
@@ -38,6 +40,7 @@ use tracing::Level;
 use url::Url;
 
 mod backend_state;
+mod cluster_state;
 pub mod command;
 mod connect;
 mod core;
@@ -64,7 +67,7 @@ pub async fn status() -> Json<StatusResponse> {
 }
 
 struct HeartbeatSender {
-    handle: JoinHandle<Result<()>>,
+    handle: JoinHandle<Never>,
     db: PlaneDatabase,
     controller_id: ControllerName,
 }
@@ -76,13 +79,16 @@ impl HeartbeatSender {
 
         let db_clone = db.clone();
         let controller_id_clone = controller_id.clone();
-        let handle = tokio::spawn(async move {
+        let handle: JoinHandle<Never> = tokio::spawn(async move {
             loop {
                 tokio::time::sleep(HEARTBEAT_INTERVAL).await;
-                db_clone
+                if let Err(err) = db_clone
                     .controller()
                     .heartbeat(&controller_id_clone, true)
-                    .await?;
+                    .await
+                {
+                    tracing::error!(?err, "Failed to send heartbeat");
+                }
             }
         });
 
@@ -174,6 +180,7 @@ impl ControllerServer {
         // barrier (such as a reverse proxy) in front.
         let control_routes = Router::new()
             .route("/status", get(status))
+            .route("/c/:cluster/state", get(handle_cluster_state))
             .route("/c/:cluster/drone-socket", get(handle_drone_socket))
             .route("/c/:cluster/proxy-socket", get(handle_proxy_socket))
             .route("/dns-socket", get(handle_dns_socket))

@@ -1,10 +1,11 @@
 use crate::{
     client::PlaneClient,
-    names::{BackendName, DroneName},
+    names::{AnyNodeName, BackendName, ControllerName, DroneName},
     util::{random_prefixed_string, random_token},
 };
 pub use backend_state::{BackendState, BackendStatus, TerminationKind, TerminationReason};
 use bollard::auth::DockerCredentials;
+use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr};
@@ -412,4 +413,30 @@ pub struct RevokeRequest {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DrainResult {
     pub updated: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct DroneState {
+    pub ready: bool,
+    pub draining: bool,
+    #[serde(with = "crate::serialization::serialize_duration_as_seconds")]
+    pub last_heartbeat_age: Duration,
+    pub backend_count: u32,
+    pub node: NodeState,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct NodeState {
+    pub name: AnyNodeName,
+    pub plane_version: String,
+    pub plane_hash: String,
+    pub controller: ControllerName,
+    #[serde(with = "crate::serialization::serialize_duration_as_seconds")]
+    pub controller_heartbeat_age: Duration,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ClusterState {
+    pub drones: Vec<DroneState>,
+    pub proxies: Vec<NodeState>,
 }
