@@ -34,22 +34,27 @@ impl<'a> DroneDatabase<'a> {
         Ok(())
     }
 
-    pub async fn drain(&self, id: NodeId) -> sqlx::Result<()> {
+    pub async fn drain(&self, id: NodeId) -> sqlx::Result<bool> {
         let result = query!(
             r#"
             update drone
             set draining = true
             where id = $1
+            returning (
+                select draining
+                from drone
+                where id = $1
+            ) as "was_draining!"
             "#,
             id.as_i32(),
         )
-        .execute(self.pool)
+        .fetch_optional(self.pool)
         .await?;
 
-        if result.rows_affected() == 0 {
-            Err(sqlx::Error::RowNotFound)
+        if let Some(was_draining) = result {
+            Ok(!was_draining.was_draining)
         } else {
-            Ok(())
+            Err(sqlx::Error::RowNotFound)
         }
     }
 

@@ -410,6 +410,11 @@ pub struct RevokeRequest {
     pub user: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DrainResult {
+    pub updated: bool,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DroneState {
     pub ready: bool,
