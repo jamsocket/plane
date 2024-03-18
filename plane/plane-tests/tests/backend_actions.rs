@@ -24,6 +24,7 @@ fn connect_request(cluster: &ClusterName) -> ConnectRequest {
             lifetime_limit_seconds: None,
             max_idle_seconds: None,
             use_static_token: false,
+            subdomain: None,
         }),
         ..Default::default()
     }

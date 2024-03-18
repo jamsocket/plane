@@ -38,6 +38,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
             lifetime_limit_seconds: None,
             max_idle_seconds: None,
             use_static_token: false,
+            subdomain: None,
         }),
         key: None,
         user: None,
