@@ -143,6 +143,20 @@ impl RequestHandler {
                 .body(hyper::Body::empty())?);
         };
 
+        let host_header_matches_subdomain = match request_rewriter.get_subdomain() {
+            Ok(request_subdomain) => {
+                let known_subdomain = route_info.subdomain.as_deref();
+                tracing::info!(?request_subdomain, ?known_subdomain, "Comparing subdomains");
+                request_subdomain == known_subdomain
+            }
+            Err(_) => false, // host header fails to parse (non-ascii)
+        };
+        if !host_header_matches_subdomain {
+            return Ok(hyper::Response::builder()
+                .status(hyper::StatusCode::UNAUTHORIZED)
+                .body(hyper::Body::from("Invalid subdomain"))?);
+        }
+
         let backend_id = route_info.backend_id.clone();
         request_rewriter.set_authority(route_info.address.0);
 

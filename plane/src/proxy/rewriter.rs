@@ -1,6 +1,7 @@
 use super::ForwardableRequestInfo;
 use crate::{protocol::RouteInfo, types::BearerToken};
 use hyper::{
+    header::{ToStrError, HOST},
     http::{request, uri},
     Body, HeaderMap, Request, Uri,
 };
@@ -59,6 +60,19 @@ impl RequestRewriter {
 
     pub fn bearer_token(&self) -> &BearerToken {
         &self.bearer_token
+    }
+
+    pub fn get_host_header(&self) -> Option<&HeaderValue> {
+        self.parts.headers.get(HOST)
+    }
+
+    pub fn get_subdomain(&self) -> Result<Option<&str>, ToStrError> {
+        Ok(self
+            .get_host_header()
+            .map(|h| h.to_str())
+            .transpose()?
+            .and_then(|h| h.rsplit_once('.'))
+            .map(|(before_domain_part, _)| before_domain_part))
     }
 
     fn into_parts(self) -> (request::Parts, Body, Uri, ForwardableRequestInfo) {
