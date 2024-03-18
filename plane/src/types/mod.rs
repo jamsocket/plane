@@ -228,6 +228,8 @@ pub struct SpawnConfig {
     /// time instead of dynamic tokens for each user.
     #[serde(default)]
     pub use_static_token: bool,
+
+    pub subdomain: Option<String>,
 }
 
 #[derive(
@@ -338,6 +340,9 @@ pub struct ConnectResponse {
 
     pub url: String,
 
+    /// Subdomain associated with the backend, if any.
+    pub subdomain: Option<String>,
+
     pub secret_token: Option<SecretToken>,
 
     pub status_url: String,
@@ -355,13 +360,15 @@ impl ConnectResponse {
         status: BackendStatus,
         token: BearerToken,
         secret_token: Option<SecretToken>,
+        subdomain: Option<String>,
         client: &PlaneClient,
         drone: Option<DroneName>,
     ) -> Self {
-        let url = if cluster.is_https() {
-            format!("https://{}/{}/", cluster, token)
+        let protocol = if cluster.is_https() { "https" } else { "http" };
+        let url = if let Some(subdomain) = &subdomain {
+            format!("{}://{}.{}/{}/", protocol, subdomain, cluster, token)
         } else {
-            format!("http://{}/{}/", cluster, token)
+            format!("{}://{}/{}/", protocol, cluster, token)
         };
 
         let status_url = client.backend_status_url(&backend_id).to_string();
@@ -372,6 +379,7 @@ impl ConnectResponse {
             status,
             token,
             url,
+            subdomain,
             secret_token,
             status_url,
             drone,

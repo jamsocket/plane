@@ -106,7 +106,8 @@ CREATE TABLE public.backend (
     last_keepalive timestamp with time zone NOT NULL,
     allowed_idle_seconds integer,
     state jsonb NOT NULL,
-    static_token character varying(256)
+    static_token character varying(256),
+    subdomain character varying(255)
 );
 
 
@@ -180,6 +181,13 @@ COMMENT ON COLUMN public.backend.allowed_idle_seconds IS 'The number of seconds 
 --
 
 COMMENT ON COLUMN public.backend.state IS 'The most recent state of the backend.';
+
+
+--
+-- Name: COLUMN backend.subdomain; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend.subdomain IS 'Optional subdomain for session backend';
 
 
 --

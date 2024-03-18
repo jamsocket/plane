@@ -127,6 +127,10 @@ pub enum AdminCommand {
         /// the host if it doesn't exist already.
         #[clap(long)]
         mount: Option<PathBuf>,
+
+        /// Optionally specify a subdomain for this backend.
+        #[clap(long)]
+        subdomain: Option<String>,
     },
     Terminate {
         #[clap(long)]
@@ -176,6 +180,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             static_token,
             pool,
             mount,
+            subdomain,
         } => {
             let mut executor_config = ExecutorConfig::from_image_with_defaults(image);
             executor_config.mount = mount.map(Mount::Path);
@@ -187,6 +192,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                 lifetime_limit_seconds: None,
                 max_idle_seconds: Some(max_idle_seconds),
                 use_static_token: static_token,
+                subdomain,
             };
             let key_config = key.map(|name| KeyConfig {
                 name,
