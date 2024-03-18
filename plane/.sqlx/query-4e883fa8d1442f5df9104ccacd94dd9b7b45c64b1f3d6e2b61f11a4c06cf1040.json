@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            select\n                id,\n                last_status,\n                cluster_address\n            from backend\n            where backend.static_token = $1\n            limit 1\n            ",
+  "query": "\n            select\n                id,\n                last_status,\n                cluster_address,\n                subdomain\n            from backend\n            where backend.static_token = $1\n            limit 1\n            ",
   "describe": {
     "columns": [
       {
@@ -17,6 +17,11 @@
         "ordinal": 2,
         "name": "cluster_address",
         "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "subdomain",
+        "type_info": "Varchar"
       }
     ],
     "parameters": {
@@ -27,8 +32,9 @@
     "nullable": [
       false,
       false,
+      true,
       true
     ]
   },
-  "hash": "6ac964c8cac15f98aeb0c7d188ee0a139239275028b1cc6cfdbd26c563deaa10"
+  "hash": "4e883fa8d1442f5df9104ccacd94dd9b7b45c64b1f3d6e2b61f11a4c06cf1040"
 }

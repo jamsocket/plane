@@ -283,7 +283,8 @@ impl<'a> BackendDatabase<'a> {
             select
                 id,
                 last_status,
-                cluster_address
+                cluster_address,
+                subdomain
             from backend
             where backend.static_token = $1
             limit 1
@@ -313,6 +314,7 @@ impl<'a> BackendDatabase<'a> {
             secret_token: SecretToken::from("".to_string()),
             user: None,
             user_data: None,
+            subdomain: result.subdomain,
         }))
     }
 
@@ -332,7 +334,8 @@ impl<'a> BackendDatabase<'a> {
                 auth,
                 last_status,
                 cluster_address,
-                secret_token
+                secret_token,
+                subdomain
             from token
             left join backend
             on backend.id = token.backend_id
@@ -364,6 +367,7 @@ impl<'a> BackendDatabase<'a> {
             secret_token: SecretToken::from(result.secret_token),
             user: result.username,
             user_data: Some(result.auth),
+            subdomain: result.subdomain,
         }))
     }
 

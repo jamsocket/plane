@@ -181,6 +181,14 @@ impl RequestHandler {
             return Err(ProxyError::InvalidConnectionToken);
         };
 
+        // If the host header doesn't parse (non-ascii) or doesn't match the backend's stored subdomain, return an error
+        if !matches!(request_rewriter.get_subdomain(), Ok(request_subdomain) if request_subdomain == route_info.subdomain.as_deref())
+        {
+            return Ok(hyper::Response::builder()
+                .status(hyper::StatusCode::UNAUTHORIZED)
+                .body(hyper::Body::from("Invalid subdomain"))?);
+        }
+
         let backend_id = route_info.backend_id.clone();
         request_rewriter.set_authority(route_info.address.0);
 

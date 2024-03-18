@@ -133,6 +133,7 @@ pub struct RouteInfo {
     pub secret_token: SecretToken,
     pub user: Option<String>,
     pub user_data: Option<serde_json::Value>,
+    pub subdomain: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
