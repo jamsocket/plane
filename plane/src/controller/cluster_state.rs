@@ -1,4 +1,4 @@
-use super::core::Controller;
+use super::{core::Controller, error::IntoApiError};
 use crate::types::{ClusterName, ClusterState};
 use axum::{
     extract::{Path, State},
@@ -15,7 +15,7 @@ pub async fn handle_cluster_state(
         .cluster()
         .cluster_state(&cluster_name)
         .await
-        .unwrap();
+        .or_internal_error("Database error")?;
 
     Ok(Json(result))
 }

@@ -2,7 +2,6 @@ use crate::{
     names::{AnyNodeName, ControllerName},
     types::{ClusterName, ClusterState, DroneState, NodeState},
 };
-use anyhow::Context;
 use sqlx::PgPool;
 
 pub struct ClusterDatabase<'a> {
@@ -14,7 +13,7 @@ impl<'a> ClusterDatabase<'a> {
         Self { pool }
     }
 
-    pub async fn cluster_state(&self, cluster: &ClusterName) -> anyhow::Result<ClusterState> {
+    pub async fn cluster_state(&self, cluster: &ClusterName) -> sqlx::Result<ClusterState> {
         // TODO: store created timestamp of nodes and use that for order.
         let result = sqlx::query!(
             r#"
@@ -54,26 +53,33 @@ impl<'a> ClusterDatabase<'a> {
             let controller_heartbeat_age = node.as_of - node.last_controller_heartbeat;
 
             let node_state = NodeState {
-                name: AnyNodeName::try_from(node.name)?,
+                name: AnyNodeName::try_from(node.name)
+                    .map_err(|_| sqlx::Error::Decode("Failed to decode node name.".into()))?,
                 plane_version: node.plane_version,
                 plane_hash: node.plane_hash,
-                controller: ControllerName::try_from(node.controller)?,
+                controller: ControllerName::try_from(node.controller)
+                    .map_err(|_| sqlx::Error::Decode("Failed to decode controller name.".into()))?,
                 controller_heartbeat_age,
             };
 
             match node.node_kind.as_str() {
                 "Drone" => {
                     let drone_state = DroneState {
-                        ready: node.ready.context("Drone should have ready")?,
-                        draining: node.draining.context("Drone should have draining")?,
-                        backend_count: node
-                            .backend_count
-                            .context("Drone should have backend_count")?
-                            as u32,
+                        ready: node.ready.ok_or_else(|| {
+                            sqlx::Error::Decode("Drone should have ready column.".into())
+                        })?,
+                        draining: node.draining.ok_or_else(|| {
+                            sqlx::Error::Decode("Drone should have draining column.".into())
+                        })?,
+                        backend_count: node.backend_count.ok_or_else(|| {
+                            sqlx::Error::Decode("Drone should have backend_count column.".into())
+                        })? as u32,
                         last_heartbeat_age: node.as_of
-                            - node
-                                .last_drone_heartbeat
-                                .context("Drone should have last_heartbeat")?,
+                            - node.last_drone_heartbeat.ok_or_else(|| {
+                                sqlx::Error::Decode(
+                                    "Drone should have last_heartbeat column.".into(),
+                                )
+                            })?,
                         node: node_state,
                     };
                     drones.push(drone_state);

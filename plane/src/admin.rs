@@ -393,7 +393,7 @@ pub fn show_cluster_state(cluster_state: &ClusterState) {
 
     println!("{}", "Proxies:".bright_yellow());
     for proxy in &cluster_state.proxies {
-        show_node_state(&proxy);
+        show_node_state(proxy);
     }
 }
 
