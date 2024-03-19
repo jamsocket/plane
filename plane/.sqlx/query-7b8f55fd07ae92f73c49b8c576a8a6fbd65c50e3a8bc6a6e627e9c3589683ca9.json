@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update node\n            set controller = null\n            where id = $1\n            and controller = $2\n            and last_connection_start_time = $3\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7b8f55fd07ae92f73c49b8c576a8a6fbd65c50e3a8bc6a6e627e9c3589683ca9"
+}

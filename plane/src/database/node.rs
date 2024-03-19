@@ -9,6 +9,7 @@ use crate::{
     PlaneVersionInfo,
 };
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{postgres::types::PgInterval, query, types::ipnetwork::IpNetwork, PgPool};
 use std::{net::IpAddr, time::Duration};
@@ -62,20 +63,30 @@ impl<'a> NodeDatabase<'a> {
         controller: &ControllerName,
         version: &PlaneVersionInfo,
         ip: IpAddr,
-    ) -> sqlx::Result<NodeId> {
+    ) -> sqlx::Result<(NodeId, DateTime<Utc>)> {
         let mut txn = self.pool.begin().await?;
 
         let ip: IpNetwork = ip.into();
         let result = query!(
             r#"
-            insert into node (cluster, name, controller, plane_version, plane_hash, kind, ip)
-            values ($1, $2, $3, $4, $5, $6, $7)
+            insert into node (
+                cluster,
+                name,
+                controller,
+                plane_version,
+                plane_hash,
+                kind,
+                ip,
+                last_connection_start_time
+            )
+            values ($1, $2, $3, $4, $5, $6, $7, now())
             on conflict (cluster, name) do update set
                 controller = $3,
                 plane_version = $4,
                 plane_hash = $5,
-                ip = $7
-            returning id
+                ip = $7,
+                last_connection_start_time = now()
+            returning id, now() as "connection_start_time!"
             "#,
             cluster.map(|c| c.to_string()),
             name.to_string(),
@@ -99,10 +110,15 @@ impl<'a> NodeDatabase<'a> {
 
         txn.commit().await?;
 
-        Ok(NodeId::from(result.id))
+        Ok((NodeId::from(result.id), result.connection_start_time))
     }
 
-    pub async fn mark_offline(&self, node_id: NodeId) -> Result<()> {
+    pub async fn mark_offline(
+        &self,
+        node_id: NodeId,
+        controller: &ControllerName,
+        connection_start_time: DateTime<Utc>,
+    ) -> Result<()> {
         let mut txn = self.pool.begin().await?;
 
         emit(
@@ -119,8 +135,12 @@ impl<'a> NodeDatabase<'a> {
             update node
             set controller = null
             where id = $1
+            and controller = $2
+            and last_connection_start_time = $3
             "#,
             node_id.as_i32(),
+            controller.to_string(),
+            connection_start_time,
         )
         .execute(&mut *txn)
         .await?;
