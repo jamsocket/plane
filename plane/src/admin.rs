@@ -359,7 +359,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             }
         }
         AdminCommand::ClusterState { cluster } => {
-            let cluster_state = client.cluster_state_url(&cluster).await?;
+            let cluster_state = client.cluster_state(&cluster).await?;
             show_cluster_state(&cluster_state);
         }
     };
