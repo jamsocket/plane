@@ -102,7 +102,7 @@ impl<'a> NodeDatabase<'a> {
         Ok(NodeId::from(result.id))
     }
 
-    pub async fn mark_offline(&self, node_id: NodeId) -> Result<()> {
+    pub async fn mark_offline(&self, node_id: NodeId, controller: &ControllerName) -> Result<()> {
         let mut txn = self.pool.begin().await?;
 
         emit(
@@ -119,8 +119,10 @@ impl<'a> NodeDatabase<'a> {
             update node
             set controller = null
             where id = $1
+            and controller = $2
             "#,
             node_id.as_i32(),
+            controller.to_string(),
         )
         .execute(&mut *txn)
         .await?;

@@ -18,6 +18,7 @@ pub struct Controller {
 
 pub struct NodeHandle {
     pub id: NodeId,
+    pub controller: ControllerName,
     db: Option<PlaneDatabase>,
 }
 
@@ -28,8 +29,9 @@ impl Drop for NodeHandle {
             .take()
             .expect("self.db is always Some before dropped.");
         let id = self.id;
+        let controller = self.controller.clone();
         tokio::spawn(async move {
-            if let Err(err) = db.node().mark_offline(id).await {
+            if let Err(err) = db.node().mark_offline(id, &controller).await {
                 tracing::error!(?err, "Failed to mark node offline.");
             }
         });
@@ -58,6 +60,7 @@ impl Controller {
         Ok(NodeHandle {
             id: node_id,
             db: Some(self.db.clone()),
+            controller: self.id.clone(),
         })
     }
 
