@@ -90,35 +90,24 @@ impl RequestHandler {
         self: Arc<Self>,
         req: hyper::Request<hyper::Body>,
     ) -> Result<hyper::Response<hyper::Body>, Infallible> {
-        let method = req.method().clone();
         let result = self.handle_request_inner(req).await;
         match result {
             Ok(response) => Ok(response),
             Err(err) => {
-                if method == hyper::Method::OPTIONS {
-                    Ok(hyper::Response::builder()
-                        .status(hyper::StatusCode::NO_CONTENT)
-                        .header("Access-Control-Allow-Origin", "*")
-                        .header("Access-Control-Allow-Methods", "*")
-                        .header("Access-Control-Allow-Headers", "*")
-                        .body(hyper::Body::empty())
-                        .expect("Static response is always valid"))
-                } else {
-                    let (status_code, body) = match err {
-                        ProxyError::InvalidConnectionToken => {
-                            (hyper::StatusCode::FORBIDDEN, "Forbidden")
-                        }
-                        ProxyError::MissingHostHeader => {
-                            (hyper::StatusCode::BAD_REQUEST, "Bad request")
-                        }
-                        ProxyError::BadRequest => (hyper::StatusCode::BAD_REQUEST, "Bad request"),
-                        _ => (hyper::StatusCode::INTERNAL_SERVER_ERROR, "Internal error"),
-                    };
-                    Ok(hyper::Response::builder()
-                        .status(status_code)
-                        .body(hyper::Body::from(body.to_string()))
-                        .expect("Static response is always valid"))
-                }
+                let (status_code, body) = match err {
+                    ProxyError::InvalidConnectionToken => {
+                        (hyper::StatusCode::FORBIDDEN, "Forbidden")
+                    }
+                    ProxyError::MissingHostHeader => {
+                        (hyper::StatusCode::BAD_REQUEST, "Bad request")
+                    }
+                    ProxyError::BadRequest => (hyper::StatusCode::BAD_REQUEST, "Bad request"),
+                    _ => (hyper::StatusCode::INTERNAL_SERVER_ERROR, "Internal error"),
+                };
+                Ok(hyper::Response::builder()
+                    .status(status_code)
+                    .body(hyper::Body::from(body.to_string()))
+                    .expect("Static response is always valid"))
             }
         }
     }
