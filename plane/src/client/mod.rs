@@ -183,7 +183,7 @@ impl PlaneClient {
         Ok(stream)
     }
 
-    pub async fn cluster_state_url(
+    pub async fn cluster_state(
         &self,
         cluster: &ClusterName,
     ) -> Result<ClusterState, PlaneClientError> {
