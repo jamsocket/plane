@@ -15,7 +15,7 @@ mod cert_pair;
 pub mod command;
 mod connection_monitor;
 pub mod proxy_connection;
-mod proxy_service;
+pub mod proxy_service;
 mod rewriter;
 mod route_map;
 mod shutdown_signal;

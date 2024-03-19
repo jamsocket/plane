@@ -4,17 +4,22 @@ use super::{
 };
 use chrono::Duration;
 use plane::{
+    client::PlaneClient,
     controller::ControllerServer,
     database::PlaneDatabase,
     dns::run_dns_with_listener,
     drone::{docker::PlaneDockerConfig, Drone, DroneConfig},
-    names::{AcmeDnsServerName, ControllerName, DroneName, Name},
-    proxy::AcmeEabConfiguration,
+    names::{AcmeDnsServerName, ControllerName, DroneName, Name, ProxyName},
+    proxy::{
+        cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection,
+        proxy_service::ProxyMakeService, run_proxy, AcmeEabConfiguration, ProxyConfig,
+        ServerPortConfig,
+    },
     types::ClusterName,
     util::random_string,
 };
 use std::{
-    net::{IpAddr, Ipv4Addr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -23,6 +28,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 use url::Url;
 
 const TEST_CLUSTER: &str = "plane.test";
+const PROXY_PORT: u16 = 9090;
 const DEFAULT_POOL: String = String::new();
 
 #[derive(Clone)]
@@ -106,9 +112,66 @@ impl TestEnvironment {
         controller
     }
 
+    pub async fn proxy(
+        &mut self,
+        controller: &ControllerServer,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let cluster: ClusterName = "localhost:9090".parse().unwrap();
+
+        // let proxy_config = ProxyConfig {
+        //     name: ProxyName::new_random(),
+        //     controller_url: controller.url().clone(),
+        //     cluster,
+        //     cert_path: None,
+        //     port_config: ServerPortConfig {
+        //         http_port: PROXY_PORT,
+        //         https_port: None,
+        //     },
+        //     acme_config: None,
+        //     root_redirect_url: None,
+        // };
+
+        let client = PlaneClient::new(controller.url().clone());
+
+        let (_, cert_manager) = watcher_manager_pair(cluster.clone(), None, None)
+            .await
+            .unwrap();
+
+        let proxy_connection =
+            ProxyConnection::new(ProxyName::new_random(), client, cluster, cert_manager);
+
+        let http_handle = ProxyMakeService {
+            state: proxy_connection.state(),
+            https_redirect: false,
+            root_redirect_url: None,
+        };
+
+        let addr: SocketAddr = ([0, 0, 0, 0], PROXY_PORT).into();
+        tracing::info!(%addr, "Listening for HTTP connections.");
+
+        // Spawn the server on a separate task
+        let server = hyper::Server::bind(&addr).serve(http_handle);
+        tokio::spawn(async move {
+            if let Err(e) = server.await {
+                tracing::error!("server error: {}", e);
+            }
+        });
+
+        Ok(())
+
+        // // run_proxy(proxy_config).await?;
+        // tokio::spawn(async {
+        //     if let Err(e) = run_proxy(proxy_config).await {
+        //         tracing::error!("Error running proxy: {:?}", e);
+        //     }
+        // });
+        // Ok(())
+    }
+
     pub async fn drone_internal(
         &mut self,
         controller: &ControllerServer,
+        cluster: Option<&ClusterName>,
         pool: &str,
         mount_base: Option<&PathBuf>,
     ) -> Drone {
@@ -120,7 +183,9 @@ impl TestEnvironment {
 
         let drone_config = DroneConfig {
             name: DroneName::new_random(),
-            cluster: TEST_CLUSTER.parse().unwrap(),
+            cluster: cluster
+                .cloned()
+                .unwrap_or_else(|| TEST_CLUSTER.parse().unwrap()),
             ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
             db_path: Some(self.scratch_dir.join("drone.db")),
             pool: pool.to_string(),
@@ -134,12 +199,12 @@ impl TestEnvironment {
     }
 
     pub async fn drone(&mut self, controller: &ControllerServer) -> Drone {
-        self.drone_internal(controller, &self.pool.clone(), None)
+        self.drone_internal(controller, None, &self.pool.clone(), None)
             .await
     }
 
     pub async fn drone_in_pool(&mut self, controller: &ControllerServer, pool: &str) -> Drone {
-        self.drone_internal(controller, pool, None).await
+        self.drone_internal(controller, None, pool, None).await
     }
 
     pub async fn drone_with_mount_base(
@@ -147,7 +212,7 @@ impl TestEnvironment {
         controller: &ControllerServer,
         mount_base: &PathBuf,
     ) -> Drone {
-        self.drone_internal(controller, &self.pool.clone(), Some(mount_base))
+        self.drone_internal(controller, None, &self.pool.clone(), Some(mount_base))
             .await
     }
 
