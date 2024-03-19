@@ -614,7 +614,8 @@ CREATE TABLE public.node (
     plane_version character varying(255) NOT NULL,
     plane_hash character varying(255) NOT NULL,
     controller character varying(255),
-    ip inet NOT NULL
+    ip inet NOT NULL,
+    last_connection_start_time timestamp with time zone
 );
 
 
@@ -674,6 +675,13 @@ COMMENT ON COLUMN public.node.controller IS 'The controller the node is register
 --
 
 COMMENT ON COLUMN public.node.ip IS 'The last-seen IP of the node relative to the controller. This is just for reference; drones self-report their IP for use by proxies.';
+
+
+--
+-- Name: COLUMN node.last_connection_start_time; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.node.last_connection_start_time IS 'The time of the most recent connection to a controller.';
 
 
 --
