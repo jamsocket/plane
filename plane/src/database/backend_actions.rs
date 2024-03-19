@@ -96,12 +96,13 @@ pub async fn create_pending_action(
 
     sqlx::query!(
         r#"
-        insert into "backend_action" ("id", "action", "drone_id")
-        values ($1, $2, $3)
+        insert into "backend_action" ("id", "action", "drone_id", "backend_id")
+        values ($1, $2, $3, $4)
         "#,
         action_id.to_string(),
         serde_json::to_value(&backend_action).expect("Backend action is always serializable"),
         drone_id.as_i32(),
+        backend_id.to_string(),
     )
     .execute(&mut **txn)
     .await?;
