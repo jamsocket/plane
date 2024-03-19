@@ -1680,6 +1680,7 @@ dependencies = [
  "dashmap",
  "data-encoding",
  "futures-util",
+ "http 1.1.0",
  "hyper 0.14.28",
  "lru",
  "openssl",
