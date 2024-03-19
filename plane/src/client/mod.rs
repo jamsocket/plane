@@ -189,10 +189,8 @@ impl PlaneClient {
     ) -> Result<ClusterState, PlaneClientError> {
         let url = self
             .controller_address
-            .join(&format!("/ctrl/c/{}/state", cluster))
-            .url;
-        let response = self.client.get(url).send().await?;
-        let cluster_state: ClusterState = get_response(response).await?;
+            .join(&format!("/ctrl/c/{}/state", cluster));
+        let cluster_state: ClusterState = authed_get(&self.client, &url).await?;
         Ok(cluster_state)
     }
 }
