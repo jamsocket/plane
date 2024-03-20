@@ -131,6 +131,7 @@ pub struct RouteInfo {
     pub backend_id: BackendName,
     pub address: BackendAddr,
     pub secret_token: SecretToken,
+    pub cluster: ClusterName,
     pub user: Option<String>,
     pub user_data: Option<serde_json::Value>,
     pub subdomain: Option<String>,

@@ -1,4 +1,5 @@
 use super::connection_monitor::ConnectionMonitorHandle;
+use super::rewriter::RequestRewriterError;
 use super::route_map::RouteMap;
 use super::tls::TlsStream;
 use super::{ForwardableRequestInfo, Protocol};
@@ -46,6 +47,14 @@ pub enum ProxyError {
 
     #[error("Hyper error: {0}")]
     HyperError(#[from] hyper::Error),
+}
+
+impl From<RequestRewriterError> for ProxyError {
+    fn from(err: RequestRewriterError) -> Self {
+        match err {
+            RequestRewriterError::InvalidHostHeader => ProxyError::BadRequest,
+        }
+    }
 }
 
 pub struct ProxyState {
@@ -187,10 +196,7 @@ impl RequestHandler {
             return Err(ProxyError::InvalidConnectionToken);
         };
 
-        let request_subdomain = request_rewriter
-            .get_subdomain()
-            .map_err(|_| ProxyError::InvalidSubdomain)?;
-        if request_subdomain != route_info.subdomain.as_deref() {
+        if request_rewriter.get_subdomain(&route_info.cluster)? != route_info.subdomain.as_deref() {
             return Err(ProxyError::InvalidSubdomain);
         }
 

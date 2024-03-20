@@ -7,8 +7,8 @@ use crate::{
     names::{BackendActionName, BackendName},
     protocol::{BackendAction, RouteInfo},
     types::{
-        backend_state::BackendStatusStreamEntry, BackendState, BackendStatus, BearerToken, NodeId,
-        SecretToken,
+        backend_state::BackendStatusStreamEntry, BackendState, BackendStatus, BearerToken,
+        ClusterName, NodeId, SecretToken,
     },
 };
 use chrono::{DateTime, Utc};
@@ -282,6 +282,7 @@ impl<'a> BackendDatabase<'a> {
             r#"
             select
                 id,
+                cluster,
                 last_status,
                 cluster_address,
                 subdomain
@@ -314,6 +315,8 @@ impl<'a> BackendDatabase<'a> {
             secret_token: SecretToken::from("".to_string()),
             user: None,
             user_data: None,
+            cluster: ClusterName::try_from(result.cluster)
+                .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))?,
             subdomain: result.subdomain,
         }))
     }
@@ -332,6 +335,7 @@ impl<'a> BackendDatabase<'a> {
                 backend_id,
                 username,
                 auth,
+                cluster,
                 last_status,
                 cluster_address,
                 secret_token,
@@ -367,6 +371,8 @@ impl<'a> BackendDatabase<'a> {
             secret_token: SecretToken::from(result.secret_token),
             user: result.username,
             user_data: Some(result.auth),
+            cluster: ClusterName::try_from(result.cluster)
+                .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))?,
             subdomain: result.subdomain,
         }))
     }

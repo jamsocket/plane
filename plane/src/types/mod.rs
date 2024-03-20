@@ -41,11 +41,15 @@ impl ClusterName {
         let port = self.0.split_once(':').map(|x| x.1);
         port.is_none() || port == Some("443")
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl Display for ClusterName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.0)
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -63,6 +67,14 @@ impl FromStr for ClusterName {
         }
 
         Ok(Self(s.to_string()))
+    }
+}
+
+impl TryFrom<String> for ClusterName {
+    type Error = &'static str;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::from_str(&value)
     }
 }
 

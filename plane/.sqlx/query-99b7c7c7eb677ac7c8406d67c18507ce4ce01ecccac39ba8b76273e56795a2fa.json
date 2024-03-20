@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            select\n                backend_id,\n                username,\n                auth,\n                last_status,\n                cluster_address,\n                secret_token,\n                subdomain\n            from token\n            left join backend\n            on backend.id = token.backend_id\n            where token = $1\n            limit 1\n            ",
+  "query": "\n            select\n                backend_id,\n                username,\n                auth,\n                cluster,\n                last_status,\n                cluster_address,\n                secret_token,\n                subdomain\n            from token\n            left join backend\n            on backend.id = token.backend_id\n            where token = $1\n            limit 1\n            ",
   "describe": {
     "columns": [
       {
@@ -20,21 +20,26 @@
       },
       {
         "ordinal": 3,
-        "name": "last_status",
+        "name": "cluster",
         "type_info": "Varchar"
       },
       {
         "ordinal": 4,
-        "name": "cluster_address",
+        "name": "last_status",
         "type_info": "Varchar"
       },
       {
         "ordinal": 5,
-        "name": "secret_token",
+        "name": "cluster_address",
         "type_info": "Varchar"
       },
       {
         "ordinal": 6,
+        "name": "secret_token",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
         "name": "subdomain",
         "type_info": "Varchar"
       }
@@ -49,10 +54,11 @@
       true,
       false,
       false,
+      false,
       true,
       false,
       true
     ]
   },
-  "hash": "e37515397ec89d49231004681bfccb8ad1137540b1590619a54855064a430865"
+  "hash": "99b7c7c7eb677ac7c8406d67c18507ce4ce01ecccac39ba8b76273e56795a2fa"
 }
