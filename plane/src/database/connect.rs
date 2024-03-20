@@ -311,7 +311,11 @@ async fn attempt_connect(
         .ok_or(ConnectError::NoClusterProvided)?;
 
     if let Some(subdomain) = &spawn_config.subdomain {
-        if subdomain.contains('.') {
+        // Subdomains can consist of a-z, 0-9, and - but not as the first or last char
+        let valid_subdomain = subdomain.chars().all(|c| c.is_alphanumeric() || c == '-')
+            && !subdomain.starts_with('-')
+            && !subdomain.ends_with('-');
+        if !valid_subdomain {
             return Err(ConnectError::InvalidSubdomain);
         }
     }
