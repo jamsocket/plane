@@ -912,7 +912,7 @@ CREATE INDEX idx_backend_action_pending ON public.backend_action USING btree (dr
 -- Name: idx_backend_drone_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_backend_drone_id ON public.backend USING btree (cluster, drone_id) WHERE ((last_status)::text <> 'terminated'::text);
+CREATE INDEX idx_backend_drone_id ON public.backend USING btree (drone_id) WHERE ((last_status)::text <> 'terminated'::text);
 
 
 --

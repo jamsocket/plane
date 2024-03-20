@@ -1,6 +1,6 @@
 use crate::{
     names::{AnyNodeName, ControllerName},
-    types::{ClusterName, ClusterState, DroneState, NodeState},
+    types::{BackendStatus, ClusterName, ClusterState, DroneState, NodeState},
 };
 use sqlx::PgPool;
 
@@ -32,7 +32,7 @@ impl<'a> ClusterDatabase<'a> {
                     select count(1)
                     from backend
                     where backend.drone_id = drone.id
-                    and backend.last_status != 'terminated'
+                    and backend.last_status != $2
                 ) as "backend_count"
             from node
             left join drone on node.id = drone.id
@@ -41,7 +41,8 @@ impl<'a> ClusterDatabase<'a> {
             and node.controller is not null
             order by node.id asc
             "#,
-            cluster.to_string()
+            cluster.to_string(),
+            BackendStatus::Terminated.to_string(),
         )
         .fetch_all(self.pool)
         .await?;
