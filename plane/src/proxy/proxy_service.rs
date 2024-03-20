@@ -38,6 +38,9 @@ pub enum ProxyError {
     #[error("Bad request")]
     BadRequest,
 
+    #[error("Invalid subdomain")]
+    InvalidSubdomain,
+
     #[error("HTTP error: {0}")]
     HttpError(#[from] hyper::http::Error),
 
@@ -100,6 +103,9 @@ impl RequestHandler {
                     }
                     ProxyError::MissingHostHeader => {
                         (hyper::StatusCode::BAD_REQUEST, "Bad request")
+                    }
+                    ProxyError::InvalidSubdomain => {
+                        (hyper::StatusCode::UNAUTHORIZED, "Invalid subdomain")
                     }
                     ProxyError::BadRequest => (hyper::StatusCode::BAD_REQUEST, "Bad request"),
                     _ => (hyper::StatusCode::INTERNAL_SERVER_ERROR, "Internal error"),
@@ -181,12 +187,11 @@ impl RequestHandler {
             return Err(ProxyError::InvalidConnectionToken);
         };
 
-        // If the host header doesn't parse (non-ascii) or doesn't match the backend's stored subdomain, return an error
-        if !matches!(request_rewriter.get_subdomain(), Ok(request_subdomain) if request_subdomain == route_info.subdomain.as_deref())
-        {
-            return Ok(hyper::Response::builder()
-                .status(hyper::StatusCode::UNAUTHORIZED)
-                .body(hyper::Body::from("Invalid subdomain"))?);
+        let request_subdomain = request_rewriter
+            .get_subdomain()
+            .map_err(|_| ProxyError::InvalidSubdomain)?;
+        if request_subdomain != route_info.subdomain.as_deref() {
+            return Err(ProxyError::InvalidSubdomain);
         }
 
         let backend_id = route_info.backend_id.clone();
