@@ -1,7 +1,7 @@
 use crate::{
     heartbeat_consts::UNHEALTHY_SECONDS,
     names::DroneName,
-    types::{ClusterName, NodeId},
+    types::{BackendStatus, ClusterName, NodeId},
 };
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, query, PgPool};
@@ -106,7 +106,7 @@ impl<'a> DroneDatabase<'a> {
                     count(*)
                 from backend
                 where drone_id = node.id
-                and last_status != 'Terminated'
+                and last_status != $4
             ) asc, random()
             limit 1
             "#,
@@ -114,6 +114,7 @@ impl<'a> DroneDatabase<'a> {
             PgInterval::try_from(Duration::from_secs(UNHEALTHY_SECONDS as _))
                 .expect("valid interval"),
             pool,
+            BackendStatus::Terminated.to_string(),
         )
         .fetch_optional(self.pool)
         .await?;
