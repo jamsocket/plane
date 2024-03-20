@@ -4,6 +4,7 @@ set -e
 
 docker stop postgres || true
 docker rm postgres || true
+rm -f "$(dirname "$0")/../drone.sqlite" || true
 
 docker run \
     -d \
