@@ -8,7 +8,7 @@ use bollard::auth::DockerCredentials;
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, fmt::Display, ops::Deref, path::PathBuf, str::FromStr};
 
 pub mod backend_state;
 
@@ -41,11 +41,15 @@ impl ClusterName {
         let port = self.0.split_once(':').map(|x| x.1);
         port.is_none() || port == Some("443")
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl Display for ClusterName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.0)
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -228,6 +232,8 @@ pub struct SpawnConfig {
     /// time instead of dynamic tokens for each user.
     #[serde(default)]
     pub use_static_token: bool,
+
+    pub subdomain: Option<Subdomain>,
 }
 
 #[derive(
@@ -338,6 +344,9 @@ pub struct ConnectResponse {
 
     pub url: String,
 
+    /// Subdomain associated with the backend, if any.
+    pub subdomain: Option<Subdomain>,
+
     pub secret_token: Option<SecretToken>,
 
     pub status_url: String,
@@ -355,13 +364,15 @@ impl ConnectResponse {
         status: BackendStatus,
         token: BearerToken,
         secret_token: Option<SecretToken>,
+        subdomain: Option<Subdomain>,
         client: &PlaneClient,
         drone: Option<DroneName>,
     ) -> Self {
-        let url = if cluster.is_https() {
-            format!("https://{}/{}/", cluster, token)
+        let protocol = if cluster.is_https() { "https" } else { "http" };
+        let url = if let Some(subdomain) = &subdomain {
+            format!("{}://{}.{}/{}/", protocol, subdomain, cluster, token)
         } else {
-            format!("http://{}/{}/", cluster, token)
+            format!("{}://{}/{}/", protocol, cluster, token)
         };
 
         let status_url = client.backend_status_url(&backend_id).to_string();
@@ -372,6 +383,7 @@ impl ConnectResponse {
             status,
             token,
             url,
+            subdomain,
             secret_token,
             status_url,
             drone,
@@ -439,4 +451,49 @@ pub struct NodeState {
 pub struct ClusterState {
     pub drones: Vec<DroneState>,
     pub proxies: Vec<NodeState>,
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("Invalid subdomain: {0}")]
+pub struct InvalidSubdomain(String);
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]
+pub struct Subdomain(String);
+
+impl std::str::FromStr for Subdomain {
+    type Err = InvalidSubdomain;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Subdomains can consist of a-z, 0-9, and '-' but not as the first or last char
+        let valid_subdomain = s.chars().all(|c| c.is_alphanumeric() || c == '-')
+            && !s.starts_with('-')
+            && !s.ends_with('-');
+        if valid_subdomain {
+            Ok(Subdomain(s.to_string()))
+        } else {
+            Err(InvalidSubdomain(s.to_string()))
+        }
+    }
+}
+
+impl Display for Subdomain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
+impl TryFrom<String> for Subdomain {
+    type Error = InvalidSubdomain;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        s.parse::<Subdomain>()
+    }
+}
+
+impl Deref for Subdomain {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }

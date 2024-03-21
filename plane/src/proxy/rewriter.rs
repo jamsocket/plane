@@ -1,6 +1,10 @@
 use super::ForwardableRequestInfo;
-use crate::{protocol::RouteInfo, types::BearerToken};
+use crate::{
+    protocol::RouteInfo,
+    types::{BearerToken, ClusterName},
+};
 use hyper::{
+    header::HOST,
     http::{request, uri},
     Body, HeaderMap, Request, Uri,
 };
@@ -15,6 +19,18 @@ const AUTH_USER_DATA_HEADER: &str = "x-verified-user-data";
 const PATH_PREFIX_HEADER: &str = "x-verified-path";
 const X_FORWARDED_FOR_HEADER: &str = "x-forwarded-for";
 const X_FORWARDED_PROTO_HEADER: &str = "x-forwarded-proto";
+
+#[derive(Debug, thiserror::Error)]
+pub enum RequestRewriterError {
+    #[error("Invalid `host` header")]
+    InvalidHostHeader,
+}
+
+impl From<hyper::header::ToStrError> for RequestRewriterError {
+    fn from(_: hyper::header::ToStrError) -> Self {
+        RequestRewriterError::InvalidHostHeader
+    }
+}
 
 pub struct RequestRewriter {
     parts: request::Parts,
@@ -59,6 +75,33 @@ impl RequestRewriter {
 
     pub fn bearer_token(&self) -> &BearerToken {
         &self.bearer_token
+    }
+
+    pub fn get_host_header(&self) -> Option<&HeaderValue> {
+        self.parts.headers.get(HOST)
+    }
+
+    pub fn get_subdomain(
+        &self,
+        cluster: &ClusterName,
+    ) -> Result<Option<&str>, RequestRewriterError> {
+        let subdomain = self
+            .get_host_header()
+            .map(|h| h.to_str())
+            .transpose()? // transpose out failure to parse (non-ascii) error
+            .map(|h| {
+                h.strip_suffix(cluster.as_str())
+                    .ok_or(RequestRewriterError::InvalidHostHeader)
+            })
+            .transpose()? // transpose out error if doesn't end in cluster name
+            .filter(|s| !s.is_empty()) // turns Some("") into None (no subdomain)
+            .map(|s| {
+                // the remaining string must be a subdomain ending in dot
+                s.strip_suffix('.')
+                    .ok_or(RequestRewriterError::InvalidHostHeader)
+            })
+            .transpose()?;
+        Ok(subdomain)
     }
 
     fn into_parts(self) -> (request::Parts, Body, Uri, ForwardableRequestInfo) {

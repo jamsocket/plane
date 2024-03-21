@@ -5,7 +5,7 @@ use crate::{
     typed_socket::ChannelMessage,
     types::{
         backend_state::TerminationReason, BackendState, BearerToken, ClusterName, ExecutorConfig,
-        KeyConfig, SecretToken, TerminationKind,
+        KeyConfig, SecretToken, Subdomain, TerminationKind,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -131,8 +131,10 @@ pub struct RouteInfo {
     pub backend_id: BackendName,
     pub address: BackendAddr,
     pub secret_token: SecretToken,
+    pub cluster: ClusterName,
     pub user: Option<String>,
     pub user_data: Option<serde_json::Value>,
+    pub subdomain: Option<Subdomain>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

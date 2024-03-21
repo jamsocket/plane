@@ -114,9 +114,10 @@ async fn create_backend_with_key(
                 allowed_idle_seconds,
                 last_keepalive,
                 state,
-                static_token
+                static_token,
+                subdomain
             )
-            values ($1, $2, $3, now(), $4, now() + $5, $6, now(), $11, $12)
+            values ($1, $2, $3, now(), $4, now() + $5, $6, now(), $11, $12, $13)
             returning id
         )
         insert into backend_key (id, key_name, namespace, tag, expires_at, fencing_token)
@@ -140,6 +141,7 @@ async fn create_backend_with_key(
         PgInterval::try_from(KEY_LEASE_EXPIRATION).expect("valid constant interval"),
         serde_json::to_value(&BackendState::Scheduled).expect("valid json"),
         static_token.map(|t| t.to_string()),
+        spawn_config.subdomain.as_ref().map(|s| s.to_string()),
     )
     .fetch_one(&mut *txn)
     .await;
@@ -270,6 +272,7 @@ async fn attempt_connect(
                     key_result.status,
                     token,
                     secret_token,
+                    key_result.subdomain,
                     client,
                     None,
                 );
@@ -347,6 +350,7 @@ async fn attempt_connect(
         BackendStatus::Scheduled,
         token,
         secret_token,
+        spawn_config.subdomain.clone(),
         client,
         Some(drone.drone),
     );

@@ -1,4 +1,5 @@
 use super::connection_monitor::ConnectionMonitorHandle;
+use super::rewriter::RequestRewriterError;
 use super::route_map::RouteMap;
 use super::tls::TlsStream;
 use super::{ForwardableRequestInfo, Protocol};
@@ -38,11 +39,22 @@ pub enum ProxyError {
     #[error("Bad request")]
     BadRequest,
 
+    #[error("Invalid subdomain")]
+    InvalidSubdomain,
+
     #[error("HTTP error: {0}")]
     HttpError(#[from] hyper::http::Error),
 
     #[error("Hyper error: {0}")]
     HyperError(#[from] hyper::Error),
+}
+
+impl From<RequestRewriterError> for ProxyError {
+    fn from(err: RequestRewriterError) -> Self {
+        match err {
+            RequestRewriterError::InvalidHostHeader => ProxyError::BadRequest,
+        }
+    }
 }
 
 pub struct ProxyState {
@@ -100,6 +112,9 @@ impl RequestHandler {
                     }
                     ProxyError::MissingHostHeader => {
                         (hyper::StatusCode::BAD_REQUEST, "Bad request")
+                    }
+                    ProxyError::InvalidSubdomain => {
+                        (hyper::StatusCode::UNAUTHORIZED, "Invalid subdomain")
                     }
                     ProxyError::BadRequest => (hyper::StatusCode::BAD_REQUEST, "Bad request"),
                     _ => (hyper::StatusCode::INTERNAL_SERVER_ERROR, "Internal error"),
@@ -180,6 +195,16 @@ impl RequestHandler {
         let Some(route_info) = route_info else {
             return Err(ProxyError::InvalidConnectionToken);
         };
+
+        let subdomain = request_rewriter.get_subdomain(&route_info.cluster)?;
+        if subdomain != route_info.subdomain.as_deref() {
+            tracing::warn!(
+                "Subdomain mismatch! subdomain in header: {:?}, subdomain in backend: {:?}",
+                subdomain,
+                route_info.subdomain
+            );
+            return Err(ProxyError::InvalidSubdomain);
+        }
 
         let backend_id = route_info.backend_id.clone();
         request_rewriter.set_authority(route_info.address.0);
