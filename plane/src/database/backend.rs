@@ -14,7 +14,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures_util::Stream;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, str::FromStr};
 
 pub struct BackendDatabase<'a> {
     db: &'a PlaneDatabase,
@@ -315,7 +315,7 @@ impl<'a> BackendDatabase<'a> {
             secret_token: SecretToken::from("".to_string()),
             user: None,
             user_data: None,
-            cluster: ClusterName::try_from(result.cluster)
+            cluster: ClusterName::from_str(&result.cluster)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))?,
             subdomain: result.subdomain,
         }))
@@ -371,7 +371,7 @@ impl<'a> BackendDatabase<'a> {
             secret_token: SecretToken::from(result.secret_token),
             user: result.username,
             user_data: Some(result.auth),
-            cluster: ClusterName::try_from(result.cluster)
+            cluster: ClusterName::from_str(&result.cluster)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))?,
             subdomain: result.subdomain,
         }))

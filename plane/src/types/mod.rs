@@ -70,14 +70,6 @@ impl FromStr for ClusterName {
     }
 }
 
-impl TryFrom<String> for ClusterName {
-    type Error = &'static str;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::from_str(&value)
-    }
-}
-
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Default, valuable::Valuable)]
 pub enum PullPolicy {
     #[default]

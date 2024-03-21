@@ -88,18 +88,19 @@ impl RequestRewriter {
         let subdomain = self
             .get_host_header()
             .map(|h| h.to_str())
-            .transpose()? // failure to parse (non-ascii)
+            .transpose()? // transpose out failure to parse (non-ascii) error
             .map(|h| {
                 h.strip_suffix(cluster.as_str())
                     .ok_or(RequestRewriterError::InvalidHostHeader)
             })
-            .transpose()? // doesn't end in cluster name
-            .filter(|s| !s.is_empty()) // filter out here if there's no subdomain
+            .transpose()? // transpose out error if doesn't end in cluster name
+            .filter(|s| !s.is_empty()) // turns Some("") into None (no subdomain)
             .map(|s| {
+                // the remaining string must be a subdomain ending in dot
                 s.strip_suffix('.')
                     .ok_or(RequestRewriterError::InvalidHostHeader)
             })
-            .transpose()?; // the remaining string must be a subdomain ending in dot
+            .transpose()?;
         Ok(subdomain)
     }
 
