@@ -73,9 +73,6 @@ pub enum ConnectError {
     #[error("No cluster provided, and no default cluster for this controller.")]
     NoClusterProvided,
 
-    #[error("Invalid subdomain provided.")]
-    InvalidSubdomain,
-
     #[error("Other internal error. {0}")]
     Other(String),
 }
@@ -144,7 +141,7 @@ async fn create_backend_with_key(
         PgInterval::try_from(KEY_LEASE_EXPIRATION).expect("valid constant interval"),
         serde_json::to_value(&BackendState::Scheduled).expect("valid json"),
         static_token.map(|t| t.to_string()),
-        spawn_config.subdomain,
+        spawn_config.subdomain.as_ref().map(|s| s.to_string()),
     )
     .fetch_one(&mut *txn)
     .await;
@@ -309,16 +306,6 @@ async fn attempt_connect(
         .as_ref()
         .or(default_cluster)
         .ok_or(ConnectError::NoClusterProvided)?;
-
-    if let Some(subdomain) = &spawn_config.subdomain {
-        // Subdomains can consist of a-z, 0-9, and - but not as the first or last char
-        let valid_subdomain = subdomain.chars().all(|c| c.is_alphanumeric() || c == '-')
-            && !subdomain.starts_with('-')
-            && !subdomain.ends_with('-');
-        if !valid_subdomain {
-            return Err(ConnectError::InvalidSubdomain);
-        }
-    }
 
     let drone = DroneDatabase::new(pool)
         .pick_drone_for_spawn(cluster, request.pool.as_deref().unwrap_or_default())

@@ -9,7 +9,7 @@
 
 use crate::{
     names::BackendName,
-    types::{BackendStatus, BearerToken, ClusterName, KeyConfig},
+    types::{BackendStatus, BearerToken, ClusterName, KeyConfig, Subdomain},
 };
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, PgPool};
@@ -125,7 +125,11 @@ impl<'a> KeysDatabase<'a> {
                     .map_err(|_| sqlx::Error::Decode("Invalid cluster name.".into()))?,
                 key: lock_result.name,
                 tag: lock_result.tag,
-                subdomain: lock_result.subdomain,
+                subdomain: lock_result
+                    .subdomain
+                    .map(Subdomain::try_from)
+                    .transpose()
+                    .map_err(|e| sqlx::Error::Decode(e.into()))?,
                 static_connection_token: lock_result.static_connection_token.map(BearerToken::from),
                 expires_at: lock_result.expires_at,
                 as_of: lock_result.as_of,
@@ -143,7 +147,7 @@ pub struct BackendKeyResult {
     pub key: String,
     pub status: BackendStatus,
     pub cluster: ClusterName,
-    pub subdomain: Option<String>,
+    pub subdomain: Option<Subdomain>,
     pub static_connection_token: Option<BearerToken>,
     expires_at: DateTime<Utc>,
     as_of: DateTime<Utc>,

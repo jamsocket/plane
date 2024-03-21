@@ -6,7 +6,7 @@ use crate::{
     protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
     types::{
         BackendStatus, ClusterName, ClusterState, ConnectRequest, ExecutorConfig, KeyConfig, Mount,
-        NodeState, SpawnConfig,
+        NodeState, SpawnConfig, Subdomain,
     },
     PLANE_GIT_HASH, PLANE_VERSION,
 };
@@ -130,7 +130,7 @@ pub enum AdminCommand {
 
         /// Optionally specify a subdomain for this backend.
         #[clap(long)]
-        subdomain: Option<String>,
+        subdomain: Option<Subdomain>,
     },
     Terminate {
         #[clap(long)]

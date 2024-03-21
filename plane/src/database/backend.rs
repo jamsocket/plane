@@ -8,7 +8,7 @@ use crate::{
     protocol::{BackendAction, RouteInfo},
     types::{
         backend_state::BackendStatusStreamEntry, BackendState, BackendStatus, BearerToken,
-        ClusterName, NodeId, SecretToken,
+        ClusterName, NodeId, SecretToken, Subdomain,
     },
 };
 use chrono::{DateTime, Utc};
@@ -317,7 +317,11 @@ impl<'a> BackendDatabase<'a> {
             user_data: None,
             cluster: ClusterName::from_str(&result.cluster)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))?,
-            subdomain: result.subdomain,
+            subdomain: result
+                .subdomain
+                .map(Subdomain::try_from)
+                .transpose()
+                .map_err(|e| sqlx::Error::Decode(e.into()))?,
         }))
     }
 
@@ -373,7 +377,11 @@ impl<'a> BackendDatabase<'a> {
             user_data: Some(result.auth),
             cluster: ClusterName::from_str(&result.cluster)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))?,
-            subdomain: result.subdomain,
+            subdomain: result
+                .subdomain
+                .map(Subdomain::try_from)
+                .transpose()
+                .map_err(|e| sqlx::Error::Decode(e.into()))?,
         }))
     }
 

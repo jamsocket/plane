@@ -1,8 +1,10 @@
 use crate::common::{test_env::TestEnvironment, wait_until_backend_terminated};
-use plane::types::{ConnectRequest, ExecutorConfig, PullPolicy, ResourceLimits, SpawnConfig};
+use plane::types::{
+    ConnectRequest, ExecutorConfig, PullPolicy, ResourceLimits, SpawnConfig, Subdomain,
+};
 use plane_test_macro::plane_test;
 use serde_json::Map;
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 mod common;
 
@@ -42,7 +44,7 @@ async fn subdomains(env: TestEnvironment) {
     // Connect request with subdomain
     let connect_request_with_subdomain = ConnectRequest {
         spawn_config: Some(SpawnConfig {
-            subdomain: Some("subdomain".to_string()),
+            subdomain: Some(Subdomain::from_str("subdomain").unwrap()),
             ..connect_request.spawn_config.clone().unwrap()
         }),
         ..connect_request.clone()
@@ -71,24 +73,6 @@ async fn subdomains(env: TestEnvironment) {
         response_with_subdomain.url, expected_subdomain_url,
         "URL with subdomain does not match expected format."
     );
-
-    // Connect request with "sub.sub" as the subdomain
-    let connect_request_with_sub_subdomain = ConnectRequest {
-        spawn_config: Some(SpawnConfig {
-            subdomain: Some("sub.sub".to_string()),
-            ..connect_request.spawn_config.clone().unwrap()
-        }),
-        ..connect_request.clone()
-    };
-
-    // sub-sub domains are not allowed, expect a spawn error
-    let error_with_sub_subdomain = client
-        .connect(&connect_request_with_sub_subdomain)
-        .await
-        .expect_err("Expected an error due to invalid subdomain format.");
-    assert!(error_with_sub_subdomain
-        .to_string()
-        .contains("Invalid subdomain provided."));
 
     wait_until_backend_terminated(&client, &response.backend_id).await;
     wait_until_backend_terminated(&client, &response_with_subdomain.backend_id).await;

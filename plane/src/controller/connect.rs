@@ -56,12 +56,6 @@ fn connect_error_to_response(connect_error: &ConnectError) -> Response {
             "No cluster provided, and no default cluster for this controller.",
             ApiErrorKind::NoClusterProvided,
         ),
-        ConnectError::InvalidSubdomain => err_to_response(
-            connect_error,
-            StatusCode::BAD_REQUEST,
-            "Invalid subdomain provided.",
-            ApiErrorKind::InvalidSubdomain,
-        ),
         ConnectError::Other(_) => err_to_response(
             connect_error,
             StatusCode::INTERNAL_SERVER_ERROR,
