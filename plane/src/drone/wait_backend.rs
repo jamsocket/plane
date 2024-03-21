@@ -1,4 +1,8 @@
-use std::{net::SocketAddr, time::Duration};
+use crate::types::backend_state::BackendError;
+use std::{
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -6,12 +10,18 @@ use tokio::{
 
 const WAIT_TIMEOUT_MS: u64 = 100;
 const REQUEST_TIMEOUT_MS: u64 = 1_000;
+const STARTUP_TIMEOUT_SECS: u64 = 300; // 5 min timeout
 const HEAD_REQUEST: &[u8] = b"HEAD / HTTP/1.1\r\nHost: localhost\r\n\r\n";
 
-/// Waits until an HTTP request to the given socket address succeeds.
-/// Retries indefinitely.
-pub async fn wait_for_backend(address: SocketAddr) {
+/// Waits until an HTTP request to the given socket address succeeds or times out after 5 minutes.
+pub async fn wait_for_backend(address: SocketAddr) -> Result<(), BackendError> {
+    let start = Instant::now();
+    let timeout_duration = Duration::from_secs(STARTUP_TIMEOUT_SECS);
     loop {
+        if start.elapsed() > timeout_duration {
+            return Err(BackendError::StartupTimeout);
+        }
+
         let Ok(mut conn) = TcpStream::connect(address).await else {
             tokio::time::sleep(Duration::from_millis(WAIT_TIMEOUT_MS)).await;
             continue;
@@ -43,7 +53,7 @@ pub async fn wait_for_backend(address: SocketAddr) {
 
         if &buffer == b"HTTP/" {
             // success
-            break;
+            break Ok(());
         } else {
             // not ready yet
             tokio::time::sleep(Duration::from_millis(WAIT_TIMEOUT_MS)).await;

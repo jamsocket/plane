@@ -8,8 +8,8 @@ use crate::{
     protocol::AcquiredKey,
     typed_socket::TypedSocketSender,
     types::{
-        backend_state::TerminationReason, BackendState, BearerToken, ExecutorConfig, PullPolicy,
-        TerminationKind,
+        backend_state::{BackendError, TerminationReason},
+        BackendState, BearerToken, ExecutorConfig, PullPolicy, TerminationKind,
     },
     util::{ExponentialBackoff, GuardHandle},
 };
@@ -275,9 +275,12 @@ impl BackendManager {
                 })
             }
             BackendState::Waiting { address } => StepStatusResult::future_status(async move {
-                wait_for_backend(address.0).await;
-
-                state.to_ready()
+                if let Err(BackendError::StartupTimeout) = wait_for_backend(address.0).await {
+                    tracing::error!("Backend startup timeout");
+                    state.to_terminating(TerminationKind::Hard, TerminationReason::StartupTimeout)
+                } else {
+                    state.to_ready()
+                }
             }),
             BackendState::Ready { .. } => StepStatusResult::DoNothing,
             BackendState::Terminating { termination, .. } => {

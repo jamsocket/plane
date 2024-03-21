@@ -184,6 +184,7 @@ pub enum TerminationReason {
     External,
     KeyExpired,
     Lost,
+    StartupTimeout,
 }
 
 impl valuable::Valuable for TerminationReason {
@@ -193,12 +194,19 @@ impl valuable::Valuable for TerminationReason {
             TerminationReason::External => valuable::Value::String("external"),
             TerminationReason::KeyExpired => valuable::Value::String("key_expired"),
             TerminationReason::Lost => valuable::Value::String("lost"),
+            TerminationReason::StartupTimeout => valuable::Value::String("startup_timeout"),
         }
     }
 
     fn visit(&self, visit: &mut dyn valuable::Visit) {
         visit.visit_value(self.as_value())
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum BackendError {
+    #[error("Timeout waiting for backend to start")]
+    StartupTimeout,
 }
 
 impl BackendState {
