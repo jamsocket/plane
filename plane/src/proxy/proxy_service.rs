@@ -196,7 +196,13 @@ impl RequestHandler {
             return Err(ProxyError::InvalidConnectionToken);
         };
 
-        if request_rewriter.get_subdomain(&route_info.cluster)? != route_info.subdomain.as_deref() {
+        let subdomain = request_rewriter.get_subdomain(&route_info.cluster)?;
+        if subdomain != route_info.subdomain.as_deref() {
+            tracing::warn!(
+                "Subdomain mismatch! subdomain in header: {:?}, subdomain in backend: {:?}",
+                subdomain,
+                route_info.subdomain
+            );
             return Err(ProxyError::InvalidSubdomain);
         }
 
