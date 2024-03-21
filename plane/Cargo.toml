@@ -1,6 +1,6 @@
 [package]
 name = "plane"
-version = "0.4.8"
+version = "0.4.9"
 edition = "2021"
 default-run = "plane"
 description = "Session backend orchestrator for ambitious browser-based apps."
