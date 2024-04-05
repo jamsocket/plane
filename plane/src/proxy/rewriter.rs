@@ -145,7 +145,11 @@ impl RequestRewriter {
         let Ok(conn_header) = conn_header.to_str() else {
             return false;
         };
-        conn_header.to_lowercase() == "upgrade"
+
+        conn_header
+            .to_lowercase()
+            .split(',')
+            .any(|s| s.trim() == "upgrade")
     }
 }
 
