@@ -184,7 +184,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
         } => {
             let mut executor_config = ExecutorConfig::from_image_with_defaults(image);
             executor_config.mount = mount.map(Mount::Path);
-            let max_idle_seconds = max_idle_seconds.unwrap_or(500);
+            let max_idle_seconds = max_idle_seconds.unwrap_or(120);
             let spawn_config = SpawnConfig {
                 id,
                 cluster: cluster.clone(),

@@ -4,7 +4,7 @@ use crate::{
     names::BackendName,
     protocol::{BackendAction, BackendEventId, BackendStateMessage},
     typed_socket::TypedSocketSender,
-    types::BackendState,
+    types::{BackendState, BackendStatus, TerminationReason},
     util::GuardHandle,
 };
 use anyhow::Result;
@@ -185,6 +185,21 @@ impl Executor {
                     // else we can deadlock.
                     let Some(manager) = self.backends.get(backend_id) else {
                         tracing::warn!(backend_id = backend_id.as_value(), "Backend not found when handling terminate action (assumed terminated).");
+
+                        self.state_store
+                            .lock()
+                            .expect("State store lock poisoned")
+                            .register_event(
+                                backend_id,
+                                &BackendState::Terminated {
+                                    last_status: BackendStatus::Terminated, // We don't know anything about this backend, but we need to set something.
+                                    termination: None,
+                                    reason: Some(TerminationReason::Lost),
+                                    exit_code: None,
+                                },
+                                chrono::Utc::now(),
+                            )?;
+
                         return Ok(());
                     };
                     manager.clone()
