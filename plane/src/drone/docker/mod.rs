@@ -4,6 +4,7 @@ use self::{
 };
 use crate::{
     database::backend::BackendMetricsMessage,
+    heartbeat_consts::KILL_AFTER_SOFT_TERMINATE_SECONDS,
     names::BackendName,
     protocol::AcquiredKey,
     types::{BearerToken, ExecutorConfig},
@@ -11,7 +12,7 @@ use crate::{
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials,
-    container::{PruneContainersOptions, StatsOptions},
+    container::{PruneContainersOptions, StatsOptions, StopContainerOptions},
     errors::Error,
     image::PruneImagesOptions,
     service::{EventMessage, HostConfigLogConfig},
@@ -175,7 +176,12 @@ impl PlaneDocker {
                 .await?;
         } else {
             self.docker
-                .stop_container(&container_id.to_string(), None)
+                .stop_container(
+                    &container_id.to_string(),
+                    Some(StopContainerOptions {
+                        t: KILL_AFTER_SOFT_TERMINATE_SECONDS,
+                    }),
+                )
                 .await?;
         }
 

@@ -31,9 +31,11 @@ pub const UNHEALTHY_SECONDS: i64 = 45;
 /// reassigned.
 pub const SOFT_TERMINATE_DEADLINE_SECONDS: i64 = 60;
 
-/// If a drone's lock message has not been confirmed in
-///
-pub const HARD_TERMINATE_DEADLINE_SECONDS: i64 = 90;
+/// Wait this many seconds after a soft terminate before
+/// killing the backend.
+pub const KILL_AFTER_SOFT_TERMINATE_SECONDS: i64 = 30;
+pub const HARD_TERMINATE_DEADLINE_SECONDS: i64 =
+    SOFT_TERMINATE_DEADLINE_SECONDS + KILL_AFTER_SOFT_TERMINATE_SECONDS;
 
 /// If we have not heard from a drone in this many seconds,
 /// we will consider it lost. This means that we will remove
