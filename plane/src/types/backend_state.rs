@@ -262,9 +262,29 @@ impl BackendState {
         reason: TerminationReason,
     ) -> BackendState {
         match self {
-            BackendState::Terminating { .. } | BackendState::Terminated { .. } => {
-                tracing::warn!(?reason, termination=termination.as_value(), state=?self, "to_terminating called on terminating/terminated backend");
+            BackendState::Terminated { .. } => {
+                tracing::warn!(?reason, termination=termination.as_value(), state=?self, "to_terminating called on terminated backend");
                 self.clone()
+            }
+            // a soft terminating backend can be transitioned to a hard terminating backend
+            BackendState::Terminating {
+                last_status,
+                termination: termination_kind,
+                ..
+            } => {
+                if termination_kind == &termination {
+                    tracing::warn!(?reason, termination=termination.as_value(), state=?self, "to_terminating called on terminating backend with the same termination_kind");
+                    return self.clone();
+                }
+                if termination_kind != &TerminationKind::Hard {
+                    tracing::warn!(?reason, termination=termination.as_value(), state=?self, "to_terminating called on terminating backend with soft termination kind");
+                    return self.clone();
+                }
+                BackendState::Terminating {
+                    last_status: *last_status,
+                    termination,
+                    reason,
+                }
             }
             _ => BackendState::Terminating {
                 last_status: self.status(),
