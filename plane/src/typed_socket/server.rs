@@ -1,7 +1,7 @@
 use super::{ChannelMessage, Handshake, SocketAction, TypedSocket};
 use crate::plane_version_info;
 use anyhow::{anyhow, Context, Result};
-use axum::extract::ws::{Message, WebSocket};
+use axum::extract::ws::{CloseFrame, Message, WebSocket};
 use tokio::sync::mpsc::{Receiver, Sender};
 
 pub async fn handle_messages<T: ChannelMessage>(
@@ -32,6 +32,10 @@ pub async fn handle_messages<T: ChannelMessage>(
                     Ok(Message::Text(msg)) => msg,
                     Err(err) => {
                         tracing::error!(?err, "Failed to receive message from websocket.");
+                        break;
+                    }
+                    Ok(Message::Close(Some(CloseFrame { code: 1001, .. }))) => {
+                        tracing::warn!("Websocket connection closed.");
                         break;
                     }
                     msg => {
