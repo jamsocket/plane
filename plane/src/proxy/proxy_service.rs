@@ -121,7 +121,7 @@ impl RequestHandler {
                     err => {
                         tracing::error!(?err, "Unhandled error handling request.");
                         (hyper::StatusCode::INTERNAL_SERVER_ERROR, "Internal error")
-                    },
+                    }
                 };
                 Ok(hyper::Response::builder()
                     .status(status_code)
