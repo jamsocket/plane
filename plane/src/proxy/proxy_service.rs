@@ -296,7 +296,7 @@ fn clone_response_empty_body(response: &Response<Body>) -> Response<Body> {
 
     builder = builder.status(response.status());
 
-    builder.body(Body::empty()).expect("Body is always valid.")
+    builder.body(Body::empty()).expect("Response is always valid.")
 }
 
 pub struct ProxyService {
