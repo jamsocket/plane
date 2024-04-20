@@ -221,7 +221,7 @@ impl RequestHandler {
         let mut response = if request_rewriter.should_upgrade() {
             let (req, req_clone) = request_rewriter.into_request_pair(&route_info);
             let response = self.state.http_client.request(req_clone).await?;
-            let response_clone = clone_response_empty_body(&response)?;
+            let response_clone = clone_response_empty_body(&response);
 
             let mut response_upgrade = hyper::upgrade::on(response).await?;
             let monitor = self.state.monitor.monitor();
@@ -286,7 +286,7 @@ impl RequestHandler {
     }
 }
 
-fn clone_response_empty_body(response: &Response<Body>) -> Result<Response<Body>, ProxyError> {
+fn clone_response_empty_body(response: &Response<Body>) -> Response<Body> {
     let mut builder = Response::builder();
 
     builder
@@ -296,7 +296,7 @@ fn clone_response_empty_body(response: &Response<Body>) -> Result<Response<Body>
 
     builder = builder.status(response.status());
 
-    Ok(builder.body(Body::empty()).expect("Body is always valid."))
+    builder.body(Body::empty()).expect("Body is always valid.")
 }
 
 pub struct ProxyService {
