@@ -6,6 +6,7 @@ use super::{ForwardableRequestInfo, Protocol};
 use crate::proxy::cert_manager::CertWatcher;
 use crate::proxy::rewriter::RequestRewriter;
 use crate::proxy::tls::TlsAcceptor;
+use crate::SERVER_NAME;
 use axum::http::uri::PathAndQuery;
 use futures_util::{Future, FutureExt};
 use hyper::server::conn::AddrIncoming;
@@ -117,10 +118,14 @@ impl RequestHandler {
                         (hyper::StatusCode::UNAUTHORIZED, "Invalid subdomain")
                     }
                     ProxyError::BadRequest => (hyper::StatusCode::BAD_REQUEST, "Bad request"),
-                    _ => (hyper::StatusCode::INTERNAL_SERVER_ERROR, "Internal error"),
+                    err => {
+                        tracing::error!(?err, "Unhandled error handling request.");
+                        (hyper::StatusCode::INTERNAL_SERVER_ERROR, "Internal error")
+                    },
                 };
                 Ok(hyper::Response::builder()
                     .status(status_code)
+                    .header(hyper::header::SERVER, SERVER_NAME)
                     .body(hyper::Body::from(body.to_string()))
                     .expect("Static response is always valid"))
             }
@@ -136,10 +141,12 @@ impl RequestHandler {
             if self.state.connected() {
                 return Ok(hyper::Response::builder()
                     .status(hyper::StatusCode::OK)
+                    .header(hyper::header::SERVER, SERVER_NAME)
                     .body("Plane Proxy server (ready)".into())?);
             } else {
                 return Ok(hyper::Response::builder()
                     .status(hyper::StatusCode::SERVICE_UNAVAILABLE)
+                    .header(hyper::header::SERVER, SERVER_NAME)
                     .body("Plane Proxy server (not ready)".into())?);
             }
         }
@@ -163,6 +170,7 @@ impl RequestHandler {
             return Ok(hyper::Response::builder()
                 .status(hyper::StatusCode::MOVED_PERMANENTLY)
                 .header(hyper::header::LOCATION, uri.to_string())
+                .header(hyper::header::SERVER, SERVER_NAME)
                 .body(hyper::Body::empty())?);
         }
 
@@ -171,6 +179,7 @@ impl RequestHandler {
                 return Ok(hyper::Response::builder()
                     .status(hyper::StatusCode::MOVED_PERMANENTLY)
                     .header(hyper::header::LOCATION, root_redirect_url.to_string())
+                    .header(hyper::header::SERVER, SERVER_NAME)
                     .body(hyper::Body::empty())?);
             }
         }
@@ -287,7 +296,7 @@ fn clone_response_empty_body(response: &Response<Body>) -> Result<Response<Body>
 
     builder = builder.status(response.status());
 
-    Ok(builder.body(Body::empty())?)
+    Ok(builder.body(Body::empty()).expect("Body is always valid."))
 }
 
 pub struct ProxyService {

@@ -33,6 +33,8 @@ pub const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The git hash of the plane binary (passed from build.rs)
 pub const PLANE_GIT_HASH: &str = env!("GIT_HASH");
 
+pub const SERVER_NAME: &str = concat!("Plane/", env!("CARGO_PKG_VERSION"));
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PlaneVersionInfo {
     pub version: String,
