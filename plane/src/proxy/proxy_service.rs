@@ -117,9 +117,10 @@ impl RequestHandler {
             Ok(response) => Ok(response),
             Err(err) => {
                 let (status_code, body) = match err {
-                    ProxyError::InvalidConnectionToken => {
-                        (hyper::StatusCode::FORBIDDEN, "Forbidden")
-                    }
+                    ProxyError::InvalidConnectionToken => (
+                        hyper::StatusCode::GONE,
+                        "The backend is no longer available or the connection token is invalid.",
+                    ),
                     ProxyError::MissingHostHeader => {
                         (hyper::StatusCode::BAD_REQUEST, "Bad request")
                     }

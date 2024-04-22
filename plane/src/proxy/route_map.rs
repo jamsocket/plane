@@ -1,4 +1,5 @@
 use crate::{
+    names::BackendName,
     protocol::{RouteInfo, RouteInfoRequest, RouteInfoResponse},
     types::BearerToken,
 };
@@ -114,5 +115,26 @@ impl RouteMap {
 
     pub fn receive(&self, response: RouteInfoResponse) {
         self.insert(response.token, response.route_info);
+    }
+
+    pub fn remove_backend(&self, backend: &BackendName) {
+        // When a backend is terminated, we invalidate all routes that point to it.
+        // We do this by looping over the connection tokens, but this is relatively inexpensive
+        // because we have a maximum of 1,000 connection tokens in the LRU cache.
+        tracing::info!(
+            backend = backend.as_value(),
+            "Removing backend from route map."
+        );
+        let mut count = 0;
+        let mut lock = self.routes.lock().expect("Routes lock was poisoned.");
+        for (_, maybe_route_info) in lock.iter_mut() {
+            if let Some(route_info) = maybe_route_info.as_mut() {
+                if route_info.backend_id == *backend {
+                    *maybe_route_info = None;
+                    count += 1;
+                }
+            }
+        }
+        tracing::info!(count, backend = backend.as_value(), "Removed routes.");
     }
 }

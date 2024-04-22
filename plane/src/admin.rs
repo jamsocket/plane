@@ -133,7 +133,6 @@ pub enum AdminCommand {
         subdomain: Option<Subdomain>,
     },
     Terminate {
-        #[clap(long)]
         backend: BackendName,
 
         #[clap(long)]

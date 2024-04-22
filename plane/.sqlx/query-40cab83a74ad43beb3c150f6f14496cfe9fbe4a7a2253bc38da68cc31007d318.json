@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            select\n                backend_id,\n                username,\n                auth,\n                cluster,\n                last_status,\n                cluster_address,\n                secret_token,\n                subdomain\n            from token\n            left join backend\n            on backend.id = token.backend_id\n            where token = $1\n            limit 1\n            ",
+  "query": "\n            select\n                backend_id,\n                username,\n                auth,\n                cluster,\n                last_status,\n                cluster_address,\n                secret_token,\n                subdomain\n            from token\n            inner join backend\n            on backend.id = token.backend_id\n            and backend.last_status = $2\n            where token = $1\n            limit 1\n            ",
   "describe": {
     "columns": [
       {
@@ -46,6 +46,7 @@
     ],
     "parameters": {
       "Left": [
+        "Text",
         "Text"
       ]
     },
@@ -60,5 +61,5 @@
       true
     ]
   },
-  "hash": "99b7c7c7eb677ac7c8406d67c18507ce4ce01ecccac39ba8b76273e56795a2fa"
+  "hash": "40cab83a74ad43beb3c150f6f14496cfe9fbe4a7a2253bc38da68cc31007d318"
 }
