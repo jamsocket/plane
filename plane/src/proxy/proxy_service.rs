@@ -46,8 +46,17 @@ pub enum ProxyError {
     #[error("HTTP error: {0}")]
     HttpError(#[from] hyper::http::Error),
 
-    #[error("Hyper error: {0}")]
-    HyperError(#[from] hyper::Error),
+    #[error("Error binding server: {0}")]
+    BindError(hyper::Error),
+
+    #[error("Error upgrading request: {0}")]
+    UpgradeError(hyper::Error),
+
+    #[error("Error making request: {0}")]
+    RequestError(hyper::Error),
+
+    #[error("Error making upgradable request: {0}")]
+    UpgradableRequestError(hyper::Error),
 }
 
 impl From<RequestRewriterError> for ProxyError {
@@ -220,10 +229,17 @@ impl RequestHandler {
 
         let mut response = if request_rewriter.should_upgrade() {
             let (req, req_clone) = request_rewriter.into_request_pair(&route_info);
-            let response = self.state.http_client.request(req_clone).await?;
+            let response = self
+                .state
+                .http_client
+                .request(req_clone)
+                .await
+                .map_err(ProxyError::UpgradableRequestError)?;
             let response_clone = clone_response_empty_body(&response);
 
-            let mut response_upgrade = hyper::upgrade::on(response).await?;
+            let mut response_upgrade = hyper::upgrade::on(response)
+                .await
+                .map_err(ProxyError::UpgradeError)?;
             let monitor = self.state.monitor.monitor();
             let backend_id = backend_id.clone();
 
@@ -270,7 +286,11 @@ impl RequestHandler {
         } else {
             let req = request_rewriter.into_request(&route_info);
             self.state.monitor.touch_backend(&backend_id);
-            self.state.http_client.request(req).await?
+            self.state
+                .http_client
+                .request(req)
+                .await
+                .map_err(ProxyError::RequestError)?
         };
 
         let headers = response.headers_mut();
@@ -357,7 +377,7 @@ impl ProxyMakeService {
             .with_cert_resolver(Arc::new(cert_watcher));
 
         let addr: SocketAddr = ([0, 0, 0, 0], port).into();
-        let incoming = AddrIncoming::bind(&addr)?;
+        let incoming = AddrIncoming::bind(&addr).map_err(ProxyError::BindError)?;
         tracing::info!(%addr, "Listening for HTTPS connections.");
 
         let tls_acceptor = TlsAcceptor::new(Arc::new(server_config), incoming);
