@@ -217,6 +217,10 @@ pub struct SpawnConfig {
     /// Cluster to spawn to. Uses the controller default if not provided.
     pub cluster: Option<ClusterName>,
 
+    /// The drone pool to use for the connect request.
+    #[serde(default)]
+    pub pool: Option<String>,
+
     /// Config to use to spawn the backend process.
     pub executable: ExecutorConfig,
 
@@ -283,10 +287,6 @@ pub struct ConnectRequest {
     /// Passed to the backend through the X-Plane-Auth header.
     #[serde(default)]
     pub auth: Map<String, Value>,
-
-    /// The drone pool to use for the connect request.
-    #[serde(default)]
-    pub pool: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]

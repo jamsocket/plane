@@ -308,7 +308,7 @@ async fn attempt_connect(
         .ok_or(ConnectError::NoClusterProvided)?;
 
     let drone = DroneDatabase::new(pool)
-        .pick_drone_for_spawn(cluster, request.pool.as_deref().unwrap_or_default())
+        .pick_drone_for_spawn(cluster, spawn_config.pool.as_deref().unwrap_or_default())
         .await?
         .ok_or(ConnectError::NoDroneAvailable)?;
 

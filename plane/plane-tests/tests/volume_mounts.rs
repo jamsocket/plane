@@ -34,6 +34,7 @@ async fn volume_mounts(env: TestEnvironment) {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(env.cluster.clone()),
+            pool: None,
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
@@ -50,7 +51,6 @@ async fn volume_mounts(env: TestEnvironment) {
         key: None,
         user: None,
         auth: Map::default(),
-        pool: None,
     };
 
     let response_custom_mount = client.connect(&connect_request_custom_mount).await.unwrap();

@@ -22,6 +22,7 @@ async fn subdomains(env: TestEnvironment) {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(env.cluster.clone()),
+            pool: None,
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
@@ -38,7 +39,6 @@ async fn subdomains(env: TestEnvironment) {
         key: None,
         user: None,
         auth: Map::default(),
-        pool: None,
     };
 
     // Connect request with subdomain

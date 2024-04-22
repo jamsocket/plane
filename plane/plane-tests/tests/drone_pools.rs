@@ -4,7 +4,6 @@ use plane::types::{
     ConnectRequest, ExecutorConfig, KeyConfig, PullPolicy, ResourceLimits, SpawnConfig,
 };
 use plane_test_macro::plane_test;
-use serde_json::Map;
 use std::collections::HashMap;
 
 mod common;
@@ -26,6 +25,7 @@ async fn drone_pools(env: TestEnvironment) {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(env.cluster.clone()),
+            pool: None,
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
@@ -44,9 +44,7 @@ async fn drone_pools(env: TestEnvironment) {
             namespace: "".to_string(),
             tag: "".to_string(),
         }),
-        user: None,
-        auth: Map::default(),
-        pool: None,
+        ..Default::default()
     };
 
     let response = client.connect(&connect_request).await.unwrap();
@@ -57,12 +55,17 @@ async fn drone_pools(env: TestEnvironment) {
     assert_eq!(response_drone, drone.id);
 
     tracing::info!("Requesting backend from pool.");
-    let mut connect_request_with_pool = connect_request.clone();
-    connect_request_with_pool.pool = Some(pool);
-    connect_request_with_pool.key = Some(KeyConfig {
-        name: "pool-specific-key".to_string(),
-        ..connect_request.key.unwrap()
-    });
+    let connect_request_with_pool = ConnectRequest {
+        spawn_config: Some(SpawnConfig {
+            pool: Some(pool),
+            ..connect_request.spawn_config.unwrap()
+        }),
+        key: Some(KeyConfig {
+            name: "pool-specific-key".to_string(),
+            ..connect_request.key.unwrap()
+        }),
+        ..Default::default()
+    };
 
     let response_from_pool = client.connect(&connect_request_with_pool).await.unwrap();
     tracing::info!("Got response from pool.");
