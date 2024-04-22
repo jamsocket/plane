@@ -1,5 +1,7 @@
 use crate::{
-    names::BackendName, protocol::{RouteInfo, RouteInfoRequest, RouteInfoResponse}, types::BearerToken
+    names::BackendName,
+    protocol::{RouteInfo, RouteInfoRequest, RouteInfoResponse},
+    types::BearerToken,
 };
 use lru::LruCache;
 use std::{
