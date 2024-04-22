@@ -70,6 +70,7 @@ impl ProxyConnection {
                                     backend = backend.as_value(),
                                     "Received backend removed message."
                                 );
+                                state.route_map.remove_backend(&backend);
                             }
                         }
                     }

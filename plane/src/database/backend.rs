@@ -345,7 +345,7 @@ impl<'a> BackendDatabase<'a> {
                 secret_token,
                 subdomain
             from token
-            left join backend
+            inner join backend
             on backend.id = token.backend_id
             and backend.last_status = $2
             where token = $1
