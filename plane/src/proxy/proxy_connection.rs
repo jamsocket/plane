@@ -65,6 +65,9 @@ impl ProxyConnection {
                                 );
                                 cert_manager.receive(response);
                             }
+                            MessageToProxy::BackendRemoved { backend } => {
+                                tracing::info!(backend = backend.as_value(), "Received backend removed message.");
+                            }
                         }
                     }
 

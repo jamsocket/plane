@@ -347,10 +347,12 @@ impl<'a> BackendDatabase<'a> {
             from token
             left join backend
             on backend.id = token.backend_id
+            and backend.last_status = $2
             where token = $1
             limit 1
             "#,
             token.to_string(),
+            BackendStatus::Ready.to_string(),
         )
         .fetch_optional(&self.db.pool)
         .await?;

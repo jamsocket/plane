@@ -1,6 +1,5 @@
 use crate::{
-    protocol::{RouteInfo, RouteInfoRequest, RouteInfoResponse},
-    types::BearerToken,
+    names::BackendName, protocol::{RouteInfo, RouteInfoRequest, RouteInfoResponse}, types::BearerToken
 };
 use lru::LruCache;
 use std::{
@@ -114,5 +113,17 @@ impl RouteMap {
 
     pub fn receive(&self, response: RouteInfoResponse) {
         self.insert(response.token, response.route_info);
+    }
+
+    pub fn remove_backend(&self, backend: &BackendName) {
+        // When a backend is removed, we invalidate all routes that point to it.
+        let mut lock = self.routes.lock().expect("Routes lock was poisoned.");
+        for (_, maybe_route_info) in lock.iter_mut() {
+            if let Some(route_info) = maybe_route_info.as_mut() {
+                if route_info.backend_id == *backend {
+                    *maybe_route_info = None;
+                }
+            }
+        }
     }
 }

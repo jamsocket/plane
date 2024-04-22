@@ -202,6 +202,7 @@ impl ChannelMessage for MessageFromProxy {
 pub enum MessageToProxy {
     RouteInfoResponse(RouteInfoResponse),
     CertManagerResponse(CertManagerResponse),
+    BackendRemoved { backend: BackendName },
 }
 
 impl ChannelMessage for MessageToProxy {
