@@ -24,6 +24,7 @@ async fn backend_status_in_response(env: TestEnvironment) {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(env.cluster.clone()),
+            pool: None,
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
@@ -44,7 +45,6 @@ async fn backend_status_in_response(env: TestEnvironment) {
         }),
         user: None,
         auth: Map::default(),
-        pool: None,
     };
 
     let response = client.connect(&connect_request).await.unwrap();
