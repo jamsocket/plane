@@ -48,7 +48,13 @@ impl RequestRewriter {
         let mut uri_parts = parts.uri.clone().into_parts();
         uri_parts.scheme = Some("http".parse().expect("Scheme is valid."));
 
-        let bearer_token = extract_bearer_token(&mut uri_parts)?;
+        let bearer_token = match extract_bearer_token(&mut uri_parts) {
+            Some(bearer_token) => bearer_token,
+            None => {
+                tracing::warn!("Bearer token not found in URI.");
+                return None;
+            }
+        };
 
         let mut prefix_uri_parts = parts.uri.clone().into_parts();
         prefix_uri_parts.path_and_query =

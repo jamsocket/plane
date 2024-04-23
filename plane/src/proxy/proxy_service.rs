@@ -202,6 +202,7 @@ impl RequestHandler {
         req: hyper::Request<hyper::Body>,
     ) -> Result<hyper::Response<hyper::Body>, ProxyError> {
         let Some(mut request_rewriter) = RequestRewriter::new(req, self.remote_meta) else {
+            tracing::warn!("Request rewriter failed to create.");
             return Err(ProxyError::BadRequest);
         };
 
@@ -215,7 +216,13 @@ impl RequestHandler {
             return Err(ProxyError::InvalidConnectionToken);
         };
 
-        let subdomain = request_rewriter.get_subdomain(&route_info.cluster)?;
+        let subdomain = match request_rewriter.get_subdomain(&route_info.cluster) {
+            Ok(subdomain) => subdomain,
+            Err(err) => {
+                tracing::warn!(?err, "Subdomain not found in request rewriter.");
+                return Err(ProxyError::InvalidSubdomain);
+            }
+        };
         if subdomain != route_info.subdomain.as_deref() {
             tracing::warn!(
                 "Subdomain mismatch! subdomain in header: {:?}, subdomain in backend: {:?}",
