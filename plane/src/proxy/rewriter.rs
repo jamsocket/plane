@@ -83,6 +83,10 @@ impl RequestRewriter {
         &self.bearer_token
     }
 
+    /// Returns the subdomain of the request's host header, after stripping the cluster name.
+    /// Returns Ok(Some(subdomain)) if a subdomain is found.
+    /// Returns Ok(None) if no subdomain is found, but the host header matches the cluster name.
+    /// Returns Err(err) if the host header does not match the cluster name, or no host header is found.
     pub fn get_subdomain(
         &self,
         cluster: &ClusterName,
