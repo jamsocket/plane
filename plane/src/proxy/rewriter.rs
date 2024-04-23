@@ -104,6 +104,12 @@ impl RequestRewriter {
             }
         };
 
+        // Remove port from hostname if present.
+        let hostname = match hostname.split_once(':') {
+            Some((hostname, _)) => hostname,
+            None => hostname,
+        };
+
         let Some(subdomain) = hostname.strip_suffix(cluster.as_str()) else {
             tracing::warn!(hostname, "Host header does not end in cluster name.");
             return Err(RequestRewriterError::InvalidHostHeader);
