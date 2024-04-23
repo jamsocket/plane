@@ -77,31 +77,40 @@ impl RequestRewriter {
         &self.bearer_token
     }
 
-    pub fn get_host_header(&self) -> Option<&HeaderValue> {
-        self.parts.headers.get(HOST)
-    }
-
     pub fn get_subdomain(
         &self,
         cluster: &ClusterName,
     ) -> Result<Option<&str>, RequestRewriterError> {
-        let subdomain = self
-            .get_host_header()
-            .map(|h| h.to_str())
-            .transpose()? // transpose out failure to parse (non-ascii) error
-            .map(|h| {
-                h.strip_suffix(cluster.as_str())
-                    .ok_or(RequestRewriterError::InvalidHostHeader)
-            })
-            .transpose()? // transpose out error if doesn't end in cluster name
-            .filter(|s| !s.is_empty()) // turns Some("") into None (no subdomain)
-            .map(|s| {
-                // the remaining string must be a subdomain ending in dot
-                s.strip_suffix('.')
-                    .ok_or(RequestRewriterError::InvalidHostHeader)
-            })
-            .transpose()?;
-        Ok(subdomain)
+        let Some(hostname) = self.parts.headers.get(HOST) else {
+            return Ok(None);
+        };
+
+        let hostname = match hostname.to_str() {
+            Ok(hostname) => hostname,
+            Err(err) => {
+                tracing::warn!(?hostname, ?err, "Host header is not valid UTF-8.");
+                return Err(RequestRewriterError::InvalidHostHeader);
+            }
+        };
+
+        let Some(subdomain) = hostname.strip_suffix(cluster.as_str()) else {
+            tracing::warn!(hostname, "Host header does not end in cluster name.");
+            return Err(RequestRewriterError::InvalidHostHeader);
+        };
+
+        if subdomain.is_empty() {
+            return Ok(None);
+        }
+
+        let subdomain = match subdomain.strip_suffix('.') {
+            Some(subdomain) => subdomain,
+            None => {
+                tracing::warn!(hostname, "Host header does not start with a dot.");
+                return Err(RequestRewriterError::InvalidHostHeader);
+            }
+        };
+
+        Ok(Some(subdomain))
     }
 
     fn into_parts(self) -> (request::Parts, Body, Uri, ForwardableRequestInfo) {
