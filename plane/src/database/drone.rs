@@ -74,6 +74,21 @@ impl<'a> DroneDatabase<'a> {
         Ok(())
     }
 
+    pub async fn get_drone_pool(&self, id: NodeId) -> sqlx::Result<String> {
+        let result = query!(
+            r#"
+            select pool
+            from drone
+            where id = $1
+            "#,
+            id.as_i32(),
+        )
+        .fetch_one(self.pool)
+        .await?;
+
+        Ok(result.pool)
+    }
+
     /// TODO: simple algorithm until we collect more metrics.
     pub async fn pick_drone_for_spawn(
         &self,

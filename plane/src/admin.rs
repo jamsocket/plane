@@ -187,6 +187,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             let spawn_config = SpawnConfig {
                 id,
                 cluster: cluster.clone(),
+                pool,
                 executable: executor_config.clone(),
                 lifetime_limit_seconds: None,
                 max_idle_seconds: Some(max_idle_seconds),
@@ -200,7 +201,6 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             let spawn_request = ConnectRequest {
                 spawn_config: Some(spawn_config),
                 key: key_config,
-                pool,
                 ..Default::default()
             };
 
