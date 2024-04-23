@@ -9,7 +9,7 @@ use hyper::{
     Body, HeaderMap, Request, Uri,
 };
 use reqwest::header::HeaderValue;
-use std::{borrow::BorrowMut, net::SocketAddr, str::FromStr};
+use std::{borrow::BorrowMut, f64::consts::E, net::SocketAddr, str::FromStr};
 use tungstenite::http::uri::PathAndQuery;
 
 const VERIFIED_HEADER_PREFIX: &str = "x-verified-";
@@ -86,13 +86,14 @@ impl RequestRewriter {
     /// Returns the subdomain of the request's host header, after stripping the cluster name.
     /// Returns Ok(Some(subdomain)) if a subdomain is found.
     /// Returns Ok(None) if no subdomain is found, but the host header matches the cluster name.
-    /// Returns Err(err) if the host header does not match the cluster name, or no host header is found.
+    /// Returns Err(RequestRewriterError::InvalidHostHeader) if the host header does not
+    /// match the cluster name, or no host header is found.
     pub fn get_subdomain(
         &self,
         cluster: &ClusterName,
     ) -> Result<Option<&str>, RequestRewriterError> {
         let Some(hostname) = self.parts.headers.get(HOST) else {
-            return Ok(None);
+            return Err(RequestRewriterError::InvalidHostHeader);
         };
 
         let hostname = match hostname.to_str() {
