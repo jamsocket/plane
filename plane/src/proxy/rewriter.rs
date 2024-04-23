@@ -51,7 +51,7 @@ impl RequestRewriter {
         let bearer_token = match extract_bearer_token(&mut uri_parts) {
             Some(bearer_token) => bearer_token,
             None => {
-                tracing::warn!("Bearer token not found in URI.");
+                tracing::warn!(uri=?parts.uri, "Bearer token not found in URI.");
                 return None;
             }
         };
