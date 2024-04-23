@@ -9,7 +9,7 @@ use hyper::{
     Body, HeaderMap, Request, Uri,
 };
 use reqwest::header::HeaderValue;
-use std::{borrow::BorrowMut, net::SocketAddr, str::FromStr};
+use std::{borrow::BorrowMut, f64::consts::E, net::SocketAddr, str::FromStr};
 use tungstenite::http::uri::PathAndQuery;
 
 const VERIFIED_HEADER_PREFIX: &str = "x-verified-";
@@ -83,31 +83,45 @@ impl RequestRewriter {
         &self.bearer_token
     }
 
-    pub fn get_host_header(&self) -> Option<&HeaderValue> {
-        self.parts.headers.get(HOST)
-    }
-
+    /// Returns the subdomain of the request's host header, after stripping the cluster name.
+    /// Returns Ok(Some(subdomain)) if a subdomain is found.
+    /// Returns Ok(None) if no subdomain is found, but the host header matches the cluster name.
+    /// Returns Err(RequestRewriterError::InvalidHostHeader) if the host header does not
+    /// match the cluster name, or no host header is found.
     pub fn get_subdomain(
         &self,
         cluster: &ClusterName,
     ) -> Result<Option<&str>, RequestRewriterError> {
-        let subdomain = self
-            .get_host_header()
-            .map(|h| h.to_str())
-            .transpose()? // transpose out failure to parse (non-ascii) error
-            .map(|h| {
-                h.strip_suffix(cluster.as_str())
-                    .ok_or(RequestRewriterError::InvalidHostHeader)
-            })
-            .transpose()? // transpose out error if doesn't end in cluster name
-            .filter(|s| !s.is_empty()) // turns Some("") into None (no subdomain)
-            .map(|s| {
-                // the remaining string must be a subdomain ending in dot
-                s.strip_suffix('.')
-                    .ok_or(RequestRewriterError::InvalidHostHeader)
-            })
-            .transpose()?;
-        Ok(subdomain)
+        let Some(hostname) = self.parts.headers.get(HOST) else {
+            return Err(RequestRewriterError::InvalidHostHeader);
+        };
+
+        let hostname = match hostname.to_str() {
+            Ok(hostname) => hostname,
+            Err(err) => {
+                tracing::warn!(?hostname, ?err, "Host header is not valid UTF-8.");
+                return Err(RequestRewriterError::InvalidHostHeader);
+            }
+        };
+
+        let Some(subdomain) = hostname.strip_suffix(cluster.as_str()) else {
+            tracing::warn!(hostname, "Host header does not end in cluster name.");
+            return Err(RequestRewriterError::InvalidHostHeader);
+        };
+
+        if subdomain.is_empty() {
+            return Ok(None);
+        }
+
+        let subdomain = match subdomain.strip_suffix('.') {
+            Some(subdomain) => subdomain,
+            None => {
+                tracing::warn!(hostname, "Host header does not start with a dot.");
+                return Err(RequestRewriterError::InvalidHostHeader);
+            }
+        };
+
+        Ok(Some(subdomain))
     }
 
     fn into_parts(self) -> (request::Parts, Body, Uri, ForwardableRequestInfo) {
