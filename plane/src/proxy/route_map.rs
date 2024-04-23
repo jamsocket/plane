@@ -121,10 +121,6 @@ impl RouteMap {
         // When a backend is terminated, we invalidate all routes that point to it.
         // We do this by looping over the connection tokens, but this is relatively inexpensive
         // because we have a maximum of 1,000 connection tokens in the LRU cache.
-        tracing::info!(
-            backend = backend.as_value(),
-            "Removing backend from route map."
-        );
         let mut count = 0;
         let mut lock = self.routes.lock().expect("Routes lock was poisoned.");
         for (_, maybe_route_info) in lock.iter_mut() {
@@ -135,6 +131,12 @@ impl RouteMap {
                 }
             }
         }
-        tracing::info!(count, backend = backend.as_value(), "Removed routes.");
+        if count > 0 {
+            tracing::info!(
+                count,
+                backend = backend.as_value(),
+                "Removed routes for terminated backend."
+            );
+        }
     }
 }
