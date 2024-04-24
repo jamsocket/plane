@@ -42,7 +42,6 @@ example payload might look like this:
         "lifetime_limit_seconds": 3600,
         "max_idle_seconds": 60,
     },
-    "pool": "example-pool",
     "user": "user-123",
     "auth": {
         "any arbitrary JSON object": "can go here",
@@ -55,7 +54,6 @@ example payload might look like this:
 - `key`: Optional object describing the key to connect to. If not provided, one will be generated randomly
   (forcing a new backend to start).
 - `spawn_config`: Optional configuration that is used to start a new backend if necessary.
-- `pool`: Optional string specifying the resource pool where the backend should be spawned. If not provided, the default pool is used.
 - `user`: Optional string to associate with the user on whose behalf this request is being made.
 - `auth`: Optional key-value map of unforgeable data (such as claims) that you would like to pass to the
   backend about this user.
