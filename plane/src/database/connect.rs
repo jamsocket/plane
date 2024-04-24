@@ -307,8 +307,10 @@ async fn attempt_connect(
         .or(default_cluster)
         .ok_or(ConnectError::NoClusterProvided)?;
 
+    let drone_pool = &spawn_config.pool.clone().unwrap_or_default();
+
     let drone = DroneDatabase::new(pool)
-        .pick_drone_for_spawn(cluster, spawn_config.pool.as_deref().unwrap_or_default())
+        .pick_drone_for_spawn(cluster, drone_pool)
         .await?
         .ok_or(ConnectError::NoDroneAvailable)?;
 

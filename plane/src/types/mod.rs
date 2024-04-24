@@ -70,6 +70,53 @@ impl FromStr for ClusterName {
     }
 }
 
+#[derive(
+    Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, valuable::Valuable,
+)]
+pub struct DronePoolName(String);
+
+impl DronePoolName {
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<String> for DronePoolName {
+    fn from(s: String) -> Self {
+        DronePoolName(s)
+    }
+}
+
+impl From<&str> for DronePoolName {
+    fn from(s: &str) -> Self {
+        DronePoolName(s.to_string())
+    }
+}
+
+impl From<&Option<String>> for DronePoolName {
+    fn from(opt: &Option<String>) -> Self {
+        DronePoolName(opt.as_deref().unwrap_or_default().to_string())
+    }
+}
+
+impl Display for DronePoolName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Deref for DronePoolName {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Default, valuable::Valuable)]
 pub enum PullPolicy {
     #[default]
@@ -219,7 +266,7 @@ pub struct SpawnConfig {
 
     /// The drone pool to use for the connect request.
     #[serde(default)]
-    pub pool: Option<String>,
+    pub pool: Option<DronePoolName>,
 
     /// Config to use to spawn the backend process.
     pub executable: ExecutorConfig,

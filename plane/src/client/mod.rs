@@ -6,7 +6,7 @@ use crate::{
     typed_socket::client::TypedSocketConnector,
     types::{
         backend_state::BackendStatusStreamEntry, ClusterName, ClusterState, ConnectRequest,
-        ConnectResponse, DrainResult, RevokeRequest,
+        ConnectResponse, DrainResult, DronePoolName, RevokeRequest,
     },
 };
 use reqwest::{Response, StatusCode};
@@ -70,13 +70,14 @@ impl PlaneClient {
     pub fn drone_connection(
         &self,
         cluster: &ClusterName,
-        pool: &str,
+        pool: &DronePoolName,
     ) -> TypedSocketConnector<MessageFromDrone> {
         let base_path = format!("/ctrl/c/{}/drone-socket", cluster);
-        let addr = if pool.is_empty() {
+        let addr = if pool.is_default() {
             self.controller_address.join(&base_path)
         } else {
-            let encoded_pool: String = form_urlencoded::byte_serialize(pool.as_bytes()).collect();
+            let encoded_pool: String =
+                form_urlencoded::byte_serialize(pool.as_str().as_bytes()).collect();
             self.controller_address
                 .join(&format!("{}?pool={}", base_path, encoded_pool))
         }

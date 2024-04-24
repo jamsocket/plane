@@ -9,7 +9,7 @@ use hyper::{
     Body, HeaderMap, Request, Uri,
 };
 use reqwest::header::HeaderValue;
-use std::{borrow::BorrowMut, f64::consts::E, net::SocketAddr, str::FromStr};
+use std::{borrow::BorrowMut, net::SocketAddr, str::FromStr};
 use tungstenite::http::uri::PathAndQuery;
 
 const VERIFIED_HEADER_PREFIX: &str = "x-verified-";

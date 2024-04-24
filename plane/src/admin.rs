@@ -5,8 +5,8 @@ use crate::{
     names::{BackendName, DroneName, Name, ProxyName},
     protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
     types::{
-        BackendStatus, ClusterName, ClusterState, ConnectRequest, ExecutorConfig, KeyConfig, Mount,
-        NodeState, SpawnConfig, Subdomain,
+        BackendStatus, ClusterName, ClusterState, ConnectRequest, DronePoolName, ExecutorConfig,
+        KeyConfig, Mount, NodeState, SpawnConfig, Subdomain,
     },
     PLANE_GIT_HASH, PLANE_VERSION,
 };
@@ -120,7 +120,7 @@ pub enum AdminCommand {
 
         /// An optional drone pool (string), used when selecting where to run the backend.
         #[clap(long)]
-        pool: Option<String>,
+        pool: Option<DronePoolName>,
 
         /// Optionally mount the specified directory from under the host's mount
         /// base to /plane-data in the backend. The directory will be created on
