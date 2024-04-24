@@ -105,6 +105,11 @@ impl RequestRewriter {
         };
 
         // Remove port from hostname if present and port is 443.
+        // We are already a bit magic with regards to HTTP/HTTPS: we assume that if a
+        // cluster name has a colon, it's HTTP and runs on that port, and if a cluster
+        // name does not have a colon, it is HTTPS and runs on 443. In other words,
+        // in production, there's no way for URLs generated and sent to clients to have
+        // a port other than the standard HTTPS port 443.
         let hostname = if let Some(hostname) = hostname.strip_suffix(":443") {
             hostname
         } else {
