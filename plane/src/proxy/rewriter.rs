@@ -104,10 +104,11 @@ impl RequestRewriter {
             }
         };
 
-        // Remove port from hostname if present.
-        let hostname = match hostname.split_once(':') {
-            Some((hostname, _)) => hostname,
-            None => hostname,
+        // Remove port from hostname if present and port is 443.
+        let hostname = if let Some(hostname) = hostname.strip_suffix(":443") {
+            hostname
+        } else {
+            hostname
         };
 
         let Some(subdomain) = hostname.strip_suffix(cluster.as_str()) else {
