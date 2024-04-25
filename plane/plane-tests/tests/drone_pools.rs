@@ -1,7 +1,8 @@
 use crate::common::wait_until_backend_terminated;
 use common::test_env::TestEnvironment;
 use plane::types::{
-    ConnectRequest, ExecutorConfig, KeyConfig, PullPolicy, ResourceLimits, SpawnConfig,
+    ConnectRequest, DronePoolName, ExecutorConfig, KeyConfig, PullPolicy, ResourceLimits,
+    SpawnConfig,
 };
 use plane_test_macro::plane_test;
 use std::collections::HashMap;
@@ -12,7 +13,7 @@ mod common;
 async fn drone_pools(env: TestEnvironment) {
     let controller = env.controller().await;
     let client = controller.client();
-    let pool = "test".to_string();
+    let pool = DronePoolName::from("test");
     let drone = env.drone(&controller).await;
     let drone_in_pool = env.drone_in_pool(&controller, &pool).await;
     assert_ne!(drone.id, drone_in_pool.id);
@@ -25,7 +26,7 @@ async fn drone_pools(env: TestEnvironment) {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(env.cluster.clone()),
-            pool: None,
+            pool: DronePoolName::default(),
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
@@ -57,7 +58,7 @@ async fn drone_pools(env: TestEnvironment) {
     tracing::info!("Requesting backend from pool.");
     let connect_request_with_pool = ConnectRequest {
         spawn_config: Some(SpawnConfig {
-            pool: Some(pool),
+            pool,
             ..connect_request.spawn_config.unwrap()
         }),
         key: Some(KeyConfig {

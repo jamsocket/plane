@@ -10,7 +10,7 @@ use plane::{
     drone::{docker::PlaneDockerConfig, Drone, DroneConfig},
     names::{AcmeDnsServerName, ControllerName, DroneName, Name},
     proxy::AcmeEabConfiguration,
-    types::ClusterName,
+    types::{ClusterName, DronePoolName},
     util::random_string,
 };
 use std::{
@@ -23,7 +23,6 @@ use tracing_appender::non_blocking::WorkerGuard;
 use url::Url;
 
 const TEST_CLUSTER: &str = "plane.test";
-const DEFAULT_POOL: String = String::new();
 
 #[derive(Clone)]
 pub struct TestEnvironment {
@@ -33,7 +32,7 @@ pub struct TestEnvironment {
     log_subscription: Arc<Mutex<Option<LogSubscription>>>,
     pub run_name: String,
     pub cluster: ClusterName,
-    pub pool: String,
+    pub pool: DronePoolName,
 }
 
 #[allow(dead_code)]
@@ -51,7 +50,7 @@ impl TestEnvironment {
             log_subscription: Arc::new(Mutex::new(Some(log_subscription))),
             cluster: TEST_CLUSTER.parse().unwrap(),
             run_name,
-            pool: DEFAULT_POOL,
+            pool: DronePoolName::default(),
         }
     }
 
@@ -109,7 +108,7 @@ impl TestEnvironment {
     pub async fn drone_internal(
         &mut self,
         controller: &ControllerServer,
-        pool: &str,
+        pool: &DronePoolName,
         mount_base: Option<&PathBuf>,
     ) -> Drone {
         let docker_config = PlaneDockerConfig {
@@ -123,7 +122,7 @@ impl TestEnvironment {
             cluster: TEST_CLUSTER.parse().unwrap(),
             ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
             db_path: Some(self.scratch_dir.join("drone.db")),
-            pool: pool.to_string(),
+            pool: pool.clone(),
             auto_prune: false,
             cleanup_min_age: Duration::zero(),
             docker_config,
@@ -138,7 +137,11 @@ impl TestEnvironment {
             .await
     }
 
-    pub async fn drone_in_pool(&mut self, controller: &ControllerServer, pool: &str) -> Drone {
+    pub async fn drone_in_pool(
+        &mut self,
+        controller: &ControllerServer,
+        pool: &DronePoolName,
+    ) -> Drone {
         self.drone_internal(controller, pool, None).await
     }
 

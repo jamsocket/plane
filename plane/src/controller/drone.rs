@@ -14,7 +14,9 @@ use crate::{
         BackendAction, Heartbeat, KeyDeadlines, MessageFromDrone, MessageToDrone, RenewKeyResponse,
     },
     typed_socket::{server::new_server, TypedSocket},
-    types::{backend_state::TerminationReason, ClusterName, NodeId, TerminationKind},
+    types::{
+        backend_state::TerminationReason, ClusterName, DronePoolName, NodeId, TerminationKind,
+    },
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, Path, Query, State, WebSocketUpgrade},
@@ -30,7 +32,7 @@ use valuable::Valuable;
 
 #[derive(Deserialize)]
 pub struct DroneSocketQuery {
-    pool: Option<String>,
+    pool: Option<DronePoolName>,
 }
 
 pub async fn handle_message_from_drone(
@@ -168,7 +170,7 @@ pub async fn drone_socket_inner(
     ws: WebSocket,
     controller: Controller,
     ip: IpAddr,
-    pool: &str,
+    pool: DronePoolName,
 ) -> anyhow::Result<()> {
     let mut socket = new_server(ws, controller.id.to_string()).await?;
 
@@ -239,9 +241,9 @@ pub async fn drone_socket(
     ws: WebSocket,
     controller: Controller,
     ip: IpAddr,
-    pool: String,
+    pool: DronePoolName,
 ) {
-    if let Err(err) = drone_socket_inner(cluster, ws, controller, ip, &pool).await {
+    if let Err(err) = drone_socket_inner(cluster, ws, controller, ip, pool).await {
         tracing::error!(?err, "Drone socket error");
     }
 }

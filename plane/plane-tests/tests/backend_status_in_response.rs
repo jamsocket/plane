@@ -1,8 +1,8 @@
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
-use plane::{
-    types::{BackendStatus, ConnectRequest, ExecutorConfig, PullPolicy, SpawnConfig},
-    types::{KeyConfig, ResourceLimits},
+use plane::types::{
+    BackendStatus, ConnectRequest, DronePoolName, ExecutorConfig, KeyConfig, PullPolicy,
+    ResourceLimits, SpawnConfig,
 };
 use plane_test_macro::plane_test;
 use serde_json::Map;
@@ -24,7 +24,7 @@ async fn backend_status_in_response(env: TestEnvironment) {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(env.cluster.clone()),
-            pool: None,
+            pool: DronePoolName::default(),
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),

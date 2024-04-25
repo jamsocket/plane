@@ -10,7 +10,7 @@ use crate::{
     protocol::{BackendAction, MessageFromDrone, MessageToDrone, RenewKeyResponse},
     signals::wait_for_shutdown_signal,
     typed_socket::client::TypedSocketConnector,
-    types::{BackendState, ClusterName},
+    types::{BackendState, ClusterName, DronePoolName},
 };
 use anyhow::Result;
 use bollard::Docker;
@@ -209,9 +209,9 @@ pub struct DroneConfig {
     pub docker_config: PlaneDockerConfig,
     pub controller_url: Url,
     pub cluster: ClusterName,
+    pub pool: DronePoolName,
     pub ip: IpAddr,
     pub db_path: Option<PathBuf>,
-    pub pool: String,
     pub auto_prune: bool,
     #[serde(with = "crate::serialization::serialize_duration_as_seconds")]
     pub cleanup_min_age: Duration,

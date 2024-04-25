@@ -1,7 +1,7 @@
 use crate::{
     heartbeat_consts::UNHEALTHY_SECONDS,
     names::DroneName,
-    types::{BackendStatus, ClusterName, NodeId},
+    types::{BackendStatus, ClusterName, DronePoolName, NodeId},
 };
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, query, PgPool};
@@ -16,7 +16,12 @@ impl<'a> DroneDatabase<'a> {
         Self { pool }
     }
 
-    pub async fn register_drone(&self, id: NodeId, ready: bool, pool: &str) -> sqlx::Result<()> {
+    pub async fn register_drone(
+        &self,
+        id: NodeId,
+        ready: bool,
+        pool: DronePoolName,
+    ) -> sqlx::Result<()> {
         query!(
             r#"
             insert into drone (id, draining, ready, pool)
@@ -26,7 +31,7 @@ impl<'a> DroneDatabase<'a> {
             "#,
             id.as_i32(),
             ready,
-            pool,
+            pool.to_string(),
         )
         .execute(self.pool)
         .await?;
@@ -74,7 +79,7 @@ impl<'a> DroneDatabase<'a> {
         Ok(())
     }
 
-    pub async fn get_drone_pool(&self, id: NodeId) -> sqlx::Result<String> {
+    pub async fn get_drone_pool(&self, id: NodeId) -> sqlx::Result<DronePoolName> {
         let result = query!(
             r#"
             select pool
@@ -86,14 +91,14 @@ impl<'a> DroneDatabase<'a> {
         .fetch_one(self.pool)
         .await?;
 
-        Ok(result.pool)
+        Ok(result.pool.into())
     }
 
     /// TODO: simple algorithm until we collect more metrics.
     pub async fn pick_drone_for_spawn(
         &self,
         cluster: &ClusterName,
-        pool: &str,
+        pool: &DronePoolName,
     ) -> sqlx::Result<Option<DroneForSpawn>> {
         let result = query!(
             r#"
@@ -128,7 +133,7 @@ impl<'a> DroneDatabase<'a> {
             cluster.to_string(),
             PgInterval::try_from(Duration::from_secs(UNHEALTHY_SECONDS as _))
                 .expect("valid interval"),
-            pool,
+            pool.to_string(),
             BackendStatus::Terminated.to_string(),
         )
         .fetch_optional(self.pool)

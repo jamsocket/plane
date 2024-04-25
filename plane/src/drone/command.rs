@@ -1,7 +1,7 @@
 use crate::{
     drone::{docker::PlaneDockerConfig, DroneConfig},
     names::{DroneName, OrRandom},
-    types::ClusterName,
+    types::{ClusterName, DronePoolName},
     util::resolve_hostname,
 };
 use anyhow::Result;
@@ -37,8 +37,8 @@ pub struct DroneOpts {
     log_config: Option<String>,
 
     /// Optional pool identifier. If present, will only schedule workloads with a matching `pool` tag on this drone.
-    #[clap(long)]
-    pool: Option<String>,
+    #[clap(long, default_value_t = DronePoolName::default())]
+    pool: DronePoolName,
 
     /// Optional base directory under which backends are allowed to mount directories.
     #[clap(long)]
@@ -84,7 +84,7 @@ impl DroneOpts {
             cluster: self.cluster.clone(),
             ip,
             db_path: self.db,
-            pool: self.pool.unwrap_or_default(),
+            pool: self.pool,
             auto_prune: self.auto_prune_images,
             cleanup_min_age,
             docker_config,
