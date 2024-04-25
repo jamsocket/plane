@@ -3,7 +3,10 @@ use common::test_env::TestEnvironment;
 use plane::{
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
-    types::{BackendStatus, ConnectRequest, DronePoolName, ExecutorConfig, PullPolicy, ResourceLimits, SpawnConfig},
+    types::{
+        BackendStatus, ConnectRequest, DronePoolName, ExecutorConfig, PullPolicy, ResourceLimits,
+        SpawnConfig,
+    },
 };
 use plane_test_macro::plane_test;
 use serde_json::Map;

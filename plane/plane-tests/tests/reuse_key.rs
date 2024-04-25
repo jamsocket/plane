@@ -1,6 +1,9 @@
 use crate::common::wait_until_backend_terminated;
 use common::test_env::TestEnvironment;
-use plane::types::{ConnectRequest, DronePoolName, ExecutorConfig, KeyConfig, PullPolicy, ResourceLimits, SpawnConfig};
+use plane::types::{
+    ConnectRequest, DronePoolName, ExecutorConfig, KeyConfig, PullPolicy, ResourceLimits,
+    SpawnConfig,
+};
 use plane_test_macro::plane_test;
 use serde_json::Map;
 use std::collections::HashMap;
