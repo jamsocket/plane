@@ -1644,7 +1644,7 @@ checksum = "d231b230927b5e4ad203db57bbcbee2802f6bce620b1e4a9024a07d94e2907ec"
 
 [[package]]
 name = "plane"
-version = "0.4.9"
+version = "0.4.10"
 dependencies = [
  "acme2-eab",
  "anyhow",
@@ -1707,7 +1707,7 @@ dependencies = [
 
 [[package]]
 name = "plane-tests"
-version = "0.4.9"
+version = "0.4.10"
 dependencies = [
  "anyhow",
  "async-trait",
