@@ -71,7 +71,7 @@ pub async fn handle_message_from_proxy(
                     let accepted = match controller
                         .db
                         .acme()
-                        .set_cluster_dns(&cluster, node_id, &txt_value)
+                        .set_cluster_dns(cluster, node_id, &txt_value)
                         .await
                     {
                         Ok(result) => result,
@@ -87,7 +87,7 @@ pub async fn handle_message_from_proxy(
                     if let Err(err) = controller
                         .db
                         .acme()
-                        .release_cluster_lease(&cluster, node_id)
+                        .release_cluster_lease(cluster, node_id)
                         .await
                     {
                         tracing::error!(?err, "Error releasing cluster DNS");
