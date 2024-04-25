@@ -1,6 +1,6 @@
 [package]
 name = "plane-tests"
-version = "0.4.9"
+version = "0.4.10"
 edition = "2021"
 
 [dependencies]
