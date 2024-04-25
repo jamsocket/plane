@@ -186,9 +186,7 @@ pub struct ResourceLimits {
 
 impl ResourceLimits {
     pub fn cpu_quota(&self) -> Option<std::time::Duration> {
-        let Some(pc) = self.cpu_period_percent else {
-            return None;
-        };
+        let pc = self.cpu_period_percent?;
         let cpu_period = self.cpu_period.clone().unwrap_or_default();
 
         let quota = cpu_period.0.mul_f64((pc as f64) / 100.0);
