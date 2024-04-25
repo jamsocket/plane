@@ -1,7 +1,8 @@
 use crate::common::test_env::TestEnvironment;
 use crate::common::wait_until_backend_terminated;
 use plane::types::{
-    ConnectRequest, ExecutorConfig, KeyConfig, Mount, PullPolicy, ResourceLimits, SpawnConfig,
+    ConnectRequest, DronePoolName, ExecutorConfig, KeyConfig, Mount, PullPolicy, ResourceLimits,
+    SpawnConfig,
 };
 use plane_test_macro::plane_test;
 use serde_json::Map;
@@ -34,7 +35,7 @@ async fn volume_mounts(env: TestEnvironment) {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(env.cluster.clone()),
-            pool: None,
+            pool: DronePoolName::default(),
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),

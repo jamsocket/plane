@@ -97,12 +97,6 @@ impl From<&str> for DronePoolName {
     }
 }
 
-impl From<&Option<String>> for DronePoolName {
-    fn from(opt: &Option<String>) -> Self {
-        DronePoolName(opt.as_deref().unwrap_or_default().to_string())
-    }
-}
-
 impl Display for DronePoolName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -266,7 +260,7 @@ pub struct SpawnConfig {
 
     /// The drone pool to use for the connect request.
     #[serde(default)]
-    pub pool: Option<DronePoolName>,
+    pub pool: DronePoolName,
 
     /// Config to use to spawn the backend process.
     pub executable: ExecutorConfig,

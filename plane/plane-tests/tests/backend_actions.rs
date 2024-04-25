@@ -7,7 +7,9 @@ use plane::{
     log_types::LoggableTime,
     names::{DroneName, Name},
     protocol::{BackendAction, Heartbeat, MessageFromDrone, MessageToDrone},
-    types::{ClusterName, ConnectRequest, ConnectResponse, ExecutorConfig, SpawnConfig},
+    types::{
+        ClusterName, ConnectRequest, ConnectResponse, DronePoolName, ExecutorConfig, SpawnConfig,
+    },
 };
 use plane_test_macro::plane_test;
 use std::time::Duration;
@@ -20,7 +22,7 @@ fn connect_request(cluster: &ClusterName) -> ConnectRequest {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(cluster.clone()),
-            pool: None,
+            pool: DronePoolName::default(),
             executable: ExecutorConfig::from_image_with_defaults("alpine"),
             lifetime_limit_seconds: None,
             max_idle_seconds: None,

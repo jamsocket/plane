@@ -26,7 +26,7 @@ async fn drone_pools(env: TestEnvironment) {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(env.cluster.clone()),
-            pool: None,
+            pool: DronePoolName::default(),
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
@@ -58,7 +58,7 @@ async fn drone_pools(env: TestEnvironment) {
     tracing::info!("Requesting backend from pool.");
     let connect_request_with_pool = ConnectRequest {
         spawn_config: Some(SpawnConfig {
-            pool: Some(pool),
+            pool,
             ..connect_request.spawn_config.unwrap()
         }),
         key: Some(KeyConfig {

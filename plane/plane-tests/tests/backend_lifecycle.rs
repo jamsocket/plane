@@ -3,8 +3,7 @@ use common::test_env::TestEnvironment;
 use plane::{
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
-    types::ResourceLimits,
-    types::{BackendStatus, ConnectRequest, ExecutorConfig, PullPolicy, SpawnConfig},
+    types::{BackendStatus, ConnectRequest, DronePoolName, ExecutorConfig, PullPolicy, ResourceLimits, SpawnConfig},
 };
 use plane_test_macro::plane_test;
 use serde_json::Map;
@@ -27,7 +26,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(env.cluster.clone()),
-            pool: None,
+            pool: DronePoolName::default(),
             executable: ExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
