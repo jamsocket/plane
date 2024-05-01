@@ -78,7 +78,9 @@ impl TestEnvironment {
     pub async fn db(&mut self) -> PlaneDatabase {
         let mut db_lock = self.db.lock().unwrap();
         if db_lock.is_none() {
-            let db = DevDatabase::start(&self).await.unwrap();
+            let db = DevDatabase::start(&self)
+                .await
+                .expect("Error starting database.");
             *db_lock = Some(db);
         }
 
