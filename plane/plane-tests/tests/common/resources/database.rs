@@ -79,21 +79,24 @@ async fn attempt_to_connect(connection_string: &str) -> Result<PlaneDatabase> {
 
 impl DevDatabase {
     pub async fn start(env: &TestEnvironment) -> Result<Self> {
-        let docker = Docker::connect_with_local_defaults()?;
+        let docker = Docker::connect_with_local_defaults().context("Connecting to Docker.")?;
         let container = Container::create(
             format!("postgres-{}", env.run_name),
             docker.clone(),
             container_config(),
             Some(env.scratch_dir.clone()),
         )
-        .await?;
+        .await
+        .context("Creating container.")?;
 
-        let port = container.get_port(5432).await?;
+        let port = container.get_port(5432).await.context("Getting port.")?;
         let connection_string = Self::get_connection_string(port);
 
         tracing::info!("Connection string: {}", connection_string);
 
-        let db = attempt_to_connect(&connection_string).await?;
+        let db = attempt_to_connect(&connection_string)
+            .await
+            .context("Attempting to connect.")?;
 
         Ok(Self {
             docker,

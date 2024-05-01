@@ -166,6 +166,7 @@ pub fn resolve_hostname(hostname: &str) -> Option<IpAddr> {
 
     for socket_addr in socket_addrs {
         if let IpAddr::V4(ip) = socket_addr.ip() {
+            tracing::info!("Resolved hostname to IP: {}", ip);
             return Some(ip.into());
         }
     }
