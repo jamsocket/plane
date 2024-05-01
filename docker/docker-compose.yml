@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   controller:
     container_name: plane-controller
@@ -22,7 +21,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command:
-      "drone --controller-url ws://plane-controller:8080 --cluster 'localhost:9090'"
+      "drone --controller-url ws://plane-controller:8080 --cluster 'localhost:9090' --ip='host.docker.internal'"
     networks:
       - plane-dev
     extra_hosts:
