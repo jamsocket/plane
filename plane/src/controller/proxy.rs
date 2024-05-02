@@ -77,7 +77,8 @@ pub async fn handle_message_from_proxy(
                         Ok(result) => result,
                         Err(err) => {
                             tracing::error!(?err, "Error setting cluster DNS");
-                            return;
+                            // We still need to send a response.
+                            false
                         }
                     };
 
