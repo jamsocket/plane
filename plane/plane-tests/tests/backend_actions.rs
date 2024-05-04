@@ -8,7 +8,8 @@ use plane::{
     names::{DroneName, Name},
     protocol::{BackendAction, Heartbeat, MessageFromDrone, MessageToDrone},
     types::{
-        ClusterName, ConnectRequest, ConnectResponse, DronePoolName, ExecutorConfig, SpawnConfig,
+        ClusterName, ConnectRequest, ConnectResponse, DockerExecutorConfig, DronePoolName,
+        SpawnConfig,
     },
 };
 use plane_test_macro::plane_test;
@@ -17,13 +18,13 @@ use std::time::Duration;
 mod common;
 
 /// Return a dummy connect request, which does not use a key.
-fn connect_request(cluster: &ClusterName) -> ConnectRequest {
+fn connect_request(cluster: &ClusterName) -> ConnectRequest<DockerExecutorConfig> {
     ConnectRequest {
         spawn_config: Some(SpawnConfig {
             id: None,
             cluster: Some(cluster.clone()),
             pool: DronePoolName::default(),
-            executable: ExecutorConfig::from_image_with_defaults("alpine"),
+            executable: DockerExecutorConfig::from_image_with_defaults("alpine"),
             lifetime_limit_seconds: None,
             max_idle_seconds: None,
             use_static_token: false,
