@@ -13,7 +13,6 @@ use crate::{
     types::{BackendState, ClusterName, DronePoolName},
 };
 use anyhow::{anyhow, Result};
-use bollard::Docker;
 use chrono::{Duration, Utc};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -184,14 +183,14 @@ impl Drone {
                 docker_config.cleanup_min_age =
                     docker_config.cleanup_min_age.or(config.cleanup_min_age);
 
-                PlaneDocker::new(Docker::connect_with_local_defaults()?, docker_config).await?
+                PlaneDocker::new(docker_config).await?
             }
             (None, Some(ExecutorConfig::Docker(mut docker_config))) => {
                 docker_config.auto_prune = docker_config.auto_prune.or(config.auto_prune);
                 docker_config.cleanup_min_age =
                     docker_config.cleanup_min_age.or(config.cleanup_min_age);
 
-                PlaneDocker::new(Docker::connect_with_local_defaults()?, docker_config).await?
+                PlaneDocker::new(docker_config).await?
             }
             (None, None) => {
                 tracing::error!("Neither `docker_config` nor `executor_config` provided.");

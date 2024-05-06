@@ -14,8 +14,7 @@ mod common;
 
 #[plane_test]
 async fn test_get_metrics(_: TestEnvironment) {
-    let docker = bollard::Docker::connect_with_local_defaults().unwrap();
-    let plane_docker = PlaneDocker::new(docker, PlaneDockerConfig::default())
+    let plane_docker = PlaneDocker::new(PlaneDockerConfig::default())
         .await
         .unwrap();
 
