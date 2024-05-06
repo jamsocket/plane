@@ -10,6 +10,8 @@ use clap::Parser;
 use std::{net::IpAddr, path::PathBuf};
 use url::Url;
 
+use super::ExecutorConfig;
+
 #[derive(Parser)]
 pub struct DroneOpts {
     #[clap(long)]
@@ -78,6 +80,7 @@ impl DroneOpts {
             Duration::try_seconds(self.auto_prune_containers_older_than_seconds as i64)
                 .expect("valid duration");
 
+        #[allow(deprecated)] // `docker_config` field is deprecated.
         let drone_config = DroneConfig {
             controller_url: self.controller_url,
             name: name.clone(),
@@ -87,7 +90,8 @@ impl DroneOpts {
             pool: self.pool,
             auto_prune: self.auto_prune_images,
             cleanup_min_age,
-            docker_config,
+            docker_config: None,
+            executor_config: Some(ExecutorConfig::Docker(docker_config)),
         };
 
         Ok(drone_config)
