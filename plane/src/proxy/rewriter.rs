@@ -1,4 +1,4 @@
-use super::ForwardableRequestInfo;
+use super::{subdomain::subdomain_from_host, ForwardableRequestInfo};
 use crate::{
     protocol::RouteInfo,
     types::{BearerToken, ClusterName},
@@ -21,7 +21,7 @@ const BACKEND_ID_HEADER: &str = "x-verified-backend";
 const X_FORWARDED_FOR_HEADER: &str = "x-forwarded-for";
 const X_FORWARDED_PROTO_HEADER: &str = "x-forwarded-proto";
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum RequestRewriterError {
     #[error("Invalid `host` header")]
     InvalidHostHeader,
@@ -105,36 +105,7 @@ impl RequestRewriter {
             }
         };
 
-        // Remove port from hostname if present and port is 443.
-        // We are already a bit magic with regards to HTTP/HTTPS: we assume that if a
-        // cluster name has a colon, it's HTTP and runs on that port, and if a cluster
-        // name does not have a colon, it is HTTPS and runs on 443. In other words,
-        // in production, there's no way for URLs generated and sent to clients to have
-        // a port other than the standard HTTPS port 443.
-        let hostname = if let Some(hostname) = hostname.strip_suffix(":443") {
-            hostname
-        } else {
-            hostname
-        };
-
-        let Some(subdomain) = hostname.strip_suffix(cluster.as_str()) else {
-            tracing::warn!(hostname, "Host header does not end in cluster name.");
-            return Err(RequestRewriterError::InvalidHostHeader);
-        };
-
-        if subdomain.is_empty() {
-            return Ok(None);
-        }
-
-        let subdomain = match subdomain.strip_suffix('.') {
-            Some(subdomain) => subdomain,
-            None => {
-                tracing::warn!(hostname, "Host header does not start with a dot.");
-                return Err(RequestRewriterError::InvalidHostHeader);
-            }
-        };
-
-        Ok(Some(subdomain))
+        subdomain_from_host(hostname, cluster)
     }
 
     fn into_parts(self) -> (request::Parts, Body, Uri, ForwardableRequestInfo) {

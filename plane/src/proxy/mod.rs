@@ -19,6 +19,7 @@ mod proxy_service;
 mod rewriter;
 mod route_map;
 mod shutdown_signal;
+mod subdomain;
 mod tls;
 
 #[derive(Debug, Clone, Copy)]
