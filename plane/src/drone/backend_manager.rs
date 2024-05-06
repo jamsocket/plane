@@ -9,7 +9,7 @@ use crate::{
     typed_socket::TypedSocketSender,
     types::{
         backend_state::{BackendError, TerminationReason},
-        BackendState, BearerToken, ExecutorConfig, PullPolicy, TerminationKind,
+        BackendState, BearerToken, DockerExecutorConfig, PullPolicy, TerminationKind,
     },
     util::{ExponentialBackoff, GuardHandle},
 };
@@ -138,7 +138,7 @@ pub struct BackendManager {
     docker: PlaneDocker,
 
     /// The configuration to use when spawning the backend.
-    executor_config: ExecutorConfig,
+    executor_config: DockerExecutorConfig,
 
     /// Function to call when the state changes.
     state_callback: StateCallback,
@@ -169,7 +169,7 @@ impl BackendManager {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         backend_id: BackendName,
-        executor_config: ExecutorConfig,
+        executor_config: DockerExecutorConfig,
         state: BackendState,
         docker: PlaneDocker,
         state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,

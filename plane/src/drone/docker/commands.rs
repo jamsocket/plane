@@ -2,7 +2,7 @@ use super::{types::ContainerId, PlaneDocker};
 use crate::{
     names::BackendName,
     protocol::AcquiredKey,
-    types::{BearerToken, ExecutorConfig, Mount},
+    types::{BearerToken, DockerExecutorConfig, Mount},
 };
 use anyhow::Result;
 use bollard::{
@@ -137,7 +137,7 @@ pub fn validate_mount_path(path: &Path) -> Result<()> {
 
 pub fn get_container_config_from_executor_config(
     backend_id: &BackendName,
-    exec_config: ExecutorConfig,
+    exec_config: DockerExecutorConfig,
     runtime: Option<&str>,
     key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
@@ -259,7 +259,7 @@ pub async fn run_container(
     docker: &PlaneDocker,
     backend_id: &BackendName,
     container_id: &ContainerId,
-    exec_config: ExecutorConfig,
+    exec_config: DockerExecutorConfig,
     acquired_key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
 ) -> Result<()> {
@@ -298,7 +298,7 @@ mod tests {
         log_types::LoggableTime,
         names::Name,
         protocol::{AcquiredKey, KeyDeadlines},
-        types::{ExecutorConfig, KeyConfig, Mount},
+        types::{DockerExecutorConfig, KeyConfig, Mount},
     };
     use std::time::UNIX_EPOCH;
 
@@ -322,7 +322,7 @@ mod tests {
             token: Default::default(),
         });
 
-        let mut exec_config = ExecutorConfig::from_image_with_defaults(String::default());
+        let mut exec_config = DockerExecutorConfig::from_image_with_defaults(String::default());
         exec_config.mount = mount;
 
         get_container_config_from_executor_config(

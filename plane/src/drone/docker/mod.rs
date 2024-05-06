@@ -7,7 +7,7 @@ use crate::{
     heartbeat_consts::KILL_AFTER_SOFT_TERMINATE_SECONDS,
     names::BackendName,
     protocol::AcquiredKey,
-    types::{BearerToken, ExecutorConfig},
+    types::{BearerToken, DockerExecutorConfig},
 };
 use anyhow::Result;
 use bollard::{
@@ -144,7 +144,7 @@ impl PlaneDocker {
         &self,
         backend_id: &BackendName,
         container_id: &ContainerId,
-        executable: ExecutorConfig,
+        executable: DockerExecutorConfig,
         acquired_key: Option<&AcquiredKey>,
         static_token: Option<&BearerToken>,
     ) -> Result<SpawnResult> {

@@ -5,7 +5,7 @@ use plane::{
         PlaneDocker, PlaneDockerConfig,
     },
     names::{BackendName, Name},
-    types::ExecutorConfig,
+    types::DockerExecutorConfig,
 };
 use plane_test_macro::plane_test;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -31,8 +31,9 @@ async fn test_get_metrics(_: TestEnvironment) {
 
     let backend_name = BackendName::new_random();
     let container_id = ContainerId::from(format!("plane-test-{}", backend_name));
-    let executor_config =
-        ExecutorConfig::from_image_with_defaults("ghcr.io/drifting-in-space/demo-image-drop-four");
+    let executor_config = DockerExecutorConfig::from_image_with_defaults(
+        "ghcr.io/drifting-in-space/demo-image-drop-four",
+    );
     plane_docker
         .spawn_backend(&backend_name, &container_id, executor_config, None, None)
         .await
