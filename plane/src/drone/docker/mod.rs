@@ -8,6 +8,7 @@ use crate::{
     names::BackendName,
     protocol::AcquiredKey,
     types::{BearerToken, DockerExecutorConfig},
+    util::GuardHandle,
 };
 use anyhow::Result;
 use bollard::{
@@ -19,13 +20,19 @@ use bollard::{
     system::EventsOptions,
     Docker,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 use std::{collections::HashMap, path::PathBuf};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 use valuable::Valuable;
+
+/// Clean up containers and images every minute.
+const CLEANUP_INTERVAL_SECS: i64 = 60;
 
 pub mod commands;
 pub mod types;
@@ -39,12 +46,17 @@ pub struct PlaneDockerConfig {
     pub runtime: Option<String>,
     pub log_config: Option<HostConfigLogConfig>,
     pub mount_base: Option<PathBuf>,
+
+    pub auto_prune: Option<bool>,
+    #[serde(with = "crate::serialization::serialize_optional_duration_as_seconds")]
+    pub cleanup_min_age: Option<Duration>,
 }
 
 #[derive(Clone, Debug)]
 pub struct PlaneDocker {
     docker: Docker,
     config: PlaneDockerConfig,
+    _cleanup_handle: Arc<GuardHandle>,
 }
 
 #[derive(Clone, Debug)]
@@ -60,7 +72,28 @@ pub struct SpawnResult {
 
 impl PlaneDocker {
     pub async fn new(docker: Docker, config: PlaneDockerConfig) -> Result<Self> {
-        Ok(Self { docker, config })
+        let cleanup_handle = {
+            let docker = docker.clone();
+            let cleanup_min_age = config.cleanup_min_age.unwrap_or_default();
+            let auto_prune = config.auto_prune.unwrap_or_default();
+            GuardHandle::new(async move {
+                cleanup_loop(
+                    docker.clone(),
+                    cleanup_min_age,
+                    Duration::try_seconds(CLEANUP_INTERVAL_SECS).expect("duration is always valid"),
+                    auto_prune,
+                )
+                .await;
+            })
+        };
+
+        let cleanup_handle = Arc::new(cleanup_handle);
+
+        Ok(Self {
+            docker,
+            config,
+            _cleanup_handle: cleanup_handle,
+        })
     }
 
     pub async fn pull(
@@ -204,60 +237,6 @@ impl PlaneDocker {
             .ok_or(anyhow::anyhow!("no stats found for {container_id}"))?
             .map_err(|e| anyhow::anyhow!("{e:?}"))
     }
-
-    /// Prune stopped backend containers that are older than the prune threshold.
-    /// Then, (optionally) remove unused images also older than the prune threshold.
-    pub async fn prune(&self, until: DateTime<Utc>, prune_images: bool) -> Result<()> {
-        tracing::info!("Pruning Docker containers and images.");
-
-        let since_unixtime = until.timestamp();
-        let filters: HashMap<String, Vec<String>> = vec![
-            ("until".to_string(), vec![since_unixtime.to_string()]),
-            ("label".to_string(), vec![PLANE_DOCKER_LABEL.to_string()]),
-        ]
-        .into_iter()
-        .collect();
-
-        match self
-            .docker
-            .prune_containers(Some(PruneContainersOptions {
-                filters: filters.clone(),
-            }))
-            .await
-        {
-            Ok(result) => {
-                let num_containers_deleted =
-                    result.containers_deleted.map(|d| d.len()).unwrap_or(0);
-                let space_reclaimed_bytes = result.space_reclaimed;
-                tracing::info!(
-                    num_containers_deleted,
-                    space_reclaimed_bytes,
-                    "Done pruning containers."
-                );
-            }
-            Err(e) => tracing::error!(?e, "Error pruning containers."),
-        }
-
-        if prune_images {
-            let filters: HashMap<String, Vec<String>> =
-                vec![("until".to_string(), vec![since_unixtime.to_string()])]
-                    .into_iter()
-                    .collect();
-            match self
-                .docker
-                .prune_images(Some(PruneImagesOptions { filters }))
-                .await
-            {
-                Ok(result) => {
-                    let num_images_deleted = result.images_deleted.map(|d| d.len()).unwrap_or(0);
-                    tracing::info!(num_images_deleted, "Pruning images.");
-                }
-                Err(e) => tracing::error!(?e, "Error pruning images."),
-            }
-        }
-
-        Ok(())
-    }
 }
 
 #[derive(Error, Debug)]
@@ -371,4 +350,72 @@ pub fn get_metrics_message_from_container_stats(
         cpu_used: container_cpu_used_delta,
         sys_cpu: system_cpu_used_delta,
     })
+}
+
+async fn cleanup_loop(docker: Docker, min_age: Duration, interval: Duration, auto_prune: bool) {
+    loop {
+        tokio::time::sleep(
+            interval
+                .to_std()
+                .expect("Expected interval to convert to std."),
+        )
+        .await;
+
+        let since = Utc::now() - min_age;
+
+        if let Err(e) = prune(&docker, since, auto_prune).await {
+            tracing::error!(?e, "Error pruning Docker containers and images.");
+        }
+    }
+}
+
+/// Prune stopped backend containers that are older than the prune threshold.
+/// Then, (optionally) remove unused images also older than the prune threshold.
+pub async fn prune(docker: &Docker, until: DateTime<Utc>, prune_images: bool) -> Result<()> {
+    tracing::info!("Pruning Docker containers and images.");
+
+    let since_unixtime = until.timestamp();
+    let filters: HashMap<String, Vec<String>> = vec![
+        ("until".to_string(), vec![since_unixtime.to_string()]),
+        ("label".to_string(), vec![PLANE_DOCKER_LABEL.to_string()]),
+    ]
+    .into_iter()
+    .collect();
+
+    match docker
+        .prune_containers(Some(PruneContainersOptions {
+            filters: filters.clone(),
+        }))
+        .await
+    {
+        Ok(result) => {
+            let num_containers_deleted = result.containers_deleted.map(|d| d.len()).unwrap_or(0);
+            let space_reclaimed_bytes = result.space_reclaimed;
+            tracing::info!(
+                num_containers_deleted,
+                space_reclaimed_bytes,
+                "Done pruning containers."
+            );
+        }
+        Err(e) => tracing::error!(?e, "Error pruning containers."),
+    }
+
+    if prune_images {
+        let filters: HashMap<String, Vec<String>> =
+            vec![("until".to_string(), vec![since_unixtime.to_string()])]
+                .into_iter()
+                .collect();
+        match docker
+            .prune_images(Some(PruneImagesOptions { filters }))
+            .await
+        {
+            Ok(result) => {
+                let num_images_deleted = result.images_deleted.map(|d| d.len()).unwrap_or(0);
+                tracing::info!(num_images_deleted, "Pruning images.");
+            }
+            Err(e) => tracing::error!(?e, "Error pruning images."),
+        }
+    }
+
+    Ok(())
 }

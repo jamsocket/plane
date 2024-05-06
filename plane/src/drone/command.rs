@@ -67,20 +67,22 @@ impl DroneOpts {
             .map(|s| serde_json::from_str(&s))
             .transpose()?;
 
+        let cleanup_min_age =
+            Duration::try_seconds(self.auto_prune_containers_older_than_seconds as i64)
+                .expect("valid duration");
+
         let docker_config = PlaneDockerConfig {
             runtime: self.docker_runtime,
             log_config,
             mount_base: self.mount_base,
+            auto_prune: Some(self.auto_prune_images),
+            cleanup_min_age: Some(cleanup_min_age),
         };
 
         let ip: IpAddr = resolve_hostname(&self.ip)
             .ok_or_else(|| anyhow::anyhow!("Failed to resolve hostname to IP address."))?;
 
-        let cleanup_min_age =
-            Duration::try_seconds(self.auto_prune_containers_older_than_seconds as i64)
-                .expect("valid duration");
-
-        #[allow(deprecated)] // `docker_config` field is deprecated.
+        #[allow(deprecated)]
         let drone_config = DroneConfig {
             controller_url: self.controller_url,
             name: name.clone(),
@@ -88,9 +90,9 @@ impl DroneOpts {
             ip,
             db_path: self.db,
             pool: self.pool,
-            auto_prune: self.auto_prune_images,
-            cleanup_min_age,
-            docker_config: None,
+            auto_prune: None,      // deprecated
+            cleanup_min_age: None, // deprecated
+            docker_config: None,   // deprecated
             executor_config: Some(ExecutorConfig::Docker(docker_config)),
         };
 
