@@ -17,6 +17,7 @@ const USERNAME_HEADER: &str = "x-verified-username";
 const AUTH_SECRET_HEADER: &str = "x-verified-secret";
 const AUTH_USER_DATA_HEADER: &str = "x-verified-user-data";
 const PATH_PREFIX_HEADER: &str = "x-verified-path";
+const BACKEND_ID_HEADER: &str = "x-verified-backend";
 const X_FORWARDED_FOR_HEADER: &str = "x-forwarded-for";
 const X_FORWARDED_PROTO_HEADER: &str = "x-forwarded-proto";
 
@@ -294,5 +295,14 @@ fn set_headers_from_route_info(
     headers.insert(
         PATH_PREFIX_HEADER,
         HeaderValue::from_str(&prefix_uri.to_string()).expect("Path is valid."),
+    );
+
+    headers.insert(
+        BACKEND_ID_HEADER,
+        route_info
+            .backend_id
+            .to_string()
+            .parse()
+            .expect("Backend ID is a valid header value."),
     );
 }
