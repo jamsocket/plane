@@ -8,7 +8,6 @@ use crate::{
     util::GuardHandle,
 };
 use anyhow::Result;
-use chrono::{Duration, Utc};
 use dashmap::DashMap;
 use futures_util::StreamExt;
 use std::{
@@ -17,48 +16,16 @@ use std::{
 };
 use valuable::Valuable;
 
-/// Clean up containers and images every minute.
-const CLEANUP_INTERVAL_SECS: i64 = 60;
-
 pub struct Executor {
     docker: PlaneDocker,
     state_store: Arc<Mutex<StateStore>>,
     backends: Arc<DashMap<BackendName, Arc<BackendManager>>>,
     ip: IpAddr,
     _backend_event_listener: GuardHandle,
-    _cleanup_handle: GuardHandle,
-}
-
-async fn cleanup_loop(
-    docker: PlaneDocker,
-    min_age: Duration,
-    interval: Duration,
-    auto_prune: bool,
-) {
-    loop {
-        tokio::time::sleep(
-            interval
-                .to_std()
-                .expect("Expected interval to convert to std."),
-        )
-        .await;
-
-        let since = Utc::now() - min_age;
-
-        if let Err(e) = docker.prune(since, auto_prune).await {
-            tracing::error!(?e, "Error pruning Docker containers and images.");
-        }
-    }
 }
 
 impl Executor {
-    pub fn new(
-        docker: PlaneDocker,
-        state_store: StateStore,
-        ip: IpAddr,
-        auto_prune: bool,
-        cleanup_min_age: Duration,
-    ) -> Self {
+    pub fn new(docker: PlaneDocker, state_store: StateStore, ip: IpAddr) -> Self {
         let backends: Arc<DashMap<BackendName, Arc<BackendManager>>> = Arc::default();
 
         let backend_event_listener = {
@@ -85,26 +52,12 @@ impl Executor {
             })
         };
 
-        let cleanup_handle = {
-            let docker = docker.clone();
-            GuardHandle::new(async move {
-                cleanup_loop(
-                    docker.clone(),
-                    cleanup_min_age,
-                    Duration::try_seconds(CLEANUP_INTERVAL_SECS).expect("duration is always valid"),
-                    auto_prune,
-                )
-                .await;
-            })
-        };
-
         Self {
             docker,
             state_store: Arc::new(Mutex::new(state_store)),
             backends,
             ip,
             _backend_event_listener: backend_event_listener,
-            _cleanup_handle: cleanup_handle,
         }
     }
 

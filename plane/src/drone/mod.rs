@@ -178,11 +178,19 @@ impl Drone {
                     "Only one of `docker_config` and `executor_config` may be provided."
                 ));
             }
-            (Some(docker_config), None) => {
+            (Some(mut docker_config), None) => {
                 tracing::warn!("`docker_config` is deprecated. Use `executor_config` instead.");
+                docker_config.auto_prune = docker_config.auto_prune.or(config.auto_prune);
+                docker_config.cleanup_min_age =
+                    docker_config.cleanup_min_age.or(config.cleanup_min_age);
+
                 PlaneDocker::new(Docker::connect_with_local_defaults()?, docker_config).await?
             }
-            (None, Some(ExecutorConfig::Docker(docker_config))) => {
+            (None, Some(ExecutorConfig::Docker(mut docker_config))) => {
+                docker_config.auto_prune = docker_config.auto_prune.or(config.auto_prune);
+                docker_config.cleanup_min_age =
+                    docker_config.cleanup_min_age.or(config.cleanup_min_age);
+
                 PlaneDocker::new(Docker::connect_with_local_defaults()?, docker_config).await?
             }
             (None, None) => {
@@ -208,13 +216,8 @@ impl Drone {
         };
 
         let state_store = StateStore::new(sqlite_connection)?;
-        let executor = Executor::new(
-            executor,
-            state_store,
-            config.ip,
-            config.auto_prune,
-            config.cleanup_min_age,
-        );
+
+        let executor = Executor::new(executor, state_store, config.ip);
 
         let id = config.name.clone();
         let drone_loop = tokio::spawn(drone_loop(id.clone(), connector, executor));
@@ -248,9 +251,18 @@ pub struct DroneConfig {
     pub pool: DronePoolName,
     pub ip: IpAddr,
     pub db_path: Option<PathBuf>,
-    pub auto_prune: bool,
-    #[serde(with = "crate::serialization::serialize_duration_as_seconds")]
-    pub cleanup_min_age: Duration,
+
+    #[deprecated(
+        since = "0.4.12",
+        note = "Moved to `executor_config` (only applies to PlaneDockerConfig)."
+    )]
+    pub auto_prune: Option<bool>,
+    #[serde(with = "crate::serialization::serialize_optional_duration_as_seconds")]
+    #[deprecated(
+        since = "0.4.12",
+        note = "Moved to `executor_config` (only applies to PlaneDockerConfig)."
+    )]
+    pub cleanup_min_age: Option<Duration>,
 }
 
 pub async fn run_drone(config: DroneConfig) -> Result<()> {

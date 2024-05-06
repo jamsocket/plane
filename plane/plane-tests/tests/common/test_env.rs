@@ -117,6 +117,8 @@ impl TestEnvironment {
             runtime: None,
             log_config: None,
             mount_base: mount_base.map(|p| p.to_owned()),
+            auto_prune: Some(false),
+            cleanup_min_age: Some(Duration::zero()),
         };
 
         #[allow(deprecated)] // `docker_config` field is deprecated.
@@ -126,8 +128,8 @@ impl TestEnvironment {
             ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
             db_path: Some(self.scratch_dir.join("drone.db")),
             pool: pool.clone(),
-            auto_prune: false,
-            cleanup_min_age: Duration::zero(),
+            auto_prune: None,
+            cleanup_min_age: None,
             executor_config: Some(ExecutorConfig::Docker(docker_config)),
             docker_config: None,
             controller_url: controller.url().clone(),
