@@ -3,7 +3,7 @@ use crate::{
     database::{connect::ConnectError, PlaneDatabase},
     names::{AnyNodeName, ControllerName},
     typed_socket::Handshake,
-    types::{ClusterName, ConnectRequest, ConnectResponse, NodeId},
+    types::{ClusterName, ConnectRequest, ConnectResponse, DockerExecutorConfig, NodeId},
 };
 use chrono::{DateTime, Utc};
 use std::net::IpAddr;
@@ -90,7 +90,7 @@ impl Controller {
 
     pub async fn connect(
         &self,
-        connect_request: &ConnectRequest,
+        connect_request: &ConnectRequest<DockerExecutorConfig>,
     ) -> Result<ConnectResponse, ConnectError> {
         let response = self
             .db

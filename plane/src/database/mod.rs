@@ -12,7 +12,7 @@ use self::{
 };
 use crate::{
     client::PlaneClient,
-    types::{ClusterName, ConnectRequest, ConnectResponse, RevokeRequest},
+    types::{ClusterName, ConnectRequest, ConnectResponse, DockerExecutorConfig, RevokeRequest},
 };
 use serde_json::Value;
 use sqlx::{postgres::PgPoolOptions, PgPool};
@@ -91,7 +91,7 @@ impl PlaneDatabase {
     pub async fn connect(
         &self,
         default_cluster: Option<&ClusterName>,
-        request: &ConnectRequest,
+        request: &ConnectRequest<DockerExecutorConfig>,
         client: &PlaneClient,
     ) -> Result<ConnectResponse, ConnectError> {
         connect::connect(&self.pool, default_cluster, request, client).await

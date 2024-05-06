@@ -5,8 +5,8 @@ use crate::{
     names::{BackendName, DroneName, Name, ProxyName},
     protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
     types::{
-        BackendStatus, ClusterName, ClusterState, ConnectRequest, DronePoolName, ExecutorConfig,
-        KeyConfig, Mount, NodeState, SpawnConfig, Subdomain,
+        BackendStatus, ClusterName, ClusterState, ConnectRequest, DockerExecutorConfig,
+        DronePoolName, KeyConfig, Mount, NodeState, SpawnConfig, Subdomain,
     },
     PLANE_GIT_HASH, PLANE_VERSION,
 };
@@ -181,7 +181,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             mount,
             subdomain,
         } => {
-            let mut executor_config = ExecutorConfig::from_image_with_defaults(image);
+            let mut executor_config = DockerExecutorConfig::from_image_with_defaults(image);
             executor_config.mount = mount.map(Mount::Path);
             let max_idle_seconds = max_idle_seconds.unwrap_or(500);
             let spawn_config = SpawnConfig {

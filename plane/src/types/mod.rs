@@ -221,7 +221,7 @@ pub enum Mount {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, valuable::Valuable)]
-pub struct ExecutorConfig {
+pub struct DockerExecutorConfig {
     pub image: String,
     pub pull_policy: Option<PullPolicy>,
     pub credentials: Option<DockerRegistryAuth>,
@@ -232,7 +232,7 @@ pub struct ExecutorConfig {
     pub mount: Option<Mount>,
 }
 
-impl ExecutorConfig {
+impl DockerExecutorConfig {
     pub fn from_image_with_defaults<T: Into<String>>(image: T) -> Self {
         Self {
             image: image.into(),
@@ -246,7 +246,7 @@ impl ExecutorConfig {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct SpawnConfig {
+pub struct SpawnConfig<EC> {
     /// ID to assign to the new backend. Must be unique.
     /// This should only be used if you really need it, otherwise you can leave it blank
     /// and let Plane assign a unique ID automatically. This may be removed from
@@ -261,7 +261,7 @@ pub struct SpawnConfig {
     pub pool: DronePoolName,
 
     /// Config to use to spawn the backend process.
-    pub executable: ExecutorConfig,
+    pub executable: EC,
 
     /// If provided, the maximum amount of time the backend will be allowed to
     /// stay alive. Time counts from when the backend is scheduled.
@@ -309,14 +309,14 @@ impl KeyConfig {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub struct ConnectRequest {
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ConnectRequest<EC> {
     /// Configuration for the key to use.
     #[serde(default)]
     pub key: Option<KeyConfig>,
 
     /// Config to use if we need to create a new backend to connect to.
-    pub spawn_config: Option<SpawnConfig>,
+    pub spawn_config: Option<SpawnConfig<EC>>,
 
     /// Username or other identifier to associate with the generated connection URL.
     /// Passed to the backend through the X-Plane-User header.
@@ -326,6 +326,20 @@ pub struct ConnectRequest {
     /// Passed to the backend through the X-Plane-Auth header.
     #[serde(default)]
     pub auth: Map<String, Value>,
+}
+
+// We need to derive this manually, because the derive macro will add a bound
+// EC: Default. This is not actually necessary because we default to spawn_config
+// being None.
+impl<EC> Default for ConnectRequest<EC> {
+    fn default() -> Self {
+        Self {
+            key: None,
+            spawn_config: None,
+            user: None,
+            auth: Map::default(),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]

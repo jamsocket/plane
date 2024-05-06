@@ -1,7 +1,7 @@
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
 use plane::types::{
-    BackendStatus, ConnectRequest, DronePoolName, ExecutorConfig, KeyConfig, PullPolicy,
+    BackendStatus, ConnectRequest, DockerExecutorConfig, DronePoolName, KeyConfig, PullPolicy,
     ResourceLimits, SpawnConfig,
 };
 use plane_test_macro::plane_test;
@@ -25,7 +25,7 @@ async fn backend_status_in_response(env: TestEnvironment) {
             id: None,
             cluster: Some(env.cluster.clone()),
             pool: DronePoolName::default(),
-            executable: ExecutorConfig {
+            executable: DockerExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
                 env: HashMap::default(),

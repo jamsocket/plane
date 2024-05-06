@@ -2,7 +2,7 @@ use super::error::{err_to_response, ApiErrorKind};
 use super::Controller;
 use crate::controller::error::IntoApiError;
 use crate::database::connect::ConnectError;
-use crate::types::{ConnectRequest, ConnectResponse, RevokeRequest};
+use crate::types::{ConnectRequest, ConnectResponse, DockerExecutorConfig, RevokeRequest};
 use axum::{extract::State, response::Response, Json};
 use reqwest::StatusCode;
 
@@ -67,7 +67,7 @@ fn connect_error_to_response(connect_error: &ConnectError) -> Response {
 
 pub async fn handle_connect(
     State(controller): State<Controller>,
-    Json(request): Json<ConnectRequest>,
+    Json(request): Json<ConnectRequest<DockerExecutorConfig>>,
 ) -> Result<Json<ConnectResponse>, Response> {
     let response = controller
         .connect(&request)

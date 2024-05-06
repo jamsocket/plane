@@ -1,6 +1,6 @@
 use crate::common::{test_env::TestEnvironment, wait_until_backend_terminated};
 use plane::types::{
-    ConnectRequest, DronePoolName, ExecutorConfig, PullPolicy, ResourceLimits, SpawnConfig,
+    ConnectRequest, DockerExecutorConfig, DronePoolName, PullPolicy, ResourceLimits, SpawnConfig,
     Subdomain,
 };
 use plane_test_macro::plane_test;
@@ -24,7 +24,7 @@ async fn subdomains(env: TestEnvironment) {
             id: None,
             cluster: Some(env.cluster.clone()),
             pool: DronePoolName::default(),
-            executable: ExecutorConfig {
+            executable: DockerExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
                 env: HashMap::default(),
