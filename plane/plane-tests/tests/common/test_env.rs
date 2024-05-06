@@ -7,7 +7,7 @@ use plane::{
     controller::ControllerServer,
     database::PlaneDatabase,
     dns::run_dns_with_listener,
-    drone::{docker::PlaneDockerConfig, Drone, DroneConfig},
+    drone::{docker::PlaneDockerConfig, Drone, DroneConfig, ExecutorConfig},
     names::{AcmeDnsServerName, ControllerName, DroneName, Name},
     proxy::AcmeEabConfiguration,
     types::{ClusterName, DronePoolName},
@@ -119,6 +119,7 @@ impl TestEnvironment {
             mount_base: mount_base.map(|p| p.to_owned()),
         };
 
+        #[allow(deprecated)] // `docker_config` field is deprecated.
         let drone_config = DroneConfig {
             name: DroneName::new_random(),
             cluster: TEST_CLUSTER.parse().unwrap(),
@@ -127,7 +128,8 @@ impl TestEnvironment {
             pool: pool.clone(),
             auto_prune: false,
             cleanup_min_age: Duration::zero(),
-            docker_config,
+            executor_config: Some(ExecutorConfig::Docker(docker_config)),
+            docker_config: None,
             controller_url: controller.url().clone(),
         };
 

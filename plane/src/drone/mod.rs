@@ -12,7 +12,7 @@ use crate::{
     typed_socket::client::TypedSocketConnector,
     types::{BackendState, ClusterName, DronePoolName},
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use bollard::Docker;
 use chrono::{Duration, Utc};
 use rusqlite::Connection;
@@ -167,8 +167,32 @@ pub struct Drone {
 impl Drone {
     pub async fn run(config: DroneConfig) -> Result<Self> {
         let client = PlaneClient::new(config.controller_url);
-        let docker =
-            PlaneDocker::new(Docker::connect_with_local_defaults()?, config.docker_config).await?;
+
+        #[allow(deprecated)]
+        let executor = match (config.docker_config, config.executor_config) {
+            (Some(_), Some(_)) => {
+                tracing::error!(
+                    "Only one of `docker_config` and `executor_config` may be provided."
+                );
+                return Err(anyhow!(
+                    "Only one of `docker_config` and `executor_config` may be provided."
+                ));
+            }
+            (Some(docker_config), None) => {
+                tracing::warn!("`docker_config` is deprecated. Use `executor_config` instead.");
+                PlaneDocker::new(Docker::connect_with_local_defaults()?, docker_config).await?
+            }
+            (None, Some(ExecutorConfig::Docker(docker_config))) => {
+                PlaneDocker::new(Docker::connect_with_local_defaults()?, docker_config).await?
+            }
+            (None, None) => {
+                tracing::error!("Neither `docker_config` nor `executor_config` provided.");
+                return Err(anyhow!(
+                    "Neither `docker_config` nor `executor_config` provided."
+                ));
+            }
+        };
+
         let connector = client.drone_connection(&config.cluster, &config.pool);
 
         let sqlite_connection = if let Some(db_path) = config.db_path.as_ref() {
@@ -185,7 +209,7 @@ impl Drone {
 
         let state_store = StateStore::new(sqlite_connection)?;
         let executor = Executor::new(
-            docker,
+            executor,
             state_store,
             config.ip,
             config.auto_prune,
@@ -204,9 +228,21 @@ impl Drone {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutorConfig {
+    Docker(PlaneDockerConfig),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DroneConfig {
     pub name: DroneName,
-    pub docker_config: PlaneDockerConfig,
+
+    #[deprecated(since = "0.4.12", note = "Use `executor_config` instead.")]
+    pub docker_config: Option<PlaneDockerConfig>,
+
+    // This will become non-optional when docker_config is removed.
+    pub executor_config: Option<ExecutorConfig>,
+
     pub controller_url: Url,
     pub cluster: ClusterName,
     pub pool: DronePoolName,
