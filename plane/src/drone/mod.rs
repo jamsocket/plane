@@ -33,6 +33,7 @@ pub mod docker;
 mod executor;
 mod heartbeat;
 mod key_manager;
+pub mod runtime;
 mod state_store;
 mod wait_backend;
 

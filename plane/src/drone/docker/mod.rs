@@ -13,7 +13,6 @@ use crate::{
 use anyhow::Result;
 use bollard::{
     container::{PruneContainersOptions, StatsOptions, StopContainerOptions},
-    errors::Error,
     image::PruneImagesOptions,
     service::{EventMessage, HostConfigLogConfig},
     system::EventsOptions,
@@ -29,6 +28,8 @@ use std::{collections::HashMap, path::PathBuf};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 use valuable::Valuable;
+
+use super::runtime::Runtime;
 
 /// Clean up containers and images every minute.
 const CLEANUP_INTERVAL_SECS: i64 = 60;
@@ -60,6 +61,88 @@ pub struct DockerRuntime {
     docker: Docker,
     config: DockerRuntimeConfig,
     _cleanup_handle: Arc<GuardHandle>,
+}
+
+impl Runtime for DockerRuntime {
+    type RuntimeConfig = DockerRuntimeConfig;
+    type BackendConfig = DockerExecutorConfig;
+
+    async fn prepare(&self, config: &DockerExecutorConfig) -> Result<()> {
+        let image = &config.image;
+        let credentials = config
+            .credentials
+            .as_ref()
+            .map(|credentials| credentials.clone().into());
+        let force = match config.pull_policy.unwrap_or_default() {
+            PullPolicy::IfNotPresent => false,
+            PullPolicy::Always => true,
+            PullPolicy::Never => {
+                // Skip the loading step.
+                return Ok(());
+            }
+        };
+
+        commands::pull_image(&self.docker, image, credentials.as_ref(), force).await?;
+        Ok(())
+    }
+
+    async fn spawn(
+        &self,
+        backend_id: &BackendName,
+        executable: DockerExecutorConfig,
+        acquired_key: Option<&AcquiredKey>,
+        static_token: Option<&BearerToken>,
+    ) -> Result<SpawnResult> {
+        let container_id =
+            run_container(self, backend_id, executable, acquired_key, static_token).await?;
+        let port = get_port(&self.docker, &container_id).await?;
+
+        Ok(SpawnResult {
+            container_id: container_id.clone(),
+            port,
+        })
+    }
+
+    async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<(), anyhow::Error> {
+        let container_id = backend_id_to_container_id(backend_id);
+
+        if hard {
+            let result = self
+                .docker
+                .kill_container::<String>(&container_id.to_string(), None)
+                .await;
+
+            if let Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 404, ..
+            }) = result
+            {
+                tracing::warn!("Container not found, assuming it was already terminated.");
+            } else {
+                return result.map_err(|e| e.into());
+            }
+        } else {
+            let result = self
+                .docker
+                .stop_container(
+                    &container_id.to_string(),
+                    Some(StopContainerOptions {
+                        t: KILL_AFTER_SOFT_TERMINATE_SECONDS,
+                    }),
+                )
+                .await;
+
+            if let Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 404, ..
+            }) = result
+            {
+                tracing::warn!("Container not found, assuming it was already terminated.");
+            } else {
+                return result.map_err(|e| e.into());
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -99,25 +182,6 @@ impl DockerRuntime {
             config,
             _cleanup_handle: cleanup_handle,
         })
-    }
-
-    pub async fn prepare(&self, config: &DockerExecutorConfig) -> Result<()> {
-        let image = &config.image;
-        let credentials = config
-            .credentials
-            .as_ref()
-            .map(|credentials| credentials.clone().into());
-        let force = match config.pull_policy.unwrap_or_default() {
-            PullPolicy::IfNotPresent => false,
-            PullPolicy::Always => true,
-            PullPolicy::Never => {
-                // Skip the loading step.
-                return Ok(());
-            }
-        };
-
-        commands::pull_image(&self.docker, image, credentials.as_ref(), force).await?;
-        Ok(())
     }
 
     pub async fn events(&self) -> impl Stream<Item = TerminateEvent> {
@@ -185,44 +249,6 @@ impl DockerRuntime {
                 exit_code,
             })
         })
-    }
-
-    pub async fn spawn(
-        &self,
-        backend_id: &BackendName,
-        executable: DockerExecutorConfig,
-        acquired_key: Option<&AcquiredKey>,
-        static_token: Option<&BearerToken>,
-    ) -> Result<SpawnResult> {
-        let container_id =
-            run_container(self, backend_id, executable, acquired_key, static_token).await?;
-        let port = get_port(&self.docker, &container_id).await?;
-
-        Ok(SpawnResult {
-            container_id: container_id.clone(),
-            port,
-        })
-    }
-
-    pub async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<(), Error> {
-        let container_id = backend_id_to_container_id(backend_id);
-
-        if hard {
-            self.docker
-                .kill_container::<String>(&container_id.to_string(), None)
-                .await?;
-        } else {
-            self.docker
-                .stop_container(
-                    &container_id.to_string(),
-                    Some(StopContainerOptions {
-                        t: KILL_AFTER_SOFT_TERMINATE_SECONDS,
-                    }),
-                )
-                .await?;
-        }
-
-        Ok(())
     }
 
     pub async fn metrics(&self, backend_id: &BackendName) -> Result<bollard::container::Stats> {
