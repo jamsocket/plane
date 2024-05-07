@@ -25,7 +25,6 @@ async fn test_get_metrics(_: TestEnvironment) {
     plane_docker.prepare(&executor_config).await.unwrap();
 
     let backend_name = BackendName::new_random();
-    let container_id = ContainerId::from(format!("plane-test-{}", backend_name));
 
     plane_docker
         .spawn(&backend_name, executor_config, None, None)
