@@ -40,6 +40,10 @@ pub mod types;
 /// The existence of this label is used to determine whether a container is managed by Plane.
 const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
+fn backend_id_to_container_id(backend_id: &BackendName) -> ContainerId {
+    ContainerId::from(format!("plane-{}", backend_id))
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DockerRuntimeConfig {
     pub runtime: Option<String>,
@@ -116,7 +120,7 @@ impl DockerRuntime {
         Ok(())
     }
 
-    pub async fn backend_events(&self) -> impl Stream<Item = TerminateEvent> {
+    pub async fn events(&self) -> impl Stream<Item = TerminateEvent> {
         let options = EventsOptions {
             since: None,
             until: None,
@@ -183,24 +187,16 @@ impl DockerRuntime {
         })
     }
 
-    pub async fn spawn_backend(
+    pub async fn spawn(
         &self,
         backend_id: &BackendName,
-        container_id: &ContainerId,
         executable: DockerExecutorConfig,
         acquired_key: Option<&AcquiredKey>,
         static_token: Option<&BearerToken>,
     ) -> Result<SpawnResult> {
-        run_container(
-            self,
-            backend_id,
-            container_id,
-            executable,
-            acquired_key,
-            static_token,
-        )
-        .await?;
-        let port = get_port(&self.docker, container_id).await?;
+        let container_id =
+            run_container(self, backend_id, executable, acquired_key, static_token).await?;
+        let port = get_port(&self.docker, &container_id).await?;
 
         Ok(SpawnResult {
             container_id: container_id.clone(),
@@ -208,11 +204,9 @@ impl DockerRuntime {
         })
     }
 
-    pub async fn terminate_backend(
-        &self,
-        container_id: &ContainerId,
-        hard: bool,
-    ) -> Result<(), Error> {
+    pub async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<(), Error> {
+        let container_id = backend_id_to_container_id(backend_id);
+
         if hard {
             self.docker
                 .kill_container::<String>(&container_id.to_string(), None)
@@ -231,10 +225,9 @@ impl DockerRuntime {
         Ok(())
     }
 
-    pub async fn get_metrics(
-        &self,
-        container_id: &ContainerId,
-    ) -> Result<bollard::container::Stats> {
+    pub async fn metrics(&self, backend_id: &BackendName) -> Result<bollard::container::Stats> {
+        let container_id = backend_id_to_container_id(backend_id);
+
         let options = StatsOptions {
             stream: false,
             one_shot: false,

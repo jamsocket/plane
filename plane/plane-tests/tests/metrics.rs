@@ -1,8 +1,8 @@
 use common::test_env::TestEnvironment;
 use plane::{
     drone::docker::{
-        get_metrics_message_from_container_stats, types::ContainerId, DockerRuntime,
-        DockerRuntimeConfig, MetricsConversionError,
+        get_metrics_message_from_container_stats, DockerRuntime, DockerRuntimeConfig,
+        MetricsConversionError,
     },
     names::{BackendName, Name},
     types::DockerExecutorConfig,
@@ -25,14 +25,13 @@ async fn test_get_metrics(_: TestEnvironment) {
     plane_docker.prepare(&executor_config).await.unwrap();
 
     let backend_name = BackendName::new_random();
-    let container_id = ContainerId::from(format!("plane-test-{}", backend_name));
 
     plane_docker
-        .spawn_backend(&backend_name, &container_id, executor_config, None, None)
+        .spawn(&backend_name, executor_config, None, None)
         .await
         .unwrap();
 
-    let metrics = plane_docker.get_metrics(&container_id).await;
+    let metrics = plane_docker.metrics(&backend_name).await;
     assert!(metrics.is_ok());
     let mut metrics = metrics.unwrap();
     let prev_container_cpu = AtomicU64::new(0);
