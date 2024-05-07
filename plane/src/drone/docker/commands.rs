@@ -1,4 +1,4 @@
-use super::{types::ContainerId, DockerRuntime};
+use super::{backend_id_to_container_id, types::ContainerId, DockerRuntime};
 use crate::{
     names::BackendName,
     protocol::AcquiredKey,
@@ -258,11 +258,12 @@ pub fn get_container_config_from_executor_config(
 pub async fn run_container(
     docker: &DockerRuntime,
     backend_id: &BackendName,
-    container_id: &ContainerId,
     exec_config: DockerExecutorConfig,
     acquired_key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
-) -> Result<()> {
+) -> Result<ContainerId> {
+    let container_id = backend_id_to_container_id(backend_id);
+
     let options = bollard::container::CreateContainerOptions {
         name: container_id.to_string(),
         ..Default::default()
@@ -288,7 +289,7 @@ pub async fn run_container(
         .start_container::<String>(&container_id.to_string(), None)
         .await?;
 
-    Ok(())
+    Ok(container_id)
 }
 
 #[cfg(test)]

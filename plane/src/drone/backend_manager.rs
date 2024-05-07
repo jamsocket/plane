@@ -1,5 +1,5 @@
 use super::{
-    docker::{get_metrics_message_from_container_stats, types::ContainerId, DockerRuntime},
+    docker::{get_metrics_message_from_container_stats, DockerRuntime},
     wait_backend::wait_for_backend,
 };
 use crate::{
@@ -53,7 +53,6 @@ struct MetricsManager {
     handle: Mutex<Option<GuardHandle>>,
     sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
     docker: DockerRuntime,
-    container_id: ContainerId,
     backend_id: BackendName,
     prev_container_cpu_cumulative_ns: Arc<AtomicU64>,
     prev_sys_cpu_cumulative_ns: Arc<AtomicU64>,
@@ -63,14 +62,12 @@ impl MetricsManager {
     fn new(
         sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
         docker: DockerRuntime,
-        container_id: ContainerId,
         backend_id: BackendName,
     ) -> Self {
         Self {
             handle: Mutex::new(None),
             sender,
             docker,
-            container_id,
             backend_id,
             prev_container_cpu_cumulative_ns: Arc::new(AtomicU64::new(0)),
             prev_sys_cpu_cumulative_ns: Arc::new(AtomicU64::new(0)),
@@ -80,7 +77,6 @@ impl MetricsManager {
     fn start_gathering_metrics(&self) {
         let docker = self.docker.clone();
         let sender = self.sender.clone();
-        let container_id = self.container_id.clone();
         let backend_id = self.backend_id.clone();
         let prev_sys_cpu_cumulative_ns = self.prev_sys_cpu_cumulative_ns.clone();
         let prev_container_cpu_cumulative_ns = self.prev_container_cpu_cumulative_ns.clone();
@@ -90,7 +86,7 @@ impl MetricsManager {
                 let mut interval = tokio::time::interval(Duration::from_secs(1));
                 while let Ok(stats) = {
                     interval.tick().await;
-                    docker.get_metrics(&container_id).await
+                    docker.metrics(&backend_id).await
                 } {
                     let Ok(metrics_message) = get_metrics_message_from_container_stats(
                         stats,
@@ -143,9 +139,6 @@ pub struct BackendManager {
     /// Function to call when the state changes.
     state_callback: StateCallback,
 
-    /// The ID of the container running the backend.
-    container_id: ContainerId,
-
     /// IP address of the drone.
     ip: IpAddr,
 
@@ -160,7 +153,6 @@ impl Debug for BackendManager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BackendManager")
             .field("backend_id", &self.backend_id)
-            .field("container_id", &self.container_id)
             .finish()
     }
 }
@@ -171,15 +163,13 @@ impl BackendManager {
         backend_id: BackendName,
         executor_config: DockerExecutorConfig,
         state: BackendState,
-        docker: DockerRuntime,
+        runtime: DockerRuntime,
         state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
         metrics_sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
         ip: IpAddr,
         acquired_key: AcquiredKey,
         static_token: Option<BearerToken>,
     ) -> Arc<Self> {
-        let container_id = ContainerId::from(format!("plane-{}", backend_id));
-
         let manager = Arc::new(Self {
             state: Mutex::new(BackendManagerState {
                 state: state.clone(),
@@ -187,15 +177,13 @@ impl BackendManager {
             }),
             metrics_manager: MetricsManager::new(
                 metrics_sender,
-                docker.clone(),
-                container_id.clone(),
+                runtime.clone(),
                 backend_id.clone(),
             ),
             backend_id,
-            docker,
+            docker: runtime,
             executor_config,
             state_callback: Box::new(state_callback),
-            container_id,
             ip,
             acquired_key,
             static_token,
@@ -243,7 +231,6 @@ impl BackendManager {
             }
             BackendState::Starting => {
                 let backend_id = self.backend_id.clone();
-                let container_id = self.container_id.clone();
                 let docker = self.docker.clone();
                 let executor_config = self.executor_config.clone();
                 let ip = self.ip;
@@ -253,9 +240,8 @@ impl BackendManager {
                 let static_token = self.static_token.clone();
                 StepStatusResult::future_status(async move {
                     let spawn_result = docker
-                        .spawn_backend(
+                        .spawn(
                             &backend_id,
-                            &container_id,
                             executor_config,
                             Some(&acquired_key),
                             static_token.as_ref(),
@@ -285,14 +271,14 @@ impl BackendManager {
             BackendState::Ready { .. } => StepStatusResult::DoNothing,
             BackendState::Terminating { termination, .. } => {
                 let docker = self.docker.clone();
-                let container_id = self.container_id.clone();
+                let backend_id = self.backend_id.clone();
 
                 StepStatusResult::future_status(async move {
                     let mut backoff = ExponentialBackoff::default();
 
                     loop {
                         match docker
-                            .terminate_backend(&container_id, termination == TerminationKind::Hard)
+                            .terminate(&backend_id, termination == TerminationKind::Hard)
                             .await
                         {
                             Ok(()) => break,

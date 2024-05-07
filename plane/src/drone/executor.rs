@@ -33,7 +33,7 @@ impl Executor {
             let backends = backends.clone();
 
             GuardHandle::new(async move {
-                let mut events = docker.backend_events().await;
+                let mut events = docker.events().await;
                 while let Some(event) = events.next().await {
                     if let Some((_, manager)) = backends.remove(&event.backend_id) {
                         tracing::info!(
