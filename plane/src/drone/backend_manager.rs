@@ -3,10 +3,16 @@ use super::{
     wait_backend::wait_for_backend,
 };
 use crate::{
-    database::backend::BackendMetricsMessage, drone::runtime::Runtime, names::BackendName, protocol::AcquiredKey, typed_socket::TypedSocketSender, types::{
+    database::backend::BackendMetricsMessage,
+    drone::runtime::Runtime,
+    names::BackendName,
+    protocol::AcquiredKey,
+    typed_socket::TypedSocketSender,
+    types::{
         backend_state::{BackendError, TerminationReason},
         BackendState, BearerToken, DockerExecutorConfig, TerminationKind,
-    }, util::{ExponentialBackoff, GuardHandle}
+    },
+    util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
 use futures_util::Future;

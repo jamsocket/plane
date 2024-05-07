@@ -1,9 +1,12 @@
 use common::test_env::TestEnvironment;
 use plane::{
-    drone::{docker::{
-        get_metrics_message_from_container_stats, DockerRuntime, DockerRuntimeConfig,
-        MetricsConversionError,
-    }, runtime::Runtime},
+    drone::{
+        docker::{
+            get_metrics_message_from_container_stats, DockerRuntime, DockerRuntimeConfig,
+            MetricsConversionError,
+        },
+        runtime::Runtime,
+    },
     names::{BackendName, Name},
     types::DockerExecutorConfig,
 };

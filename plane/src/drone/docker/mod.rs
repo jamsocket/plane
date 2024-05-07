@@ -143,48 +143,8 @@ impl Runtime for DockerRuntime {
 
         Ok(())
     }
-}
 
-#[derive(Clone, Debug)]
-pub struct TerminateEvent {
-    pub backend_id: BackendName,
-    pub exit_code: Option<i32>,
-}
-
-pub struct SpawnResult {
-    pub container_id: ContainerId,
-    pub port: u16,
-}
-
-impl DockerRuntime {
-    pub async fn new(config: DockerRuntimeConfig) -> Result<Self> {
-        let docker = Docker::connect_with_local_defaults()?;
-
-        let cleanup_handle = {
-            let docker = docker.clone();
-            let cleanup_min_age = config.cleanup_min_age.unwrap_or_default();
-            let auto_prune = config.auto_prune.unwrap_or_default();
-            GuardHandle::new(async move {
-                cleanup_loop(
-                    docker.clone(),
-                    cleanup_min_age,
-                    Duration::try_seconds(CLEANUP_INTERVAL_SECS).expect("duration is always valid"),
-                    auto_prune,
-                )
-                .await;
-            })
-        };
-
-        let cleanup_handle = Arc::new(cleanup_handle);
-
-        Ok(Self {
-            docker,
-            config,
-            _cleanup_handle: cleanup_handle,
-        })
-    }
-
-    pub async fn events(&self) -> impl Stream<Item = TerminateEvent> {
+    async fn events(&self) -> impl Stream<Item = TerminateEvent> {
         let options = EventsOptions {
             since: None,
             until: None,
@@ -251,7 +211,7 @@ impl DockerRuntime {
         })
     }
 
-    pub async fn metrics(&self, backend_id: &BackendName) -> Result<bollard::container::Stats> {
+    async fn metrics(&self, backend_id: &BackendName) -> Result<bollard::container::Stats> {
         let container_id = backend_id_to_container_id(backend_id);
 
         let options = StatsOptions {
@@ -265,6 +225,46 @@ impl DockerRuntime {
             .await
             .ok_or(anyhow::anyhow!("no stats found for {container_id}"))?
             .map_err(|e| anyhow::anyhow!("{e:?}"))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TerminateEvent {
+    pub backend_id: BackendName,
+    pub exit_code: Option<i32>,
+}
+
+pub struct SpawnResult {
+    pub container_id: ContainerId,
+    pub port: u16,
+}
+
+impl DockerRuntime {
+    pub async fn new(config: DockerRuntimeConfig) -> Result<Self> {
+        let docker = Docker::connect_with_local_defaults()?;
+
+        let cleanup_handle = {
+            let docker = docker.clone();
+            let cleanup_min_age = config.cleanup_min_age.unwrap_or_default();
+            let auto_prune = config.auto_prune.unwrap_or_default();
+            GuardHandle::new(async move {
+                cleanup_loop(
+                    docker.clone(),
+                    cleanup_min_age,
+                    Duration::try_seconds(CLEANUP_INTERVAL_SECS).expect("duration is always valid"),
+                    auto_prune,
+                )
+                .await;
+            })
+        };
+
+        let cleanup_handle = Arc::new(cleanup_handle);
+
+        Ok(Self {
+            docker,
+            config,
+            _cleanup_handle: cleanup_handle,
+        })
     }
 }
 
