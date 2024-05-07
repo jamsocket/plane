@@ -7,12 +7,11 @@ use crate::{
     heartbeat_consts::KILL_AFTER_SOFT_TERMINATE_SECONDS,
     names::BackendName,
     protocol::AcquiredKey,
-    types::{BearerToken, DockerExecutorConfig},
+    types::{BearerToken, DockerExecutorConfig, PullPolicy},
     util::GuardHandle,
 };
 use anyhow::Result;
 use bollard::{
-    auth::DockerCredentials,
     container::{PruneContainersOptions, StatsOptions, StopContainerOptions},
     errors::Error,
     image::PruneImagesOptions,
@@ -98,13 +97,22 @@ impl DockerRuntime {
         })
     }
 
-    pub async fn pull(
-        &self,
-        image: &str,
-        credentials: Option<&DockerCredentials>,
-        force: bool,
-    ) -> Result<()> {
-        commands::pull_image(&self.docker, image, credentials, force).await?;
+    pub async fn prepare(&self, config: &DockerExecutorConfig) -> Result<()> {
+        let image = &config.image;
+        let credentials = config
+            .credentials
+            .as_ref()
+            .map(|credentials| credentials.clone().into());
+        let force = match config.pull_policy.unwrap_or_default() {
+            PullPolicy::IfNotPresent => false,
+            PullPolicy::Always => true,
+            PullPolicy::Never => {
+                // Skip the loading step.
+                return Ok(());
+            }
+        };
+
+        commands::pull_image(&self.docker, image, credentials.as_ref(), force).await?;
         Ok(())
     }
 

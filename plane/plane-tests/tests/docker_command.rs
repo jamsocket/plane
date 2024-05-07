@@ -9,7 +9,6 @@ use plane::{
     names::{BackendName, Name},
     types::{DockerExecutorConfig, ResourceLimits},
 };
-use serde_json;
 
 /// starts and runs command in container
 /// with given container config, returns stdout + stderr as string
@@ -78,7 +77,7 @@ async fn test_resource_limits() {
         "cpu_time_limit": 100,
         "cpu_period_percent": 80,
         "memory_limit_bytes": 10000000,
-        "disk_limit_bytes": 10000000000 as i64
+        "disk_limit_bytes": 10000000000_i64
     }))
     .unwrap();
     executor_config.resource_limits = resource_limits;

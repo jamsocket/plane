@@ -238,7 +238,7 @@ mod tests {
     impl DemoSseServer {
         fn new() -> Self {
             let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
-            let listener = std::net::TcpListener::bind(&addr).unwrap();
+            let listener = std::net::TcpListener::bind(addr).unwrap();
             let port = listener.local_addr().unwrap().port();
             let (disconnect_sender, _) = broadcast::channel::<()>(1);
 
