@@ -9,12 +9,12 @@ use crate::{
     typed_socket::TypedSocketSender,
     types::{
         backend_state::{BackendError, TerminationReason},
-        BackendState, BearerToken, DockerExecutorConfig, PullPolicy, TerminationKind,
+        BackendState, BearerToken, DockerExecutorConfig, TerminationKind,
     },
     util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
-use bollard::{auth::DockerCredentials, errors::Error::DockerResponseServerError};
+use bollard::errors::Error::DockerResponseServerError;
 use futures_util::Future;
 use std::{error::Error, fmt::Debug, sync::atomic::AtomicU64, time::Duration};
 use std::{future::pending, pin::Pin};
@@ -197,27 +197,15 @@ impl BackendManager {
         match state {
             BackendState::Scheduled => StepStatusResult::SetState(state.to_loading()),
             BackendState::Loading => {
-                let force_pull = match self.executor_config.pull_policy.unwrap_or_default() {
-                    PullPolicy::IfNotPresent => false,
-                    PullPolicy::Always => true,
-                    PullPolicy::Never => {
-                        // Skip the loading step.
-                        return StepStatusResult::SetState(state.to_starting());
-                    }
-                };
-
                 let executor_config = self.executor_config.clone();
                 let docker = self.docker.clone();
                 StepStatusResult::future_status(async move {
                     let image = &executor_config.image;
                     let span = tracing::info_span!("pull", image = image.as_str());
-                    let credentials: Option<DockerCredentials> =
-                        executor_config.credentials.map(|creds| creds.into());
 
                     async move {
                         tracing::info!("pulling...");
-                        if let Err(err) = docker.pull(image, credentials.as_ref(), force_pull).await
-                        {
+                        if let Err(err) = docker.prepare(&executor_config).await {
                             tracing::error!(?err, "failed to pull image");
                             state.to_terminated(None)
                         } else {
