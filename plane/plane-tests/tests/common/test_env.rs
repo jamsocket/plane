@@ -7,7 +7,7 @@ use plane::{
     controller::ControllerServer,
     database::PlaneDatabase,
     dns::run_dns_with_listener,
-    drone::{docker::PlaneDockerConfig, Drone, DroneConfig, ExecutorConfig},
+    drone::{docker::DockerRuntimeConfig, Drone, DroneConfig, ExecutorConfig},
     names::{AcmeDnsServerName, ControllerName, DroneName, Name},
     proxy::AcmeEabConfiguration,
     types::{ClusterName, DronePoolName},
@@ -113,7 +113,7 @@ impl TestEnvironment {
         pool: &DronePoolName,
         mount_base: Option<&PathBuf>,
     ) -> Drone {
-        let docker_config = PlaneDockerConfig {
+        let docker_config = DockerRuntimeConfig {
             runtime: None,
             log_config: None,
             mount_base: mount_base.map(|p| p.to_owned()),

@@ -1,5 +1,5 @@
 use crate::{
-    drone::{docker::PlaneDockerConfig, DroneConfig},
+    drone::{docker::DockerRuntimeConfig, DroneConfig},
     names::{DroneName, OrRandom},
     types::{ClusterName, DronePoolName},
     util::resolve_hostname,
@@ -71,7 +71,7 @@ impl DroneOpts {
             Duration::try_seconds(self.auto_prune_containers_older_than_seconds as i64)
                 .expect("valid duration");
 
-        let docker_config = PlaneDockerConfig {
+        let docker_config = DockerRuntimeConfig {
             runtime: self.docker_runtime,
             log_config,
             mount_base: self.mount_base,

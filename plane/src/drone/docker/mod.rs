@@ -42,7 +42,7 @@ pub mod types;
 const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct PlaneDockerConfig {
+pub struct DockerRuntimeConfig {
     pub runtime: Option<String>,
     pub log_config: Option<HostConfigLogConfig>,
     pub mount_base: Option<PathBuf>,
@@ -53,9 +53,9 @@ pub struct PlaneDockerConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct PlaneDocker {
+pub struct DockerRuntime {
     docker: Docker,
-    config: PlaneDockerConfig,
+    config: DockerRuntimeConfig,
     _cleanup_handle: Arc<GuardHandle>,
 }
 
@@ -70,8 +70,8 @@ pub struct SpawnResult {
     pub port: u16,
 }
 
-impl PlaneDocker {
-    pub async fn new(config: PlaneDockerConfig) -> Result<Self> {
+impl DockerRuntime {
+    pub async fn new(config: DockerRuntimeConfig) -> Result<Self> {
         let docker = Docker::connect_with_local_defaults()?;
 
         let cleanup_handle = {

@@ -1,4 +1,4 @@
-use super::{backend_manager::BackendManager, docker::PlaneDocker, state_store::StateStore};
+use super::{backend_manager::BackendManager, docker::DockerRuntime, state_store::StateStore};
 use crate::{
     database::backend::BackendMetricsMessage,
     names::BackendName,
@@ -17,7 +17,7 @@ use std::{
 use valuable::Valuable;
 
 pub struct Executor {
-    docker: PlaneDocker,
+    docker: DockerRuntime,
     state_store: Arc<Mutex<StateStore>>,
     backends: Arc<DashMap<BackendName, Arc<BackendManager>>>,
     ip: IpAddr,
@@ -25,7 +25,7 @@ pub struct Executor {
 }
 
 impl Executor {
-    pub fn new(docker: PlaneDocker, state_store: StateStore, ip: IpAddr) -> Self {
+    pub fn new(docker: DockerRuntime, state_store: StateStore, ip: IpAddr) -> Self {
         let backends: Arc<DashMap<BackendName, Arc<BackendManager>>> = Arc::default();
 
         let backend_event_listener = {

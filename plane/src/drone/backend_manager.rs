@@ -1,5 +1,5 @@
 use super::{
-    docker::{get_metrics_message_from_container_stats, types::ContainerId, PlaneDocker},
+    docker::{get_metrics_message_from_container_stats, types::ContainerId, DockerRuntime},
     wait_backend::wait_for_backend,
 };
 use crate::{
@@ -52,7 +52,7 @@ type StateCallback = Box<dyn Fn(&BackendState) -> Result<(), Box<dyn Error>> + S
 struct MetricsManager {
     handle: Mutex<Option<GuardHandle>>,
     sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
-    docker: PlaneDocker,
+    docker: DockerRuntime,
     container_id: ContainerId,
     backend_id: BackendName,
     prev_container_cpu_cumulative_ns: Arc<AtomicU64>,
@@ -62,7 +62,7 @@ struct MetricsManager {
 impl MetricsManager {
     fn new(
         sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
-        docker: PlaneDocker,
+        docker: DockerRuntime,
         container_id: ContainerId,
         backend_id: BackendName,
     ) -> Self {
@@ -135,7 +135,7 @@ pub struct BackendManager {
     backend_id: BackendName,
 
     /// The Docker client to use for all Docker operations.
-    docker: PlaneDocker,
+    docker: DockerRuntime,
 
     /// The configuration to use when spawning the backend.
     executor_config: DockerExecutorConfig,
@@ -171,7 +171,7 @@ impl BackendManager {
         backend_id: BackendName,
         executor_config: DockerExecutorConfig,
         state: BackendState,
-        docker: PlaneDocker,
+        docker: DockerRuntime,
         state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
         metrics_sender: Arc<RwLock<TypedSocketSender<BackendMetricsMessage>>>,
         ip: IpAddr,

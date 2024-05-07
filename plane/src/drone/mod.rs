@@ -1,11 +1,11 @@
 use self::{
-    docker::PlaneDockerConfig, executor::Executor, heartbeat::HeartbeatLoop,
+    docker::DockerRuntimeConfig, executor::Executor, heartbeat::HeartbeatLoop,
     key_manager::KeyManager, state_store::StateStore,
 };
 use crate::{
     client::PlaneClient,
     database::backend::BackendActionMessage,
-    drone::docker::PlaneDocker,
+    drone::docker::DockerRuntime,
     names::DroneName,
     protocol::{BackendAction, MessageFromDrone, MessageToDrone, RenewKeyResponse},
     signals::wait_for_shutdown_signal,
@@ -183,14 +183,14 @@ impl Drone {
                 docker_config.cleanup_min_age =
                     docker_config.cleanup_min_age.or(config.cleanup_min_age);
 
-                PlaneDocker::new(docker_config).await?
+                DockerRuntime::new(docker_config).await?
             }
             (None, Some(ExecutorConfig::Docker(mut docker_config))) => {
                 docker_config.auto_prune = docker_config.auto_prune.or(config.auto_prune);
                 docker_config.cleanup_min_age =
                     docker_config.cleanup_min_age.or(config.cleanup_min_age);
 
-                PlaneDocker::new(docker_config).await?
+                DockerRuntime::new(docker_config).await?
             }
             (None, None) => {
                 tracing::error!("Neither `docker_config` nor `executor_config` provided.");
@@ -232,7 +232,7 @@ impl Drone {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutorConfig {
-    Docker(PlaneDockerConfig),
+    Docker(DockerRuntimeConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -240,7 +240,7 @@ pub struct DroneConfig {
     pub name: DroneName,
 
     #[deprecated(since = "0.4.12", note = "Use `executor_config` instead.")]
-    pub docker_config: Option<PlaneDockerConfig>,
+    pub docker_config: Option<DockerRuntimeConfig>,
 
     // This will become non-optional when docker_config is removed.
     pub executor_config: Option<ExecutorConfig>,
@@ -253,13 +253,13 @@ pub struct DroneConfig {
 
     #[deprecated(
         since = "0.4.12",
-        note = "Moved to `executor_config` (only applies to PlaneDockerConfig)."
+        note = "Moved to `executor_config` (only applies to DockerRuntimeConfig)."
     )]
     pub auto_prune: Option<bool>,
     #[serde(with = "crate::serialization::serialize_optional_duration_as_seconds")]
     #[deprecated(
         since = "0.4.12",
-        note = "Moved to `executor_config` (only applies to PlaneDockerConfig)."
+        note = "Moved to `executor_config` (only applies to DockerRuntimeConfig)."
     )]
     pub cleanup_min_age: Option<Duration>,
 }
