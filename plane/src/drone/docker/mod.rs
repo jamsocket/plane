@@ -71,7 +71,9 @@ pub struct SpawnResult {
 }
 
 impl PlaneDocker {
-    pub async fn new(docker: Docker, config: PlaneDockerConfig) -> Result<Self> {
+    pub async fn new(config: PlaneDockerConfig) -> Result<Self> {
+        let docker = Docker::connect_with_local_defaults()?;
+
         let cleanup_handle = {
             let docker = docker.clone();
             let cleanup_min_age = config.cleanup_min_age.unwrap_or_default();
