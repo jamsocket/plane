@@ -18,21 +18,15 @@ async fn test_get_metrics(_: TestEnvironment) {
         .await
         .unwrap();
 
-    // TODO: replace with locally built hello world
-    plane_docker
-        .pull(
-            "ghcr.io/drifting-in-space/demo-image-drop-four",
-            None,
-            false,
-        )
-        .await
-        .unwrap();
-
-    let backend_name = BackendName::new_random();
-    let container_id = ContainerId::from(format!("plane-test-{}", backend_name));
     let executor_config = DockerExecutorConfig::from_image_with_defaults(
         "ghcr.io/drifting-in-space/demo-image-drop-four",
     );
+
+    plane_docker.prepare(&executor_config).await.unwrap();
+
+    let backend_name = BackendName::new_random();
+    let container_id = ContainerId::from(format!("plane-test-{}", backend_name));
+
     plane_docker
         .spawn_backend(&backend_name, &container_id, executor_config, None, None)
         .await
