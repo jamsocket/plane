@@ -41,7 +41,7 @@ pub mod types;
 const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
 fn backend_id_to_container_id(backend_id: &BackendName) -> ContainerId {
-    ContainerId::from(format!("plane-{}", backend_id.to_string()))
+    ContainerId::from(format!("plane-{}", backend_id))
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
