@@ -1,4 +1,4 @@
-use super::{types::ContainerId, PlaneDocker};
+use super::{types::ContainerId, DockerRuntime};
 use crate::{
     names::BackendName,
     protocol::AcquiredKey,
@@ -256,7 +256,7 @@ pub fn get_container_config_from_executor_config(
 }
 
 pub async fn run_container(
-    docker: &PlaneDocker,
+    docker: &DockerRuntime,
     backend_id: &BackendName,
     container_id: &ContainerId,
     exec_config: DockerExecutorConfig,

@@ -1,8 +1,8 @@
 use common::test_env::TestEnvironment;
 use plane::{
     drone::docker::{
-        get_metrics_message_from_container_stats, types::ContainerId, MetricsConversionError,
-        PlaneDocker, PlaneDockerConfig,
+        get_metrics_message_from_container_stats, types::ContainerId, DockerRuntime,
+        DockerRuntimeConfig, MetricsConversionError,
     },
     names::{BackendName, Name},
     types::DockerExecutorConfig,
@@ -14,7 +14,7 @@ mod common;
 
 #[plane_test]
 async fn test_get_metrics(_: TestEnvironment) {
-    let plane_docker = PlaneDocker::new(PlaneDockerConfig::default())
+    let plane_docker = DockerRuntime::new(DockerRuntimeConfig::default())
         .await
         .unwrap();
 
