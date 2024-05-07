@@ -99,11 +99,10 @@ impl DockerRuntime {
 
     pub async fn prepare(&self, config: &DockerExecutorConfig) -> Result<()> {
         let image = &config.image;
-        let credentials = if let Some(credentials) = &config.credentials {
-            Some(credentials.clone().into())
-        } else {
-            None
-        };
+        let credentials = config
+            .credentials
+            .as_ref()
+            .map(|credentials| credentials.clone().into());
         let force = match config.pull_policy.unwrap_or_default() {
             PullPolicy::IfNotPresent => false,
             PullPolicy::Always => true,

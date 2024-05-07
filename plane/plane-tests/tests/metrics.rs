@@ -47,7 +47,7 @@ async fn test_get_metrics(_: TestEnvironment) {
 
     assert!(backend_metrics_message.is_ok());
 
-    let tmp_mem = metrics.memory_stats.usage.clone();
+    let tmp_mem = metrics.memory_stats.usage;
     metrics.memory_stats.usage = None;
 
     let backend_metrics_message = get_metrics_message_from_container_stats(

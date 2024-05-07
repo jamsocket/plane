@@ -78,7 +78,7 @@ impl TestEnvironment {
     pub async fn db(&mut self) -> PlaneDatabase {
         let mut db_lock = self.db.lock().unwrap();
         if db_lock.is_none() {
-            let db = DevDatabase::start(&self)
+            let db = DevDatabase::start(self)
                 .await
                 .expect("Error starting database.");
             *db_lock = Some(db);
@@ -94,7 +94,8 @@ impl TestEnvironment {
         let url: Url = format!("http://{}", listener.local_addr().unwrap())
             .parse()
             .unwrap();
-        let controller = ControllerServer::run_with_listener(
+
+        ControllerServer::run_with_listener(
             db.clone(),
             listener,
             ControllerName::new_random(),
@@ -103,8 +104,7 @@ impl TestEnvironment {
             None,
         )
         .await
-        .expect("Unable to construct controller.");
-        controller
+        .expect("Unable to construct controller.")
     }
 
     pub async fn drone_internal(
@@ -180,7 +180,7 @@ impl TestEnvironment {
     }
 
     pub async fn pebble(&mut self, dns_port: u16) -> Arc<Pebble> {
-        let pebble = Arc::new(Pebble::new(&self, dns_port, None).await.unwrap());
+        let pebble = Arc::new(Pebble::new(self, dns_port, None).await.unwrap());
         self.drop_futures.lock().unwrap().push(pebble.clone());
         pebble
     }
@@ -191,7 +191,7 @@ impl TestEnvironment {
         eab_keypair: AcmeEabConfiguration,
     ) -> Arc<Pebble> {
         let pebble = Arc::new(
-            Pebble::new(&self, dns_port, Some(eab_keypair))
+            Pebble::new(self, dns_port, Some(eab_keypair))
                 .await
                 .unwrap(),
         );
@@ -216,8 +216,7 @@ fn get_project_root() -> PathBuf {
     let manifest_dir_path = Path::new(&manifest_dir);
     let project_root = manifest_dir_path
         .ancestors()
-        .filter(|e| e.join(".git").exists())
-        .next()
+        .find(|e| e.join(".git").exists())
         .expect("not in git repo");
     project_root.to_path_buf()
 }
