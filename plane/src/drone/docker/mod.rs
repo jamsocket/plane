@@ -13,7 +13,6 @@ use crate::{
 use anyhow::Result;
 use bollard::{
     container::{PruneContainersOptions, StatsOptions, StopContainerOptions},
-    errors::Error,
     image::PruneImagesOptions,
     service::{EventMessage, HostConfigLogConfig},
     system::EventsOptions,
@@ -29,6 +28,8 @@ use std::{collections::HashMap, path::PathBuf};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 use valuable::Valuable;
+
+use super::runtime::Runtime;
 
 /// Clean up containers and images every minute.
 const CLEANUP_INTERVAL_SECS: i64 = 60;
@@ -62,46 +63,11 @@ pub struct DockerRuntime {
     _cleanup_handle: Arc<GuardHandle>,
 }
 
-#[derive(Clone, Debug)]
-pub struct TerminateEvent {
-    pub backend_id: BackendName,
-    pub exit_code: Option<i32>,
-}
+impl Runtime for DockerRuntime {
+    type RuntimeConfig = DockerRuntimeConfig;
+    type BackendConfig = DockerExecutorConfig;
 
-pub struct SpawnResult {
-    pub container_id: ContainerId,
-    pub port: u16,
-}
-
-impl DockerRuntime {
-    pub async fn new(config: DockerRuntimeConfig) -> Result<Self> {
-        let docker = Docker::connect_with_local_defaults()?;
-
-        let cleanup_handle = {
-            let docker = docker.clone();
-            let cleanup_min_age = config.cleanup_min_age.unwrap_or_default();
-            let auto_prune = config.auto_prune.unwrap_or_default();
-            GuardHandle::new(async move {
-                cleanup_loop(
-                    docker.clone(),
-                    cleanup_min_age,
-                    Duration::try_seconds(CLEANUP_INTERVAL_SECS).expect("duration is always valid"),
-                    auto_prune,
-                )
-                .await;
-            })
-        };
-
-        let cleanup_handle = Arc::new(cleanup_handle);
-
-        Ok(Self {
-            docker,
-            config,
-            _cleanup_handle: cleanup_handle,
-        })
-    }
-
-    pub async fn prepare(&self, config: &DockerExecutorConfig) -> Result<()> {
+    async fn prepare(&self, config: &DockerExecutorConfig) -> Result<()> {
         let image = &config.image;
         let credentials = config
             .credentials
@@ -120,7 +86,58 @@ impl DockerRuntime {
         Ok(())
     }
 
-    pub async fn events(&self) -> impl Stream<Item = TerminateEvent> {
+    async fn spawn(
+        &self,
+        backend_id: &BackendName,
+        executable: DockerExecutorConfig,
+        acquired_key: Option<&AcquiredKey>,
+        static_token: Option<&BearerToken>,
+    ) -> Result<SpawnResult> {
+        let container_id =
+            run_container(self, backend_id, executable, acquired_key, static_token).await?;
+        let port = get_port(&self.docker, &container_id).await?;
+
+        Ok(SpawnResult {
+            container_id: container_id.clone(),
+            port,
+        })
+    }
+
+    async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<(), anyhow::Error> {
+        let container_id = backend_id_to_container_id(backend_id);
+
+        let result = if hard {
+            self.docker
+                .kill_container::<String>(&container_id.to_string(), None)
+                .await
+        } else {
+            self.docker
+                .stop_container(
+                    &container_id.to_string(),
+                    Some(StopContainerOptions {
+                        t: KILL_AFTER_SOFT_TERMINATE_SECONDS,
+                    }),
+                )
+                .await
+        };
+
+        if let Err(bollard::errors::Error::DockerResponseServerError {
+            status_code: 404, ..
+        }) = result
+        {
+            tracing::warn!(
+                %container_id,
+                %backend_id,
+                "Container not found, assuming it was already terminated."
+            );
+        } else {
+            return result.map_err(|e| e.into());
+        }
+
+        Ok(())
+    }
+
+    async fn events(&self) -> impl Stream<Item = TerminateEvent> {
         let options = EventsOptions {
             since: None,
             until: None,
@@ -187,45 +204,7 @@ impl DockerRuntime {
         })
     }
 
-    pub async fn spawn(
-        &self,
-        backend_id: &BackendName,
-        executable: DockerExecutorConfig,
-        acquired_key: Option<&AcquiredKey>,
-        static_token: Option<&BearerToken>,
-    ) -> Result<SpawnResult> {
-        let container_id =
-            run_container(self, backend_id, executable, acquired_key, static_token).await?;
-        let port = get_port(&self.docker, &container_id).await?;
-
-        Ok(SpawnResult {
-            container_id: container_id.clone(),
-            port,
-        })
-    }
-
-    pub async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<(), Error> {
-        let container_id = backend_id_to_container_id(backend_id);
-
-        if hard {
-            self.docker
-                .kill_container::<String>(&container_id.to_string(), None)
-                .await?;
-        } else {
-            self.docker
-                .stop_container(
-                    &container_id.to_string(),
-                    Some(StopContainerOptions {
-                        t: KILL_AFTER_SOFT_TERMINATE_SECONDS,
-                    }),
-                )
-                .await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn metrics(&self, backend_id: &BackendName) -> Result<bollard::container::Stats> {
+    async fn metrics(&self, backend_id: &BackendName) -> Result<bollard::container::Stats> {
         let container_id = backend_id_to_container_id(backend_id);
 
         let options = StatsOptions {
@@ -239,6 +218,46 @@ impl DockerRuntime {
             .await
             .ok_or(anyhow::anyhow!("no stats found for {container_id}"))?
             .map_err(|e| anyhow::anyhow!("{e:?}"))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TerminateEvent {
+    pub backend_id: BackendName,
+    pub exit_code: Option<i32>,
+}
+
+pub struct SpawnResult {
+    pub container_id: ContainerId,
+    pub port: u16,
+}
+
+impl DockerRuntime {
+    pub async fn new(config: DockerRuntimeConfig) -> Result<Self> {
+        let docker = Docker::connect_with_local_defaults()?;
+
+        let cleanup_handle = {
+            let docker = docker.clone();
+            let cleanup_min_age = config.cleanup_min_age.unwrap_or_default();
+            let auto_prune = config.auto_prune.unwrap_or_default();
+            GuardHandle::new(async move {
+                cleanup_loop(
+                    docker.clone(),
+                    cleanup_min_age,
+                    Duration::try_seconds(CLEANUP_INTERVAL_SECS).expect("duration is always valid"),
+                    auto_prune,
+                )
+                .await;
+            })
+        };
+
+        let cleanup_handle = Arc::new(cleanup_handle);
+
+        Ok(Self {
+            docker,
+            config,
+            _cleanup_handle: cleanup_handle,
+        })
     }
 }
 
