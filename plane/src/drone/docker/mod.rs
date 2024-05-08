@@ -106,39 +106,32 @@ impl Runtime for DockerRuntime {
     async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<(), anyhow::Error> {
         let container_id = backend_id_to_container_id(backend_id);
 
-        if hard {
-            let result = self
-                .docker
+        let result = if hard {
+            self.docker
                 .kill_container::<String>(&container_id.to_string(), None)
-                .await;
-
-            if let Err(bollard::errors::Error::DockerResponseServerError {
-                status_code: 404, ..
-            }) = result
-            {
-                tracing::warn!("Container not found, assuming it was already terminated.");
-            } else {
-                return result.map_err(|e| e.into());
-            }
+                .await
         } else {
-            let result = self
-                .docker
+            self.docker
                 .stop_container(
                     &container_id.to_string(),
                     Some(StopContainerOptions {
                         t: KILL_AFTER_SOFT_TERMINATE_SECONDS,
                     }),
                 )
-                .await;
+                .await
+        };
 
-            if let Err(bollard::errors::Error::DockerResponseServerError {
-                status_code: 404, ..
-            }) = result
-            {
-                tracing::warn!("Container not found, assuming it was already terminated.");
-            } else {
-                return result.map_err(|e| e.into());
-            }
+        if let Err(bollard::errors::Error::DockerResponseServerError {
+            status_code: 404, ..
+        }) = result
+        {
+            tracing::warn!(
+                %container_id,
+                %backend_id,
+                "Container not found, assuming it was already terminated."
+            );
+        } else {
+            return result.map_err(|e| e.into());
         }
 
         Ok(())
