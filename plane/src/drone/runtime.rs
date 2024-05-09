@@ -1,11 +1,13 @@
 use super::docker::{SpawnResult, TerminateEvent};
-use crate::{names::BackendName, protocol::AcquiredKey, types::BearerToken};
+use crate::{
+    database::backend::BackendMetricsMessage, names::BackendName, protocol::AcquiredKey,
+    types::BearerToken,
+};
 use anyhow::Error;
 use futures_util::Stream;
-use std::fmt::Debug;
 
 #[allow(async_fn_in_trait)]
-pub trait Runtime: Clone + Send + Sync + Debug {
+pub trait Runtime: Sync {
     type RuntimeConfig;
     type BackendConfig: Clone + Send + Sync;
 
@@ -21,7 +23,9 @@ pub trait Runtime: Clone + Send + Sync + Debug {
 
     async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<(), Error>;
 
-    async fn metrics(&self, backend_id: &BackendName) -> Result<bollard::container::Stats, Error>;
+    /// Provides a callback to be called when the executor has a new metrics message for
+    /// any backend.
+    fn metrics_callback<F: Fn(BackendMetricsMessage) + Send + Sync + 'static>(&self, sender: F);
 
-    async fn events(&self) -> impl Stream<Item = TerminateEvent>;
+    fn events(&self) -> impl Stream<Item = TerminateEvent>;
 }

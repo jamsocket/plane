@@ -10,6 +10,12 @@ impl From<String> for ContainerId {
     }
 }
 
+impl ContainerId {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Display for ContainerId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.0)
