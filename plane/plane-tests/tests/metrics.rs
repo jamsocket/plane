@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 use common::test_env::TestEnvironment;
 use common::timeout::WithTimeout;
-use futures_util::StreamExt;
 use plane::{
     drone::{
         docker::{DockerRuntime, DockerRuntimeConfig},
@@ -31,25 +28,7 @@ async fn test_get_metrics(_: TestEnvironment) {
         send.try_send(metrics_message).unwrap();
     });
 
-    let runtime = Arc::new(runtime);
-
     let backend_name = BackendName::new_random();
-
-    {
-        // TODO: metrics currently only works if events are being polled for the executor!
-        // This is always true in Plane, but is kind of an awkward coupling when it comes to tests.
-        // We should refactor the event loop.
-
-        let runtime = runtime.clone();
-        tokio::spawn(async move {
-            let mut events = runtime.events();
-
-            loop {
-                let event = events.next().await.unwrap();
-                tracing::info!("Event: {:?}", event);
-            }
-        });
-    }
 
     runtime
         .spawn(&backend_name, executor_config, None, None)

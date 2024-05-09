@@ -23,6 +23,8 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, path::PathBuf};
+use tokio::sync::broadcast::Sender;
+use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
 use valuable::Valuable;
 
@@ -58,7 +60,100 @@ pub struct DockerRuntime {
     docker: Docker,
     config: DockerRuntimeConfig,
     metrics_callback: Arc<Mutex<Option<MetricsCallback>>>,
+    events_sender: Sender<TerminateEvent>,
+    _events_loop_handle: GuardHandle,
     _cleanup_handle: GuardHandle,
+}
+
+async fn events_loop(
+    docker: Docker,
+    metrics_callback: Arc<Mutex<Option<MetricsCallback>>>,
+    event_sender: Sender<TerminateEvent>,
+) {
+    let options = EventsOptions {
+        since: None,
+        until: None,
+        filters: vec![
+            ("type", vec!["container"]),
+            ("event", vec!["die", "stop", "start"]),
+            ("label", vec![PLANE_DOCKER_LABEL]),
+        ]
+        .into_iter()
+        .collect(),
+    };
+    //docker.events(Some(options)).filter_map(|e| {
+    let mut stream = docker.events(Some(options));
+
+    while let Some(e) = stream.next().await {
+        let e: EventMessage = match e {
+            Err(e) => {
+                tracing::error!(?e, "Error receiving Docker event.");
+                continue;
+            }
+            Ok(e) => e,
+        };
+
+        tracing::info!(event=?e, "Received event");
+
+        let Some(actor) = &e.actor else {
+            tracing::warn!("Received event without actor.");
+            continue;
+        };
+        let Some(attributes) = &actor.attributes else {
+            tracing::warn!("Received event without attributes.");
+            continue;
+        };
+        let Some(backend_id) = attributes.get(PLANE_DOCKER_LABEL) else {
+            tracing::warn!(?e.actor, "Ignoring event without Plane backend ID label.");
+            continue;
+        };
+
+        if e.action.as_deref() == Some("start") {
+            tracing::info!(backend_id = backend_id.as_value(), "Received start event.");
+
+            let Ok(backend_id) = BackendName::try_from(backend_id.to_string()) else {
+                tracing::warn!(?e.actor, "Ignoring start event with invalid backend ID.");
+                continue;
+            };
+            let docker = docker.clone();
+            let metrics_callback = metrics_callback.clone();
+            tracing::info!(%backend_id, "Spawning metrics loop.");
+            tokio::spawn(async move {
+                metrics_loop(backend_id, docker, metrics_callback).await;
+            });
+
+            continue;
+        }
+
+        // By elimination, we know that the event is a stop/die event.
+
+        let exit_code = attributes.get("exitCode");
+        let exit_code = exit_code.and_then(|s| s.parse::<i32>().ok());
+        let backend_id = match BackendName::try_from(backend_id.to_string()) {
+            Ok(backend_id) => backend_id,
+            Err(err) => {
+                tracing::warn!(
+                    ?err,
+                    backend_id = backend_id.as_value(),
+                    "Ignoring event with invalid backend ID."
+                );
+                continue;
+            }
+        };
+
+        tracing::info!(
+            exit_code,
+            backend_id = backend_id.as_value(),
+            "Received exit code"
+        );
+
+        if let Err(err) = event_sender.send(TerminateEvent {
+            backend_id,
+            exit_code,
+        }) {
+            tracing::error!(?err, "Error sending event.");
+        }
+    }
 }
 
 impl Runtime for DockerRuntime {
@@ -136,82 +231,12 @@ impl Runtime for DockerRuntime {
     }
 
     fn events(&self) -> impl Stream<Item = TerminateEvent> {
-        let options = EventsOptions {
-            since: None,
-            until: None,
-            filters: vec![
-                ("type", vec!["container"]),
-                ("event", vec!["die", "stop", "start"]),
-                ("label", vec![PLANE_DOCKER_LABEL]),
-            ]
-            .into_iter()
-            .collect(),
-        };
-        self.docker.events(Some(options)).filter_map(|e| {
-            let e: EventMessage = match e {
-                Err(e) => {
-                    tracing::error!(?e, "Error receiving Docker event.");
-                    return None;
-                }
-                Ok(e) => e,
-            };
-
-            tracing::info!(event=?e, "Received event");
-
-            let Some(actor) = &e.actor else {
-                tracing::warn!("Received event without actor.");
-                return None;
-            };
-            let Some(attributes) = &actor.attributes else {
-                tracing::warn!("Received event without attributes.");
-                return None;
-            };
-            let Some(backend_id) = attributes.get(PLANE_DOCKER_LABEL) else {
-                tracing::warn!(?e.actor, "Ignoring event without Plane backend ID label.");
-                return None;
-            };
-
-            if e.action.as_deref() == Some("start") {
-                tracing::info!(backend_id = backend_id.as_value(), "Received start event.");
-
-                let Ok(backend_id) = BackendName::try_from(backend_id.to_string()) else {
-                    tracing::warn!(?e.actor, "Ignoring start event with invalid backend ID.");
-                    return None;
-                };
-                let docker = self.docker.clone();
-                let metrics_callback = self.metrics_callback.clone();
-                tracing::info!(%backend_id, "Spawning metrics loop.");
-                tokio::spawn(async move {
-                    metrics_loop(backend_id, docker, metrics_callback).await;
-                });
-
-                return None;
+        BroadcastStream::new(self.events_sender.subscribe()).filter_map(|e| match e {
+            Ok(e) => Some(e),
+            Err(e) => {
+                tracing::error!(?e, "Error receiving Docker event.");
+                None
             }
-
-            let exit_code = attributes.get("exitCode");
-            let exit_code = exit_code.and_then(|s| s.parse::<i32>().ok());
-            let backend_id = match BackendName::try_from(backend_id.to_string()) {
-                Ok(backend_id) => backend_id,
-                Err(err) => {
-                    tracing::warn!(
-                        ?err,
-                        backend_id = backend_id.as_value(),
-                        "Ignoring event with invalid backend ID."
-                    );
-                    return None;
-                }
-            };
-
-            tracing::info!(
-                exit_code,
-                backend_id = backend_id.as_value(),
-                "Received exit code"
-            );
-
-            Some(TerminateEvent {
-                backend_id,
-                exit_code,
-            })
         })
     }
 
@@ -235,6 +260,7 @@ pub struct SpawnResult {
 impl DockerRuntime {
     pub async fn new(config: DockerRuntimeConfig) -> Result<Self> {
         let docker = Docker::connect_with_local_defaults()?;
+        let (events_sender, _) = tokio::sync::broadcast::channel::<TerminateEvent>(128);
 
         let cleanup_handle = {
             let docker = docker.clone();
@@ -251,10 +277,23 @@ impl DockerRuntime {
             })
         };
 
+        let metrics_callback = Arc::new(Mutex::new(None));
+
+        let event_loop_handle = {
+            let metrics_callback = metrics_callback.clone();
+            let docker = docker.clone();
+            let events_sender = events_sender.clone();
+            GuardHandle::new(async move {
+                events_loop(docker.clone(), metrics_callback.clone(), events_sender).await;
+            })
+        };
+
         Ok(Self {
             docker,
             config,
-            metrics_callback: Arc::default(),
+            metrics_callback,
+            events_sender,
+            _events_loop_handle: event_loop_handle,
             _cleanup_handle: cleanup_handle,
         })
     }
