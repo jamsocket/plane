@@ -81,7 +81,6 @@ async fn events_loop(
         .into_iter()
         .collect(),
     };
-    //docker.events(Some(options)).filter_map(|e| {
     let mut stream = docker.events(Some(options));
 
     while let Some(e) = stream.next().await {
