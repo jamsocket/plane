@@ -1,6 +1,6 @@
 use self::{
     docker::DockerRuntimeConfig, executor::Executor, heartbeat::HeartbeatLoop,
-    key_manager::KeyManager, state_store::StateStore,
+    key_manager::KeyManager, runtime::Runtime, state_store::StateStore,
 };
 use crate::{
     client::PlaneClient,
@@ -49,8 +49,14 @@ pub async fn drone_loop(
         let mut socket = connection.connect_with_retry(&name).await;
         let _heartbeat_guard = HeartbeatLoop::start(socket.sender(MessageFromDrone::Heartbeat));
 
-        let metrics_sender = socket.sender(MessageFromDrone::BackendMetrics);
-        executor.register_metrics_sender(metrics_sender);
+        {
+            let socket = socket.sender(MessageFromDrone::BackendMetrics);
+            executor.runtime.metrics_callback(move |metrics_message| {
+                if let Err(err) = socket.send(metrics_message) {
+                    tracing::error!(?err, "Error sending metrics message.");
+                }
+            });
+        };
 
         key_manager
             .lock()
@@ -169,7 +175,7 @@ impl Drone {
         let client = PlaneClient::new(config.controller_url);
 
         #[allow(deprecated)]
-        let executor = match (config.docker_config, config.executor_config) {
+        let runtime = match (config.docker_config, config.executor_config) {
             (Some(_), Some(_)) => {
                 tracing::error!(
                     "Only one of `docker_config` and `executor_config` may be provided."
@@ -217,7 +223,8 @@ impl Drone {
 
         let state_store = StateStore::new(sqlite_connection)?;
 
-        let executor = Executor::new(executor, state_store, config.ip);
+        let runtime = Arc::new(runtime);
+        let executor = Executor::new(runtime, state_store, config.ip);
 
         let id = config.name.clone();
         let drone_loop = tokio::spawn(drone_loop(id.clone(), connector, executor));

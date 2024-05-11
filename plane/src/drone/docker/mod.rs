@@ -4,6 +4,7 @@ use self::{
 };
 use crate::{
     database::backend::BackendMetricsMessage,
+    drone::{docker::metrics::metrics_loop, runtime::Runtime},
     heartbeat_consts::KILL_AFTER_SOFT_TERMINATE_SECONDS,
     names::BackendName,
     protocol::AcquiredKey,
@@ -12,7 +13,7 @@ use crate::{
 };
 use anyhow::Result;
 use bollard::{
-    container::{PruneContainersOptions, StatsOptions, StopContainerOptions},
+    container::{PruneContainersOptions, StopContainerOptions},
     image::PruneImagesOptions,
     service::{EventMessage, HostConfigLogConfig},
     system::EventsOptions,
@@ -20,21 +21,18 @@ use bollard::{
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
+use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, path::PathBuf};
-use thiserror::Error;
+use tokio::sync::broadcast::Sender;
+use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
 use valuable::Valuable;
-
-use super::runtime::Runtime;
 
 /// Clean up containers and images every minute.
 const CLEANUP_INTERVAL_SECS: i64 = 60;
 
 pub mod commands;
+pub mod metrics;
 pub mod types;
 
 /// The label used to identify containers managed by Plane.
@@ -56,11 +54,105 @@ pub struct DockerRuntimeConfig {
     pub cleanup_min_age: Option<Duration>,
 }
 
-#[derive(Clone, Debug)]
+pub type MetricsCallback = Box<dyn Fn(BackendMetricsMessage) + Send + Sync + 'static>;
+
 pub struct DockerRuntime {
     docker: Docker,
     config: DockerRuntimeConfig,
-    _cleanup_handle: Arc<GuardHandle>,
+    metrics_callback: Arc<Mutex<Option<MetricsCallback>>>,
+    events_sender: Sender<TerminateEvent>,
+    _events_loop_handle: GuardHandle,
+    _cleanup_handle: GuardHandle,
+}
+
+async fn events_loop(
+    docker: Docker,
+    metrics_callback: Arc<Mutex<Option<MetricsCallback>>>,
+    event_sender: Sender<TerminateEvent>,
+) {
+    let options = EventsOptions {
+        since: None,
+        until: None,
+        filters: vec![
+            ("type", vec!["container"]),
+            ("event", vec!["die", "stop", "start"]),
+            ("label", vec![PLANE_DOCKER_LABEL]),
+        ]
+        .into_iter()
+        .collect(),
+    };
+    let mut stream = docker.events(Some(options));
+
+    while let Some(e) = stream.next().await {
+        let e: EventMessage = match e {
+            Err(e) => {
+                tracing::error!(?e, "Error receiving Docker event.");
+                continue;
+            }
+            Ok(e) => e,
+        };
+
+        tracing::info!(event=?e, "Received event");
+
+        let Some(actor) = &e.actor else {
+            tracing::warn!("Received event without actor.");
+            continue;
+        };
+        let Some(attributes) = &actor.attributes else {
+            tracing::warn!("Received event without attributes.");
+            continue;
+        };
+        let Some(backend_id) = attributes.get(PLANE_DOCKER_LABEL) else {
+            tracing::warn!(?e.actor, "Ignoring event without Plane backend ID label.");
+            continue;
+        };
+
+        if e.action.as_deref() == Some("start") {
+            tracing::info!(backend_id = backend_id.as_value(), "Received start event.");
+
+            let Ok(backend_id) = BackendName::try_from(backend_id.to_string()) else {
+                tracing::warn!(?e.actor, "Ignoring start event with invalid backend ID.");
+                continue;
+            };
+            let docker = docker.clone();
+            let metrics_callback = metrics_callback.clone();
+            tracing::info!(%backend_id, "Spawning metrics loop.");
+            tokio::spawn(async move {
+                metrics_loop(backend_id, docker, metrics_callback).await;
+            });
+
+            continue;
+        }
+
+        // By elimination, we know that the event is a stop/die event.
+
+        let exit_code = attributes.get("exitCode");
+        let exit_code = exit_code.and_then(|s| s.parse::<i32>().ok());
+        let backend_id = match BackendName::try_from(backend_id.to_string()) {
+            Ok(backend_id) => backend_id,
+            Err(err) => {
+                tracing::warn!(
+                    ?err,
+                    backend_id = backend_id.as_value(),
+                    "Ignoring event with invalid backend ID."
+                );
+                continue;
+            }
+        };
+
+        tracing::info!(
+            exit_code,
+            backend_id = backend_id.as_value(),
+            "Received exit code"
+        );
+
+        if let Err(err) = event_sender.send(TerminateEvent {
+            backend_id,
+            exit_code,
+        }) {
+            tracing::error!(?err, "Error sending event.");
+        }
+    }
 }
 
 impl Runtime for DockerRuntime {
@@ -137,87 +229,19 @@ impl Runtime for DockerRuntime {
         Ok(())
     }
 
-    async fn events(&self) -> impl Stream<Item = TerminateEvent> {
-        let options = EventsOptions {
-            since: None,
-            until: None,
-            filters: vec![
-                ("type", vec!["container"]),
-                ("event", vec!["die", "stop"]),
-                ("label", vec![PLANE_DOCKER_LABEL]),
-            ]
-            .into_iter()
-            .collect(),
-        };
-        self.docker.events(Some(options)).filter_map(|e| {
-            let e: EventMessage = match e {
-                Err(e) => {
-                    tracing::error!(?e, "Error receiving Docker event.");
-                    return None;
-                }
-                Ok(e) => e,
-            };
-
-            tracing::info!(event=?e, "Received event");
-
-            let Some(actor) = e.actor else {
-                tracing::warn!("Received event without actor.");
-                return None;
-            };
-            let Some(attributes) = actor.attributes else {
-                tracing::warn!("Received event without attributes.");
-                return None;
-            };
-
-            let exit_code = attributes.get("exitCode");
-            let exit_code = exit_code.and_then(|s| s.parse::<i32>().ok());
-            let Some(backend_id) = attributes.get(PLANE_DOCKER_LABEL) else {
-                tracing::warn!(
-                    "Ignoring event without Plane backend \
-                    ID (this is expected if non-Plane \
-                    backends are running on the same Docker instance.)"
-                );
-                return None;
-            };
-            let backend_id = match BackendName::try_from(backend_id.to_string()) {
-                Ok(backend_id) => backend_id,
-                Err(err) => {
-                    tracing::warn!(
-                        ?err,
-                        backend_id = backend_id.as_value(),
-                        "Ignoring event with invalid backend ID."
-                    );
-                    return None;
-                }
-            };
-
-            tracing::info!(
-                exit_code,
-                backend_id = backend_id.as_value(),
-                "Received exit code"
-            );
-
-            Some(TerminateEvent {
-                backend_id,
-                exit_code,
-            })
+    fn events(&self) -> impl Stream<Item = TerminateEvent> {
+        BroadcastStream::new(self.events_sender.subscribe()).filter_map(|e| match e {
+            Ok(e) => Some(e),
+            Err(e) => {
+                tracing::error!(?e, "Error receiving Docker event.");
+                None
+            }
         })
     }
 
-    async fn metrics(&self, backend_id: &BackendName) -> Result<bollard::container::Stats> {
-        let container_id = backend_id_to_container_id(backend_id);
-
-        let options = StatsOptions {
-            stream: false,
-            one_shot: false,
-        };
-
-        self.docker
-            .stats(&container_id.to_string(), Some(options))
-            .next()
-            .await
-            .ok_or(anyhow::anyhow!("no stats found for {container_id}"))?
-            .map_err(|e| anyhow::anyhow!("{e:?}"))
+    fn metrics_callback<F: Fn(BackendMetricsMessage) + Send + Sync + 'static>(&self, sender: F) {
+        let mut lock = self.metrics_callback.lock().unwrap();
+        *lock = Some(Box::new(sender));
     }
 }
 
@@ -235,6 +259,7 @@ pub struct SpawnResult {
 impl DockerRuntime {
     pub async fn new(config: DockerRuntimeConfig) -> Result<Self> {
         let docker = Docker::connect_with_local_defaults()?;
+        let (events_sender, _) = tokio::sync::broadcast::channel::<TerminateEvent>(128);
 
         let cleanup_handle = {
             let docker = docker.clone();
@@ -251,127 +276,26 @@ impl DockerRuntime {
             })
         };
 
-        let cleanup_handle = Arc::new(cleanup_handle);
+        let metrics_callback = Arc::new(Mutex::new(None));
+
+        let event_loop_handle = {
+            let metrics_callback = metrics_callback.clone();
+            let docker = docker.clone();
+            let events_sender = events_sender.clone();
+            GuardHandle::new(async move {
+                events_loop(docker.clone(), metrics_callback.clone(), events_sender).await;
+            })
+        };
 
         Ok(Self {
             docker,
             config,
+            metrics_callback,
+            events_sender,
+            _events_loop_handle: event_loop_handle,
             _cleanup_handle: cleanup_handle,
         })
     }
-}
-
-#[derive(Error, Debug)]
-pub enum MetricsConversionError {
-    #[error("{0} stat not present in provided struct")]
-    NoStatsAvailable(String),
-    #[error("Measured cumulative system cpu use: {current} is less than previous cumulative total: {prev}")]
-    SysCpuLessThanCurrent { current: u64, prev: u64 },
-    #[error("Measured cumulative container cpu use: {current} is less than previous cumulative total: {prev}")]
-    ContainerCpuLessThanCurrent { current: u64, prev: u64 },
-}
-
-pub fn get_metrics_message_from_container_stats(
-    stats: bollard::container::Stats,
-    backend_id: BackendName,
-    prev_sys_cpu_ns: &AtomicU64,
-    prev_container_cpu_ns: &AtomicU64,
-) -> std::result::Result<BackendMetricsMessage, MetricsConversionError> {
-    let Some(mem_stats) = stats.memory_stats.stats else {
-        return Err(MetricsConversionError::NoStatsAvailable(
-            "memory_stats.stats".into(),
-        ));
-    };
-
-    let Some(total_system_cpu_used) = stats.cpu_stats.system_cpu_usage else {
-        return Err(MetricsConversionError::NoStatsAvailable(
-            "cpu_stats.system_cpu_usage".into(),
-        ));
-    };
-
-    let Some(mem_used_total_docker) = stats.memory_stats.usage else {
-        return Err(MetricsConversionError::NoStatsAvailable(
-            "memory_stats.usage".into(),
-        ));
-    };
-
-    let Some(mem_limit) = stats.memory_stats.limit else {
-        return Err(MetricsConversionError::NoStatsAvailable(
-            "memory_stats.limit".into(),
-        ));
-    };
-
-    let container_cpu_used = stats.cpu_stats.cpu_usage.total_usage;
-    let prev_sys_cpu_ns_load = prev_sys_cpu_ns.load(Ordering::SeqCst);
-    let prev_container_cpu_ns_load = prev_container_cpu_ns.load(Ordering::SeqCst);
-
-    if container_cpu_used < prev_container_cpu_ns_load {
-        return Err(MetricsConversionError::ContainerCpuLessThanCurrent {
-            current: container_cpu_used,
-            prev: prev_container_cpu_ns_load,
-        });
-    }
-    if total_system_cpu_used < prev_sys_cpu_ns_load {
-        return Err(MetricsConversionError::SysCpuLessThanCurrent {
-            current: total_system_cpu_used,
-            prev: prev_sys_cpu_ns_load,
-        });
-    }
-
-    let container_cpu_used_delta =
-        container_cpu_used - prev_container_cpu_ns.load(Ordering::SeqCst);
-
-    let system_cpu_used_delta = total_system_cpu_used - prev_sys_cpu_ns_load;
-
-    prev_container_cpu_ns.store(container_cpu_used, Ordering::SeqCst);
-    prev_sys_cpu_ns.store(total_system_cpu_used, Ordering::SeqCst);
-
-    // NOTE: a BIG limitation here is that docker does not report swap info!
-    // This may be important for scheduling decisions!
-
-    let (mem_total, mem_active, mem_inactive, mem_unevictable, mem_used) = match mem_stats {
-        bollard::container::MemoryStatsStats::V1(v1_stats) => {
-            let active_mem = v1_stats.total_active_anon + v1_stats.total_active_file;
-            let total_mem = v1_stats.total_rss + v1_stats.total_cache;
-            let unevictable_mem = v1_stats.total_unevictable;
-            let inactive_mem = v1_stats.total_inactive_anon + v1_stats.total_inactive_file;
-            let mem_used = mem_used_total_docker - v1_stats.total_inactive_file;
-            (
-                total_mem,
-                active_mem,
-                inactive_mem,
-                unevictable_mem,
-                mem_used,
-            )
-        }
-        bollard::container::MemoryStatsStats::V2(v2_stats) => {
-            let active_mem = v2_stats.active_anon + v2_stats.active_file;
-            let kernel = v2_stats.kernel_stack + v2_stats.sock + v2_stats.slab;
-            let total_mem = v2_stats.file + v2_stats.anon + kernel;
-            let unevictable_mem = v2_stats.unevictable;
-            let inactive_mem = v2_stats.inactive_anon + v2_stats.inactive_file;
-            let mem_used = mem_used_total_docker - v2_stats.inactive_file;
-            (
-                total_mem,
-                active_mem,
-                inactive_mem,
-                unevictable_mem,
-                mem_used,
-            )
-        }
-    };
-
-    Ok(BackendMetricsMessage {
-        backend_id,
-        mem_total,
-        mem_used,
-        mem_active,
-        mem_inactive,
-        mem_unevictable,
-        mem_limit,
-        cpu_used: container_cpu_used_delta,
-        sys_cpu: system_cpu_used_delta,
-    })
 }
 
 async fn cleanup_loop(docker: Docker, min_age: Duration, interval: Duration, auto_prune: bool) {

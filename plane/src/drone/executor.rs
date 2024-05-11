@@ -1,10 +1,8 @@
 use super::{backend_manager::BackendManager, docker::DockerRuntime, state_store::StateStore};
 use crate::{
-    database::backend::BackendMetricsMessage,
     drone::runtime::Runtime,
     names::BackendName,
     protocol::{BackendAction, BackendEventId, BackendStateMessage},
-    typed_socket::TypedSocketSender,
     types::BackendState,
     util::GuardHandle,
 };
@@ -18,7 +16,7 @@ use std::{
 use valuable::Valuable;
 
 pub struct Executor {
-    docker: DockerRuntime,
+    pub runtime: Arc<DockerRuntime>,
     state_store: Arc<Mutex<StateStore>>,
     backends: Arc<DashMap<BackendName, Arc<BackendManager>>>,
     ip: IpAddr,
@@ -26,15 +24,15 @@ pub struct Executor {
 }
 
 impl Executor {
-    pub fn new(docker: DockerRuntime, state_store: StateStore, ip: IpAddr) -> Self {
+    pub fn new(runtime: Arc<DockerRuntime>, state_store: StateStore, ip: IpAddr) -> Self {
         let backends: Arc<DashMap<BackendName, Arc<BackendManager>>> = Arc::default();
 
         let backend_event_listener = {
-            let docker = docker.clone();
+            let docker = runtime.clone();
             let backends = backends.clone();
 
             GuardHandle::new(async move {
-                let mut events = docker.events().await;
+                let mut events = docker.events();
                 while let Some(event) = events.next().await {
                     if let Some((_, manager)) = backends.remove(&event.backend_id) {
                         tracing::info!(
@@ -54,7 +52,7 @@ impl Executor {
         };
 
         Self {
-            docker,
+            runtime,
             state_store: Arc::new(Mutex::new(state_store)),
             backends,
             ip,
@@ -70,13 +68,6 @@ impl Executor {
             .lock()
             .expect("State store lock poisoned.")
             .register_listener(listener)
-    }
-
-    pub fn register_metrics_sender(&self, sender: TypedSocketSender<BackendMetricsMessage>) {
-        self.state_store
-            .lock()
-            .expect("State store lock poisoned")
-            .register_metrics_sender(sender);
     }
 
     pub fn ack_event(&self, event_id: BackendEventId) -> Result<()> {
@@ -111,19 +102,12 @@ impl Executor {
                     }
                 };
 
-                let metrics_sender = self
-                    .state_store
-                    .lock()
-                    .expect("State store lock poisoned")
-                    .get_metrics_sender()?;
-
                 let manager = BackendManager::new(
                     backend_id.clone(),
                     executable.as_ref().clone(),
                     BackendState::default(),
-                    self.docker.clone(),
+                    self.runtime.clone(),
                     callback,
-                    metrics_sender,
                     self.ip,
                     key.clone(),
                     static_token.clone(),
