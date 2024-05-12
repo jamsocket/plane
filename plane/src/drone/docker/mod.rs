@@ -240,7 +240,10 @@ impl Runtime for DockerRuntime {
     }
 
     fn metrics_callback<F: Fn(BackendMetricsMessage) + Send + Sync + 'static>(&self, sender: F) {
-        let mut lock = self.metrics_callback.lock().unwrap();
+        let mut lock = self
+            .metrics_callback
+            .lock()
+            .expect("Metrics callback lock poisoned.");
         *lock = Some(Box::new(sender));
     }
 }

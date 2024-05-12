@@ -18,14 +18,15 @@ use valuable::Valuable;
 pub struct Executor {
     pub runtime: Arc<DockerRuntime>,
     state_store: Arc<Mutex<StateStore>>,
-    backends: Arc<DashMap<BackendName, Arc<BackendManager>>>,
+    backends: Arc<DashMap<BackendName, Arc<BackendManager<DockerRuntime>>>>,
     ip: IpAddr,
     _backend_event_listener: GuardHandle,
 }
 
 impl Executor {
     pub fn new(runtime: Arc<DockerRuntime>, state_store: StateStore, ip: IpAddr) -> Self {
-        let backends: Arc<DashMap<BackendName, Arc<BackendManager>>> = Arc::default();
+        let backends: Arc<DashMap<BackendName, Arc<BackendManager<DockerRuntime>>>> =
+            Arc::default();
 
         let backend_event_listener = {
             let docker = runtime.clone();

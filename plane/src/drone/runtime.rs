@@ -4,24 +4,30 @@ use crate::{
     types::BearerToken,
 };
 use anyhow::Error;
-use futures_util::Stream;
+use futures_util::{Future, Stream};
 
-#[allow(async_fn_in_trait)]
-pub trait Runtime: Sync {
+pub trait Runtime: Send + Sync + 'static {
     type RuntimeConfig;
-    type BackendConfig: Clone + Send + Sync;
+    type BackendConfig: Clone + Send + Sync + 'static;
 
-    async fn prepare(&self, config: &Self::BackendConfig) -> Result<(), Error>;
+    fn prepare(
+        &self,
+        config: &Self::BackendConfig,
+    ) -> impl Future<Output = Result<(), Error>> + Send;
 
-    async fn spawn(
+    fn spawn(
         &self,
         backend_id: &BackendName,
         executable: Self::BackendConfig,
         acquired_key: Option<&AcquiredKey>,
         static_token: Option<&BearerToken>,
-    ) -> Result<SpawnResult, Error>;
+    ) -> impl Future<Output = Result<SpawnResult, Error>> + Send;
 
-    async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<(), Error>;
+    fn terminate(
+        &self,
+        backend_id: &BackendName,
+        hard: bool,
+    ) -> impl Future<Output = Result<(), Error>> + Send;
 
     /// Provides a callback to be called when the executor has a new metrics message for
     /// any backend.
