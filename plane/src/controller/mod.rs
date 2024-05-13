@@ -127,9 +127,13 @@ impl ControllerServer {
     pub async fn run(config: ControllerConfig) -> Result<Self> {
         let listener = TcpListener::bind(config.bind_addr)?;
 
+        tracing::info!("Attempting to connect to database...");
+
         let db = connect_and_migrate(&config.db_url)
             .await
             .context("Failed to connect to database and run migrations.")?;
+
+        tracing::info!("Connected to database. Listening for connections.");
 
         Self::run_with_listener(
             db,
