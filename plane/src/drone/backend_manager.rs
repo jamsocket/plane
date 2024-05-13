@@ -1,11 +1,11 @@
-use super::{docker::DockerRuntime, wait_backend::wait_for_backend};
+use super::wait_backend::wait_for_backend;
 use crate::drone::runtime::Runtime;
 use crate::{
     names::BackendName,
     protocol::AcquiredKey,
     types::{
         backend_state::{BackendError, TerminationReason},
-        BackendState, BearerToken, DockerExecutorConfig, TerminationKind,
+        BackendState, BearerToken, TerminationKind,
     },
     util::{ExponentialBackoff, GuardHandle},
 };
@@ -17,7 +17,6 @@ use std::{
     net::IpAddr,
     sync::{Arc, Mutex},
 };
-use tracing::Instrument;
 use valuable::Valuable;
 
 /// The backend manager uses a state machine internally to manage the state of the backend.
@@ -56,17 +55,17 @@ struct BackendManagerState {
 /// Every active backend should have a backend manager.
 /// All container- and image-level commands sent to Docker go through the backend manager.
 /// The backend manager owns the status for the backend it is responsible for.
-pub struct BackendManager {
+pub struct BackendManager<R: Runtime> {
     state: Mutex<BackendManagerState>,
 
     /// The ID of the backend this manager is responsible for.
     backend_id: BackendName,
 
     /// The Docker client to use for all Docker operations.
-    runtime: Arc<DockerRuntime>,
+    runtime: Arc<R>,
 
     /// The configuration to use when spawning the backend.
-    executor_config: DockerExecutorConfig,
+    backend_config: R::BackendConfig,
 
     /// Function to call when the state changes.
     state_callback: StateCallback,
@@ -81,7 +80,7 @@ pub struct BackendManager {
     static_token: Option<BearerToken>,
 }
 
-impl Debug for BackendManager {
+impl<R: Runtime> Debug for BackendManager<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BackendManager")
             .field("backend_id", &self.backend_id)
@@ -89,13 +88,13 @@ impl Debug for BackendManager {
     }
 }
 
-impl BackendManager {
+impl<R: Runtime> BackendManager<R> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         backend_id: BackendName,
-        executor_config: DockerExecutorConfig,
+        backend_config: R::BackendConfig,
         state: BackendState,
-        runtime: Arc<DockerRuntime>,
+        runtime: Arc<R>,
         state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
         ip: IpAddr,
         acquired_key: AcquiredKey,
@@ -108,7 +107,7 @@ impl BackendManager {
             }),
             backend_id,
             runtime,
-            executor_config,
+            backend_config,
             state_callback: Box::new(state_callback),
             ip,
             acquired_key,
@@ -123,30 +122,24 @@ impl BackendManager {
         match state {
             BackendState::Scheduled => StepStatusResult::SetState(state.to_loading()),
             BackendState::Loading => {
-                let executor_config = self.executor_config.clone();
+                let executor_config = self.backend_config.clone();
                 let runtime = self.runtime.clone();
+                let backend_id = self.backend_id.clone();
                 StepStatusResult::future_status(async move {
-                    let image = &executor_config.image;
-                    let span = tracing::info_span!("pull", image = image.as_str());
-
-                    async move {
-                        tracing::info!("pulling...");
-                        if let Err(err) = runtime.prepare(&executor_config).await {
-                            tracing::error!(?err, "failed to pull image");
-                            state.to_terminated(None)
-                        } else {
-                            tracing::info!("done pulling...");
-                            state.to_starting()
-                        }
+                    tracing::info!(%backend_id, "preparing...");
+                    if let Err(err) = runtime.prepare(&executor_config).await {
+                        tracing::error!(?err, %backend_id, "failed to prepare");
+                        state.to_terminated(None)
+                    } else {
+                        tracing::info!(%backend_id, "done preparing...");
+                        state.to_starting()
                     }
-                    .instrument(span)
-                    .await
                 })
             }
             BackendState::Starting => {
                 let backend_id = self.backend_id.clone();
                 let docker = self.runtime.clone();
-                let executor_config = self.executor_config.clone();
+                let executor_config = self.backend_config.clone();
                 let ip = self.ip;
 
                 let acquired_key = self.acquired_key.clone();

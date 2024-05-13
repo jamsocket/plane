@@ -30,14 +30,15 @@ async fn backend_lifecycle(env: TestEnvironment) {
             id: None,
             cluster: Some(env.cluster.clone()),
             pool: DronePoolName::default(),
-            executable: DockerExecutorConfig {
+            executable: serde_json::to_value(DockerExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
                 env: HashMap::default(),
                 resource_limits: ResourceLimits::default(),
                 credentials: None,
                 mount: None,
-            },
+            })
+            .unwrap(),
             lifetime_limit_seconds: None,
             max_idle_seconds: None,
             use_static_token: false,

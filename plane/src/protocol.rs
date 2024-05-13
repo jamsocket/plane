@@ -4,11 +4,12 @@ use crate::{
     names::{BackendActionName, BackendName},
     typed_socket::ChannelMessage,
     types::{
-        backend_state::TerminationReason, BackendState, BearerToken, ClusterName,
-        DockerExecutorConfig, KeyConfig, SecretToken, Subdomain, TerminationKind,
+        backend_state::TerminationReason, BackendState, BearerToken, ClusterName, KeyConfig,
+        SecretToken, Subdomain, TerminationKind,
     },
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub struct KeyDeadlines {
@@ -38,10 +39,10 @@ pub struct AcquiredKey {
     pub token: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum BackendAction {
     Spawn {
-        executable: Box<DockerExecutorConfig>,
+        executable: Value,
         key: AcquiredKey,
         static_token: Option<BearerToken>,
     },

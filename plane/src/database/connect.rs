@@ -14,7 +14,7 @@ use crate::{
     protocol::{AcquiredKey, BackendAction, KeyDeadlines},
     types::{
         BackendState, BackendStatus, BearerToken, ClusterName, ConnectRequest, ConnectResponse,
-        DockerExecutorConfig, KeyConfig, RevokeRequest, SecretToken, SpawnConfig,
+        KeyConfig, RevokeRequest, SecretToken, SpawnConfig,
     },
     util::random_token,
 };
@@ -93,7 +93,7 @@ impl ConnectError {
 async fn create_backend_with_key(
     pool: &PgPool,
     key: &KeyConfig,
-    spawn_config: &SpawnConfig<DockerExecutorConfig>,
+    spawn_config: &SpawnConfig,
     cluster: &ClusterName,
     drone_for_spawn: &DroneForSpawn,
     static_token: Option<&BearerToken>,
@@ -171,7 +171,7 @@ async fn create_backend_with_key(
     };
 
     let pending_action = BackendAction::Spawn {
-        executable: Box::new(spawn_config.executable.clone()),
+        executable: spawn_config.executable.clone(),
         key: acquired_key,
         static_token: static_token.cloned(),
     };
@@ -232,7 +232,7 @@ pub async fn revoke(pool: &PgPool, request: &RevokeRequest) -> Result<()> {
 async fn attempt_connect(
     pool: &PgPool,
     default_cluster: Option<&ClusterName>,
-    request: &ConnectRequest<DockerExecutorConfig>,
+    request: &ConnectRequest,
     client: &PlaneClient,
 ) -> Result<ConnectResponse> {
     let key = if let Some(key) = &request.key {
@@ -361,7 +361,7 @@ async fn attempt_connect(
 pub async fn connect(
     pool: &PgPool,
     default_cluster: Option<&ClusterName>,
-    request: &ConnectRequest<DockerExecutorConfig>,
+    request: &ConnectRequest,
     client: &PlaneClient,
 ) -> Result<ConnectResponse> {
     let mut attempt = 1;

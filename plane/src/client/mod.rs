@@ -6,7 +6,7 @@ use crate::{
     typed_socket::client::TypedSocketConnector,
     types::{
         backend_state::BackendStatusStreamEntry, ClusterName, ClusterState, ConnectRequest,
-        ConnectResponse, DockerExecutorConfig, DrainResult, DronePoolName, RevokeRequest,
+        ConnectResponse, DrainResult, DronePoolName, RevokeRequest,
     },
 };
 use reqwest::{Response, StatusCode};
@@ -106,7 +106,7 @@ impl PlaneClient {
 
     pub async fn connect(
         &self,
-        connect_request: &ConnectRequest<DockerExecutorConfig>,
+        connect_request: &ConnectRequest,
     ) -> Result<ConnectResponse, PlaneClientError> {
         let addr = self.controller_address.join("/ctrl/connect");
 

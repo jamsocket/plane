@@ -37,10 +37,10 @@ pub mod runtime;
 mod state_store;
 mod wait_backend;
 
-pub async fn drone_loop(
+pub async fn drone_loop<R: Runtime>(
     name: DroneName,
     mut connection: TypedSocketConnector<MessageFromDrone>,
-    executor: Executor,
+    executor: Executor<R>,
 ) {
     let executor = Arc::new(executor);
     let key_manager = Arc::new(Mutex::new(KeyManager::new(executor.clone())));
@@ -100,7 +100,7 @@ pub async fn drone_loop(
                 }) => {
                     tracing::info!(
                         backend_id = backend_id.as_value(),
-                        action = action.as_value(),
+                        action = ?action,
                         "Received action."
                     );
 
