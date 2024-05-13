@@ -37,10 +37,10 @@ pub mod runtime;
 mod state_store;
 mod wait_backend;
 
-pub async fn drone_loop(
+pub async fn drone_loop<R: Runtime>(
     name: DroneName,
     mut connection: TypedSocketConnector<MessageFromDrone>,
-    executor: Executor<DockerRuntime>,
+    executor: Executor<R>,
 ) {
     let executor = Arc::new(executor);
     let key_manager = Arc::new(Mutex::new(KeyManager::new(executor.clone())));
