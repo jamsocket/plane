@@ -455,21 +455,79 @@ impl<'a> BackendDatabase<'a> {
     }
 
     pub async fn cleanup(&self, min_age_days: i32) -> sqlx::Result<()> {
-        let result = sqlx::query!(
+        tracing::info!("Cleaning up terminated backends.");
+        let mut txn = self.db.pool.begin().await?;
+
+        sqlx::query(
             r#"
-            delete from backend
-            where
-                last_status = $1
-                and now() - last_status_time > make_interval(days => $2)
-            "#,
-            BackendStatus::Terminated.to_string(),
-            min_age_days,
+            create temporary table deleted_backend on commit drop as (
+                select id from backend
+                where
+                    last_status = $1
+                    and now() - last_status_time > make_interval(days => $2)
+            );
+        "#,
         )
-        .execute(&self.db.pool)
+        .bind(BackendStatus::Terminated.to_string())
+        .bind(min_age_days)
+        .execute(&mut *txn)
         .await?;
 
-        let row_count = result.rows_affected();
-        tracing::info!(row_count, "Cleaned up terminated backends.");
+        let token_result = sqlx::query(
+            r#"
+            delete from token
+            where token.backend_id in (select id from deleted_backend);
+        "#,
+        )
+        .execute(&mut *txn)
+        .await?;
+
+        let token_deleted = token_result.rows_affected();
+
+        let backend_action_result = sqlx::query(
+            r#"
+            delete from backend_action
+            where backend_action.backend_id in (select id from deleted_backend);
+        "#,
+        )
+        .execute(&mut *txn)
+        .await?;
+
+        let backend_action_deleted = backend_action_result.rows_affected();
+
+        let backend_state_result = sqlx::query(
+            r#"
+            delete from backend_state
+            where backend_state.backend_id in (select id from deleted_backend);
+        "#,
+        )
+        .execute(&mut *txn)
+        .await?;
+
+        let backend_state_deleted = backend_state_result.rows_affected();
+
+        let backend_result = sqlx::query(
+            r#"
+            delete from backend
+            where id in (select id from deleted_backend);
+        "#,
+        )
+        .execute(&mut *txn)
+        .await?;
+
+        let backend_deleted = backend_result.rows_affected();
+
+        txn.commit().await?;
+
+        if backend_deleted > 0 {
+            tracing::info!(
+                token_deleted,
+                backend_action_deleted,
+                backend_state_deleted,
+                backend_deleted,
+                "Finished cleanup."
+            );
+        }
 
         Ok(())
     }
