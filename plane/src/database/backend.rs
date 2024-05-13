@@ -466,7 +466,7 @@ impl<'a> BackendDatabase<'a> {
                     last_status = $1
                     and now() - last_status_time > make_interval(days => $2)
             );
-        "#,
+            "#,
         )
         .bind(BackendStatus::Terminated.to_string())
         .bind(min_age_days)
@@ -477,7 +477,7 @@ impl<'a> BackendDatabase<'a> {
             r#"
             delete from token
             where token.backend_id in (select id from deleted_backend);
-        "#,
+            "#,
         )
         .execute(&mut *txn)
         .await?;
@@ -488,7 +488,7 @@ impl<'a> BackendDatabase<'a> {
             r#"
             delete from backend_action
             where backend_action.backend_id in (select id from deleted_backend);
-        "#,
+            "#,
         )
         .execute(&mut *txn)
         .await?;
@@ -499,7 +499,7 @@ impl<'a> BackendDatabase<'a> {
             r#"
             delete from backend_state
             where backend_state.backend_id in (select id from deleted_backend);
-        "#,
+            "#,
         )
         .execute(&mut *txn)
         .await?;
@@ -510,7 +510,7 @@ impl<'a> BackendDatabase<'a> {
             r#"
             delete from backend
             where id in (select id from deleted_backend);
-        "#,
+            "#,
         )
         .execute(&mut *txn)
         .await?;
@@ -519,15 +519,13 @@ impl<'a> BackendDatabase<'a> {
 
         txn.commit().await?;
 
-        if backend_deleted > 0 {
-            tracing::info!(
-                token_deleted,
-                backend_action_deleted,
-                backend_state_deleted,
-                backend_deleted,
-                "Finished cleanup."
-            );
-        }
+        tracing::info!(
+            token_deleted,
+            backend_action_deleted,
+            backend_state_deleted,
+            backend_deleted,
+            "Finished cleanup."
+        );
 
         Ok(())
     }
