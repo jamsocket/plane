@@ -5,11 +5,11 @@ use crate::{
 };
 use anyhow::Error;
 use futures_util::{Future, Stream};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 
 pub trait Runtime: Send + Sync + 'static {
     type RuntimeConfig;
-    type BackendConfig: Clone + Send + Sync + 'static + DeserializeOwned;
+    type BackendConfig: Clone + Send + Sync + 'static + DeserializeOwned + Serialize;
 
     fn prepare(
         &self,
