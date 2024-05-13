@@ -1,6 +1,7 @@
 use self::{
     commands::{get_port, run_container},
     types::ContainerId,
+    wait_backend::wait_for_backend,
 };
 use crate::{
     database::backend::BackendMetricsMessage,
@@ -8,7 +9,7 @@ use crate::{
     heartbeat_consts::KILL_AFTER_SOFT_TERMINATE_SECONDS,
     names::BackendName,
     protocol::AcquiredKey,
-    types::{BearerToken, DockerExecutorConfig, PullPolicy},
+    types::{backend_state::BackendError, BearerToken, DockerExecutorConfig, PullPolicy},
     util::GuardHandle,
 };
 use anyhow::Result;
@@ -21,8 +22,11 @@ use bollard::{
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, path::PathBuf};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+};
 use tokio::sync::broadcast::Sender;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
@@ -34,6 +38,7 @@ const CLEANUP_INTERVAL_SECS: i64 = 60;
 pub mod commands;
 pub mod metrics;
 pub mod types;
+mod wait_backend;
 
 /// The label used to identify containers managed by Plane.
 /// The existence of this label is used to determine whether a container is managed by Plane.
@@ -245,6 +250,14 @@ impl Runtime for DockerRuntime {
             .lock()
             .expect("Metrics callback lock poisoned.");
         *lock = Some(Box::new(sender));
+    }
+
+    async fn wait_for_backend(
+        &self,
+        _backend: &BackendName,
+        address: SocketAddr,
+    ) -> Result<(), BackendError> {
+        wait_for_backend(address).await
     }
 }
 

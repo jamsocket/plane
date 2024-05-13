@@ -1,4 +1,3 @@
-use super::wait_backend::wait_for_backend;
 use crate::drone::runtime::Runtime;
 use crate::{
     names::BackendName,
@@ -138,14 +137,14 @@ impl<R: Runtime> BackendManager<R> {
             }
             BackendState::Starting => {
                 let backend_id = self.backend_id.clone();
-                let docker = self.runtime.clone();
+                let runtime = self.runtime.clone();
                 let executor_config = self.backend_config.clone();
                 let ip = self.ip;
 
                 let acquired_key = self.acquired_key.clone();
                 let static_token = self.static_token.clone();
                 StepStatusResult::future_status(async move {
-                    let spawn_result = docker
+                    let spawn_result = runtime
                         .spawn(
                             &backend_id,
                             executor_config,
@@ -166,14 +165,23 @@ impl<R: Runtime> BackendManager<R> {
                     state.to_waiting(address)
                 })
             }
-            BackendState::Waiting { address } => StepStatusResult::future_status(async move {
-                if let Err(BackendError::StartupTimeout) = wait_for_backend(address.0).await {
-                    tracing::error!("Backend startup timeout");
-                    state.to_terminating(TerminationKind::Hard, TerminationReason::StartupTimeout)
-                } else {
-                    state.to_ready()
-                }
-            }),
+            BackendState::Waiting { address } => {
+                let backend_id = self.backend_id.clone();
+                let runtime = self.runtime.clone();
+                StepStatusResult::future_status(async move {
+                    if let Err(BackendError::StartupTimeout) =
+                        runtime.wait_for_backend(&backend_id, address.0).await
+                    {
+                        tracing::error!("Backend startup timeout");
+                        state.to_terminating(
+                            TerminationKind::Hard,
+                            TerminationReason::StartupTimeout,
+                        )
+                    } else {
+                        state.to_ready()
+                    }
+                })
+            }
             BackendState::Ready { .. } => StepStatusResult::DoNothing,
             BackendState::Terminating { termination, .. } => {
                 let docker = self.runtime.clone();
