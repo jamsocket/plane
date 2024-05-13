@@ -5,10 +5,11 @@ use crate::{
 };
 use anyhow::Error;
 use futures_util::{Future, Stream};
+use serde::de::DeserializeOwned;
 
 pub trait Runtime: Send + Sync + 'static {
     type RuntimeConfig;
-    type BackendConfig: Clone + Send + Sync + 'static;
+    type BackendConfig: Clone + Send + Sync + 'static + DeserializeOwned;
 
     fn prepare(
         &self,
@@ -33,5 +34,5 @@ pub trait Runtime: Send + Sync + 'static {
     /// any backend.
     fn metrics_callback<F: Fn(BackendMetricsMessage) + Send + Sync + 'static>(&self, sender: F);
 
-    fn events(&self) -> impl Stream<Item = TerminateEvent>;
+    fn events(&self) -> impl Stream<Item = TerminateEvent> + Send;
 }

@@ -246,7 +246,7 @@ impl DockerExecutorConfig {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct SpawnConfig<EC> {
+pub struct SpawnConfig {
     /// ID to assign to the new backend. Must be unique.
     /// This should only be used if you really need it, otherwise you can leave it blank
     /// and let Plane assign a unique ID automatically. This may be removed from
@@ -261,7 +261,7 @@ pub struct SpawnConfig<EC> {
     pub pool: DronePoolName,
 
     /// Config to use to spawn the backend process.
-    pub executable: EC,
+    pub executable: Value,
 
     /// If provided, the maximum amount of time the backend will be allowed to
     /// stay alive. Time counts from when the backend is scheduled.
@@ -310,13 +310,13 @@ impl KeyConfig {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct ConnectRequest<EC> {
+pub struct ConnectRequest {
     /// Configuration for the key to use.
     #[serde(default)]
     pub key: Option<KeyConfig>,
 
     /// Config to use if we need to create a new backend to connect to.
-    pub spawn_config: Option<SpawnConfig<EC>>,
+    pub spawn_config: Option<SpawnConfig>,
 
     /// Username or other identifier to associate with the generated connection URL.
     /// Passed to the backend through the X-Plane-User header.
@@ -331,7 +331,7 @@ pub struct ConnectRequest<EC> {
 // We need to derive this manually, because the derive macro will add a bound
 // EC: Default. This is not actually necessary because we default to spawn_config
 // being None.
-impl<EC> Default for ConnectRequest<EC> {
+impl Default for ConnectRequest {
     fn default() -> Self {
         Self {
             key: None,

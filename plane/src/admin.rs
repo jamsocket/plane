@@ -188,7 +188,8 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                 id,
                 cluster: cluster.clone(),
                 pool,
-                executable: executor_config.clone(),
+                executable: serde_json::to_value(&executor_config)
+                    .expect("Failed to serialize config"),
                 lifetime_limit_seconds: None,
                 max_idle_seconds: Some(max_idle_seconds),
                 use_static_token: static_token,

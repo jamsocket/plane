@@ -36,14 +36,15 @@ async fn volume_mounts(env: TestEnvironment) {
             id: None,
             cluster: Some(env.cluster.clone()),
             pool: DronePoolName::default(),
-            executable: DockerExecutorConfig {
+            executable: serde_json::to_value(DockerExecutorConfig {
                 image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
                 pull_policy: Some(PullPolicy::IfNotPresent),
                 env: HashMap::default(),
                 resource_limits: ResourceLimits::default(),
                 credentials: None,
                 mount: Some(Mount::Path(PathBuf::from(mount))),
-            },
+            })
+            .unwrap(),
             lifetime_limit_seconds: Some(5),
             max_idle_seconds: None,
             use_static_token: false,
@@ -59,18 +60,34 @@ async fn volume_mounts(env: TestEnvironment) {
     assert!(response_custom_mount.spawned);
 
     tracing::info!("Requesting backend with key mount.");
-    let mut connect_request_key_mount = connect_request_custom_mount.clone();
-    connect_request_key_mount.key = Some(KeyConfig {
-        name: key.to_string(),
-        namespace: "".to_string(),
-        tag: "".to_string(),
-    });
-    connect_request_key_mount
-        .spawn_config
-        .as_mut()
-        .unwrap()
-        .executable
-        .mount = Some(Mount::Bool(true));
+
+    let connect_request_key_mount = ConnectRequest {
+        spawn_config: Some(SpawnConfig {
+            id: None,
+            cluster: Some(env.cluster.clone()),
+            pool: DronePoolName::default(),
+            executable: serde_json::to_value(DockerExecutorConfig {
+                image: "ghcr.io/drifting-in-space/demo-image-drop-four".to_string(),
+                pull_policy: Some(PullPolicy::IfNotPresent),
+                env: HashMap::default(),
+                resource_limits: ResourceLimits::default(),
+                credentials: None,
+                mount: Some(Mount::Bool(true)),
+            })
+            .unwrap(),
+            lifetime_limit_seconds: Some(5),
+            max_idle_seconds: None,
+            use_static_token: false,
+            subdomain: None,
+        }),
+        key: Some(KeyConfig {
+            name: key.to_string(),
+            namespace: "".to_string(),
+            tag: "".to_string(),
+        }),
+        user: None,
+        auth: Map::default(),
+    };
 
     let response_key_mount = client.connect(&connect_request_key_mount).await.unwrap();
     tracing::info!("Got response for key mount.");

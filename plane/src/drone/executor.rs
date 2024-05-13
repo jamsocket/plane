@@ -1,4 +1,4 @@
-use super::{backend_manager::BackendManager, docker::DockerRuntime, state_store::StateStore};
+use super::{backend_manager::BackendManager, state_store::StateStore};
 use crate::{
     drone::runtime::Runtime,
     names::BackendName,
@@ -15,25 +15,24 @@ use std::{
 };
 use valuable::Valuable;
 
-pub struct Executor {
-    pub runtime: Arc<DockerRuntime>,
+pub struct Executor<R: Runtime> {
+    pub runtime: Arc<R>,
     state_store: Arc<Mutex<StateStore>>,
-    backends: Arc<DashMap<BackendName, Arc<BackendManager<DockerRuntime>>>>,
+    backends: Arc<DashMap<BackendName, Arc<BackendManager<R>>>>,
     ip: IpAddr,
     _backend_event_listener: GuardHandle,
 }
 
-impl Executor {
-    pub fn new(runtime: Arc<DockerRuntime>, state_store: StateStore, ip: IpAddr) -> Self {
-        let backends: Arc<DashMap<BackendName, Arc<BackendManager<DockerRuntime>>>> =
-            Arc::default();
+impl<R: Runtime> Executor<R> {
+    pub fn new(runtime: Arc<R>, state_store: StateStore, ip: IpAddr) -> Self {
+        let backends: Arc<DashMap<BackendName, Arc<BackendManager<R>>>> = Arc::default();
 
         let backend_event_listener = {
             let docker = runtime.clone();
             let backends = backends.clone();
 
             GuardHandle::new(async move {
-                let mut events = docker.events();
+                let mut events = Box::pin(docker.events());
                 while let Some(event) = events.next().await {
                     if let Some((_, manager)) = backends.remove(&event.backend_id) {
                         tracing::info!(
@@ -103,9 +102,11 @@ impl Executor {
                     }
                 };
 
+                let backend_config: R::BackendConfig = serde_json::from_value(executable.clone())?;
+
                 let manager = BackendManager::new(
                     backend_id.clone(),
-                    executable.as_ref().clone(),
+                    backend_config,
                     BackendState::default(),
                     self.runtime.clone(),
                     callback,

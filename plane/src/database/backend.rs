@@ -14,7 +14,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures_util::Stream;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, str::FromStr};
+use std::{fmt::Debug, net::SocketAddr, str::FromStr};
 
 pub struct BackendDatabase<'a> {
     db: &'a PlaneDatabase,
