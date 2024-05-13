@@ -309,7 +309,7 @@ impl KeyConfig {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct ConnectRequest {
     /// Configuration for the key to use.
     #[serde(default)]
@@ -326,20 +326,6 @@ pub struct ConnectRequest {
     /// Passed to the backend through the X-Plane-Auth header.
     #[serde(default)]
     pub auth: Map<String, Value>,
-}
-
-// We need to derive this manually, because the derive macro will add a bound
-// EC: Default. This is not actually necessary because we default to spawn_config
-// being None.
-impl Default for ConnectRequest {
-    fn default() -> Self {
-        Self {
-            key: None,
-            spawn_config: None,
-            user: None,
-            auth: Map::default(),
-        }
-    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]
