@@ -1,7 +1,11 @@
+use std::net::SocketAddr;
+
 use super::docker::{SpawnResult, TerminateEvent};
 use crate::{
-    database::backend::BackendMetricsMessage, names::BackendName, protocol::AcquiredKey,
-    types::BearerToken,
+    database::backend::BackendMetricsMessage,
+    names::BackendName,
+    protocol::AcquiredKey,
+    types::{backend_state::BackendError, BearerToken},
 };
 use anyhow::Error;
 use futures_util::{Future, Stream};
@@ -35,4 +39,10 @@ pub trait Runtime: Send + Sync + 'static {
     fn metrics_callback<F: Fn(BackendMetricsMessage) + Send + Sync + 'static>(&self, sender: F);
 
     fn events(&self) -> impl Stream<Item = TerminateEvent> + Send;
+
+    fn wait_for_backend(
+        &self,
+        backend: &BackendName,
+        address: SocketAddr,
+    ) -> impl Future<Output = Result<(), BackendError>> + Send;
 }

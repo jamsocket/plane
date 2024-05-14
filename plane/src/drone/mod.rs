@@ -35,7 +35,6 @@ mod heartbeat;
 mod key_manager;
 pub mod runtime;
 mod state_store;
-mod wait_backend;
 
 pub async fn drone_loop<R: Runtime>(
     name: DroneName,
