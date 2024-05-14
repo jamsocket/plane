@@ -50,6 +50,8 @@ pub struct DockerRuntimeConfig {
     pub mount_base: Option<PathBuf>,
 
     pub auto_prune: Option<bool>,
+    
+    #[serde(default)]
     #[serde(with = "crate::serialization::serialize_optional_duration_as_seconds")]
     pub cleanup_min_age: Option<Duration>,
 }
