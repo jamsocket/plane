@@ -19,7 +19,7 @@ async fn test_get_metrics(_: TestEnvironment) {
         .unwrap();
 
     let executor_config = DockerExecutorConfig::from_image_with_defaults(
-        "ghcr.io/drifting-in-space/demo-image-drop-four",
+        "ghcr.io/jamsocket/demo-image-drop-four",
     );
 
     runtime.prepare(&executor_config).await.unwrap();

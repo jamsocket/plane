@@ -2,7 +2,7 @@
     <img src="../resources/plane-logo-light.svg" alt="Plane logo" />
 </a>
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/drifting-in-space/plane?style=social)](https://github.com/jamsocket/plane)
+[![GitHub Repo stars](https://img.shields.io/github/stars/jamsocket/plane?style=social)](https://github.com/jamsocket/plane)
 [![Docker image](https://img.shields.io/docker/v/plane/plane)](https://hub.docker.com/r/plane/plane/tags)
 [![Build Docker Image](https://github.com/jamsocket/plane/actions/workflows/build-image.yml/badge.svg)](https://github.com/jamsocket/plane/actions/workflows/build-image.yml)
 [![Tests](https://github.com/jamsocket/plane/actions/workflows/tests.yml/badge.svg)](https://github.com/jamsocket/plane/actions/workflows/tests.yml)
