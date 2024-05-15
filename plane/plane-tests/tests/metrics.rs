@@ -18,9 +18,8 @@ async fn test_get_metrics(_: TestEnvironment) {
         .await
         .unwrap();
 
-    let executor_config = DockerExecutorConfig::from_image_with_defaults(
-        "ghcr.io/drifting-in-space/demo-image-drop-four",
-    );
+    let executor_config =
+        DockerExecutorConfig::from_image_with_defaults("ghcr.io/jamsocket/demo-image-drop-four");
 
     runtime.prepare(&executor_config).await.unwrap();
     let (send, mut recv) = tokio::sync::mpsc::channel(1);
