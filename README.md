@@ -8,8 +8,8 @@
 </div>
 
 [![Docker image](https://img.shields.io/docker/v/plane/plane)](https://hub.docker.com/r/plane/plane/tags)
-[![Build Docker Image](https://github.com/drifting-in-space/plane/actions/workflows/build-image.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/build-image.yml)
-[![Tests](https://github.com/drifting-in-space/plane/actions/workflows/tests.yml/badge.svg)](https://github.com/drifting-in-space/plane/actions/workflows/tests.yml)
+[![Build Docker Image](https://github.com/jamsocket/plane/actions/workflows/build-image.yml/badge.svg)](https://github.com/jamsocket/plane/actions/workflows/build-image.yml)
+[![Tests](https://github.com/jamsocket/plane/actions/workflows/tests.yml/badge.svg)](https://github.com/jamsocket/plane/actions/workflows/tests.yml)
 [![Chat on Discord](https://img.shields.io/static/v1?label=chat&message=discord&color=404eed)](https://discord.gg/N5sEpsuhh9)
 [![crates.io](https://img.shields.io/crates/v/plane.svg)](https://crates.io/crates/plane)
 
