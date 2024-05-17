@@ -44,7 +44,7 @@ pub async fn connect(db: &str) -> sqlx::Result<PlaneDatabase> {
 
 #[derive(Clone)]
 pub struct PlaneDatabase {
-    pool: PgPool,
+    pub pool: PgPool,
     subscription_manager: Arc<OnceLock<EventSubscriptionManager>>,
 }
 
