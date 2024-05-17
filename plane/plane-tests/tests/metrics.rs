@@ -2,7 +2,7 @@ use common::test_env::TestEnvironment;
 use common::timeout::WithTimeout;
 use plane::{
     drone::{
-        docker::{DockerRuntime, DockerRuntimeConfig},
+        runtime::docker::{DockerRuntime, DockerRuntimeConfig},
         runtime::Runtime,
     },
     names::{BackendName, Name},

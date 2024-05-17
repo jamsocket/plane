@@ -1,5 +1,5 @@
 use crate::{
-    drone::{docker::DockerRuntimeConfig, DroneConfig},
+    drone::{runtime::docker::DockerRuntimeConfig, DroneConfig},
     names::{DroneName, OrRandom},
     types::{ClusterName, DronePoolName},
     util::resolve_hostname,

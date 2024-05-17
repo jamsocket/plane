@@ -5,7 +5,7 @@ use self::{
 };
 use crate::{
     database::backend::BackendMetricsMessage,
-    drone::{docker::metrics::metrics_loop, runtime::Runtime},
+    drone::runtime::{docker::metrics::metrics_loop, Runtime},
     heartbeat_consts::KILL_AFTER_SOFT_TERMINATE_SECONDS,
     names::BackendName,
     protocol::AcquiredKey,

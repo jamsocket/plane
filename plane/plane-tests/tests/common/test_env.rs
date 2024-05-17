@@ -7,7 +7,7 @@ use plane::{
     controller::ControllerServer,
     database::PlaneDatabase,
     dns::run_dns_with_listener,
-    drone::{docker::DockerRuntimeConfig, Drone, DroneConfig, ExecutorConfig},
+    drone::{runtime::docker::DockerRuntimeConfig, Drone, DroneConfig, ExecutorConfig},
     names::{AcmeDnsServerName, ControllerName, DroneName, Name},
     proxy::AcmeEabConfiguration,
     types::{ClusterName, DronePoolName},

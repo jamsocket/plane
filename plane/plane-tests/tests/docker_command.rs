@@ -2,7 +2,7 @@ use anyhow::Context;
 use bollard::container::LogsOptions;
 use futures_util::TryStreamExt;
 use plane::{
-    drone::docker::{
+    drone::runtime::docker::{
         commands::{get_container_config_from_executor_config, pull_image},
         types::ContainerId,
     },

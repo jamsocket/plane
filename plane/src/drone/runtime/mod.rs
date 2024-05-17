@@ -1,6 +1,3 @@
-use std::net::SocketAddr;
-
-use super::docker::{SpawnResult, TerminateEvent};
 use crate::{
     database::backend::BackendMetricsMessage,
     names::BackendName,
@@ -8,8 +5,12 @@ use crate::{
     types::{backend_state::BackendError, BearerToken},
 };
 use anyhow::Error;
+use docker::{SpawnResult, TerminateEvent};
 use futures_util::{Future, Stream};
 use serde::{de::DeserializeOwned, Serialize};
+use std::net::SocketAddr;
+
+pub mod docker;
 
 pub trait Runtime: Send + Sync + 'static {
     type RuntimeConfig;
