@@ -1,11 +1,14 @@
 use self::{
-    docker::DockerRuntimeConfig, executor::Executor, heartbeat::HeartbeatLoop,
-    key_manager::KeyManager, runtime::Runtime, state_store::StateStore,
+    executor::Executor,
+    heartbeat::HeartbeatLoop,
+    key_manager::KeyManager,
+    runtime::{docker::DockerRuntimeConfig, Runtime},
+    state_store::StateStore,
 };
 use crate::{
     client::PlaneClient,
     database::backend::BackendActionMessage,
-    drone::docker::DockerRuntime,
+    drone::runtime::docker::DockerRuntime,
     names::DroneName,
     protocol::{BackendAction, MessageFromDrone, MessageToDrone, RenewKeyResponse},
     signals::wait_for_shutdown_signal,
@@ -29,7 +32,6 @@ use valuable::Valuable;
 
 mod backend_manager;
 pub mod command;
-pub mod docker;
 mod executor;
 mod heartbeat;
 mod key_manager;
