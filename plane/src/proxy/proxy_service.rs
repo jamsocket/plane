@@ -29,6 +29,21 @@ use url::Url;
 
 const PLANE_BACKEND_ID_HEADER: &str = "x-plane-backend-id";
 
+fn response_builder() -> hyper::http::response::Builder {
+    let mut request = hyper::Response::builder();
+    request = request.header("Access-Control-Allow-Origin", "*");
+    request = request.header(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, DELETE, OPTIONS",
+    );
+    request = request.header(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization",
+    );
+    request = request.header("Access-Control-Allow-Credentials", "true");
+    request
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ProxyError {
     #[error("Invalid or expired connection token")]
@@ -133,7 +148,7 @@ impl RequestHandler {
                         (hyper::StatusCode::INTERNAL_SERVER_ERROR, "Internal error")
                     }
                 };
-                Ok(hyper::Response::builder()
+                Ok(response_builder()
                     .status(status_code)
                     .header(hyper::header::SERVER, SERVER_NAME)
                     .body(hyper::Body::from(body.to_string()))
@@ -149,12 +164,12 @@ impl RequestHandler {
         // Handle "/ready"
         if req.uri().path() == "/ready" {
             if self.state.connected() {
-                return Ok(hyper::Response::builder()
+                return Ok(response_builder()
                     .status(hyper::StatusCode::OK)
                     .header(hyper::header::SERVER, SERVER_NAME)
                     .body("Plane Proxy server (ready)".into())?);
             } else {
-                return Ok(hyper::Response::builder()
+                return Ok(response_builder()
                     .status(hyper::StatusCode::SERVICE_UNAVAILABLE)
                     .header(hyper::header::SERVER, SERVER_NAME)
                     .body("Plane Proxy server (not ready)".into())?);
@@ -177,7 +192,7 @@ impl RequestHandler {
                 .path_and_query
                 .or_else(|| Some(PathAndQuery::from_static("")));
             let uri = hyper::Uri::from_parts(uri_parts).expect("URI parts are valid.");
-            return Ok(hyper::Response::builder()
+            return Ok(response_builder()
                 .status(hyper::StatusCode::MOVED_PERMANENTLY)
                 .header(hyper::header::LOCATION, uri.to_string())
                 .header(hyper::header::SERVER, SERVER_NAME)
@@ -186,7 +201,7 @@ impl RequestHandler {
 
         if req.uri().path() == "/" {
             if let Some(root_redirect_url) = &self.root_redirect_url {
-                return Ok(hyper::Response::builder()
+                return Ok(response_builder()
                     .status(hyper::StatusCode::MOVED_PERMANENTLY)
                     .header(hyper::header::LOCATION, root_redirect_url.to_string())
                     .header(hyper::header::SERVER, SERVER_NAME)
@@ -308,6 +323,26 @@ impl RequestHandler {
                 .to_string()
                 .parse()
                 .expect("Backend ID is a valid header value."),
+        );
+        headers.insert(
+            "Access-Control-Allow-Origin",
+            "*".parse().expect("Valid header value."),
+        );
+        headers.insert(
+            "Access-Control-Allow-Methods",
+            "GET, POST, PUT, DELETE, OPTIONS"
+                .parse()
+                .expect("Valid header value."),
+        );
+        headers.insert(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization"
+                .parse()
+                .expect("Valid header value."),
+        );
+        headers.insert(
+            "Access-Control-Allow-Credentials",
+            "true".parse().expect("Valid header value."),
         );
 
         Ok(response)
