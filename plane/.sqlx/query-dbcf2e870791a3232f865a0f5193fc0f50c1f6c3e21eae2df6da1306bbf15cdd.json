@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into node (\n                cluster,\n                name,\n                controller,\n                plane_version,\n                plane_hash,\n                kind,\n                ip,\n                last_connection_start_time\n            )\n            values ($1, $2, $3, $4, $5, $6, $7, now())\n            on conflict (name) do update set\n                controller = $3,\n                plane_version = $4,\n                plane_hash = $5,\n                ip = $7,\n                last_connection_start_time = now()\n            returning id, now() as \"connection_start_time!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "connection_start_time!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Inet"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "dbcf2e870791a3232f865a0f5193fc0f50c1f6c3e21eae2df6da1306bbf15cdd"
+}

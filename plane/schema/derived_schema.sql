@@ -896,6 +896,14 @@ ALTER TABLE ONLY public.token
 
 
 --
+-- Name: node unique_node_name; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.node
+    ADD CONSTRAINT unique_node_name UNIQUE (name);
+
+
+--
 -- Name: idx_backend_action_backend; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -935,13 +943,6 @@ CREATE INDEX idx_backend_state_created_at ON public.backend_state USING btree (b
 --
 
 CREATE INDEX idx_backend_static_token ON public.backend USING btree (static_token);
-
-
---
--- Name: idx_cluster_name; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX idx_cluster_name ON public.node USING btree (cluster, name);
 
 
 --
