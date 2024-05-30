@@ -80,7 +80,7 @@ impl<'a> NodeDatabase<'a> {
                 last_connection_start_time
             )
             values ($1, $2, $3, $4, $5, $6, $7, now())
-            on conflict (cluster, name) do update set
+            on conflict (name) do update set
                 controller = $3,
                 plane_version = $4,
                 plane_hash = $5,
