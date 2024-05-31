@@ -184,7 +184,14 @@ fn extract_bearer_token(parts: &mut uri::Parts) -> Option<BearerToken> {
         panic!("No path and query");
     };
 
-    let (token, path) = path_and_query.path().strip_prefix('/')?.split_once('/')?;
+    let full_path = path_and_query.path().strip_prefix('/')?;
+
+    // Split the incoming path into the token and the path to proxy to. If there is no slash, the token is
+    // the full incoming path, and the path to proxy to is just `/`.
+    let (token, path) = match full_path.split_once('/') {
+        Some((token, path)) => (token, path),
+        None => (full_path, "/"),
+    };
 
     let token = BearerToken::from(token.to_string());
 
