@@ -7,6 +7,7 @@ use crate::{
     util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
+use chrono::Utc;
 use dashmap::DashMap;
 use futures_util::StreamExt;
 use std::{
@@ -74,10 +75,19 @@ impl<R: Runtime> Executor<R> {
         runtime: Arc<R>,
         state_store: Arc<Mutex<StateStore>>,
     ) -> Result<()> {
-        let backends = state_store.lock().unwrap().active_backends()?;
+        let backends = state_store
+            .lock()
+            .expect("State store lock poisoned.")
+            .active_backends()?;
+
+        tracing::info!(?backends, "Terminating preexisting backends");
+
         let mut tasks = vec![];
-        for backend_id in backends {
+        let state_store_clone = state_store.clone();
+        for (backend_id, state) in backends {
             let runtime_clone = runtime.clone();
+            let state_store = state_store_clone.clone();
+            let state = state.clone();
             tasks.push(tokio::spawn(async move {
                 let mut backoff = ExponentialBackoff::default();
                 let mut success = false;
@@ -98,7 +108,18 @@ impl<R: Runtime> Executor<R> {
                         }
                     }
                 }
-                if !success {
+                if success {
+                    state_store
+                        .lock()
+                        .expect("State store lock poisoned.")
+                        .register_event(&backend_id, &state.to_terminated(Some(137)), Utc::now())
+                        .unwrap_or_else(|_| {
+                            panic!(
+                                "Failed to register backend termination for backend {:?}",
+                                backend_id
+                            )
+                        });
+                } else {
                     tracing::error!(?backend_id, "Failed to terminate backend after 10 attempts");
                 }
             }));
