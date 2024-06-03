@@ -4,7 +4,7 @@ use crate::{
     names::BackendName,
     protocol::{BackendAction, BackendEventId, BackendStateMessage},
     types::BackendState,
-    util::GuardHandle,
+    util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
 use dashmap::DashMap;
@@ -24,8 +24,15 @@ pub struct Executor<R: Runtime> {
 }
 
 impl<R: Runtime> Executor<R> {
-    pub fn new(runtime: Arc<R>, state_store: StateStore, ip: IpAddr) -> Self {
+    pub async fn new(runtime: Arc<R>, state_store: StateStore, ip: IpAddr) -> Self {
         let backends: Arc<DashMap<BackendName, Arc<BackendManager<R>>>> = Arc::default();
+        let state_store = Arc::new(Mutex::new(state_store));
+
+        if let Err(err) =
+            Self::terminate_preexisting_backends(runtime.clone(), state_store.clone()).await
+        {
+            tracing::error!(?err, "Error terminating preexisting backends.");
+        }
 
         let backend_event_listener = {
             let docker = runtime.clone();
@@ -53,11 +60,55 @@ impl<R: Runtime> Executor<R> {
 
         Self {
             runtime,
-            state_store: Arc::new(Mutex::new(state_store)),
+            state_store,
             backends,
             ip,
             _backend_event_listener: backend_event_listener,
         }
+    }
+
+    // On restart, we want to terminate all existing backends and start fresh.
+    // This prevents bugs where an agent restart leaves the drone unable to
+    // terminate old backends.
+    async fn terminate_preexisting_backends(
+        runtime: Arc<R>,
+        state_store: Arc<Mutex<StateStore>>,
+    ) -> Result<()> {
+        let backends = state_store.lock().unwrap().active_backends()?;
+        let mut tasks = vec![];
+        for backend_id in backends {
+            let runtime_clone = runtime.clone();
+            tasks.push(tokio::spawn(async move {
+                let mut backoff = ExponentialBackoff::default();
+                let mut success = false;
+                for attempt in 1..=10 {
+                    match runtime_clone.terminate(&backend_id, true).await {
+                        Ok(()) => {
+                            success = true;
+                            break;
+                        }
+                        Err(err) => {
+                            tracing::error!(
+                                ?err,
+                                ?backend_id,
+                                ?attempt,
+                                "Attempt failed to terminate backend"
+                            );
+                            backoff.wait().await;
+                        }
+                    }
+                }
+                if !success {
+                    tracing::error!(?backend_id, "Failed to terminate backend after 10 attempts");
+                }
+            }));
+        }
+
+        for task in tasks {
+            task.await?
+        }
+
+        Ok(())
     }
 
     pub fn register_listener<F>(&self, listener: F) -> Result<()>

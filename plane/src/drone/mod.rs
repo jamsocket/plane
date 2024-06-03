@@ -225,7 +225,7 @@ impl Drone {
         let state_store = StateStore::new(sqlite_connection)?;
 
         let runtime = Arc::new(runtime);
-        let executor = Executor::new(runtime, state_store, config.ip);
+        let executor = Executor::new(runtime, state_store, config.ip).await;
 
         let id = config.name.clone();
         let drone_loop = tokio::spawn(drone_loop(id.clone(), connector, executor));
