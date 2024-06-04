@@ -43,6 +43,7 @@ async fn volume_mounts(env: TestEnvironment) {
                 resource_limits: ResourceLimits::default(),
                 credentials: None,
                 mount: Some(Mount::Path(PathBuf::from(mount))),
+                network_name: None,
             })
             .unwrap(),
             lifetime_limit_seconds: Some(5),
@@ -73,6 +74,7 @@ async fn volume_mounts(env: TestEnvironment) {
                 resource_limits: ResourceLimits::default(),
                 credentials: None,
                 mount: Some(Mount::Bool(true)),
+                network_name: None,
             })
             .unwrap(),
             lifetime_limit_seconds: Some(5),

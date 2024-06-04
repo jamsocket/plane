@@ -230,6 +230,7 @@ pub struct DockerExecutorConfig {
     #[serde(default)]
     pub resource_limits: ResourceLimits,
     pub mount: Option<Mount>,
+    pub network_name: Option<String>,
 }
 
 impl DockerExecutorConfig {
@@ -241,6 +242,7 @@ impl DockerExecutorConfig {
             resource_limits: ResourceLimits::default(),
             credentials: None,
             mount: None,
+            network_name: None,
         }
     }
 }

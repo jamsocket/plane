@@ -217,6 +217,7 @@ pub fn get_container_config_from_executor_config(
             runtime: runtime.map(|s| s.to_string()),
             memory: exec_config.resource_limits.memory_limit_bytes,
             log_config: log_config.cloned(),
+            network_mode: exec_config.network_name.map(|n| n.to_string()),
             cpu_period: exec_config
                 .resource_limits
                 .cpu_period
@@ -325,6 +326,7 @@ mod tests {
 
         let mut exec_config = DockerExecutorConfig::from_image_with_defaults(String::default());
         exec_config.mount = mount;
+        exec_config.network_name = Some("my-network".to_string());
 
         get_container_config_from_executor_config(
             &backend_name,

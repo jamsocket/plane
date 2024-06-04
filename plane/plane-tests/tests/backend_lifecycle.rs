@@ -37,6 +37,7 @@ async fn backend_lifecycle(env: TestEnvironment) {
                 resource_limits: ResourceLimits::default(),
                 credentials: None,
                 mount: None,
+                network_name: None,
             })
             .unwrap(),
             lifetime_limit_seconds: None,
