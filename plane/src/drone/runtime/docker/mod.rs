@@ -269,6 +269,7 @@ pub struct TerminateEvent {
     pub exit_code: Option<i32>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SpawnResult {
     pub container_id: ContainerId,
     pub port: u16,
