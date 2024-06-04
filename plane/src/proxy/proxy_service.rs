@@ -29,6 +29,19 @@ use url::Url;
 
 const PLANE_BACKEND_ID_HEADER: &str = "x-plane-backend-id";
 
+const DEFAULT_CORS_HEADERS: &[(&str, &str)] = &[
+    ("Access-Control-Allow-Origin", "*"),
+    (
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, DELETE, OPTIONS",
+    ),
+    (
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization",
+    ),
+    ("Access-Control-Allow-Credentials", "true"),
+];
+
 fn response_builder() -> hyper::http::response::Builder {
     let mut request = hyper::Response::builder();
     request = request.header("Access-Control-Allow-Origin", "*");
@@ -324,26 +337,15 @@ impl RequestHandler {
                 .parse()
                 .expect("Backend ID is a valid header value."),
         );
-        headers.insert(
-            "Access-Control-Allow-Origin",
-            "*".parse().expect("Valid header value."),
-        );
-        headers.insert(
-            "Access-Control-Allow-Methods",
-            "GET, POST, PUT, DELETE, OPTIONS"
-                .parse()
-                .expect("Valid header value."),
-        );
-        headers.insert(
-            "Access-Control-Allow-Headers",
-            "Content-Type, Authorization"
-                .parse()
-                .expect("Valid header value."),
-        );
-        headers.insert(
-            "Access-Control-Allow-Credentials",
-            "true".parse().expect("Valid header value."),
-        );
+
+        for (key, value) in DEFAULT_CORS_HEADERS {
+            if !headers.contains_key(*key) {
+                headers.insert(
+                    *key,
+                    value.parse().expect("CORS header is a valid header value."),
+                );
+            }
+        }
 
         Ok(response)
     }
