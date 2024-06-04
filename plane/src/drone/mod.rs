@@ -2,7 +2,11 @@ use self::{
     executor::Executor,
     heartbeat::HeartbeatLoop,
     key_manager::KeyManager,
-    runtime::{docker::DockerRuntimeConfig, Runtime},
+    runtime::{
+        docker::DockerRuntimeConfig,
+        unix_socket::{UnixSocketRuntime, UnixSocketRuntimeConfig},
+        Runtime,
+    },
     state_store::StateStore,
 };
 use crate::{
@@ -199,6 +203,9 @@ impl Drone {
                     docker_config.cleanup_min_age.or(config.cleanup_min_age);
 
                 DockerRuntime::new(docker_config).await?
+            }
+            (None, Some(ExecutorConfig::UnixSocket(unix_socket_config))) => {
+                UnixSocketRuntime::new(unix_socket_config).await?
             }
             (None, None) => {
                 tracing::error!("Neither `docker_config` nor `executor_config` provided.");
