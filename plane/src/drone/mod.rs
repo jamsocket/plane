@@ -242,6 +242,7 @@ impl Drone {
 #[serde(rename_all = "snake_case")]
 pub enum ExecutorConfig {
     Docker(DockerRuntimeConfig),
+    UnixSocket(UnixSocketRuntimeConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
