@@ -326,7 +326,6 @@ mod tests {
 
         let mut exec_config = DockerExecutorConfig::from_image_with_defaults(String::default());
         exec_config.mount = mount;
-        exec_config.network_name = Some("my-network".to_string());
 
         get_container_config_from_executor_config(
             &backend_name,
@@ -336,6 +335,39 @@ mod tests {
             None,
             None,
             Some(&PathBuf::from(mount_base)),
+        )
+    }
+
+    fn get_container_config_from_network(
+        network_name: Option<&str>,
+    ) -> Result<bollard::container::Config<String>> {
+        let backend_name = BackendName::new_random();
+        let key = "key";
+
+        let acquired_key = Some(AcquiredKey {
+            key: KeyConfig {
+                name: key.to_string(),
+                ..Default::default()
+            },
+            deadlines: KeyDeadlines {
+                renew_at: LoggableTime(UNIX_EPOCH.into()),
+                soft_terminate_at: LoggableTime(UNIX_EPOCH.into()),
+                hard_terminate_at: LoggableTime(UNIX_EPOCH.into()),
+            },
+            token: Default::default(),
+        });
+
+        let mut exec_config = DockerExecutorConfig::from_image_with_defaults(String::default());
+        exec_config.network_name = network_name.map(|n| n.to_string());
+
+        get_container_config_from_executor_config(
+            &backend_name,
+            exec_config,
+            None,
+            acquired_key.as_ref(),
+            None,
+            None,
+            None,
         )
     }
 
@@ -399,6 +431,24 @@ mod tests {
             .binds;
 
         assert_eq!(config, expected_binds);
+    }
+
+    #[test]
+    fn test_network_none() {
+        let config = get_container_config_from_network(None).unwrap();
+
+        assert_eq!(config.host_config.unwrap().network_mode, None);
+    }
+
+    #[test]
+    fn test_network_name() {
+        let network_name = "my-network";
+        let config = get_container_config_from_network(Some(network_name)).unwrap();
+
+        assert_eq!(
+            config.host_config.unwrap().network_mode,
+            Some(network_name.to_string())
+        );
     }
 
     // Test invalid mount paths
