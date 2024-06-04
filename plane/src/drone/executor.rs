@@ -3,7 +3,7 @@ use crate::{
     drone::runtime::Runtime,
     names::BackendName,
     protocol::{BackendAction, BackendEventId, BackendStateMessage},
-    types::BackendState,
+    types::{BackendState, TerminationKind, TerminationReason},
     util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
@@ -89,6 +89,21 @@ impl<R: Runtime> Executor<R> {
             let state_store = state_store.clone();
             let state = state.clone();
             tasks.push(tokio::spawn(async move {
+                state_store
+                    .lock()
+                    .expect("State store lock poisoned.")
+                    .register_event(
+                        &backend_id,
+                        &state.to_terminating(TerminationKind::Hard, TerminationReason::KeyExpired),
+                        Utc::now(),
+                    )
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Failed to register backend terminating for backend {:?}",
+                            backend_id
+                        )
+                    });
+
                 let mut backoff = ExponentialBackoff::default();
                 let mut success = false;
                 for attempt in 1..=10 {
@@ -98,7 +113,7 @@ impl<R: Runtime> Executor<R> {
                             break;
                         }
                         Err(err) => {
-                            tracing::error!(
+                            tracing::warn!(
                                 ?err,
                                 ?backend_id,
                                 ?attempt,
@@ -108,20 +123,22 @@ impl<R: Runtime> Executor<R> {
                         }
                     }
                 }
-                if success {
-                    state_store
-                        .lock()
-                        .expect("State store lock poisoned.")
-                        .register_event(&backend_id, &state.to_terminated(Some(137)), Utc::now())
-                        .unwrap_or_else(|_| {
-                            panic!(
-                                "Failed to register backend termination for backend {:?}",
-                                backend_id
-                            )
-                        });
-                } else {
-                    tracing::error!(?backend_id, "Failed to terminate backend after 10 attempts");
+                if !success {
+                    tracing::warn!(
+                        ?backend_id,
+                        "Failed to terminate backend after 10 attempts. Marking terminated anyways."
+                    );
                 }
+                state_store
+                    .lock()
+                    .expect("State store lock poisoned.")
+                    .register_event(&backend_id, &state.to_terminated(None), Utc::now())
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Failed to register backend termination for backend {:?}",
+                            backend_id
+                        )
+                    });
             }));
         }
 
