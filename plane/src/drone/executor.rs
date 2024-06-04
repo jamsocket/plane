@@ -6,7 +6,7 @@ use crate::{
     types::{BackendState, TerminationKind, TerminationReason},
     util::{ExponentialBackoff, GuardHandle},
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use futures_util::StreamExt;
@@ -29,11 +29,10 @@ impl<R: Runtime> Executor<R> {
         let backends: Arc<DashMap<BackendName, Arc<BackendManager<R>>>> = Arc::default();
         let state_store = Arc::new(Mutex::new(state_store));
 
-        if let Err(err) =
-            Self::terminate_preexisting_backends(runtime.clone(), state_store.clone()).await
-        {
-            tracing::error!(?err, "Error terminating preexisting backends.");
-        }
+        Self::terminate_preexisting_backends(runtime.clone(), state_store.clone())
+            .await
+            .context("Failed to terminate all preexisting backends! Locks may be violated, Drone aborting startup.")
+            .unwrap();
 
         let backend_event_listener = {
             let docker = runtime.clone();
