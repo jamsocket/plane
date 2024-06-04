@@ -80,19 +80,19 @@ impl<R: Runtime> Executor<R> {
             .expect("State store lock poisoned.")
             .active_backends()?;
 
-        tracing::info!(?backends, "Terminating preexisting backends");
-
+        if !backends.is_empty() {
+            tracing::info!(?backends, "Terminating preexisting backends");
+        }
         let mut tasks = vec![];
-        let state_store_clone = state_store.clone();
         for (backend_id, state) in backends {
-            let runtime_clone = runtime.clone();
-            let state_store = state_store_clone.clone();
+            let runtime = runtime.clone();
+            let state_store = state_store.clone();
             let state = state.clone();
             tasks.push(tokio::spawn(async move {
                 let mut backoff = ExponentialBackoff::default();
                 let mut success = false;
                 for attempt in 1..=10 {
-                    match runtime_clone.terminate(&backend_id, true).await {
+                    match runtime.terminate(&backend_id, true).await {
                         Ok(()) => {
                             success = true;
                             break;
