@@ -29,10 +29,16 @@ use url::Url;
 
 const PLANE_BACKEND_ID_HEADER: &str = "x-plane-backend-id";
 
-const DEFAULT_CORS_HEADERS: &[(&str, str)] = &[
+const DEFAULT_CORS_HEADERS: &[(&str, &str)] = &[
     ("Access-Control-Allow-Origin", "*"),
-    ("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"),
-    ("Access-Control-Allow-Headers", "Content-Type, Authorization"),
+    (
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, DELETE, OPTIONS",
+    ),
+    (
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization",
+    ),
     ("Access-Control-Allow-Credentials", "true"),
 ];
 
@@ -333,8 +339,11 @@ impl RequestHandler {
         );
 
         for (key, value) in DEFAULT_CORS_HEADERS {
-            if !headers.contains_key(key) {
-                headers.insert(key, value.parse().expect("CORS header is a valid header value."));
+            if !headers.contains_key(*key) {
+                headers.insert(
+                    *key,
+                    value.parse().expect("CORS header is a valid header value."),
+                );
             }
         }
 
