@@ -29,6 +29,7 @@ impl<R: Runtime> Executor<R> {
         let backends: Arc<DashMap<BackendName, Arc<BackendManager<R>>>> = Arc::default();
         let state_store = Arc::new(Mutex::new(state_store));
 
+        #[allow(clippy::unwrap_used)]
         Self::terminate_preexisting_backends(runtime.clone(), state_store.clone())
             .await
             .context("Failed to terminate all preexisting backends! Locks may be violated, Drone aborting startup.")
