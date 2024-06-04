@@ -81,15 +81,15 @@ pub struct UnixSocketRuntimeConfig {
     socket_path: String,
 }
 
-pub struct UnixSocketClient {
+pub struct UnixSocketRuntime {
     config: UnixSocketRuntimeConfig,
     stream: Arc<Mutex<Option<UnixStream>>>,
 }
 
-impl UnixSocketClient {
+impl UnixSocketRuntime {
     pub async fn new(socket_path: String) -> Result<Self> {
         let stream = UnixStream::connect(&socket_path).await.ok();
-        Ok(UnixSocketClient {
+        Ok(UnixSocketRuntime {
             config: UnixSocketRuntimeConfig { socket_path },
             stream: Arc::new(Mutex::new(stream)),
         })
@@ -122,7 +122,7 @@ impl UnixSocketClient {
     }
 }
 
-impl Runtime for UnixSocketClient {
+impl Runtime for UnixSocketRuntime {
     type RuntimeConfig = ();
     type BackendConfig = String; // Simplified for example purposes
 
