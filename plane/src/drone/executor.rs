@@ -6,10 +6,10 @@ use crate::{
     types::{BackendState, TerminationKind, TerminationReason},
     util::{ExponentialBackoff, GuardHandle},
 };
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::Utc;
 use dashmap::DashMap;
-use futures_util::StreamExt;
+use futures_util::{future::join_all, StreamExt};
 use std::{
     net::IpAddr,
     sync::{Arc, Mutex},
@@ -32,8 +32,7 @@ impl<R: Runtime> Executor<R> {
         #[allow(clippy::unwrap_used)]
         Self::terminate_preexisting_backends(runtime.clone(), state_store.clone())
             .await
-            .context("Failed to terminate all preexisting backends! Locks may be violated, Drone aborting startup.")
-            .unwrap();
+            .expect("Failed to terminate all preexisting backends! Locks may be violated, Drone aborting startup.");
 
         let backend_event_listener = {
             let docker = runtime.clone();
@@ -88,7 +87,7 @@ impl<R: Runtime> Executor<R> {
             let runtime = runtime.clone();
             let state_store = state_store.clone();
             let state = state.clone();
-            tasks.push(tokio::spawn(async move {
+            tasks.push(async move {
                 state_store
                     .lock()
                     .expect("State store lock poisoned.")
@@ -139,12 +138,10 @@ impl<R: Runtime> Executor<R> {
                             backend_id
                         )
                     });
-            }));
+            });
         }
 
-        for task in tasks {
-            task.await?
-        }
+        join_all(tasks).await;
 
         Ok(())
     }
