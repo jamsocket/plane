@@ -1,4 +1,4 @@
-use crate::database::PlaneDatabase;
+use crate::database::{subscribe::EventSubscriptionManager, PlaneDatabase};
 use anyhow::Result;
 
 const CLEANUP_LOOP_INTERVAL_SECONDS: u64 = 60 * 15;
@@ -8,6 +8,7 @@ pub async fn run_cleanup(db: &PlaneDatabase, min_age_days: Option<i32>) -> Resul
 
     if let Some(min_age_days) = min_age_days {
         db.backend().cleanup(min_age_days).await?;
+        EventSubscriptionManager::clean_up_events(&db.pool, min_age_days).await?;
     }
 
     db.clean_up_tokens().await?;

@@ -263,6 +263,24 @@ impl EventSubscriptionManager {
         }
     }
 
+    pub async fn clean_up_events(db: &PgPool, min_age_days: i32) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"
+            delete from event
+            where id in (
+                select id
+                from event
+                where created_at < now() - make_interval(days => $1)
+            )
+            "#,
+            min_age_days
+        )
+        .execute(db)
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn get_events_since(
         db: &PgPool,
         since: i32,
