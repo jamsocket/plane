@@ -201,6 +201,31 @@ impl StateStore {
 
         Ok(())
     }
+
+    /// Retrieves a list of all backends that are not in a Terminated state.
+    pub fn active_backends(&self) -> Result<Vec<(BackendName, BackendState)>> {
+        let mut stmt = self.db_conn.prepare(
+            r#"
+                select "id", "state"
+                from "backend"
+            "#,
+        )?;
+
+        let mut rows = stmt.query([])?;
+        let mut active_backends = Vec::new();
+
+        while let Some(row) = rows.next()? {
+            let id: String = row.get(0)?;
+            let state_json: String = row.get(1)?;
+            let state: BackendState = serde_json::from_str(&state_json)?;
+
+            if !matches!(state, BackendState::Terminated { .. }) {
+                active_backends.push((BackendName::try_from(id)?, state));
+            }
+        }
+
+        Ok(active_backends)
+    }
 }
 
 #[cfg(test)]

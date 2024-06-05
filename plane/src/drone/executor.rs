@@ -3,12 +3,13 @@ use crate::{
     drone::runtime::Runtime,
     names::BackendName,
     protocol::{BackendAction, BackendEventId, BackendStateMessage},
-    types::BackendState,
-    util::GuardHandle,
+    types::{BackendState, TerminationKind, TerminationReason},
+    util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
+use chrono::Utc;
 use dashmap::DashMap;
-use futures_util::StreamExt;
+use futures_util::{future::join_all, StreamExt};
 use std::{
     net::IpAddr,
     sync::{Arc, Mutex},
@@ -24,8 +25,14 @@ pub struct Executor<R: Runtime> {
 }
 
 impl<R: Runtime> Executor<R> {
-    pub fn new(runtime: Arc<R>, state_store: StateStore, ip: IpAddr) -> Self {
+    pub async fn new(runtime: Arc<R>, state_store: StateStore, ip: IpAddr) -> Self {
         let backends: Arc<DashMap<BackendName, Arc<BackendManager<R>>>> = Arc::default();
+        let state_store = Arc::new(Mutex::new(state_store));
+
+        #[allow(clippy::unwrap_used)]
+        Self::terminate_preexisting_backends(runtime.clone(), state_store.clone())
+            .await
+            .expect("Failed to terminate all preexisting backends! Locks may be violated, Drone aborting startup.");
 
         let backend_event_listener = {
             let docker = runtime.clone();
@@ -53,11 +60,90 @@ impl<R: Runtime> Executor<R> {
 
         Self {
             runtime,
-            state_store: Arc::new(Mutex::new(state_store)),
+            state_store,
             backends,
             ip,
             _backend_event_listener: backend_event_listener,
         }
+    }
+
+    // On restart, we want to terminate all existing backends and start fresh.
+    // This prevents bugs where an agent restart leaves the drone unable to
+    // terminate old backends.
+    async fn terminate_preexisting_backends(
+        runtime: Arc<R>,
+        state_store: Arc<Mutex<StateStore>>,
+    ) -> Result<()> {
+        let backends = state_store
+            .lock()
+            .expect("State store lock poisoned.")
+            .active_backends()?;
+
+        if !backends.is_empty() {
+            tracing::info!(?backends, "Terminating preexisting backends");
+        }
+        let mut tasks = vec![];
+        for (backend_id, state) in backends {
+            let runtime = runtime.clone();
+            let state_store = state_store.clone();
+            let state = state.clone();
+            tasks.push(async move {
+                state_store
+                    .lock()
+                    .expect("State store lock poisoned.")
+                    .register_event(
+                        &backend_id,
+                        &state.to_terminating(TerminationKind::Hard, TerminationReason::KeyExpired),
+                        Utc::now(),
+                    )
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Failed to register backend terminating for backend {:?}",
+                            backend_id
+                        )
+                    });
+
+                let mut backoff = ExponentialBackoff::default();
+                let mut success = false;
+                for attempt in 1..=10 {
+                    match runtime.terminate(&backend_id, true).await {
+                        Ok(()) => {
+                            success = true;
+                            break;
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                ?err,
+                                ?backend_id,
+                                ?attempt,
+                                "Attempt failed to terminate backend"
+                            );
+                            backoff.wait().await;
+                        }
+                    }
+                }
+                if !success {
+                    tracing::warn!(
+                        ?backend_id,
+                        "Failed to terminate backend after 10 attempts. Marking terminated anyways."
+                    );
+                }
+                state_store
+                    .lock()
+                    .expect("State store lock poisoned.")
+                    .register_event(&backend_id, &state.to_terminated(None), Utc::now())
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Failed to register backend termination for backend {:?}",
+                            backend_id
+                        )
+                    });
+            });
+        }
+
+        join_all(tasks).await;
+
+        Ok(())
     }
 
     pub fn register_listener<F>(&self, listener: F) -> Result<()>
