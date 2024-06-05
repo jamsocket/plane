@@ -168,6 +168,11 @@ impl Runtime for UnixSocketRuntime {
     }
 
     fn events(&self) -> impl Stream<Item = TerminateEvent> + Send {
+        // Stream is to iterator as what future is to T. Seems here we need to
+        // receive terminate events from the runtime. We can do similar to
+        // what's done in docker with BroadCaststream::new -- the only part
+        // different here is we need a way to receive the terminating event over
+        // the unix socket.
         todo!()
     }
 
@@ -180,7 +185,8 @@ impl Runtime for UnixSocketRuntime {
             backend_id: backend.to_string(),
             address: address.to_string(),
         })
-        .await?
+        .await
+        .map_err(|_| BackendError::StartupTimeout)?
         .into()
     }
 }
