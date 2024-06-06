@@ -16,13 +16,16 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::{io::{AsyncReadExt, AsyncWriteExt}, sync::{mpsc, oneshot, broadcast}};
 use tokio::net::UnixStream;
-use tokio_util::codec::{Framed, LengthDelimitedCodec};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    sync::{broadcast, mpsc, oneshot},
+};
 use tokio_serde::formats::Json;
 use tokio_serde::Framed as SerdeFramed;
-use uuid::Uuid;
 use tokio_stream::wrappers::BroadcastStream;
+use tokio_util::codec::{Framed, LengthDelimitedCodec};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
 struct CommandWrapper {
@@ -61,12 +64,8 @@ struct ResponseWrapper {
 #[derive(Serialize, Deserialize)]
 enum RuntimeResponse {
     Ok,
-    SpawnResponse {
-        result: SpawnResult,
-    },
-    Error {
-        message: String,
-    },
+    SpawnResponse { result: SpawnResult },
+    Error { message: String },
     TerminateEvent(TerminateEvent),
 }
 
@@ -117,7 +116,12 @@ impl UnixSocketRuntime {
         let response_map = Arc::new(DashMap::new());
         let (event_tx, _) = broadcast::channel(100);
 
-        tokio::spawn(handle_connection(stream, rx, Arc::clone(&response_map), event_tx.clone()));
+        tokio::spawn(handle_connection(
+            stream,
+            rx,
+            Arc::clone(&response_map),
+            event_tx.clone(),
+        ));
 
         Ok(UnixSocketRuntime {
             config: UnixSocketRuntimeConfig { socket_path },
@@ -150,7 +154,10 @@ async fn handle_connection(
     event_tx: broadcast::Sender<TerminateEvent>,
 ) -> Result<(), Box<dyn Error>> {
     let length_delimited = Framed::new(stream, LengthDelimitedCodec::new());
-    let mut framed = SerdeFramed::new(length_delimited, Json::<CommandWrapper, ResponseWrapper>::default());
+    let mut framed = SerdeFramed::new(
+        length_delimited,
+        Json::<CommandWrapper, ResponseWrapper>::default(),
+    );
 
     // Task to handle receiving messages
     let recv_task = tokio::spawn(async move {
