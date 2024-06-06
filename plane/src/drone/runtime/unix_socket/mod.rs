@@ -67,9 +67,7 @@ enum RuntimeResponse {
     Error {
         message: String,
     },
-    TerminateEvent {
-        event: TerminateEvent,
-    },
+    TerminateEvent(TerminateEvent),
 }
 
 impl From<ResponseWrapper> for Result<(), Error> {
@@ -160,7 +158,7 @@ async fn handle_connection(
             let id = msg.id;
 
             match msg.response {
-                RuntimeResponse::TerminateEvent { event } => {
+                RuntimeResponse::TerminateEvent(event) => {
                     let _ = event_tx.send(event);
                 }
                 _ => {
