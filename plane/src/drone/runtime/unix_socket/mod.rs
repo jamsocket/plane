@@ -11,17 +11,18 @@ use crate::{
 use anyhow::anyhow;
 use anyhow::{Error, Result};
 use dashmap::DashMap;
-use futures_util::Stream;
+use futures_util::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::{io::{AsyncReadExt, AsyncWriteExt}, sync::{mpsc, oneshot}};
+use tokio::{io::{AsyncReadExt, AsyncWriteExt}, sync::{mpsc, oneshot, broadcast}};
 use tokio::net::UnixStream;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use tokio_serde::formats::Json;
 use tokio_serde::Framed as SerdeFramed;
 use uuid::Uuid;
+use tokio_stream::wrappers::BroadcastStream;
 
 #[derive(Serialize, Deserialize)]
 struct CommandWrapper {
@@ -66,6 +67,9 @@ enum RuntimeResponse {
     Error {
         message: String,
     },
+    TerminateEvent {
+        event: TerminateEvent,
+    },
 }
 
 impl From<ResponseWrapper> for Result<(), Error> {
@@ -105,6 +109,7 @@ pub struct UnixSocketRuntime {
     config: UnixSocketRuntimeConfig,
     tx: mpsc::Sender<CommandWrapper>,
     response_map: Arc<DashMap<Uuid, oneshot::Sender<ResponseWrapper>>>,
+    event_tx: broadcast::Sender<TerminateEvent>,
 }
 
 impl UnixSocketRuntime {
@@ -112,13 +117,15 @@ impl UnixSocketRuntime {
         let stream = UnixStream::connect(&socket_path).await?;
         let (tx, rx) = mpsc::unbounded_channel();
         let response_map = Arc::new(DashMap::new());
+        let (event_tx, _) = broadcast::channel(100);
 
-        tokio::spawn(handle_connection(stream, rx, Arc::clone(&response_map)));
+        tokio::spawn(handle_connection(stream, rx, Arc::clone(&response_map), event_tx.clone()));
 
         Ok(UnixSocketRuntime {
             config: UnixSocketRuntimeConfig { socket_path },
             tx,
             response_map,
+            event_tx,
         })
     }
 
@@ -132,12 +139,17 @@ impl UnixSocketRuntime {
         let response = response_rx.await?;
         Ok(response.response)
     }
+
+    pub fn subscribe_events(&self) -> broadcast::Receiver<TerminateEvent> {
+        self.event_tx.subscribe()
+    }
 }
 
 async fn handle_connection(
     stream: UnixStream,
     mut rx: mpsc::Receiver<CommandWrapper>,
     response_map: Arc<DashMap<Uuid, oneshot::Sender<ResponseWrapper>>>,
+    event_tx: broadcast::Sender<TerminateEvent>,
 ) -> Result<(), Box<dyn Error>> {
     let length_delimited = Framed::new(stream, LengthDelimitedCodec::new());
     let mut framed = SerdeFramed::new(length_delimited, Json::<CommandWrapper, ResponseWrapper>::default());
@@ -147,10 +159,17 @@ async fn handle_connection(
         while let Some(Ok(msg)) = framed.try_next().await {
             let id = msg.id;
 
-            if let Some(tx) = response_map.remove(&id).map(|(_, tx)| tx) {
-                let _ = tx.send(msg);
-            } else {
-                eprintln!("No sender found for response ID: {:?}", id);
+            match msg.response {
+                RuntimeResponse::TerminateEvent { event } => {
+                    let _ = event_tx.send(event);
+                }
+                _ => {
+                    if let Some(tx) = response_map.remove(&id).map(|(_, tx)| tx) {
+                        let _ = tx.send(msg);
+                    } else {
+                        eprintln!("No sender found for response ID: {:?}", id);
+                    }
+                }
             }
         }
     });
@@ -213,12 +232,12 @@ impl Runtime for UnixSocketRuntime {
     }
 
     fn events(&self) -> impl Stream<Item = TerminateEvent> + Send {
-        // Stream is to iterator as what future is to T. Seems here we need to
-        // receive terminate events from the runtime. We can do similar to
-        // what's done in docker with BroadCaststream::new -- the only part
-        // different here is we need a way to receive the terminating event over
-        // the unix socket.
-        todo!()
+        BroadcastStream::new(self.subscribe_events()).filter_map(|result| async {
+            match result {
+                Ok(event) => Some(event),
+                Err(_) => None, // Handle lagging or closed receiver
+            }
+        })
     }
 
     async fn wait_for_backend(
