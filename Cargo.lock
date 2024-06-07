@@ -1683,10 +1683,8 @@ dependencies = [
  "time",
  "tokio",
  "tokio-rustls",
- "tokio-serde",
  "tokio-stream",
  "tokio-tungstenite",
- "tokio-util",
  "tower-http",
  "tracing",
  "tracing-subscriber",
@@ -2675,18 +2673,6 @@ checksum = "c28327cf380ac148141087fbfb9de9d7bd4e84ab5d2c28fbc911d753de8a7081"
 dependencies = [
  "rustls",
  "tokio",
-]
-
-[[package]]
-name = "tokio-serde"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caf600e7036b17782571dd44fa0a5cea3c82f60db5137f774a325a76a0d6852b"
-dependencies = [
- "bytes",
- "futures-core",
- "futures-sink",
- "pin-project",
 ]
 
 [[package]]
