@@ -1,9 +1,6 @@
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
 
@@ -15,11 +12,13 @@ struct IDedMessage<T> {
     message: T,
 }
 
+#[derive(Serialize, Deserialize)]
 enum WrappedServerMessageType<ResponseType, ServerMessageType> {
     Response(IDedMessage<ResponseType>),
     ServerMessage(ServerMessageType),
 }
 
+#[derive(Serialize, Deserialize)]
 enum WrappedClientMessageType<RequestType, ClientMessageType> {
     Request(IDedMessage<RequestType>),
     ClientMessage(ClientMessageType),
@@ -39,39 +38,39 @@ where
     event_tx: broadcast::Sender<ServerMessageType>,
 }
 
-struct TypedUnixSocket<ClientMessageType, ServerMessageType, RequestType, ResponseType>
-where
-    ClientMessageType: Send + Sync + 'static,
-    ServerMessageType: Send + Sync + 'static + Clone,
-    RequestType: Send + Sync + 'static,
-    ResponseType: Send + Sync + 'static,
-{
-    socket_path: PathBuf,
-}
+// struct TypedUnixSocket<ClientMessageType, ServerMessageType, RequestType, ResponseType>
+// where
+//     ClientMessageType: Send + Sync + 'static,
+//     ServerMessageType: Send + Sync + 'static + Clone,
+//     RequestType: Send + Sync + 'static,
+//     ResponseType: Send + Sync + 'static,
+// {
+//     socket_path: PathBuf,
+// }
 
-impl<ClientMessageType, ServerMessageType, RequestType, ResponseType>
-    TypedUnixSocket<ClientMessageType, ServerMessageType, RequestType, ResponseType>
-where
-    ClientMessageType: Send + Sync + 'static,
-    ServerMessageType: Send + Sync + 'static + Clone,
-    RequestType: Send + Sync + 'static,
-    ResponseType: Send + Sync + 'static,
-{
-    pub fn new<P: AsRef<Path>>(socket_path: P) -> Self {
-        Self {
-            socket_path: socket_path.into(),
-        }
-    }
+// impl<ClientMessageType, ServerMessageType, RequestType, ResponseType>
+//     TypedUnixSocket<ClientMessageType, ServerMessageType, RequestType, ResponseType>
+// where
+//     ClientMessageType: Send + Sync + 'static,
+//     ServerMessageType: Send + Sync + 'static + Clone,
+//     RequestType: Send + Sync + 'static,
+//     ResponseType: Send + Sync + 'static,
+// {
+//     pub fn new<P: AsRef<Path>>(socket_path: P) -> Self {
+//         Self {
+//             socket_path: socket_path.into(),
+//         }
+//     }
 
-    pub async fn create_client(
-        &self,
-    ) -> TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
-    {
-        TypedUnixSocketClient::new(&self.socket_path).await.unwrap()
-    }
+//     pub async fn create_client(
+//         &self,
+//     ) -> TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
+//     {
+//         TypedUnixSocketClient::new(&self.socket_path).await.unwrap()
+//     }
 
-    // pub async fn create_server(&self) -> TypedUnixSocketServer<ClientMessageType, ServerMessageType> {
-    //     //TODO
-    //     unimplemented!()
-    // }
-}
+//     // pub async fn create_server(&self) -> TypedUnixSocketServer<ClientMessageType, ServerMessageType> {
+//     //     //TODO
+//     //     unimplemented!()
+//     // }
+// }
