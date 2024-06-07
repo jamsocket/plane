@@ -3,22 +3,23 @@ use super::{
 };
 use anyhow::Error;
 use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc};
+use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncBufReadExt, BufReader, BufWriter, Lines};
 use tokio::{
     net::UnixStream,
     sync::{broadcast, mpsc, oneshot},
 };
-use tokio_serde::{formats::Json, Framed as SerdeFramed};
-use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use uuid::Uuid;
 
 impl<ClientMessageType, ServerMessageType, RequestType, ResponseType>
     TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
 where
-    ClientMessageType: Send + Sync + 'static,
-    ServerMessageType: Send + Sync + 'static + Clone,
-    RequestType: Send + Sync + 'static,
-    ResponseType: Send + Sync + 'static,
+    ClientMessageType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
+    ServerMessageType: Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>,
+    RequestType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
+    ResponseType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
 {
     pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Error> {
         let stream = UnixStream::connect(socket_path.as_ref()).await?;
@@ -72,26 +73,26 @@ async fn handle_connection<ClientMessageType, ServerMessageType, RequestType, Re
     event_tx: broadcast::Sender<ServerMessageType>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
-    ClientMessageType: Send + Sync + 'static,
-    ServerMessageType: Send + Sync + 'static + Clone,
-    RequestType: Send + Sync + 'static,
-    ResponseType: Send + Sync + 'static,
+    ClientMessageType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
+    ServerMessageType: Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>,
+    RequestType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
+    ResponseType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
 {
-    let length_delimited = Framed::new(stream, LengthDelimitedCodec::new());
-    let mut framed = SerdeFramed::new(
-        length_delimited,
-        Json::<
-            WrappedClientMessageType<RequestType, ClientMessageType>,
-            WrappedServerMessageType<ResponseType, ServerMessageType>,
-        >::default(),
-    );
+    let (read_half, write_half) = tokio::io::split(stream);
+    let reader = BufReader::new(read_half);
+    let writer = BufWriter::new(write_half);
+
+    let mut lines = reader.lines();
+    let mut writer = writer;
 
     // Task to handle receiving messages
     let recv_task = tokio::spawn({
         let event_tx = event_tx.clone();
         let response_map = Arc::clone(&response_map);
         async move {
-            while let Some(Ok(msg)) = framed.try_next().await {
+            while let Some(line) = lines.next_line().await? {
+                let msg: WrappedServerMessageType<ResponseType, ServerMessageType> =
+                    serde_json::from_str(&line)?;
                 match msg {
                     WrappedServerMessageType::ServerMessage(event) => {
                         let _ = event_tx.send(event);
@@ -106,17 +107,19 @@ where
                     }
                 }
             }
+            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
         }
     });
 
     // Task to handle sending messages
     let send_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
-            if framed.send(msg).await.is_err() {
-                eprintln!("failed to send message");
-                return;
-            }
+            let msg = serde_json::to_string(&msg)?;
+            writer.write_all(msg.as_bytes()).await?;
+            writer.write_all(b"\n").await?;
+            writer.flush().await?;
         }
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
     });
 
     tokio::try_join!(recv_task, send_task)?;
