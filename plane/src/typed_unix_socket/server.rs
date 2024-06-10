@@ -84,6 +84,13 @@ where
         self.response_tx.send(response_msg)?;
         Ok(())
     }
+
+    pub async fn send_message(&self, message: ServerMessageType) -> Result<(), Error> {
+        let message_msg =
+            WrappedServerMessageType::<ResponseType, ServerMessageType>::ServerMessage(message);
+        self.response_tx.send(message_msg)?;
+        Ok(())
+    }
 }
 
 impl<ClientMessageType, ServerMessageType, RequestType, ResponseType> Drop

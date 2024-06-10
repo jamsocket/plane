@@ -84,10 +84,37 @@ mod tests {
         let mut event_rx = server.subscribe_events();
 
         // Send an ad-hoc message from the client
-        let ad_hoc_message = "Ad-hoc message".to_string();
+        let ad_hoc_message = "Ad-hoc message from client".to_string();
         client.send_message(ad_hoc_message.clone()).await.unwrap();
 
         // Receive the ad-hoc message on the server
+        let received_message = event_rx.recv().await.unwrap();
+        assert_eq!(received_message, ad_hoc_message);
+    }
+
+    #[tokio::test]
+    async fn test_server_to_client_ad_hoc() {
+        let socket_path = create_temp_socket_path();
+
+        let server = TypedUnixSocketServer::<String, String, String, String>::new(
+            socket_path.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+        let client = TypedUnixSocketClient::<String, String, String, String>::new(
+            socket_path.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+
+        // Subscribe to client events
+        let mut event_rx = client.subscribe_events();
+
+        // Send an ad-hoc message from the server
+        let ad_hoc_message = "Ad-hoc message from server".to_string();
+        server.send_message(ad_hoc_message.clone()).await.unwrap();
+
+        // Receive the ad-hoc message on the client
         let received_message = event_rx.recv().await.unwrap();
         assert_eq!(received_message, ad_hoc_message);
     }
