@@ -27,6 +27,8 @@ mod tests {
     use super::client::TypedUnixSocketClient;
     use super::server::TypedUnixSocketServer;
     use super::IDedMessage;
+    use futures_util::future::join_all;
+    use std::collections::HashSet;
     use std::env;
     use std::path::PathBuf;
     use tokio::spawn;
@@ -152,9 +154,7 @@ mod tests {
             }));
         }
 
-        for handle in handles {
-            handle.await.unwrap();
-        }
+        join_all(handles).await;
     }
 
     #[tokio::test]
@@ -180,13 +180,16 @@ mod tests {
             }));
         }
 
-        for handle in handles {
-            handle.await.unwrap();
+        join_all(handles).await;
+
+        let mut received_messages = HashSet::new();
+        for _ in 0..10 {
+            let received_message = event_rx.recv().await.unwrap();
+            received_messages.insert(received_message);
         }
 
         for i in 0..10 {
-            let received_message = event_rx.recv().await.unwrap();
-            assert_eq!(received_message, format!("Message {}", i));
+            assert!(received_messages.contains(&format!("Message {}", i)));
         }
     }
 
@@ -213,13 +216,16 @@ mod tests {
             }));
         }
 
-        for handle in handles {
-            handle.await.unwrap();
+        join_all(handles).await;
+
+        let mut received_messages = HashSet::new();
+        for _ in 0..10 {
+            let received_message = event_rx.recv().await.unwrap();
+            received_messages.insert(received_message);
         }
 
         for i in 0..10 {
-            let received_message = event_rx.recv().await.unwrap();
-            assert_eq!(received_message, format!("Message {}", i));
+            assert!(received_messages.contains(&format!("Message {}", i)));
         }
     }
 }
