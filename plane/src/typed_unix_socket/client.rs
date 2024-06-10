@@ -11,7 +11,7 @@ use tokio::{
 };
 use uuid::Uuid;
 
-struct TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
+pub struct TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
 where
     ClientMessageType: Send + Sync + 'static,
     ServerMessageType: Send + Sync + 'static + Clone,
