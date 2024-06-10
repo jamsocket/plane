@@ -10,14 +10,14 @@ pub struct IDedMessage<T> {
     message: T,
 }
 
-#[derive(Serialize, Deserialize)]
-enum WrappedServerMessageType<ResponseType, ServerMessageType> {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum WrappedServerMessageType<ResponseType, ServerMessageType> {
     Response(IDedMessage<ResponseType>),
     ServerMessage(ServerMessageType),
 }
 
-#[derive(Serialize, Deserialize)]
-enum WrappedClientMessageType<RequestType, ClientMessageType> {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum WrappedClientMessageType<RequestType, ClientMessageType> {
     Request(IDedMessage<RequestType>),
     ClientMessage(ClientMessageType),
 }
@@ -227,5 +227,75 @@ mod tests {
         for i in 0..10 {
             assert!(received_messages.contains(&format!("Message {}", i)));
         }
+    }
+
+    #[tokio::test]
+    async fn test_client_reconnect() {
+        let socket_path = create_temp_socket_path();
+
+        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+
+        // Spawn a task to handle server requests
+        let server_clone = server.clone();
+        spawn(async move {
+            let mut request_rx = server_clone.subscribe_requests();
+            while let Ok(request) = request_rx.recv().await {
+                let response = IDedMessage {
+                    id: request.id,
+                    message: "Hello, client!".to_string(),
+                };
+                server_clone.send_response(response).await.unwrap();
+            }
+        });
+
+        // Simulate client restart
+        drop(client);
+        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+
+        let request = "Hello, server!".to_string();
+        let response = client.send_request(request).await.unwrap();
+        assert_eq!(response, "Hello, client!");
+    }
+
+    #[tokio::test]
+    async fn test_server_reconnect() {
+        let socket_path = create_temp_socket_path();
+
+        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+
+        // Simulate server restart
+        drop(server);
+        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+
+        // Spawn a task to handle server requests
+        let server_clone = server.clone();
+        spawn(async move {
+            let mut request_rx = server_clone.subscribe_requests();
+            while let Ok(request) = request_rx.recv().await {
+                let response = IDedMessage {
+                    id: request.id,
+                    message: "Hello, client!".to_string(),
+                };
+                server_clone.send_response(response).await.unwrap();
+            }
+        });
+
+        let request = "Hello, server!".to_string();
+        let response = client.send_request(request).await.unwrap();
+        assert_eq!(response, "Hello, client!");
     }
 }

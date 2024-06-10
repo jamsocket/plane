@@ -2,26 +2,26 @@ use super::{IDedMessage, WrappedClientMessageType, WrappedServerMessageType};
 use anyhow::Error;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::{clone::Clone, path::Path, sync::Arc};
+use std::{clone::Clone, fmt::Debug, path::Path, sync::Arc};
 use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncBufReadExt, BufReader, BufWriter};
 use tokio::{
     net::UnixStream,
-    sync::{broadcast, mpsc, oneshot},
+    sync::{broadcast, oneshot},
 };
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
 where
-    ClientMessageType: Send + Sync + 'static,
-    ServerMessageType: Send + Sync + 'static + Clone,
-    RequestType: Send + Sync + 'static,
-    ResponseType: Send + Sync + 'static,
+    ClientMessageType:
+        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    ServerMessageType:
+        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    RequestType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    ResponseType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
-    // stream: UnixStream,
-    tx: mpsc::UnboundedSender<WrappedClientMessageType<RequestType, ClientMessageType>>,
-    // rx: mpsc::UnboundedReceiver<WrappedClientMessageType<RequestType, ClientMessageType>>,
+    tx: broadcast::Sender<WrappedClientMessageType<RequestType, ClientMessageType>>,
     response_map: Arc<DashMap<Uuid, oneshot::Sender<ResponseType>>>,
     event_tx: broadcast::Sender<ServerMessageType>,
 }
@@ -29,23 +29,46 @@ where
 impl<ClientMessageType, ServerMessageType, RequestType, ResponseType>
     TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
 where
-    ClientMessageType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
-    ServerMessageType: Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>,
-    RequestType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
-    ResponseType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
+    ClientMessageType:
+        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    ServerMessageType:
+        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    RequestType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    ResponseType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
     pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Error> {
-        let stream = UnixStream::connect(socket_path.as_ref()).await?;
-        let (tx, rx) = mpsc::unbounded_channel();
+        let (tx, _) = broadcast::channel(100);
         let response_map = Arc::new(DashMap::new());
         let (event_tx, _) = broadcast::channel(100);
 
-        tokio::spawn(handle_connection(
-            stream,
-            rx,
-            Arc::clone(&response_map),
-            event_tx.clone(),
-        ));
+        tokio::spawn({
+            let socket_path = socket_path.as_ref().to_path_buf();
+            let tx = tx.clone();
+            let response_map = Arc::clone(&response_map);
+            let event_tx = event_tx.clone();
+            async move {
+                loop {
+                    match UnixStream::connect(&socket_path).await {
+                        Ok(stream) => {
+                            handle_connection(
+                                stream,
+                                tx.subscribe(),
+                                Arc::clone(&response_map),
+                                event_tx.clone(),
+                            )
+                            .await
+                            .unwrap_or_else(|e| {
+                                tracing::error!("Error handling connection: {}", e);
+                            });
+                        }
+                        Err(e) => {
+                            tracing::error!("Error connecting to server: {}", e);
+                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        }
+                    }
+                }
+            }
+        });
 
         Ok(Self {
             tx,
@@ -63,6 +86,13 @@ where
         });
 
         self.response_map.insert(id, response_tx);
+
+        // Wait until there is at least one subscriber
+        while self.tx.receiver_count() == 0 {
+            tracing::info!("Waiting for a subscriber...");
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+
         self.tx.send(wrapper)?;
         let response = response_rx.await?;
         Ok(response)
@@ -70,6 +100,13 @@ where
 
     pub async fn send_message(&self, message: ClientMessageType) -> Result<(), Error> {
         let wrapper = WrappedClientMessageType::ClientMessage(message);
+
+        // Wait until there is at least one subscriber
+        while self.tx.receiver_count() == 0 {
+            tracing::info!("Waiting for a subscriber...");
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+
         self.tx.send(wrapper)?;
         Ok(())
     }
@@ -81,15 +118,17 @@ where
 
 async fn handle_connection<ClientMessageType, ServerMessageType, RequestType, ResponseType>(
     stream: UnixStream,
-    mut rx: mpsc::UnboundedReceiver<WrappedClientMessageType<RequestType, ClientMessageType>>,
+    mut rx: broadcast::Receiver<WrappedClientMessageType<RequestType, ClientMessageType>>,
     response_map: Arc<DashMap<Uuid, oneshot::Sender<ResponseType>>>,
     event_tx: broadcast::Sender<ServerMessageType>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
-    ClientMessageType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
-    ServerMessageType: Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>,
-    RequestType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
-    ResponseType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
+    ClientMessageType:
+        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    ServerMessageType:
+        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    RequestType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    ResponseType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
     let (read_half, write_half) = tokio::io::split(stream);
     let reader = BufReader::new(read_half);
@@ -126,7 +165,7 @@ where
 
     // Task to handle sending messages
     let send_task = tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
+        while let Ok(msg) = rx.recv().await {
             let msg = serde_json::to_string(&msg)?;
             writer.write_all(msg.as_bytes()).await?;
             writer.write_all(b"\n").await?;
