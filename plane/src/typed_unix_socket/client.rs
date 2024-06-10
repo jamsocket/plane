@@ -1,17 +1,29 @@
-use super::{
-    IDedMessage, TypedUnixSocketClient, WrappedClientMessageType, WrappedServerMessageType,
-};
+use super::{IDedMessage, WrappedClientMessageType, WrappedServerMessageType};
 use anyhow::Error;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc};
 use tokio::io::AsyncWriteExt;
-use tokio::io::{AsyncBufReadExt, BufReader, BufWriter, Lines};
+use tokio::io::{AsyncBufReadExt, BufReader, BufWriter};
 use tokio::{
     net::UnixStream,
     sync::{broadcast, mpsc, oneshot},
 };
 use uuid::Uuid;
+
+struct TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
+where
+    ClientMessageType: Send + Sync + 'static,
+    ServerMessageType: Send + Sync + 'static + Clone,
+    RequestType: Send + Sync + 'static,
+    ResponseType: Send + Sync + 'static,
+{
+    // stream: UnixStream,
+    tx: mpsc::UnboundedSender<WrappedClientMessageType<RequestType, ClientMessageType>>,
+    // rx: mpsc::UnboundedReceiver<WrappedClientMessageType<RequestType, ClientMessageType>>,
+    response_map: Arc<DashMap<Uuid, oneshot::Sender<ResponseType>>>,
+    event_tx: broadcast::Sender<ServerMessageType>,
+}
 
 impl<ClientMessageType, ServerMessageType, RequestType, ResponseType>
     TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
