@@ -118,4 +118,108 @@ mod tests {
         let received_message = event_rx.recv().await.unwrap();
         assert_eq!(received_message, ad_hoc_message);
     }
+
+    #[tokio::test]
+    async fn test_multiple_concurrent_requests_responses() {
+        let socket_path = create_temp_socket_path();
+
+        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+
+        // Spawn a task to handle server requests
+        spawn(async move {
+            let mut request_rx = server.subscribe_requests();
+            while let Ok(request) = request_rx.recv().await {
+                let response = IDedMessage {
+                    id: request.id,
+                    message: format!("Response to {}", request.message),
+                };
+                server.send_response(response).await.unwrap();
+            }
+        });
+
+        let mut handles = vec![];
+        for i in 0..10 {
+            let client = client.clone();
+            handles.push(spawn(async move {
+                let request = format!("Request {}", i);
+                let response = client.send_request(request).await.unwrap();
+                assert_eq!(response, format!("Response to Request {}", i));
+            }));
+        }
+
+        for handle in handles {
+            handle.await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_client_to_server_messages() {
+        let socket_path = create_temp_socket_path();
+
+        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+
+        // Subscribe to server events
+        let mut event_rx = server.subscribe_events();
+
+        let mut handles = vec![];
+        for i in 0..10 {
+            let client = client.clone();
+            handles.push(spawn(async move {
+                let message = format!("Message {}", i);
+                client.send_message(message.clone()).await.unwrap();
+            }));
+        }
+
+        for handle in handles {
+            handle.await.unwrap();
+        }
+
+        for i in 0..10 {
+            let received_message = event_rx.recv().await.unwrap();
+            assert_eq!(received_message, format!("Message {}", i));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_server_to_client_messages() {
+        let socket_path = create_temp_socket_path();
+
+        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+            .await
+            .unwrap();
+
+        // Subscribe to client events
+        let mut event_rx = client.subscribe_events();
+
+        let mut handles = vec![];
+        for i in 0..10 {
+            let server = server.clone();
+            handles.push(spawn(async move {
+                let message = format!("Message {}", i);
+                server.send_message(message.clone()).await.unwrap();
+            }));
+        }
+
+        for handle in handles {
+            handle.await.unwrap();
+        }
+
+        for i in 0..10 {
+            let received_message = event_rx.recv().await.unwrap();
+            assert_eq!(received_message, format!("Message {}", i));
+        }
+    }
 }

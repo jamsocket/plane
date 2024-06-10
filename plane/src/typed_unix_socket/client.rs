@@ -2,7 +2,7 @@ use super::{IDedMessage, WrappedClientMessageType, WrappedServerMessageType};
 use anyhow::Error;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::{path::Path, sync::Arc};
+use std::{clone::Clone, path::Path, sync::Arc};
 use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncBufReadExt, BufReader, BufWriter};
 use tokio::{
@@ -11,6 +11,7 @@ use tokio::{
 };
 use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
 where
     ClientMessageType: Send + Sync + 'static,
