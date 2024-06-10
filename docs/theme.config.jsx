@@ -12,7 +12,7 @@ export default {
     },
     footer: {
         text: <span>
-            Plane is an open-source project of <a href="https://driftingin.space">Drifting in Space Corp.</a>
+            Plane is an open-source project of <a href="https://jamsocket.com">Jamsocket.</a>
         </span>,
     },
     head: () => {
