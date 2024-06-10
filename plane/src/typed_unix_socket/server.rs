@@ -13,6 +13,7 @@ use tokio::{
     sync::{broadcast, mpsc},
 };
 
+#[derive(Clone)]
 pub struct TypedUnixSocketServer<ClientMessageType, ServerMessageType, RequestType, ResponseType>
 where
     ClientMessageType: Send + Sync + 'static + Clone,
