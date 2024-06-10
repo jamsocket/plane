@@ -2,11 +2,7 @@ use self::{
     executor::Executor,
     heartbeat::HeartbeatLoop,
     key_manager::KeyManager,
-    runtime::{
-        docker::DockerRuntimeConfig,
-        unix_socket::{UnixSocketRuntime, UnixSocketRuntimeConfig},
-        Runtime,
-    },
+    runtime::{docker::DockerRuntimeConfig, Runtime},
     state_store::StateStore,
 };
 use crate::{
@@ -204,9 +200,6 @@ impl Drone {
 
                 DockerRuntime::new(docker_config).await?
             }
-            (None, Some(ExecutorConfig::UnixSocket(unix_socket_config))) => {
-                UnixSocketRuntime::new(unix_socket_config).await?
-            }
             (None, None) => {
                 tracing::error!("Neither `docker_config` nor `executor_config` provided.");
                 return Err(anyhow!(
@@ -249,7 +242,6 @@ impl Drone {
 #[serde(rename_all = "snake_case")]
 pub enum ExecutorConfig {
     Docker(DockerRuntimeConfig),
-    UnixSocket(UnixSocketRuntimeConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
