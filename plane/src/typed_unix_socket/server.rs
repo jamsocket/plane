@@ -160,6 +160,9 @@ where
         Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
     });
 
-    tokio::try_join!(recv_task, send_task)?;
+    let (recv_result, send_result) = tokio::try_join!(recv_task, send_task)?;
+
+    recv_result?;
+    send_result?;
     Ok(())
 }
