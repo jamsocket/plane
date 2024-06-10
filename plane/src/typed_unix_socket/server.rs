@@ -1,7 +1,12 @@
 use super::{IDedMessage, WrappedClientMessageType, WrappedServerMessageType};
 use anyhow::Error;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, marker::PhantomData, path::Path};
+use std::{
+    fmt::Debug,
+    fs,
+    marker::PhantomData,
+    path::{Path, PathBuf},
+};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     net::{UnixListener, UnixStream},
@@ -15,6 +20,7 @@ where
     RequestType: Send + Sync + 'static + Clone + Debug,
     ResponseType: Send + Sync + 'static,
 {
+    socket_path: PathBuf,
     event_tx: broadcast::Sender<ClientMessageType>,
     request_tx: broadcast::Sender<IDedMessage<RequestType>>,
     response_tx: mpsc::UnboundedSender<WrappedServerMessageType<ResponseType, ServerMessageType>>,
@@ -30,7 +36,8 @@ where
     ResponseType: Send + Sync + 'static + Serialize + for<'de> Deserialize<'de>,
 {
     pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Error> {
-        let listener = UnixListener::bind(socket_path.as_ref())?;
+        let socket_path = socket_path.as_ref().to_path_buf();
+        let listener = UnixListener::bind(&socket_path)?;
         let (event_tx, _) = broadcast::channel(100);
         let (request_tx, _) = broadcast::channel(100);
         let (response_tx, response_rx) = mpsc::unbounded_channel();
@@ -55,6 +62,7 @@ where
         });
 
         Ok(Self {
+            socket_path,
             event_tx,
             request_tx,
             response_tx,
@@ -75,6 +83,21 @@ where
             WrappedServerMessageType::<ResponseType, ServerMessageType>::Response(response);
         self.response_tx.send(response_msg)?;
         Ok(())
+    }
+}
+
+impl<ClientMessageType, ServerMessageType, RequestType, ResponseType> Drop
+    for TypedUnixSocketServer<ClientMessageType, ServerMessageType, RequestType, ResponseType>
+where
+    ClientMessageType: Send + Sync + 'static + Clone,
+    ServerMessageType: Send + Sync + 'static + Clone,
+    RequestType: Send + Sync + 'static + Clone + Debug,
+    ResponseType: Send + Sync + 'static,
+{
+    fn drop(&mut self) {
+        if let Err(e) = fs::remove_file(&self.socket_path) {
+            tracing::warn!("Failed to remove socket file: {}", e);
+        }
     }
 }
 
