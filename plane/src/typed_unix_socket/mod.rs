@@ -130,7 +130,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_multiple_concurrent_requests_responses() {
+    async fn test_concurrent_requests_responses() {
         let socket_path = create_temp_socket_path();
 
         let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
