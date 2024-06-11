@@ -165,36 +165,71 @@ where
     let recv_task = tokio::spawn({
         let event_tx = event_tx.clone();
         async move {
-            while let Some(line) = lines.next_line().await? {
-                let msg: WrappedClientMessageType<RequestType, ClientMessageType> =
-                    serde_json::from_str(&line)?;
-                match msg {
-                    WrappedClientMessageType::ClientMessage(event) => {
-                        let _ = event_tx.send(event);
+            loop {
+                match lines.next_line().await {
+                    Ok(Some(line)) => {
+                        let msg: WrappedClientMessageType<RequestType, ClientMessageType> =
+                            match serde_json::from_str(&line) {
+                                Ok(msg) => msg,
+                                Err(e) => {
+                                    tracing::error!("Error deserializing message: {}", e);
+                                    continue;
+                                }
+                            };
+                        match msg {
+                            WrappedClientMessageType::ClientMessage(event) => {
+                                if let Err(e) = event_tx.send(event) {
+                                    tracing::error!("Error sending event: {}", e);
+                                }
+                            }
+                            WrappedClientMessageType::Request(request) => {
+                                if let Err(e) = request_tx.send(request) {
+                                    tracing::error!("Error sending request: {}", e);
+                                }
+                            }
+                        }
                     }
-                    WrappedClientMessageType::Request(request) => {
-                        request_tx.send(request)?;
+                    Ok(None) => {
+                        tracing::error!("Connection closed by client");
+                    }
+                    Err(e) => {
+                        tracing::error!("Error reading line: {}", e);
                     }
                 }
             }
-            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
         }
     });
 
     // Task to handle sending responses
     let send_task = tokio::spawn(async move {
-        while let Ok(response) = response_rx.recv().await {
-            let response_str = serde_json::to_string(&response)?;
-            writer.write_all(response_str.as_bytes()).await?;
-            writer.write_all(b"\n").await?;
-            writer.flush().await?;
+        loop {
+            match response_rx.recv().await {
+                Ok(response) => {
+                    let response_str = match serde_json::to_string(&response) {
+                        Ok(response_str) => response_str,
+                        Err(e) => {
+                            tracing::error!("Error serializing response: {}", e);
+                            continue;
+                        }
+                    };
+                    if let Err(e) = writer.write_all(response_str.as_bytes()).await {
+                        tracing::error!("Error writing response: {}", e);
+                    }
+                    if let Err(e) = writer.write_all(b"\n").await {
+                        tracing::error!("Error writing newline: {}", e);
+                    }
+                    if let Err(e) = writer.flush().await {
+                        tracing::error!("Error flushing writer: {}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Error receiving response: {}", e);
+                }
+            }
         }
-        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
     });
 
-    let (recv_result, send_result) = tokio::try_join!(recv_task, send_task)?;
+    let _ = tokio::try_join!(recv_task, send_task);
 
-    recv_result?;
-    send_result?;
     Ok(())
 }
