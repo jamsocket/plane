@@ -92,9 +92,16 @@ where
         self.request_tx.subscribe()
     }
 
-    pub async fn send_response(&self, response: IDedMessage<ResponseType>) -> Result<(), Error> {
+    pub async fn send_response(
+        &self,
+        request: IDedMessage<RequestType>,
+        response: ResponseType,
+    ) -> Result<(), Error> {
         let response_msg =
-            WrappedServerMessageType::<ResponseType, ServerMessageType>::Response(response);
+            WrappedServerMessageType::<ResponseType, ServerMessageType>::Response(IDedMessage {
+                id: request.id,
+                message: response,
+            });
 
         // Wait until there is at least one subscriber
         let mut backoff = get_quick_backoff();
