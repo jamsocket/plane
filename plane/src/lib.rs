@@ -24,9 +24,9 @@ pub mod proxy;
 pub mod serialization;
 pub mod signals;
 pub mod typed_socket;
+mod typed_unix_socket;
 pub mod types;
 pub mod util;
-mod typed_unix_socket;
 
 /// The version of the plane binary from Cargo.toml.
 pub const PLANE_VERSION: &str = env!("CARGO_PKG_VERSION");
