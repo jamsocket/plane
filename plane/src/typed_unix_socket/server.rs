@@ -58,16 +58,12 @@ where
                 loop {
                     match listener.accept().await {
                         Ok((stream, _)) => {
-                            handle_connection(
+                            tokio::spawn(handle_connection(
                                 stream,
                                 event_tx.clone(),
                                 request_tx.clone(),
                                 response_tx.subscribe(),
-                            )
-                            .await
-                            .unwrap_or_else(|e| {
-                                tracing::error!("Error handling connection: {}", e);
-                            });
+                            ));
                         }
                         Err(e) => {
                             tracing::error!("Error accepting connection: {}", e);
