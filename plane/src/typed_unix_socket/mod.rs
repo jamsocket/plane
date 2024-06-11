@@ -38,7 +38,6 @@ fn get_quick_backoff() -> ExponentialBackoff {
 mod tests {
     use super::client::TypedUnixSocketClient;
     use super::server::TypedUnixSocketServer;
-    use super::IDedMessage;
     use futures_util::future::join_all;
     use std::collections::HashSet;
     use std::env;
@@ -65,11 +64,8 @@ mod tests {
         spawn(async move {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
-                let response = IDedMessage {
-                    id: request.id,
-                    message: "Hello, client!".to_string(),
-                };
-                server.send_response(response).await.unwrap();
+                let response = "Hello, client!".to_string();
+                server.send_response(request, response).await.unwrap();
             }
         });
 
@@ -148,11 +144,8 @@ mod tests {
         spawn(async move {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
-                let response = IDedMessage {
-                    id: request.id,
-                    message: format!("Response to {}", request.message),
-                };
-                server.send_response(response).await.unwrap();
+                let response = format!("Response to {}", request.message);
+                server.send_response(request, response).await.unwrap();
             }
         });
 
@@ -257,11 +250,8 @@ mod tests {
         spawn(async move {
             let mut request_rx = server_clone.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
-                let response = IDedMessage {
-                    id: request.id,
-                    message: "Hello, client!".to_string(),
-                };
-                server_clone.send_response(response).await.unwrap();
+                let response = "Hello, client!".to_string();
+                server_clone.send_response(request, response).await.unwrap();
             }
         });
 
@@ -298,11 +288,8 @@ mod tests {
         spawn(async move {
             let mut request_rx = server_clone.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
-                let response = IDedMessage {
-                    id: request.id,
-                    message: "Hello, client!".to_string(),
-                };
-                server_clone.send_response(response).await.unwrap();
+                let response = "Hello, client!".to_string();
+                server_clone.send_response(request, response).await.unwrap();
             }
         });
 
