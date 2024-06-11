@@ -7,7 +7,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncBufReadExt, BufReader, BufWriter};
 use tokio::{
     net::UnixStream,
-    sync::{broadcast, oneshot},
+    sync::{broadcast, oneshot, watch},
 };
 use uuid::Uuid;
 
@@ -24,6 +24,7 @@ where
     tx: broadcast::Sender<WrappedClientMessageType<RequestType, ClientMessageType>>,
     response_map: Arc<DashMap<Uuid, oneshot::Sender<ResponseType>>>,
     event_tx: broadcast::Sender<ServerMessageType>,
+    shutdown_tx: watch::Sender<()>,
 }
 
 impl<ClientMessageType, ServerMessageType, RequestType, ResponseType>
@@ -40,33 +41,41 @@ where
         let (tx, _) = broadcast::channel(100);
         let response_map = Arc::new(DashMap::new());
         let (event_tx, _) = broadcast::channel(100);
+        let (shutdown_tx, shutdown_rx) = watch::channel(());
+
+        // Handle ctrl_c signal
+        tokio::spawn({
+            let shutdown_tx = shutdown_tx.clone();
+            async move {
+                tokio::signal::ctrl_c()
+                    .await
+                    .expect("Failed to install Ctrl+C handler");
+                tracing::info!("Ctrl+C received, initiating shutdown...");
+                let _ = shutdown_tx.send(());
+            }
+        });
+
+        let stream = loop {
+            match UnixStream::connect(&socket_path).await {
+                Ok(stream) => break stream,
+                Err(e) => {
+                    tracing::error!("Error connecting to server: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+            }
+        };
 
         tokio::spawn({
-            let socket_path = socket_path.as_ref().to_path_buf();
             let tx = tx.clone();
             let response_map = Arc::clone(&response_map);
             let event_tx = event_tx.clone();
+            let shutdown_rx = shutdown_rx.clone();
             async move {
-                loop {
-                    match UnixStream::connect(&socket_path).await {
-                        Ok(stream) => {
-                            handle_connection(
-                                stream,
-                                tx.subscribe(),
-                                Arc::clone(&response_map),
-                                event_tx.clone(),
-                            )
-                            .await
-                            .unwrap_or_else(|e| {
-                                tracing::error!("Error handling connection: {}", e);
-                            });
-                        }
-                        Err(e) => {
-                            tracing::error!("Error connecting to server: {}", e);
-                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        }
-                    }
-                }
+                handle_connection(stream, tx.subscribe(), response_map, event_tx, shutdown_rx)
+                    .await
+                    .unwrap_or_else(|e| {
+                        tracing::error!("Error handling connection: {}", e);
+                    });
             }
         });
 
@@ -74,6 +83,7 @@ where
             tx,
             response_map,
             event_tx,
+            shutdown_tx,
         })
     }
 
@@ -89,12 +99,15 @@ where
 
         // Wait until there is at least one subscriber
         while self.tx.receiver_count() == 0 {
+            println!("wait loop");
             tracing::info!("Waiting for a subscriber...");
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
         self.tx.send(wrapper)?;
+        println!("sent");
         let response = response_rx.await?;
+        println!("got response");
         Ok(response)
     }
 
@@ -116,11 +129,29 @@ where
     }
 }
 
+impl<ClientMessageType, ServerMessageType, RequestType, ResponseType> Drop
+    for TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
+where
+    ClientMessageType:
+        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    ServerMessageType:
+        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    RequestType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    ResponseType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+{
+    fn drop(&mut self) {
+        if let Err(e) = self.shutdown_tx.send(()) {
+            tracing::warn!("Failed to send shutdown signal: {}", e);
+        }
+    }
+}
+
 async fn handle_connection<ClientMessageType, ServerMessageType, RequestType, ResponseType>(
     stream: UnixStream,
     mut rx: broadcast::Receiver<WrappedClientMessageType<RequestType, ClientMessageType>>,
     response_map: Arc<DashMap<Uuid, oneshot::Sender<ResponseType>>>,
     event_tx: broadcast::Sender<ServerMessageType>,
+    shutdown_rx: watch::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     ClientMessageType:
@@ -140,21 +171,52 @@ where
     // Task to handle receiving messages
     let recv_task = tokio::spawn({
         let event_tx = event_tx.clone();
-        let response_map = Arc::clone(&response_map);
+        let mut shutdown_rx = shutdown_rx.clone();
         async move {
-            while let Some(line) = lines.next_line().await? {
-                let msg: WrappedServerMessageType<ResponseType, ServerMessageType> =
-                    serde_json::from_str(&line)?;
-                match msg {
-                    WrappedServerMessageType::ServerMessage(event) => {
-                        let _ = event_tx.send(event);
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.changed() => {
+                        tracing::info!("Shutdown signal received in recv_task.");
+                        break;
                     }
-                    WrappedServerMessageType::Response(response) => {
-                        let id = response.id;
-                        if let Some(tx) = response_map.remove(&id).map(|(_, tx)| tx) {
-                            let _ = tx.send(response.message);
-                        } else {
-                            eprintln!("No sender found for response ID: {:?}", id);
+                    line = lines.next_line() => {
+                        match line {
+                            Ok(Some(line)) => {
+                                match serde_json::from_str::<WrappedServerMessageType<ResponseType, ServerMessageType>>(&line) {
+                                    Ok(msg) => {
+                                        match msg {
+                                            WrappedServerMessageType::ServerMessage(event) => {
+                                                if let Err(e) = event_tx.send(event) {
+                                                    tracing::error!("Failed to send server message: {:?}", e);
+                                                }
+                                            }
+                                            WrappedServerMessageType::Response(response) => {
+                                                let id = response.id;
+                                                match response_map.remove(&id).map(|(_, tx)| tx) {
+                                                    Some(tx) => {
+                                                        if let Err(e) = tx.send(response.message) {
+                                                            tracing::error!("Failed to send response message: {:?}", e);
+                                                        }
+                                                    }
+                                                    None => {
+                                                        tracing::error!("No sender found for response ID: {:?}", id);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Failed to deserialize message: {:?}", e);
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                // End of stream, no more lines to read
+                                tracing::warn!("Encountered end of stream");
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to read next line: {:?}", e);
+                            }
                         }
                     }
                 }
@@ -164,14 +226,44 @@ where
     });
 
     // Task to handle sending messages
-    let send_task = tokio::spawn(async move {
-        while let Ok(msg) = rx.recv().await {
-            let msg = serde_json::to_string(&msg)?;
-            writer.write_all(msg.as_bytes()).await?;
-            writer.write_all(b"\n").await?;
-            writer.flush().await?;
+    let send_task = tokio::spawn({
+        let mut shutdown_rx = shutdown_rx.clone(); // Make shutdown_rx mutable
+        async move {
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.changed() => {
+                        tracing::info!("Shutdown signal received in send_task.");
+                        break;
+                    }
+                    msg = rx.recv() => {
+                        match msg {
+                            Ok(msg) => {
+                                match serde_json::to_string(&msg) {
+                                    Ok(msg) => {
+                                        if let Err(e) = writer.write_all(msg.as_bytes()).await {
+                                            tracing::error!("Failed to write message: {:?}", e);
+                                        }
+                                        if let Err(e) = writer.write_all(b"\n").await {
+                                            tracing::error!("Failed to write newline: {:?}", e);
+                                        }
+                                        if let Err(e) = writer.flush().await {
+                                            tracing::error!("Failed to flush writer: {:?}", e);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Failed to serialize message: {:?}", e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to receive message: {:?}", e);
+                            }
+                        }
+                    }
+                }
+            }
+            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
         }
-        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
     });
 
     let (recv_result, send_result) = tokio::try_join!(recv_task, send_task)?;

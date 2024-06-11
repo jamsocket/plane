@@ -291,9 +291,11 @@ mod tests {
                     message: "Hello, client!".to_string(),
                 };
                 server_clone.send_response(response).await.unwrap();
+                println!("sent response");
             }
         });
 
+        println!("sending");
         let request = "Hello, server!".to_string();
         let response = client.send_request(request).await.unwrap();
         assert_eq!(response, "Hello, client!");
