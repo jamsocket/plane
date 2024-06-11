@@ -144,41 +144,76 @@ where
         let event_tx = event_tx.clone();
         let response_map = Arc::clone(&response_map);
         async move {
-            while let Some(line) = lines.next_line().await? {
-                let msg: WrappedServerMessageType<ResponseType, ServerMessageType> =
-                    serde_json::from_str(&line)?;
-                match msg {
-                    WrappedServerMessageType::ServerMessage(event) => {
-                        let _ = event_tx.send(event);
-                    }
-                    WrappedServerMessageType::Response(response) => {
-                        let id = response.id;
-                        if let Some(tx) = response_map.remove(&id).map(|(_, tx)| tx) {
-                            let _ = tx.send(response.message);
-                        } else {
-                            eprintln!("No sender found for response ID: {:?}", id);
+            loop {
+                match lines.next_line().await {
+                    Ok(Some(line)) => {
+                        let msg: WrappedServerMessageType<ResponseType, ServerMessageType> =
+                            match serde_json::from_str(&line) {
+                                Ok(msg) => msg,
+                                Err(e) => {
+                                    tracing::error!("Error deserializing message: {}", e);
+                                    continue;
+                                }
+                            };
+                        match msg {
+                            WrappedServerMessageType::ServerMessage(event) => {
+                                if let Err(e) = event_tx.send(event) {
+                                    tracing::error!("Error sending event: {}", e);
+                                }
+                            }
+                            WrappedServerMessageType::Response(response) => {
+                                let id = response.id;
+                                if let Some(tx) = response_map.remove(&id).map(|(_, tx)| tx) {
+                                    if tx.send(response.message).is_err() {
+                                        tracing::error!("Error sending response");
+                                    }
+                                } else {
+                                    tracing::error!("No sender found for response ID: {:?}", id);
+                                }
+                            }
                         }
+                    }
+                    Ok(None) => {
+                        tracing::error!("Connection closed by server");
+                    }
+                    Err(e) => {
+                        tracing::error!("Error reading line: {}", e);
                     }
                 }
             }
-            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
         }
     });
 
     // Task to handle sending messages
     let send_task = tokio::spawn(async move {
-        while let Ok(msg) = rx.recv().await {
-            let msg = serde_json::to_string(&msg)?;
-            writer.write_all(msg.as_bytes()).await?;
-            writer.write_all(b"\n").await?;
-            writer.flush().await?;
+        loop {
+            match rx.recv().await {
+                Ok(msg) => {
+                    let msg = match serde_json::to_string(&msg) {
+                        Ok(msg) => msg,
+                        Err(e) => {
+                            tracing::error!("Error serializing message: {}", e);
+                            continue;
+                        }
+                    };
+                    if let Err(e) = writer.write_all(msg.as_bytes()).await {
+                        tracing::error!("Error writing message: {}", e);
+                    }
+                    if let Err(e) = writer.write_all(b"\n").await {
+                        tracing::error!("Error writing newline: {}", e);
+                    }
+                    if let Err(e) = writer.flush().await {
+                        tracing::error!("Error flushing writer: {}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Error receiving message: {}", e);
+                }
+            }
         }
-        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
     });
 
-    let (recv_result, send_result) = tokio::try_join!(recv_task, send_task)?;
+    let _ = tokio::try_join!(recv_task, send_task);
 
-    recv_result?;
-    send_result?;
     Ok(())
 }
