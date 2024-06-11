@@ -1,4 +1,4 @@
-use super::{IDedMessage, WrappedClientMessageType, WrappedServerMessageType};
+use super::{get_quick_backoff, IDedMessage, WrappedClientMessageType, WrappedServerMessageType};
 use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -55,6 +55,7 @@ where
             let request_tx = request_tx.clone();
             let response_tx = response_tx.clone();
             async move {
+                let mut backoff = get_quick_backoff();
                 loop {
                     match listener.accept().await {
                         Ok((stream, _)) => {
@@ -67,6 +68,7 @@ where
                         }
                         Err(e) => {
                             tracing::error!("Error accepting connection: {}", e);
+                            backoff.wait().await;
                         }
                     }
                 }
@@ -95,9 +97,10 @@ where
             WrappedServerMessageType::<ResponseType, ServerMessageType>::Response(response);
 
         // Wait until there is at least one subscriber
+        let mut backoff = get_quick_backoff();
         while self.response_tx.receiver_count() == 0 {
             tracing::info!("Waiting for a subscriber...");
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            backoff.wait().await;
         }
 
         self.response_tx.send(response_msg)?;
@@ -109,9 +112,10 @@ where
             WrappedServerMessageType::<ResponseType, ServerMessageType>::ServerMessage(message);
 
         // Wait until there is at least one subscriber
+        let mut backoff = get_quick_backoff();
         while self.response_tx.receiver_count() == 0 {
             tracing::info!("Waiting for a subscriber...");
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            backoff.wait().await;
         }
 
         self.response_tx.send(message_msg)?;

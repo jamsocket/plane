@@ -1,5 +1,8 @@
+use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::util::ExponentialBackoff;
 
 pub mod client;
 pub mod server;
@@ -20,6 +23,15 @@ pub enum WrappedServerMessageType<ResponseType, ServerMessageType> {
 pub enum WrappedClientMessageType<RequestType, ClientMessageType> {
     Request(IDedMessage<RequestType>),
     ClientMessage(ClientMessageType),
+}
+
+fn get_quick_backoff() -> ExponentialBackoff {
+    ExponentialBackoff::new(
+        Duration::try_milliseconds(10).expect("duration is always valid"),
+        Duration::try_milliseconds(100).expect("duration is always valid"),
+        1.1,
+        Duration::try_milliseconds(100).expect("duration is always valid"),
+    )
 }
 
 #[cfg(test)]

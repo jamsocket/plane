@@ -1,4 +1,4 @@
-use super::{IDedMessage, WrappedClientMessageType, WrappedServerMessageType};
+use super::{get_quick_backoff, IDedMessage, WrappedClientMessageType, WrappedServerMessageType};
 use anyhow::Error;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -47,6 +47,7 @@ where
             let response_map = Arc::clone(&response_map);
             let event_tx = event_tx.clone();
             async move {
+                let mut backoff = get_quick_backoff();
                 loop {
                     match UnixStream::connect(&socket_path).await {
                         Ok(stream) => {
@@ -63,13 +64,12 @@ where
                         }
                         Err(e) => {
                             tracing::error!("Error connecting to server: {}", e);
-                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                            backoff.wait().await;
                         }
                     }
                 }
             }
         });
-
         Ok(Self {
             tx,
             response_map,
@@ -88,9 +88,10 @@ where
         self.response_map.insert(id, response_tx);
 
         // Wait until there is at least one subscriber
+        let mut backoff = get_quick_backoff();
         while self.tx.receiver_count() == 0 {
             tracing::info!("Waiting for a subscriber...");
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            backoff.wait().await;
         }
 
         self.tx.send(wrapper)?;
@@ -102,9 +103,10 @@ where
         let wrapper = WrappedClientMessageType::ClientMessage(message);
 
         // Wait until there is at least one subscriber
+        let mut backoff = get_quick_backoff();
         while self.tx.receiver_count() == 0 {
             tracing::info!("Waiting for a subscriber...");
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            backoff.wait().await;
         }
 
         self.tx.send(wrapper)?;
