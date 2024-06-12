@@ -35,7 +35,18 @@ mod tests {
     use tokio::spawn;
 
     fn create_temp_socket_path() -> PathBuf {
-        env::temp_dir().join(format!("test_socket_{}", random_string())) // ensure random file name
+        // We generate a random string to use as the socket path.
+        // Due to limitations of the underlying syscall (ref: https://man7.org/linux/man-pages/man7/unix.7.html),
+        // the total length of the socket path is limited to 108 characters.
+        // We use random_string() rather than random_token() to minimize the chance of exceeding this limit.
+        let path = env::temp_dir().join(format!("test_socket_{}", random_string()));
+        if path.to_str().unwrap().len() > 107 {
+            panic!(
+                "The socket path ({:?}) is too long. The maximum length is 108 characters (including terminating null). Try running the tests in a shallower directory.",
+                path
+            );
+        }
+        path
     }
 
     #[tokio::test]
