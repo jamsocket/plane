@@ -48,7 +48,6 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "va
 trust-dns-server = "0.23.2"
 tungstenite = "0.20.1"
 url = { version="2.4.1", features=["serde"] }
-uuid = { version = "1.8.0", features = ["v4", "fast-rng", "serde"] }
 x509-parser = "0.15.1"
 valuable = { version = "0.1.0", features = ["derive"] }
 http = "1.1.0"
