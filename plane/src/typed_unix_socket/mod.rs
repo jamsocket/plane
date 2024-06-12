@@ -1,6 +1,5 @@
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::util::ExponentialBackoff;
 
@@ -8,21 +7,11 @@ pub mod client;
 pub mod server;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct IDedMessage<T> {
-    id: Uuid,
+pub struct WrappedMessage<T> {
+    /// Optional ID for this message. If it is provided, this message belongs to a request/response pair
+    /// (either as the request or the response). If it is not provided, this message is an event.
+    id: Option<String>,
     message: T,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum WrappedServerMessageType<ResponseType, ServerMessageType> {
-    Response(IDedMessage<ResponseType>),
-    ServerMessage(ServerMessageType),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum WrappedClientMessageType<RequestType, ClientMessageType> {
-    Request(IDedMessage<RequestType>),
-    ClientMessage(ClientMessageType),
 }
 
 fn get_quick_backoff() -> ExponentialBackoff {
@@ -38,25 +27,36 @@ fn get_quick_backoff() -> ExponentialBackoff {
 mod tests {
     use super::client::TypedUnixSocketClient;
     use super::server::TypedUnixSocketServer;
+    use crate::util::random_string;
     use futures_util::future::join_all;
     use std::collections::HashSet;
     use std::env;
     use std::path::PathBuf;
     use tokio::spawn;
-    use uuid::Uuid;
 
     fn create_temp_socket_path() -> PathBuf {
-        env::temp_dir().join(format!("test_socket_{}", Uuid::new_v4())) // ensure random file name
+        // We generate a random string to use as the socket path.
+        // Due to limitations of the underlying syscall (ref: https://man7.org/linux/man-pages/man7/unix.7.html),
+        // the total length of the socket path is limited to 108 characters.
+        // We use random_string() rather than random_token() to minimize the chance of exceeding this limit.
+        let path = env::temp_dir().join(format!("test_socket_{}", random_string()));
+        if path.to_str().unwrap().len() > 107 {
+            panic!(
+                "The socket path ({:?}) is too long. The maximum length is 108 characters (including terminating null). Try running the tests in a shallower directory.",
+                path
+            );
+        }
+        path
     }
 
     #[tokio::test]
     async fn test_request_response() {
         let socket_path = create_temp_socket_path();
 
-        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+        let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
             .await
             .unwrap();
 
@@ -65,7 +65,10 @@ mod tests {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();
-                server.send_response(request, response).await.unwrap();
+                server
+                    .send_response(request.id.unwrap(), response)
+                    .await
+                    .unwrap();
             }
         });
 
@@ -79,16 +82,12 @@ mod tests {
     async fn test_client_to_server_ad_hoc() {
         let socket_path = create_temp_socket_path();
 
-        let server = TypedUnixSocketServer::<String, String, String, String>::new(
-            socket_path.to_str().unwrap(),
-        )
-        .await
-        .unwrap();
-        let client = TypedUnixSocketClient::<String, String, String, String>::new(
-            socket_path.to_str().unwrap(),
-        )
-        .await
-        .unwrap();
+        let server = TypedUnixSocketServer::<String, String>::new(socket_path.to_str().unwrap())
+            .await
+            .unwrap();
+        let client = TypedUnixSocketClient::<String, String>::new(socket_path.to_str().unwrap())
+            .await
+            .unwrap();
 
         // Subscribe to server events
         let mut event_rx = server.subscribe_events();
@@ -106,16 +105,12 @@ mod tests {
     async fn test_server_to_client_ad_hoc() {
         let socket_path = create_temp_socket_path();
 
-        let server = TypedUnixSocketServer::<String, String, String, String>::new(
-            socket_path.to_str().unwrap(),
-        )
-        .await
-        .unwrap();
-        let client = TypedUnixSocketClient::<String, String, String, String>::new(
-            socket_path.to_str().unwrap(),
-        )
-        .await
-        .unwrap();
+        let server = TypedUnixSocketServer::<String, String>::new(socket_path.to_str().unwrap())
+            .await
+            .unwrap();
+        let client = TypedUnixSocketClient::<String, String>::new(socket_path.to_str().unwrap())
+            .await
+            .unwrap();
 
         // Subscribe to client events
         let mut event_rx = client.subscribe_events();
@@ -133,10 +128,10 @@ mod tests {
     async fn test_concurrent_requests_responses() {
         let socket_path = create_temp_socket_path();
 
-        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+        let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
             .await
             .unwrap();
 
@@ -145,7 +140,10 @@ mod tests {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = format!("Response to {}", request.message);
-                server.send_response(request, response).await.unwrap();
+                server
+                    .send_response(request.id.unwrap(), response)
+                    .await
+                    .unwrap();
             }
         });
 
@@ -166,10 +164,10 @@ mod tests {
     async fn test_concurrent_client_to_server_messages() {
         let socket_path = create_temp_socket_path();
 
-        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+        let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
             .await
             .unwrap();
 
@@ -202,10 +200,10 @@ mod tests {
     async fn test_concurrent_server_to_client_messages() {
         let socket_path = create_temp_socket_path();
 
-        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+        let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
             .await
             .unwrap();
 
@@ -238,10 +236,10 @@ mod tests {
     async fn test_client_reconnect() {
         let socket_path = create_temp_socket_path();
 
-        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+        let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
             .await
             .unwrap();
 
@@ -251,13 +249,16 @@ mod tests {
             let mut request_rx = server_clone.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();
-                server_clone.send_response(request, response).await.unwrap();
+                server_clone
+                    .send_response(request.id.unwrap(), response)
+                    .await
+                    .unwrap();
             }
         });
 
         // Simulate client restart
         drop(client);
-        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
             .await
             .unwrap();
 
@@ -270,16 +271,16 @@ mod tests {
     async fn test_server_reconnect() {
         let socket_path = create_temp_socket_path();
 
-        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+        let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String, String, String>::new(&socket_path)
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
             .await
             .unwrap();
 
         // Simulate server restart
         drop(server);
-        let server = TypedUnixSocketServer::<String, String, String, String>::new(&socket_path)
+        let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
 
@@ -289,7 +290,10 @@ mod tests {
             let mut request_rx = server_clone.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();
-                server_clone.send_response(request, response).await.unwrap();
+                server_clone
+                    .send_response(request.id.unwrap(), response)
+                    .await
+                    .unwrap();
             }
         });
 

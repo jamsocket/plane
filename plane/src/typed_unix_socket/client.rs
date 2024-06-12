@@ -1,4 +1,5 @@
-use super::{get_quick_backoff, IDedMessage, WrappedClientMessageType, WrappedServerMessageType};
+use super::{get_quick_backoff, WrappedMessage};
+use crate::util::random_token;
 use anyhow::Error;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -9,32 +10,22 @@ use tokio::{
     net::UnixStream,
     sync::{broadcast, oneshot},
 };
-use uuid::Uuid;
 
 #[derive(Clone)]
-pub struct TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
+pub struct TypedUnixSocketClient<MessageToServer, MessageToClient>
 where
-    ClientMessageType:
-        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    ServerMessageType:
-        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    RequestType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    ResponseType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
-    tx: broadcast::Sender<WrappedClientMessageType<RequestType, ClientMessageType>>,
-    response_map: Arc<DashMap<Uuid, oneshot::Sender<ResponseType>>>,
-    event_tx: broadcast::Sender<ServerMessageType>,
+    tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
+    response_map: Arc<DashMap<String, oneshot::Sender<MessageToClient>>>,
+    event_tx: broadcast::Sender<MessageToClient>,
 }
 
-impl<ClientMessageType, ServerMessageType, RequestType, ResponseType>
-    TypedUnixSocketClient<ClientMessageType, ServerMessageType, RequestType, ResponseType>
+impl<MessageToServer, MessageToClient> TypedUnixSocketClient<MessageToServer, MessageToClient>
 where
-    ClientMessageType:
-        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    ServerMessageType:
-        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    RequestType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    ResponseType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
     pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Error> {
         let (tx, _) = broadcast::channel(100);
@@ -77,13 +68,14 @@ where
         })
     }
 
-    pub async fn send_request(&self, request: RequestType) -> Result<ResponseType, Error> {
+    pub async fn send_request(&self, request: MessageToServer) -> Result<MessageToClient, Error> {
         let (response_tx, response_rx) = oneshot::channel();
-        let id = Uuid::new_v4();
-        let wrapper = WrappedClientMessageType::Request(IDedMessage {
-            id,
+        let id = random_token();
+
+        let wrapper = WrappedMessage {
+            id: Some(id.clone()),
             message: request,
-        });
+        };
 
         self.response_map.insert(id, response_tx);
 
@@ -99,8 +91,8 @@ where
         Ok(response)
     }
 
-    pub async fn send_message(&self, message: ClientMessageType) -> Result<(), Error> {
-        let wrapper = WrappedClientMessageType::ClientMessage(message);
+    pub async fn send_message(&self, message: MessageToServer) -> Result<(), Error> {
+        let wrapper = WrappedMessage { id: None, message };
 
         // Wait until there is at least one subscriber
         let mut backoff = get_quick_backoff();
@@ -113,24 +105,20 @@ where
         Ok(())
     }
 
-    pub fn subscribe_events(&self) -> broadcast::Receiver<ServerMessageType> {
+    pub fn subscribe_events(&self) -> broadcast::Receiver<MessageToClient> {
         self.event_tx.subscribe()
     }
 }
 
-async fn handle_connection<ClientMessageType, ServerMessageType, RequestType, ResponseType>(
+async fn handle_connection<MessageToServer, MessageToClient>(
     stream: UnixStream,
-    mut rx: broadcast::Receiver<WrappedClientMessageType<RequestType, ClientMessageType>>,
-    response_map: Arc<DashMap<Uuid, oneshot::Sender<ResponseType>>>,
-    event_tx: broadcast::Sender<ServerMessageType>,
+    mut rx: broadcast::Receiver<WrappedMessage<MessageToServer>>,
+    response_map: Arc<DashMap<String, oneshot::Sender<MessageToClient>>>,
+    event_tx: broadcast::Sender<MessageToClient>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
-    ClientMessageType:
-        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    ServerMessageType:
-        Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    RequestType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    ResponseType: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
+    MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
     let (read_half, write_half) = tokio::io::split(stream);
     let reader = BufReader::new(read_half);
@@ -147,28 +135,30 @@ where
             loop {
                 match lines.next_line().await {
                     Ok(Some(line)) => {
-                        let msg: WrappedServerMessageType<ResponseType, ServerMessageType> =
-                            match serde_json::from_str(&line) {
-                                Ok(msg) => msg,
-                                Err(e) => {
-                                    tracing::error!("Error deserializing message: {}", e);
-                                    continue;
-                                }
-                            };
-                        match msg {
-                            WrappedServerMessageType::ServerMessage(event) => {
-                                if let Err(e) = event_tx.send(event) {
-                                    tracing::error!("Error sending event: {}", e);
-                                }
+                        let msg: WrappedMessage<MessageToClient> = match serde_json::from_str(&line)
+                        {
+                            Ok(msg) => msg,
+                            Err(e) => {
+                                tracing::error!("Error deserializing message: {}", e);
+                                continue;
                             }
-                            WrappedServerMessageType::Response(response) => {
-                                let id = response.id;
-                                if let Some(tx) = response_map.remove(&id).map(|(_, tx)| tx) {
-                                    if tx.send(response.message).is_err() {
-                                        tracing::error!("Error sending response");
+                        };
+                        match msg {
+                            WrappedMessage {
+                                id: Some(id),
+                                message,
+                            } => {
+                                if let Some((_, tx)) = response_map.remove(&id) {
+                                    if let Err(e) = tx.send(message) {
+                                        tracing::error!("Error sending response: {:?}", e);
                                     }
                                 } else {
                                     tracing::error!("No sender found for response ID: {:?}", id);
+                                }
+                            }
+                            WrappedMessage { id: None, message } => {
+                                if let Err(e) = event_tx.send(message) {
+                                    tracing::error!("Error sending event: {}", e);
                                 }
                             }
                         }
