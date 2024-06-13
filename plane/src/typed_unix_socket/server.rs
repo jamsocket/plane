@@ -81,7 +81,11 @@ where
         self.request_tx.subscribe()
     }
 
-    pub async fn send_response(&self, id: String, response: MessageToClient) -> Result<(), Error> {
+    pub async fn send_response(
+        &self,
+        request: &WrappedMessage<MessageToServer>,
+        response: MessageToClient,
+    ) -> Result<(), Error> {
         // Wait until there is at least one subscriber
         let mut backoff = get_quick_backoff();
         while self.response_tx.receiver_count() == 0 {
@@ -90,7 +94,7 @@ where
         }
 
         let response = WrappedMessage {
-            id: Some(id),
+            id: request.id.clone(),
             message: response,
         };
 
@@ -99,10 +103,7 @@ where
     }
 
     pub async fn send_message(&self, message: MessageToClient) -> Result<(), Error> {
-        let message_msg = WrappedMessage {
-            id: None,
-            message: message,
-        };
+        let message_msg = WrappedMessage { id: None, message };
 
         // Wait until there is at least one subscriber
         let mut backoff = get_quick_backoff();
