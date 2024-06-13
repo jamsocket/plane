@@ -203,7 +203,7 @@ where
         }
     });
 
-    let _ = tokio::try_join!(recv_task, send_task);
+    tokio::join!(recv_task, send_task);
 
     Ok(())
 }
