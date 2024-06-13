@@ -22,7 +22,8 @@ where
     event_tx: broadcast::Sender<MessageToServer>,
     request_tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     response_tx: broadcast::Sender<WrappedMessage<MessageToClient>>,
-    shutdown_tx: watch::Sender<()>,
+    shutdown_server_tx: watch::Sender<()>,
+    shutdown_handler_tx: watch::Sender<()>,
 }
 
 impl<MessageToServer, MessageToClient> TypedUnixSocketServer<MessageToServer, MessageToClient>
@@ -39,32 +40,42 @@ where
         let (event_tx, _) = broadcast::channel(100);
         let (request_tx, _) = broadcast::channel(100);
         let (response_tx, _) = broadcast::channel(100);
-        let (shutdown_tx, _) = watch::channel(());
+        let (shutdown_server_tx, _) = watch::channel(());
+        let (shutdown_handler_tx, _) = watch::channel(());
 
         tokio::spawn({
             let event_tx = event_tx.clone();
             let request_tx = request_tx.clone();
             let response_tx = response_tx.clone();
-            let shutdown_tx = shutdown_tx.clone();
+            let shutdown_handler_tx = shutdown_handler_tx.clone();
+            let mut shutdown_server_rx = shutdown_server_tx.subscribe();
             async move {
                 let mut backoff = get_quick_backoff();
                 loop {
-                    match listener.accept().await {
-                        Ok((stream, _)) => {
-                            // Signal the previous connection to shut down
-                            let _ = shutdown_tx.send(());
-
-                            tokio::spawn(handle_connection(
-                                stream,
-                                event_tx.clone(),
-                                request_tx.clone(),
-                                response_tx.subscribe(),
-                                shutdown_tx.subscribe(),
-                            ));
+                    tokio::select! {
+                        _ = shutdown_server_rx.changed() => {
+                            tracing::info!("Shutting down server loop");
+                            break;
                         }
-                        Err(e) => {
-                            tracing::error!("Error accepting connection: {}", e);
-                            backoff.wait().await;
+                        result = listener.accept() => {
+                            match result {
+                                Ok((stream, _)) => {
+                                    // Signal the previous connection to shut down
+                                    let _ = shutdown_handler_tx.send(());
+
+                                    tokio::spawn(handle_connection(
+                                        stream,
+                                        event_tx.clone(),
+                                        request_tx.clone(),
+                                        response_tx.subscribe(),
+                                        shutdown_handler_tx.subscribe(),
+                                    ));
+                                }
+                                Err(e) => {
+                                    tracing::error!("Error accepting connection: {}", e);
+                                    backoff.wait().await;
+                                }
+                            }
                         }
                     }
                 }
@@ -76,7 +87,8 @@ where
             event_tx,
             request_tx,
             response_tx,
-            shutdown_tx,
+            shutdown_server_tx,
+            shutdown_handler_tx,
         })
     }
 
@@ -131,6 +143,12 @@ where
     MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
     fn drop(&mut self) {
+        // Signal the server loop to shut down
+        let _ = self.shutdown_server_tx.send(());
+
+        // Signal the handler to shut down
+        let _ = self.shutdown_handler_tx.send(());
+
         if let Err(e) = fs::remove_file(&self.socket_path) {
             tracing::warn!("Failed to remove socket file: {}", e);
         }
@@ -142,7 +160,7 @@ async fn handle_connection<MessageToServer, MessageToClient>(
     event_tx: broadcast::Sender<MessageToServer>,
     request_tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     mut response_rx: broadcast::Receiver<WrappedMessage<MessageToClient>>,
-    shutdown_rx: watch::Receiver<()>,
+    shutdown_handler_rx: watch::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
@@ -155,8 +173,8 @@ where
     let mut lines = reader.lines();
     let mut writer = writer;
 
-    let mut shutdown_rx_recv = shutdown_rx.clone();
-    let mut shutdown_rx_send = shutdown_rx;
+    let mut shutdown_handler_rx_recv = shutdown_handler_rx.clone();
+    let mut shutdown_handler_rx_send = shutdown_handler_rx;
 
     // Task to handle receiving messages
     let recv_task = tokio::spawn({
@@ -164,7 +182,7 @@ where
         async move {
             loop {
                 tokio::select! {
-                    _ = shutdown_rx_recv.changed() => {
+                    _ = shutdown_handler_rx_recv.changed() => {
                         tracing::info!("Shutting down receive task");
                         break;
                     }
@@ -208,7 +226,7 @@ where
     let send_task = tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = shutdown_rx_send.changed() => {
+                _ = shutdown_handler_rx_send.changed() => {
                     tracing::info!("Shutting down send task");
                     break;
                 }
