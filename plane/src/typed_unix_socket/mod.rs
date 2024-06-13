@@ -31,6 +31,7 @@ mod tests {
     use std::collections::HashSet;
     use std::env;
     use std::path::PathBuf;
+    use std::sync::Arc;
     use tokio::spawn;
 
     fn create_temp_socket_path() -> PathBuf {
@@ -204,6 +205,7 @@ mod tests {
         let mut event_rx = client.subscribe_events();
 
         let mut handles = vec![];
+        let server = Arc::new(server);
         for i in 0..10 {
             let server = server.clone();
             handles.push(spawn(async move {
