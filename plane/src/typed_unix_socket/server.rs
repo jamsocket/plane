@@ -50,7 +50,6 @@ where
             let shutdown_handler_tx = shutdown_handler_tx.clone();
             let mut shutdown_server_rx = shutdown_server_tx.subscribe();
             async move {
-                let mut backoff = get_quick_backoff();
                 loop {
                     tokio::select! {
                         _ = shutdown_server_rx.changed() => {
@@ -73,7 +72,6 @@ where
                                 }
                                 Err(e) => {
                                     tracing::error!("Error accepting connection: {}", e);
-                                    backoff.wait().await;
                                 }
                             }
                         }
