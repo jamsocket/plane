@@ -1,7 +1,6 @@
+use crate::util::ExponentialBackoff;
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
-
-use crate::util::ExponentialBackoff;
 
 pub mod client;
 pub mod server;
