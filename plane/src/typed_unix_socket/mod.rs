@@ -65,10 +65,7 @@ mod tests {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();
-                server
-                    .send_response(request.id.unwrap(), response)
-                    .await
-                    .unwrap();
+                server.send_response(&request, response).await.unwrap();
             }
         });
 
@@ -140,10 +137,7 @@ mod tests {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = format!("Response to {}", request.message);
-                server
-                    .send_response(request.id.unwrap(), response)
-                    .await
-                    .unwrap();
+                server.send_response(&request, response).await.unwrap();
             }
         });
 
@@ -250,7 +244,7 @@ mod tests {
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();
                 server_clone
-                    .send_response(request.id.unwrap(), response)
+                    .send_response(&request, response)
                     .await
                     .unwrap();
             }
@@ -291,7 +285,7 @@ mod tests {
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();
                 server_clone
-                    .send_response(request.id.unwrap(), response)
+                    .send_response(&request, response)
                     .await
                     .unwrap();
             }
