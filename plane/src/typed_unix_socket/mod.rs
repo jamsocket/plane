@@ -142,6 +142,7 @@ mod tests {
         });
 
         let mut handles = vec![];
+        let client = Arc::new(client);
         for i in 0..10 {
             let client = client.clone();
             handles.push(spawn(async move {
@@ -169,6 +170,7 @@ mod tests {
         let mut event_rx = server.subscribe_events();
 
         let mut handles = vec![];
+        let client = Arc::new(client);
         for i in 0..10 {
             let client = client.clone();
             handles.push(spawn(async move {
@@ -228,7 +230,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_client_reconnect() {
+    async fn test_client_restart() {
         let socket_path = create_temp_socket_path();
 
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
@@ -239,15 +241,12 @@ mod tests {
             .unwrap();
 
         // Spawn a task to handle server requests
-        let server_clone = server.clone();
+        let server = server.clone();
         spawn(async move {
-            let mut request_rx = server_clone.subscribe_requests();
+            let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();
-                server_clone
-                    .send_response(&request, response)
-                    .await
-                    .unwrap();
+                server.send_response(&request, response).await.unwrap();
             }
         });
 
@@ -263,7 +262,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_server_reconnect() {
+    async fn test_server_restart() {
         let socket_path = create_temp_socket_path();
 
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
@@ -280,15 +279,12 @@ mod tests {
             .unwrap();
 
         // Spawn a task to handle server requests
-        let server_clone = server.clone();
+        let server = server.clone();
         spawn(async move {
-            let mut request_rx = server_clone.subscribe_requests();
+            let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();
-                server_clone
-                    .send_response(&request, response)
-                    .await
-                    .unwrap();
+                server.send_response(&request, response).await.unwrap();
             }
         });
 
