@@ -202,7 +202,7 @@ impl Runtime for DockerRuntime {
         })
     }
 
-    async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<(), anyhow::Error> {
+    async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<bool, anyhow::Error> {
         let container_id = backend_id_to_container_id(backend_id);
 
         let result = if hard {
@@ -220,20 +220,20 @@ impl Runtime for DockerRuntime {
                 .await
         };
 
-        if let Err(bollard::errors::Error::DockerResponseServerError {
-            status_code: 404, ..
-        }) = result
-        {
-            tracing::warn!(
-                %container_id,
-                %backend_id,
-                "Container not found, assuming it was already terminated."
-            );
-        } else {
-            return result.map_err(|e| e.into());
+        match result {
+            Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 404, ..
+            }) => {
+                tracing::warn!(
+                    %container_id,
+                    %backend_id,
+                    "Container not found, assuming it was already terminated."
+                );
+                Ok(false)
+            }
+            Err(e) => Err(e.into()),
+            Ok(_) => Ok(true),
         }
-
-        Ok(())
     }
 
     fn events(&self) -> impl Stream<Item = TerminateEvent> {

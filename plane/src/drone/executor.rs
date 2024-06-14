@@ -107,7 +107,7 @@ impl<R: Runtime> Executor<R> {
                 let mut success = false;
                 for attempt in 1..=10 {
                     match runtime.terminate(&backend_id, true).await {
-                        Ok(()) => {
+                        Ok(_) => {
                             success = true;
                             break;
                         }
@@ -211,6 +211,9 @@ impl<R: Runtime> Executor<R> {
                     // else we can deadlock.
                     let Some(manager) = self.backends.get(backend_id) else {
                         tracing::warn!(backend_id = backend_id.as_value(), "Backend not found when handling terminate action (assumed terminated).");
+
+                        // Terminate will only return an error on a docker error, not if the backend is already terminated.
+                        self.runtime.terminate(backend_id, true).await?;
 
                         self.state_store
                             .lock()
