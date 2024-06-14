@@ -9,9 +9,10 @@ use tokio::io::{AsyncBufReadExt, BufReader, BufWriter};
 use tokio::time::error::Elapsed;
 use tokio::{
     net::UnixStream,
-    sync::{broadcast, oneshot, watch},
+    sync::{broadcast, oneshot},
     time::{timeout, Duration},
 };
+use tokio_util::sync::CancellationToken;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -24,7 +25,7 @@ where
     tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     response_map: Arc<DashMap<String, oneshot::Sender<MessageToClient>>>,
     event_tx: broadcast::Sender<MessageToClient>,
-    shutdown_tx: watch::Sender<()>,
+    shutdown_token: CancellationToken,
 }
 
 impl<MessageToServer, MessageToClient> TypedUnixSocketClient<MessageToServer, MessageToClient>
@@ -36,7 +37,7 @@ where
         let (tx, _) = broadcast::channel(100);
         let response_map = Arc::new(DashMap::new());
         let (event_tx, _) = broadcast::channel(100);
-        let (shutdown_tx, shutdown_rx) = watch::channel(());
+        let shutdown_token = CancellationToken::new();
 
         tokio::spawn({
             let socket_path = socket_path.as_ref().to_path_buf();
@@ -44,7 +45,7 @@ where
             let rx = tx.subscribe(); // ensure we subscribe synchronously to avoid issues sending messages
             let response_map = Arc::clone(&response_map);
             let event_tx = event_tx.clone();
-            let mut shutdown_rx = shutdown_rx.clone();
+            let shutdown_token = shutdown_token.clone();
             async move {
                 let mut rx = rx; // we're doing this so that we can re-subscribe at the end of the loop for successive iterations
                 loop {
@@ -54,7 +55,7 @@ where
                         rx,
                         Arc::clone(&response_map),
                         event_tx.clone(),
-                        shutdown_rx.clone(),
+                        shutdown_token.clone(),
                     )
                     .await
                     .is_ok()
@@ -73,7 +74,7 @@ where
             tx,
             response_map,
             event_tx,
-            shutdown_tx,
+            shutdown_token,
         })
     }
 
@@ -105,7 +106,7 @@ where
     }
 
     pub fn shutdown(&self) {
-        let _ = self.shutdown_tx.send(());
+        self.shutdown_token.cancel();
     }
 }
 
@@ -128,7 +129,7 @@ async fn handle_connection<MessageToServer, MessageToClient>(
     mut rx: broadcast::Receiver<WrappedMessage<MessageToServer>>,
     response_map: Arc<DashMap<String, oneshot::Sender<MessageToClient>>>,
     event_tx: broadcast::Sender<MessageToClient>,
-    shutdown_rx: watch::Receiver<()>,
+    shutdown_token: CancellationToken,
 ) -> Result<(), anyhow::Error>
 where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
@@ -145,11 +146,11 @@ where
     let recv_task = {
         let event_tx = event_tx.clone();
         let response_map = Arc::clone(&response_map);
-        let mut shutdown_rx = shutdown_rx.clone();
+        let shutdown_token = shutdown_token.clone();
         async move {
             loop {
                 tokio::select! {
-                    _ = shutdown_rx.changed() => {
+                    _ = shutdown_token.cancelled() => {
                         tracing::info!("Shutting down receive task");
                         break;
                     }
@@ -202,11 +203,11 @@ where
 
     // Task to handle sending messages
     let send_task = {
-        let mut shutdown_rx = shutdown_rx.clone();
+        let shutdown_token = shutdown_token.clone();
         async move {
             loop {
                 tokio::select! {
-                    _ = shutdown_rx.changed() => {
+                    _ = shutdown_token.cancelled() => {
                         tracing::info!("Shutting down send task");
                         break;
                     }
