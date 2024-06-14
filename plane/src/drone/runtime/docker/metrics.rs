@@ -35,6 +35,28 @@ pub async fn metrics_loop(
             Ok(stats) => stats,
         };
 
+        if stats.memory_stats.stats.is_none() {
+            // If the stats come back empty, it could be because the container is not running, in which case
+            // we can close the metrics loop and stop the container.
+            let container_info = match docker.inspect_container(container_id.as_str(), None).await {
+                Err(err) => {
+                    tracing::error!(?err, "Error getting container info for {container_id}");
+                    break;
+                }
+                Ok(container_info) => container_info,
+            };
+
+            let running = container_info
+                .state
+                .as_ref()
+                .and_then(|state| state.running)
+                .unwrap_or(false);
+            if !running {
+                tracing::info!("Container {container_id} is not running, stopping metrics.");
+                break;
+            }
+        }
+
         let callback = callback.lock().expect("Metrics callback lock poisoned");
         if let Some(callback) = callback.as_ref() {
             match metrics_message_from_container_stats(stats, backend_id.clone()) {
