@@ -36,6 +36,8 @@ pub async fn metrics_loop(
         };
 
         if stats.memory_stats.stats.is_none() {
+            // If the stats come back empty, it could be because the container is not running, in which case
+            // we can close the metrics loop and stop the container.
             let container_info = match docker.inspect_container(container_id.as_str(), None).await {
                 Err(err) => {
                     tracing::error!(?err, "Error getting container info for {container_id}");
