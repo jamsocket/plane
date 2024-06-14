@@ -272,7 +272,7 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         println!("dropping server");
         // Simulate server restart
@@ -281,7 +281,7 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         // Spawn a task to handle server requests
         let server = server.clone();
