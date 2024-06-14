@@ -50,7 +50,6 @@ where
             async move {
                 let mut response_rx = response_rx; // we're doing this so that we can re-subscribe at the end of the loop for successive iterations
                 loop {
-                    println!("accepting connection");
                     match listener.accept().await {
                         Ok((stream, _)) => {
                             if handle_connection(
@@ -74,7 +73,6 @@ where
                     }
                     response_rx = response_tx.subscribe();
                 }
-                println!("server terminated");
             }
         });
 
@@ -113,15 +111,8 @@ where
         self.response_tx.send(message_msg)?;
         Ok(())
     }
-}
 
-impl<MessageToServer, MessageToClient> Drop
-    for TypedUnixSocketServer<MessageToServer, MessageToClient>
-where
-    MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-{
-    fn drop(&mut self) {
+    pub fn shutdown(&self) {
         // Signal the handler to shut down
         let _ = self.shutdown_handler_tx.send(());
 
@@ -187,7 +178,6 @@ where
                             }
                             Ok(None) => {
                                 tracing::info!("Connection closed by client");
-                                println!("Connection closed by client");
                                 return Err(anyhow::anyhow!("Connection closed by server"));
                             }
                             Err(e) => {
