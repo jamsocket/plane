@@ -22,7 +22,6 @@ where
     event_tx: broadcast::Sender<MessageToServer>,
     request_tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     response_tx: broadcast::Sender<WrappedMessage<MessageToClient>>,
-    shutdown_server_tx: watch::Sender<()>,
     shutdown_handler_tx: watch::Sender<()>,
 }
 
@@ -40,7 +39,6 @@ where
         let (event_tx, _) = broadcast::channel(100);
         let (request_tx, _) = broadcast::channel(100);
         let (response_tx, _) = broadcast::channel(100);
-        let (shutdown_server_tx, _) = watch::channel(());
         let (shutdown_handler_tx, _) = watch::channel(());
 
         tokio::spawn({
@@ -49,7 +47,6 @@ where
             let response_tx = response_tx.clone();
             let response_rx = response_tx.subscribe(); // ensure we subscribe synchronously to avoid issues sending messages
             let shutdown_handler_tx = shutdown_handler_tx.clone();
-            let mut shutdown_server_rx = shutdown_server_tx.subscribe();
             async move {
                 let mut response_rx = response_rx; // we're doing this so that we can re-subscribe at the end of the loop for successive iterations
                 loop {
@@ -86,7 +83,6 @@ where
             event_tx,
             request_tx,
             response_tx,
-            shutdown_server_tx,
             shutdown_handler_tx,
         })
     }
@@ -126,9 +122,6 @@ where
     MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
     fn drop(&mut self) {
-        // Signal the server loop to shut down
-        // let _ = self.shutdown_server_tx.send(());
-
         // Signal the handler to shut down
         let _ = self.shutdown_handler_tx.send(());
 
