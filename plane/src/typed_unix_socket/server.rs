@@ -9,8 +9,9 @@ use std::{
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     net::{UnixListener, UnixStream},
-    sync::{broadcast, watch},
+    sync::broadcast,
 };
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct TypedUnixSocketServer<MessageToServer, MessageToClient>
@@ -22,7 +23,7 @@ where
     event_tx: broadcast::Sender<MessageToServer>,
     request_tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     response_tx: broadcast::Sender<WrappedMessage<MessageToClient>>,
-    shutdown_tx: watch::Sender<()>,
+    shutdown_token: CancellationToken,
 }
 
 impl<MessageToServer, MessageToClient> TypedUnixSocketServer<MessageToServer, MessageToClient>
@@ -39,14 +40,14 @@ where
         let (event_tx, _) = broadcast::channel(100);
         let (request_tx, _) = broadcast::channel(100);
         let (response_tx, _) = broadcast::channel(100);
-        let (shutdown_tx, _) = watch::channel(());
+        let shutdown_token = CancellationToken::new();
 
         tokio::spawn({
             let event_tx = event_tx.clone();
             let request_tx = request_tx.clone();
             let response_tx = response_tx.clone();
             let response_rx = response_tx.subscribe(); // ensure we subscribe synchronously to avoid issues sending messages
-            let shutdown_tx = shutdown_tx.clone();
+            let shutdown_token = shutdown_token.clone();
             async move {
                 let mut response_rx = response_rx; // we're doing this so that we can re-subscribe at the end of the loop for successive iterations
                 loop {
@@ -57,7 +58,7 @@ where
                                 event_tx.clone(),
                                 request_tx.clone(),
                                 response_rx,
-                                shutdown_tx.subscribe(),
+                                shutdown_token.clone(),
                             )
                             .await
                             .is_ok()
@@ -81,7 +82,7 @@ where
             event_tx,
             request_tx,
             response_tx,
-            shutdown_tx,
+            shutdown_token,
         })
     }
 
@@ -114,7 +115,7 @@ where
 
     pub fn shutdown(&self) {
         // Signal the handler to shut down
-        let _ = self.shutdown_tx.send(());
+        self.shutdown_token.cancel();
 
         if let Err(e) = fs::remove_file(&self.socket_path) {
             tracing::warn!("Failed to remove socket file: {}", e);
@@ -127,7 +128,7 @@ async fn handle_connection<MessageToServer, MessageToClient>(
     event_tx: broadcast::Sender<MessageToServer>,
     request_tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     mut response_rx: broadcast::Receiver<WrappedMessage<MessageToClient>>,
-    shutdown_rx: watch::Receiver<()>,
+    shutdown_token: CancellationToken,
 ) -> Result<(), anyhow::Error>
 where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
@@ -140,16 +141,14 @@ where
     let mut lines = reader.lines();
     let mut writer = writer;
 
-    let mut shutdown_rx_recv = shutdown_rx.clone();
-    let mut shutdown_rx_send = shutdown_rx;
-
     // Task to handle receiving messages
     let recv_task = {
         let event_tx = event_tx.clone();
+        let shutdown_token = shutdown_token.clone();
         async move {
             loop {
                 tokio::select! {
-                    _ = shutdown_rx_recv.changed() => {
+                    _ = shutdown_token.cancelled() => {
                         tracing::info!("Shutting down receive task");
                         break;
                     }
@@ -193,41 +192,44 @@ where
     };
 
     // Task to handle sending responses
-    let send_task = async move {
-        loop {
-            tokio::select! {
-                _ = shutdown_rx_send.changed() => {
-                    tracing::info!("Shutting down send task");
-                    break;
-                }
-                result = response_rx.recv() => {
-                    match result {
-                        Ok(response) => {
-                            let response_str = match serde_json::to_string(&response) {
-                                Ok(response_str) => response_str,
-                                Err(e) => {
-                                    tracing::error!("Error serializing response: {}", e);
-                                    continue;
+    let send_task = {
+        let shutdown_token = shutdown_token.clone();
+        async move {
+            loop {
+                tokio::select! {
+                    _ = shutdown_token.cancelled() => {
+                        tracing::info!("Shutting down send task");
+                        break;
+                    }
+                    result = response_rx.recv() => {
+                        match result {
+                            Ok(response) => {
+                                let response_str = match serde_json::to_string(&response) {
+                                    Ok(response_str) => response_str,
+                                    Err(e) => {
+                                        tracing::error!("Error serializing response: {}", e);
+                                        continue;
+                                    }
+                                };
+                                if let Err(e) = writer.write_all(response_str.as_bytes()).await {
+                                    tracing::error!("Error writing response: {}", e);
                                 }
-                            };
-                            if let Err(e) = writer.write_all(response_str.as_bytes()).await {
-                                tracing::error!("Error writing response: {}", e);
+                                if let Err(e) = writer.write_all(b"\n").await {
+                                    tracing::error!("Error writing newline: {}", e);
+                                }
+                                if let Err(e) = writer.flush().await {
+                                    tracing::error!("Error flushing writer: {}", e);
+                                }
                             }
-                            if let Err(e) = writer.write_all(b"\n").await {
-                                tracing::error!("Error writing newline: {}", e);
+                            Err(e) => {
+                                tracing::error!("Error receiving response: {}", e);
                             }
-                            if let Err(e) = writer.flush().await {
-                                tracing::error!("Error flushing writer: {}", e);
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Error receiving response: {}", e);
                         }
                     }
                 }
             }
+            Ok(())
         }
-        Ok(())
     };
 
     tokio::try_join!(recv_task, send_task)?;

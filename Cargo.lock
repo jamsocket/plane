@@ -1685,6 +1685,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-stream",
  "tokio-tungstenite",
+ "tokio-util",
  "tower-http",
  "tracing",
  "tracing-subscriber",
