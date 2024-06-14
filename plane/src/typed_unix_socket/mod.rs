@@ -250,11 +250,15 @@ mod tests {
             }
         });
 
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
         // Simulate client restart
         drop(client);
         let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
             .await
             .unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         let request = "Hello, server!".to_string();
         let response = client.send_request(request).await.unwrap();
