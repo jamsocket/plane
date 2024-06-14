@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::{clone::Clone, fmt::Debug, path::Path, sync::Arc};
 use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncBufReadExt, BufReader, BufWriter};
+use tokio::time::error::Elapsed;
 use tokio::{
     net::UnixStream,
     sync::{broadcast, oneshot, watch},
@@ -31,7 +32,7 @@ where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
     MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
-    pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Error> {
+    pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Elapsed> {
         let (tx, _) = broadcast::channel(100);
         let response_map = Arc::new(DashMap::new());
         let (event_tx, _) = broadcast::channel(100);
@@ -41,42 +42,32 @@ where
         tokio::spawn({
             let socket_path = socket_path.as_ref().to_path_buf();
             let tx = tx.clone();
-            let rx = tx.subscribe(); // ensure we subscribe syncronously to avoid issues sending messages
+            let rx = tx.subscribe(); // ensure we subscribe synchronously to avoid issues sending messages
             let response_map = Arc::clone(&response_map);
             let event_tx = event_tx.clone();
             let mut shutdown_rx = shutdown_rx.clone();
             async move {
-                let mut backoff = get_quick_backoff();
                 let mut rx = rx; // we're doing this so that we can re-subscribe at the end of the loop for successive iterations
                 loop {
                     println!("Connecting!");
-                    match UnixStream::connect(&socket_path).await {
-                        Ok(stream) => {
-                            let res = handle_connection(
-                                stream,
-                                rx,
-                                Arc::clone(&response_map),
-                                event_tx.clone(),
-                                shutdown_rx.clone(),
-                            )
-                            .await;
-                            match res {
-                                Ok(_) => {
-                                    tracing::info!("Shutdown client");
-                                    break;
-                                }
-                                Err(e) => {
-                                    tracing::error!("Error handling connection: {}", e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Error connecting to server: {}", e);
-                            backoff.wait().await;
-                        }
+                    let stream = timeout(CONNECT_TIMEOUT, connect(&socket_path)).await?;
+                    if handle_connection(
+                        stream,
+                        rx,
+                        Arc::clone(&response_map),
+                        event_tx.clone(),
+                        shutdown_rx.clone(),
+                    )
+                    .await
+                    .is_ok()
+                    {
+                        tracing::info!("Shutdown client");
+                        break;
                     }
+                    tracing::error!("Error handling connection");
                     rx = tx.subscribe();
                 }
+                Ok::<(), Elapsed>(())
             }
         });
 
@@ -126,6 +117,20 @@ where
 {
     fn drop(&mut self) {
         let _ = self.shutdown_tx.send(());
+    }
+}
+
+async fn connect<P: AsRef<Path>>(socket_path: P) -> UnixStream {
+    let socket_path = socket_path.as_ref().to_path_buf();
+    let mut backoff = get_quick_backoff();
+    loop {
+        match UnixStream::connect(&socket_path).await {
+            Ok(stream) => return stream,
+            Err(e) => {
+                tracing::error!("Error connecting to server: {}", e);
+                backoff.wait().await;
+            }
+        }
     }
 }
 
