@@ -22,7 +22,7 @@ where
     event_tx: broadcast::Sender<MessageToServer>,
     request_tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     response_tx: broadcast::Sender<WrappedMessage<MessageToClient>>,
-    shutdown_handler_tx: watch::Sender<()>,
+    shutdown_tx: watch::Sender<()>,
 }
 
 impl<MessageToServer, MessageToClient> TypedUnixSocketServer<MessageToServer, MessageToClient>
@@ -39,14 +39,14 @@ where
         let (event_tx, _) = broadcast::channel(100);
         let (request_tx, _) = broadcast::channel(100);
         let (response_tx, _) = broadcast::channel(100);
-        let (shutdown_handler_tx, _) = watch::channel(());
+        let (shutdown_tx, _) = watch::channel(());
 
         tokio::spawn({
             let event_tx = event_tx.clone();
             let request_tx = request_tx.clone();
             let response_tx = response_tx.clone();
             let response_rx = response_tx.subscribe(); // ensure we subscribe synchronously to avoid issues sending messages
-            let shutdown_handler_tx = shutdown_handler_tx.clone();
+            let shutdown_tx = shutdown_tx.clone();
             async move {
                 let mut response_rx = response_rx; // we're doing this so that we can re-subscribe at the end of the loop for successive iterations
                 loop {
@@ -57,7 +57,7 @@ where
                                 event_tx.clone(),
                                 request_tx.clone(),
                                 response_rx,
-                                shutdown_handler_tx.subscribe(),
+                                shutdown_tx.subscribe(),
                             )
                             .await
                             .is_ok()
@@ -81,7 +81,7 @@ where
             event_tx,
             request_tx,
             response_tx,
-            shutdown_handler_tx,
+            shutdown_tx,
         })
     }
 
@@ -114,7 +114,7 @@ where
 
     pub fn shutdown(&self) {
         // Signal the handler to shut down
-        let _ = self.shutdown_handler_tx.send(());
+        let _ = self.shutdown_tx.send(());
 
         if let Err(e) = fs::remove_file(&self.socket_path) {
             tracing::warn!("Failed to remove socket file: {}", e);
@@ -127,7 +127,7 @@ async fn handle_connection<MessageToServer, MessageToClient>(
     event_tx: broadcast::Sender<MessageToServer>,
     request_tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     mut response_rx: broadcast::Receiver<WrappedMessage<MessageToClient>>,
-    shutdown_handler_rx: watch::Receiver<()>,
+    shutdown_rx: watch::Receiver<()>,
 ) -> Result<(), anyhow::Error>
 where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
@@ -140,8 +140,8 @@ where
     let mut lines = reader.lines();
     let mut writer = writer;
 
-    let mut shutdown_handler_rx_recv = shutdown_handler_rx.clone();
-    let mut shutdown_handler_rx_send = shutdown_handler_rx;
+    let mut shutdown_rx_recv = shutdown_rx.clone();
+    let mut shutdown_rx_send = shutdown_rx;
 
     // Task to handle receiving messages
     let recv_task = {
@@ -149,7 +149,7 @@ where
         async move {
             loop {
                 tokio::select! {
-                    _ = shutdown_handler_rx_recv.changed() => {
+                    _ = shutdown_rx_recv.changed() => {
                         tracing::info!("Shutting down receive task");
                         break;
                     }
@@ -196,7 +196,7 @@ where
     let send_task = async move {
         loop {
             tokio::select! {
-                _ = shutdown_handler_rx_send.changed() => {
+                _ = shutdown_rx_send.changed() => {
                     tracing::info!("Shutting down send task");
                     break;
                 }
