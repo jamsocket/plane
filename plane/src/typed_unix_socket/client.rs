@@ -28,7 +28,7 @@ where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
     MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
-    pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Error> {
+    pub async fn new<P: AsRef<Path>>(socket_path: P) -> Self {
         let (tx, _) = broadcast::channel(100);
         let response_map = Arc::new(DashMap::new());
         let (event_tx, _) = broadcast::channel(100);
@@ -66,12 +66,13 @@ where
                 }
             }
         });
-        Ok(Self {
+
+        Self {
             tx,
             response_map,
             event_tx,
             shutdown_tx,
-        })
+        }
     }
 
     pub async fn send_request(&self, request: MessageToServer) -> Result<MessageToClient, Error> {

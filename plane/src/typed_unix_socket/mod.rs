@@ -56,9 +56,7 @@ mod tests {
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
-            .await
-            .unwrap();
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path).await;
 
         // Spawn a task to handle server requests
         spawn(async move {
@@ -82,9 +80,8 @@ mod tests {
         let server = TypedUnixSocketServer::<String, String>::new(socket_path.to_str().unwrap())
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String>::new(socket_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let client =
+            TypedUnixSocketClient::<String, String>::new(socket_path.to_str().unwrap()).await;
 
         // Subscribe to server events
         let mut event_rx = server.subscribe_events();
@@ -105,9 +102,8 @@ mod tests {
         let server = TypedUnixSocketServer::<String, String>::new(socket_path.to_str().unwrap())
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String>::new(socket_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let client =
+            TypedUnixSocketClient::<String, String>::new(socket_path.to_str().unwrap()).await;
 
         // Subscribe to client events
         let mut event_rx = client.subscribe_events();
@@ -128,9 +124,7 @@ mod tests {
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
-            .await
-            .unwrap();
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path).await;
 
         // Spawn a task to handle server requests
         spawn(async move {
@@ -162,9 +156,7 @@ mod tests {
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
-            .await
-            .unwrap();
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path).await;
 
         // Subscribe to server events
         let mut event_rx = server.subscribe_events();
@@ -199,9 +191,7 @@ mod tests {
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
-            .await
-            .unwrap();
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path).await;
 
         // Subscribe to client events
         let mut event_rx = client.subscribe_events();
@@ -236,9 +226,7 @@ mod tests {
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
-            .await
-            .unwrap();
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path).await;
 
         // Spawn a task to handle server requests
         let server = server.clone();
@@ -252,9 +240,7 @@ mod tests {
 
         // Simulate client restart
         drop(client);
-        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
-            .await
-            .unwrap();
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path).await;
 
         let request = "Hello, server!".to_string();
         let response = client.send_request(request).await.unwrap();
@@ -268,9 +254,7 @@ mod tests {
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
-        let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
-            .await
-            .unwrap();
+        let client = TypedUnixSocketClient::<String, String>::new(&socket_path).await;
 
         // Simulate server restart
         drop(server);
