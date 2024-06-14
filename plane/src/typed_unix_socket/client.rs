@@ -9,7 +9,10 @@ use tokio::io::{AsyncBufReadExt, BufReader, BufWriter};
 use tokio::{
     net::UnixStream,
     sync::{broadcast, oneshot, watch},
+    time::{timeout, Duration},
 };
+
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct TypedUnixSocketClient<MessageToServer, MessageToClient>
@@ -33,39 +36,50 @@ where
         let response_map = Arc::new(DashMap::new());
         let (event_tx, _) = broadcast::channel(100);
         let (shutdown_tx, shutdown_rx) = watch::channel(());
+        println!("Creating new client");
 
         tokio::spawn({
             let socket_path = socket_path.as_ref().to_path_buf();
             let tx = tx.clone();
+            let rx = tx.subscribe(); // ensure we subscribe syncronously to avoid issues sending messages
             let response_map = Arc::clone(&response_map);
             let event_tx = event_tx.clone();
             let mut shutdown_rx = shutdown_rx.clone();
             async move {
                 let mut backoff = get_quick_backoff();
+                let mut rx = rx; // we're doing this so that we can re-subscribe at the end of the loop for successive iterations
                 loop {
+                    println!("Connecting!");
                     match UnixStream::connect(&socket_path).await {
                         Ok(stream) => {
-                            handle_connection(
+                            let res = handle_connection(
                                 stream,
-                                tx.subscribe(),
+                                rx,
                                 Arc::clone(&response_map),
                                 event_tx.clone(),
                                 shutdown_rx.clone(),
                             )
-                            .await
-                            .unwrap_or_else(|e| {
-                                tracing::error!("Error handling connection: {}", e);
-                            });
-                            break;
+                            .await;
+                            match res {
+                                Ok(_) => {
+                                    tracing::info!("Shutdown client");
+                                    break;
+                                }
+                                Err(e) => {
+                                    tracing::error!("Error handling connection: {}", e);
+                                }
+                            }
                         }
                         Err(e) => {
                             tracing::error!("Error connecting to server: {}", e);
                             backoff.wait().await;
                         }
                     }
+                    rx = tx.subscribe();
                 }
             }
         });
+
         Ok(Self {
             tx,
             response_map,
@@ -85,27 +99,15 @@ where
 
         self.response_map.insert(id, response_tx);
 
-        // Wait until there is at least one subscriber
-        let mut backoff = get_quick_backoff();
-        while self.tx.receiver_count() == 0 {
-            tracing::info!("Waiting for a subscriber...");
-            backoff.wait().await;
-        }
-
         self.tx.send(wrapper)?;
+        println!("sent request");
         let response = response_rx.await?;
+        println!("received response");
         Ok(response)
     }
 
     pub async fn send_message(&self, message: MessageToServer) -> Result<(), Error> {
         let wrapper = WrappedMessage { id: None, message };
-
-        // Wait until there is at least one subscriber
-        let mut backoff = get_quick_backoff();
-        while self.tx.receiver_count() == 0 {
-            tracing::info!("Waiting for a subscriber...");
-            backoff.wait().await;
-        }
 
         self.tx.send(wrapper)?;
         Ok(())
@@ -133,7 +135,7 @@ async fn handle_connection<MessageToServer, MessageToClient>(
     response_map: Arc<DashMap<String, oneshot::Sender<MessageToClient>>>,
     event_tx: broadcast::Sender<MessageToClient>,
     shutdown_rx: watch::Receiver<()>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+) -> Result<(), anyhow::Error>
 where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
     MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
@@ -146,7 +148,7 @@ where
     let mut writer = writer;
 
     // Task to handle receiving messages
-    let recv_task = tokio::spawn({
+    let recv_task = {
         let event_tx = event_tx.clone();
         let response_map = Arc::clone(&response_map);
         let mut shutdown_rx = shutdown_rx.clone();
@@ -190,19 +192,23 @@ where
                             }
                             Ok(None) => {
                                 tracing::error!("Connection closed by server");
+                                println!("Connection closed by server");
+                                return Err(anyhow::anyhow!("Connection closed by server"));
                             }
                             Err(e) => {
                                 tracing::error!("Error reading line: {}", e);
+                                return Err(anyhow::anyhow!("Error reading line: {}", e));
                             }
                         }
                     }
                 }
             }
+            Ok(())
         }
-    });
+    };
 
     // Task to handle sending messages
-    let send_task = tokio::spawn({
+    let send_task = {
         let mut shutdown_rx = shutdown_rx.clone();
         async move {
             loop {
@@ -238,10 +244,10 @@ where
                     }
                 }
             }
+            Ok(())
         }
-    });
+    };
 
-    tokio::join!(recv_task, send_task);
-
+    tokio::try_join!(recv_task, send_task)?;
     Ok(())
 }

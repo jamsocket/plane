@@ -272,11 +272,16 @@ mod tests {
             .await
             .unwrap();
 
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        println!("dropping server");
         // Simulate server restart
         drop(server);
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Spawn a task to handle server requests
         let server = server.clone();
@@ -288,8 +293,10 @@ mod tests {
             }
         });
 
+        println!("sending request");
         let request = "Hello, server!".to_string();
         let response = client.send_request(request).await.unwrap();
+        println!("received response");
         assert_eq!(response, "Hello, client!");
     }
 }
