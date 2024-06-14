@@ -47,36 +47,37 @@ where
             let event_tx = event_tx.clone();
             let request_tx = request_tx.clone();
             let response_tx = response_tx.clone();
+            let response_rx = response_tx.subscribe(); // ensure we subscribe synchronously to avoid issues sending messages
             let shutdown_handler_tx = shutdown_handler_tx.clone();
             let mut shutdown_server_rx = shutdown_server_tx.subscribe();
             async move {
+                let mut response_rx = response_rx; // we're doing this so that we can re-subscribe at the end of the loop for successive iterations
                 loop {
-                    tokio::select! {
-                        _ = shutdown_server_rx.changed() => {
-                            tracing::info!("Shutting down server loop");
-                            break;
-                        }
-                        result = listener.accept() => {
-                            match result {
-                                Ok((stream, _)) => {
-                                    // Signal the previous connection to shut down
-                                    let _ = shutdown_handler_tx.send(());
-
-                                    tokio::spawn(handle_connection(
-                                        stream,
-                                        event_tx.clone(),
-                                        request_tx.clone(),
-                                        response_tx.subscribe(),
-                                        shutdown_handler_tx.subscribe(),
-                                    ));
-                                }
-                                Err(e) => {
-                                    tracing::error!("Error accepting connection: {}", e);
-                                }
+                    println!("accepting connection");
+                    match listener.accept().await {
+                        Ok((stream, _)) => {
+                            if handle_connection(
+                                stream,
+                                event_tx.clone(),
+                                request_tx.clone(),
+                                response_rx,
+                                shutdown_handler_tx.subscribe(),
+                            )
+                            .await
+                            .is_ok()
+                            {
+                                tracing::info!("Shutdown server");
+                                break;
                             }
+                            tracing::error!("Error handling connection");
+                        }
+                        Err(e) => {
+                            tracing::error!("Error accepting connection: {}", e);
                         }
                     }
+                    response_rx = response_tx.subscribe();
                 }
+                println!("server terminated");
             }
         });
 
@@ -103,32 +104,16 @@ where
         request: &WrappedMessage<MessageToServer>,
         response: MessageToClient,
     ) -> Result<(), Error> {
-        // Wait until there is at least one subscriber
-        let mut backoff = get_quick_backoff();
-        while self.response_tx.receiver_count() == 0 {
-            tracing::info!("Waiting for a subscriber...");
-            backoff.wait().await;
-        }
-
         let response = WrappedMessage {
             id: request.id.clone(),
             message: response,
         };
-
         self.response_tx.send(response)?;
         Ok(())
     }
 
     pub async fn send_message(&self, message: MessageToClient) -> Result<(), Error> {
         let message_msg = WrappedMessage { id: None, message };
-
-        // Wait until there is at least one subscriber
-        let mut backoff = get_quick_backoff();
-        while self.response_tx.receiver_count() == 0 {
-            tracing::info!("Waiting for a subscriber...");
-            backoff.wait().await;
-        }
-
         self.response_tx.send(message_msg)?;
         Ok(())
     }
@@ -142,7 +127,7 @@ where
 {
     fn drop(&mut self) {
         // Signal the server loop to shut down
-        let _ = self.shutdown_server_tx.send(());
+        // let _ = self.shutdown_server_tx.send(());
 
         // Signal the handler to shut down
         let _ = self.shutdown_handler_tx.send(());
@@ -159,7 +144,7 @@ async fn handle_connection<MessageToServer, MessageToClient>(
     request_tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     mut response_rx: broadcast::Receiver<WrappedMessage<MessageToClient>>,
     shutdown_handler_rx: watch::Receiver<()>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+) -> Result<(), anyhow::Error>
 where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
     MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
@@ -175,7 +160,7 @@ where
     let mut shutdown_handler_rx_send = shutdown_handler_rx;
 
     // Task to handle receiving messages
-    let recv_task = tokio::spawn({
+    let recv_task = {
         let event_tx = event_tx.clone();
         async move {
             loop {
@@ -209,19 +194,23 @@ where
                             }
                             Ok(None) => {
                                 tracing::info!("Connection closed by client");
+                                println!("Connection closed by client");
+                                return Err(anyhow::anyhow!("Connection closed by server"));
                             }
                             Err(e) => {
                                 tracing::error!("Error reading line: {}", e);
+                                return Err(anyhow::anyhow!("Error reading line: {}", e));
                             }
                         }
                     }
                 }
             }
+            Ok(())
         }
-    });
+    };
 
     // Task to handle sending responses
-    let send_task = tokio::spawn(async move {
+    let send_task = async move {
         loop {
             tokio::select! {
                 _ = shutdown_handler_rx_send.changed() => {
@@ -255,9 +244,10 @@ where
                 }
             }
         }
-    });
+        Ok(())
+    };
 
-    tokio::join!(recv_task, send_task);
+    tokio::try_join!(recv_task, send_task)?;
 
     Ok(())
 }
