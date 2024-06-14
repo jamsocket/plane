@@ -29,11 +29,14 @@ pub trait Runtime: Send + Sync + 'static {
         static_token: Option<&BearerToken>,
     ) -> impl Future<Output = Result<SpawnResult, Error>> + Send;
 
+    /// Attempts to terminate the backend. If `hard` is true, the runtime should make every effort
+    /// to forcibly terminate the backend immediately; otherwise it should invoke graceful shutdown.
+    /// If the backend is already terminated or does not exist, this should return `Ok(false)`.
     fn terminate(
         &self,
         backend_id: &BackendName,
         hard: bool,
-    ) -> impl Future<Output = Result<(), Error>> + Send;
+    ) -> impl Future<Output = Result<bool, Error>> + Send;
 
     /// Provides a callback to be called when the executor has a new metrics message for
     /// any backend.

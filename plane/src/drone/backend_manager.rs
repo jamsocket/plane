@@ -195,7 +195,7 @@ impl<R: Runtime> BackendManager<R> {
                             .terminate(&backend_id, termination == TerminationKind::Hard)
                             .await
                         {
-                            Ok(()) => break,
+                            Ok(_) => break,
                             Err(err) => {
                                 tracing::error!(?err, "failed to terminate backend");
                                 backoff.wait().await;
