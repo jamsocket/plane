@@ -3,7 +3,7 @@ use crate::{
     drone::runtime::Runtime,
     names::BackendName,
     protocol::{BackendAction, BackendEventId, BackendStateMessage},
-    types::{BackendState, TerminationKind, TerminationReason},
+    types::{BackendState, BackendStatus, TerminationKind, TerminationReason},
     util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
@@ -211,6 +211,21 @@ impl<R: Runtime> Executor<R> {
                     // else we can deadlock.
                     let Some(manager) = self.backends.get(backend_id) else {
                         tracing::warn!(backend_id = backend_id.as_value(), "Backend not found when handling terminate action (assumed terminated).");
+
+                        self.state_store
+                            .lock()
+                            .expect("State store lock poisoned.")
+                            .register_event(
+                                backend_id,
+                                &BackendState::Terminated {
+                                    last_status: BackendStatus::Ready, // assumed
+                                    termination: None,
+                                    reason: Some(TerminationReason::Lost),
+                                    exit_code: None,
+                                },
+                                Utc::now(),
+                            )?;
+
                         return Ok(());
                     };
                     manager.clone()
