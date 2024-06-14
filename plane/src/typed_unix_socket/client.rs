@@ -37,7 +37,6 @@ where
         let response_map = Arc::new(DashMap::new());
         let (event_tx, _) = broadcast::channel(100);
         let (shutdown_tx, shutdown_rx) = watch::channel(());
-        println!("Creating new client");
 
         tokio::spawn({
             let socket_path = socket_path.as_ref().to_path_buf();
@@ -49,7 +48,6 @@ where
             async move {
                 let mut rx = rx; // we're doing this so that we can re-subscribe at the end of the loop for successive iterations
                 loop {
-                    println!("Connecting!");
                     let stream = timeout(CONNECT_TIMEOUT, connect(&socket_path)).await?;
                     if handle_connection(
                         stream,
@@ -91,9 +89,7 @@ where
         self.response_map.insert(id, response_tx);
 
         self.tx.send(wrapper)?;
-        println!("sent request");
         let response = response_rx.await?;
-        println!("received response");
         Ok(response)
     }
 
@@ -107,15 +103,8 @@ where
     pub fn subscribe_events(&self) -> broadcast::Receiver<MessageToClient> {
         self.event_tx.subscribe()
     }
-}
 
-impl<MessageToServer, MessageToClient> Drop
-    for TypedUnixSocketClient<MessageToServer, MessageToClient>
-where
-    MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-{
-    fn drop(&mut self) {
+    pub fn shutdown(&self) {
         let _ = self.shutdown_tx.send(());
     }
 }
@@ -197,7 +186,6 @@ where
                             }
                             Ok(None) => {
                                 tracing::error!("Connection closed by server");
-                                println!("Connection closed by server");
                                 return Err(anyhow::anyhow!("Connection closed by server"));
                             }
                             Err(e) => {

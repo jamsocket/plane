@@ -31,7 +31,6 @@ mod tests {
     use std::collections::HashSet;
     use std::env;
     use std::path::PathBuf;
-    use std::sync::Arc;
     use tokio::spawn;
 
     fn create_temp_socket_path() -> PathBuf {
@@ -142,7 +141,6 @@ mod tests {
         });
 
         let mut handles = vec![];
-        let client = Arc::new(client);
         for i in 0..10 {
             let client = client.clone();
             handles.push(spawn(async move {
@@ -170,7 +168,6 @@ mod tests {
         let mut event_rx = server.subscribe_events();
 
         let mut handles = vec![];
-        let client = Arc::new(client);
         for i in 0..10 {
             let client = client.clone();
             handles.push(spawn(async move {
@@ -207,7 +204,6 @@ mod tests {
         let mut event_rx = client.subscribe_events();
 
         let mut handles = vec![];
-        let server = Arc::new(server);
         for i in 0..10 {
             let server = server.clone();
             handles.push(spawn(async move {
@@ -253,7 +249,7 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         // Simulate client restart
-        drop(client);
+        client.shutdown();
         let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
             .await
             .unwrap();
@@ -278,9 +274,8 @@ mod tests {
 
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
-        println!("dropping server");
         // Simulate server restart
-        drop(server);
+        server.shutdown();
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
@@ -297,10 +292,8 @@ mod tests {
             }
         });
 
-        println!("sending request");
         let request = "Hello, server!".to_string();
         let response = client.send_request(request).await.unwrap();
-        println!("received response");
         assert_eq!(response, "Hello, client!");
     }
 }
