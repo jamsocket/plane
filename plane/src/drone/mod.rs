@@ -120,7 +120,7 @@ pub async fn drone_loop<R: Runtime>(
                             .register_key(backend_id.clone(), key.clone());
 
                         if !result {
-                            tracing::error!(
+                            tracing::warn!(
                                 backend = backend_id.as_value(),
                                 "Key already registered for backend. Ignoring spawn request."
                             );
