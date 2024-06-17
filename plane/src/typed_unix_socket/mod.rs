@@ -248,8 +248,8 @@ mod tests {
 
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
-        // Simulate client restart
-        client.shutdown();
+        // Simulate new client connection
+        drop(client);
         let client = TypedUnixSocketClient::<String, String>::new(&socket_path)
             .await
             .unwrap();
@@ -275,7 +275,7 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         // Simulate server restart
-        server.shutdown();
+        drop(server);
         let server = TypedUnixSocketServer::<String, String>::new(&socket_path)
             .await
             .unwrap();
