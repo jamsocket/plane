@@ -27,11 +27,9 @@ mod tests {
     use super::client::TypedUnixSocketClient;
     use super::server::TypedUnixSocketServer;
     use crate::util::random_string;
-    use futures_util::future::join_all;
     use std::collections::HashSet;
     use std::env;
     use std::path::PathBuf;
-    use tokio::spawn;
 
     fn create_temp_socket_path() -> PathBuf {
         // We generate a random string to use as the socket path.
