@@ -157,7 +157,7 @@ impl RequestHandler {
                     }
                     ProxyError::BadRequest => (hyper::StatusCode::BAD_REQUEST, "Bad request"),
                     ProxyError::RequestError(err) => {
-                        tracing::warn!(?err, "Error making request.");
+                        tracing::warn!(?err, "Error proxying request to backend.");
                         (hyper::StatusCode::BAD_GATEWAY, "Connect error")
                     }
                     err => {
