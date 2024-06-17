@@ -30,6 +30,7 @@ mod tests {
     use futures_util::future::join_all;
     use std::collections::HashSet;
     use std::env;
+    use std::ops::Deref;
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::Duration;
@@ -133,34 +134,29 @@ mod tests {
             .await
             .unwrap();
 
-        let client = Arc::new(client);
-
         // Spawn a task to handle server requests
-        spawn(async move {
+        tokio::spawn(async move {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 // We simulate a delay inverse to the request number, so that later requests are completed first.
                 let req_num: u64 = request.message.parse().unwrap();
-                tokio::time::sleep(Duration::from_millis((10 - req_num) * 100)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis((10 - req_num) * 10)).await;
                 let response = format!("Response to Request {}", request.message);
                 server.send_response(&request, response).await.unwrap();
             }
         });
-        
+
         let mut handles = vec![];
         for i in 0..10 {
             let request = format!("{}", i);
             let client = client.clone();
-
-            handles.push(async move {
-                client.send_request(request).await.unwrap()
-            });
+            handles.push(async move { client.send_request(request).await.unwrap() });
         }
-        
+
         let result = futures::future::join_all(handles).await;
-        
-        for i in 0..10 {
-            assert_eq!(result[i], format!("Response to Request {}", i));
+
+        for (i, res) in result.into_iter().enumerate() {
+            assert_eq!(res, format!("Response to Request {}", i));
         }
     }
 
@@ -180,14 +176,16 @@ mod tests {
 
         let mut handles = vec![];
         for i in 0..10 {
+            let message = format!("Message {}", i);
             let client = client.clone();
-            handles.push(spawn(async move {
-                let message = format!("Message {}", i);
-                client.send_message(message.clone()).await.unwrap();
-            }));
+            let sleep = (5 - i as i64).unsigned_abs() * 10; // simulate a delay to attempt to have some concurrency in message sending
+            handles.push(async move {
+                tokio::time::sleep(tokio::time::Duration::from_millis(sleep)).await;
+                client.send_message(message).await.unwrap();
+            });
         }
 
-        join_all(handles).await;
+        futures::future::join_all(handles).await;
 
         let mut received_messages = HashSet::new();
         for _ in 0..10 {
@@ -216,14 +214,16 @@ mod tests {
 
         let mut handles = vec![];
         for i in 0..10 {
+            let message = format!("Message {}", i);
             let server = server.clone();
-            handles.push(spawn(async move {
-                let message = format!("Message {}", i);
+            let sleep = (5 - i as i64).unsigned_abs() * 10; // simulate a delay to attempt to have some concurrency in message sending
+            handles.push(async move {
+                tokio::time::sleep(tokio::time::Duration::from_millis(sleep)).await;
                 server.send_message(message.clone()).await.unwrap();
-            }));
+            });
         }
 
-        join_all(handles).await;
+        futures::future::join_all(handles).await;
 
         let mut received_messages = HashSet::new();
         for _ in 0..10 {
