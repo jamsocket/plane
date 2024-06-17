@@ -15,10 +15,10 @@ pub struct WrappedMessage<T> {
 
 fn get_quick_backoff() -> ExponentialBackoff {
     ExponentialBackoff::new(
-        Duration::try_milliseconds(10).expect("duration is always valid"),
-        Duration::try_milliseconds(100).expect("duration is always valid"),
+        Duration::milliseconds(10),
+        Duration::milliseconds(100),
         1.1,
-        Duration::try_milliseconds(100).expect("duration is always valid"),
+        Duration::milliseconds(100),
     )
 }
 
@@ -30,10 +30,7 @@ mod tests {
     use futures_util::future::join_all;
     use std::collections::HashSet;
     use std::env;
-    use std::ops::Deref;
     use std::path::PathBuf;
-    use std::sync::Arc;
-    use std::time::Duration;
     use tokio::spawn;
 
     fn create_temp_socket_path() -> PathBuf {
@@ -63,7 +60,7 @@ mod tests {
             .unwrap();
 
         // Spawn a task to handle server requests
-        spawn(async move {
+        tokio::spawn(async move {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();
@@ -153,7 +150,7 @@ mod tests {
             handles.push(async move { client.send_request(request).await.unwrap() });
         }
 
-        let result = futures::future::join_all(handles).await;
+        let result = futures_util::future::join_all(handles).await;
 
         for (i, res) in result.into_iter().enumerate() {
             assert_eq!(res, format!("Response to Request {}", i));
@@ -185,7 +182,7 @@ mod tests {
             });
         }
 
-        futures::future::join_all(handles).await;
+        futures_util::future::join_all(handles).await;
 
         let mut received_messages = HashSet::new();
         for _ in 0..10 {
@@ -223,7 +220,7 @@ mod tests {
             });
         }
 
-        futures::future::join_all(handles).await;
+        futures_util::future::join_all(handles).await;
 
         let mut received_messages = HashSet::new();
         for _ in 0..10 {
@@ -249,7 +246,7 @@ mod tests {
 
         // Spawn a task to handle server requests
         let server = server.clone();
-        spawn(async move {
+        tokio::spawn(async move {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();
@@ -295,7 +292,7 @@ mod tests {
 
         // Spawn a task to handle server requests
         let server = server.clone();
-        spawn(async move {
+        tokio::spawn(async move {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
                 let response = "Hello, client!".to_string();

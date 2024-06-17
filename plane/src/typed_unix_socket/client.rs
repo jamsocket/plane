@@ -1,6 +1,6 @@
 use super::{get_quick_backoff, WrappedMessage};
 use crate::util::{random_token, GuardHandle};
-use anyhow::Error;
+use anyhow::{Error, Result};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::{clone::Clone, fmt::Debug, path::Path, sync::Arc};
@@ -17,6 +17,7 @@ use tokio::{
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// A client for communicating with a Unix socket server using typed messages.
 #[derive(Clone)]
 pub struct TypedUnixSocketClient<MessageToServer, MessageToClient>
 where
@@ -34,6 +35,7 @@ where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
     MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
+    /// Creates a new `TypedUnixSocketClient` and connects to the specified Unix socket path.
     pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Elapsed> {
         let (tx, _) = broadcast::channel(100);
         let response_map = Arc::new(DashMap::new());
@@ -75,6 +77,7 @@ where
         })
     }
 
+    /// Sends a request to the server and waits for a response.
     pub async fn send_request(&self, request: MessageToServer) -> Result<MessageToClient, Error> {
         let (response_tx, response_rx) = oneshot::channel();
         let id = random_token();
@@ -91,6 +94,7 @@ where
         Ok(response)
     }
 
+    /// Sends a message to the server without waiting for a response.
     pub async fn send_message(&self, message: MessageToServer) -> Result<(), Error> {
         let wrapper = WrappedMessage { id: None, message };
 
@@ -98,6 +102,7 @@ where
         Ok(())
     }
 
+    /// Subscribes to events from the server.
     pub fn subscribe_events(&self) -> broadcast::Receiver<MessageToClient> {
         self.event_tx.subscribe()
     }

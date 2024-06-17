@@ -1,7 +1,7 @@
 use crate::util::GuardHandle;
 
 use super::{get_quick_backoff, WrappedMessage};
-use anyhow::Error;
+use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
@@ -15,6 +15,7 @@ use tokio::{
     sync::broadcast,
 };
 
+/// A server for handling Unix socket connections using typed messages.
 #[derive(Clone)]
 pub struct TypedUnixSocketServer<MessageToServer, MessageToClient>
 where
@@ -33,6 +34,7 @@ where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
     MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
+    /// Creates a new `TypedUnixSocketServer` and binds to the specified Unix socket path.
     pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Error> {
         let socket_path = socket_path.as_ref().to_path_buf();
         if socket_path.exists() {
@@ -85,14 +87,17 @@ where
         })
     }
 
+    /// Subscribes to events from clients.
     pub fn subscribe_events(&self) -> broadcast::Receiver<MessageToServer> {
         self.event_tx.subscribe()
     }
 
+    /// Subscribes to requests from clients.
     pub fn subscribe_requests(&self) -> broadcast::Receiver<WrappedMessage<MessageToServer>> {
         self.request_tx.subscribe()
     }
 
+    /// Sends a response to a client's request.
     pub async fn send_response(
         &self,
         request: &WrappedMessage<MessageToServer>,
@@ -106,6 +111,7 @@ where
         Ok(())
     }
 
+    /// Sends a message to the client without waiting for a response.
     pub async fn send_message(&self, message: MessageToClient) -> Result<(), Error> {
         let message_msg = WrappedMessage { id: None, message };
         self.response_tx.send(message_msg)?;
