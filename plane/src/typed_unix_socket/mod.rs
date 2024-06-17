@@ -31,6 +31,8 @@ mod tests {
     use std::collections::HashSet;
     use std::env;
     use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::time::Duration;
     use tokio::spawn;
 
     fn create_temp_socket_path() -> PathBuf {
@@ -131,26 +133,35 @@ mod tests {
             .await
             .unwrap();
 
+        let client = Arc::new(client);
+
         // Spawn a task to handle server requests
         spawn(async move {
             let mut request_rx = server.subscribe_requests();
             while let Ok(request) = request_rx.recv().await {
-                let response = format!("Response to {}", request.message);
+                // We simulate a delay inverse to the request number, so that later requests are completed first.
+                let req_num: u64 = request.message.parse().unwrap();
+                tokio::time::sleep(Duration::from_millis((10 - req_num) * 100)).await;
+                let response = format!("Response to Request {}", request.message);
                 server.send_response(&request, response).await.unwrap();
             }
         });
-
+        
         let mut handles = vec![];
         for i in 0..10 {
+            let request = format!("{}", i);
             let client = client.clone();
-            handles.push(spawn(async move {
-                let request = format!("Request {}", i);
-                let response = client.send_request(request).await.unwrap();
-                assert_eq!(response, format!("Response to Request {}", i));
-            }));
-        }
 
-        join_all(handles).await;
+            handles.push(async move {
+                client.send_request(request).await.unwrap()
+            });
+        }
+        
+        let result = futures::future::join_all(handles).await;
+        
+        for i in 0..10 {
+            assert_eq!(result[i], format!("Response to Request {}", i));
+        }
     }
 
     #[tokio::test]
