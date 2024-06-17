@@ -108,7 +108,7 @@ impl RouteMap {
         let listener_lock = self.listeners.lock().expect("Listeners lock was poisoned.");
         if let Some(listener_lock) = listener_lock.get(&token) {
             if let Err(err) = listener_lock.send(()) {
-                tracing::error!(?err, "Error sending to listener.");
+                tracing::warn!(?err, "Error sending to listener.");
             }
         };
     }
