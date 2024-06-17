@@ -1,18 +1,19 @@
 use super::{get_quick_backoff, WrappedMessage};
-use crate::util::random_token;
+use crate::util::{random_token, GuardHandle};
 use anyhow::Error;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::{clone::Clone, fmt::Debug, path::Path, sync::Arc};
 use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncBufReadExt, BufReader, BufWriter};
+use tokio::sync::broadcast::error::RecvError;
+use tokio::task::JoinHandle;
 use tokio::time::error::Elapsed;
 use tokio::{
     net::UnixStream,
     sync::{broadcast, oneshot},
     time::{timeout, Duration},
 };
-use tokio_util::sync::CancellationToken;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -25,7 +26,7 @@ where
     tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     response_map: Arc<DashMap<String, oneshot::Sender<MessageToClient>>>,
     event_tx: broadcast::Sender<MessageToClient>,
-    shutdown_token: CancellationToken,
+    loop_task: Arc<GuardHandle>,
 }
 
 impl<MessageToServer, MessageToClient> TypedUnixSocketClient<MessageToServer, MessageToClient>
@@ -37,28 +38,25 @@ where
         let (tx, _) = broadcast::channel(100);
         let response_map = Arc::new(DashMap::new());
         let (event_tx, _) = broadcast::channel(100);
-        let shutdown_token = CancellationToken::new();
 
-        tokio::spawn({
+        let loop_task = {
             let socket_path = socket_path.as_ref().to_path_buf();
             let tx = tx.clone();
-            let rx = tx.subscribe(); // ensure we subscribe synchronously to avoid issues sending messages
+            let mut rx = tx.subscribe(); // ensure we subscribe synchronously to avoid issues sending messages
             let response_map = Arc::clone(&response_map);
             let event_tx = event_tx.clone();
-            let shutdown_token = shutdown_token.clone();
-            async move {
-                let mut rx = rx; // we're doing this so that we can re-subscribe at the end of the loop for successive iterations
+            GuardHandle::new(async move {
+                let mut backoff = get_quick_backoff();
                 loop {
-                    let stream = timeout(CONNECT_TIMEOUT, connect(&socket_path)).await?;
-                    if handle_connection(
-                        stream,
-                        rx,
-                        Arc::clone(&response_map),
-                        event_tx.clone(),
-                        shutdown_token.clone(),
-                    )
-                    .await
-                    .is_ok()
+                    let Ok(stream) = timeout(CONNECT_TIMEOUT, connect(&socket_path)).await else {
+                        tracing::error!("Timeout connecting to server");
+                        backoff.wait().await;
+                        continue;
+                    };
+                    backoff.reset();
+                    if handle_connection(stream, rx, Arc::clone(&response_map), event_tx.clone())
+                        .await
+                        .is_ok()
                     {
                         tracing::info!("Shutdown client");
                         break;
@@ -66,15 +64,14 @@ where
                     tracing::error!("Error handling connection");
                     rx = tx.subscribe();
                 }
-                Ok::<(), Elapsed>(())
-            }
-        });
+            })
+        };
 
         Ok(Self {
             tx,
             response_map,
             event_tx,
-            shutdown_token,
+            loop_task: Arc::new(loop_task),
         })
     }
 
@@ -104,10 +101,6 @@ where
     pub fn subscribe_events(&self) -> broadcast::Receiver<MessageToClient> {
         self.event_tx.subscribe()
     }
-
-    pub fn shutdown(&self) {
-        self.shutdown_token.cancel();
-    }
 }
 
 async fn connect<P: AsRef<Path>>(socket_path: P) -> UnixStream {
@@ -129,7 +122,6 @@ async fn handle_connection<MessageToServer, MessageToClient>(
     mut rx: broadcast::Receiver<WrappedMessage<MessageToServer>>,
     response_map: Arc<DashMap<String, oneshot::Sender<MessageToClient>>>,
     event_tx: broadcast::Sender<MessageToClient>,
-    shutdown_token: CancellationToken,
 ) -> Result<(), anyhow::Error>
 where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
@@ -143,57 +135,49 @@ where
     let mut writer = writer;
 
     // Task to handle receiving messages
-    let recv_task = {
+    let recv_future = {
         let event_tx = event_tx.clone();
         let response_map = Arc::clone(&response_map);
-        let shutdown_token = shutdown_token.clone();
         async move {
             loop {
-                tokio::select! {
-                    _ = shutdown_token.cancelled() => {
-                        tracing::info!("Shutting down receive task");
-                        break;
-                    }
-                    result = lines.next_line() => {
-                        match result {
-                            Ok(Some(line)) => {
-                                let msg: WrappedMessage<MessageToClient> = match serde_json::from_str(&line)
-                                {
-                                    Ok(msg) => msg,
-                                    Err(e) => {
-                                        tracing::error!("Error deserializing message: {}", e);
-                                        continue;
+                let result = lines.next_line().await;
+                match result {
+                    Ok(Some(line)) => {
+                        let msg: WrappedMessage<MessageToClient> = match serde_json::from_str(&line)
+                        {
+                            Ok(msg) => msg,
+                            Err(e) => {
+                                tracing::error!("Error deserializing message: {}", e);
+                                continue;
+                            }
+                        };
+                        match msg {
+                            WrappedMessage {
+                                id: Some(id),
+                                message,
+                            } => {
+                                if let Some((_, tx)) = response_map.remove(&id) {
+                                    if let Err(e) = tx.send(message) {
+                                        tracing::error!("Error sending response: {:?}", e);
                                     }
-                                };
-                                match msg {
-                                    WrappedMessage {
-                                        id: Some(id),
-                                        message,
-                                    } => {
-                                        if let Some((_, tx)) = response_map.remove(&id) {
-                                            if let Err(e) = tx.send(message) {
-                                                tracing::error!("Error sending response: {:?}", e);
-                                            }
-                                        } else {
-                                            tracing::error!("No sender found for response ID: {:?}", id);
-                                        }
-                                    }
-                                    WrappedMessage { id: None, message } => {
-                                        if let Err(e) = event_tx.send(message) {
-                                            tracing::error!("Error sending event: {}", e);
-                                        }
-                                    }
+                                } else {
+                                    tracing::error!("No sender found for response ID: {:?}", id);
                                 }
                             }
-                            Ok(None) => {
-                                tracing::error!("Connection closed by server");
-                                return Err(anyhow::anyhow!("Connection closed by server"));
-                            }
-                            Err(e) => {
-                                tracing::error!("Error reading line: {}", e);
-                                return Err(anyhow::anyhow!("Error reading line: {}", e));
+                            WrappedMessage { id: None, message } => {
+                                if let Err(e) = event_tx.send(message) {
+                                    tracing::error!("Error sending event: {}", e);
+                                }
                             }
                         }
+                    }
+                    Ok(None) => {
+                        tracing::error!("Connection closed by server");
+                        return Err(anyhow::anyhow!("Connection closed by server"));
+                    }
+                    Err(e) => {
+                        tracing::error!("Error reading line: {}", e);
+                        return Err(anyhow::anyhow!("Error reading line: {}", e));
                     }
                 }
             }
@@ -202,46 +186,39 @@ where
     };
 
     // Task to handle sending messages
-    let send_task = {
-        let shutdown_token = shutdown_token.clone();
-        async move {
-            loop {
-                tokio::select! {
-                    _ = shutdown_token.cancelled() => {
-                        tracing::info!("Shutting down send task");
-                        break;
-                    }
-                    result = rx.recv() => {
-                        match result {
-                            Ok(msg) => {
-                                let msg = match serde_json::to_string(&msg) {
-                                    Ok(msg) => msg,
-                                    Err(e) => {
-                                        tracing::error!("Error serializing message: {}", e);
-                                        continue;
-                                    }
-                                };
-                                if let Err(e) = writer.write_all(msg.as_bytes()).await {
-                                    tracing::error!("Error writing message: {}", e);
-                                }
-                                if let Err(e) = writer.write_all(b"\n").await {
-                                    tracing::error!("Error writing newline: {}", e);
-                                }
-                                if let Err(e) = writer.flush().await {
-                                    tracing::error!("Error flushing writer: {}", e);
-                                }
-                            }
-                            Err(e) => {
-                                tracing::error!("Error receiving message: {}", e);
-                            }
+    let send_future = async move {
+        loop {
+            let result = rx.recv().await;
+            match result {
+                Ok(msg) => {
+                    let msg = match serde_json::to_string(&msg) {
+                        Ok(msg) => msg,
+                        Err(e) => {
+                            tracing::error!("Error serializing message: {}", e);
+                            continue;
                         }
+                    };
+                    if let Err(e) = writer.write_all(msg.as_bytes()).await {
+                        tracing::error!("Error writing message: {}", e);
+                    }
+                    if let Err(e) = writer.write_all(b"\n").await {
+                        tracing::error!("Error writing newline: {}", e);
+                    }
+                    if let Err(e) = writer.flush().await {
+                        tracing::error!("Error flushing writer: {}", e);
                     }
                 }
+                Err(RecvError::Closed) => {
+                    break;
+                }
+                Err(e) => {
+                    tracing::error!("Error receiving message: {}", e);
+                }
             }
-            Ok(())
         }
+        Ok(())
     };
 
-    tokio::try_join!(recv_task, send_task)?;
+    tokio::try_join!(recv_future, send_future)?;
     Ok(())
 }
