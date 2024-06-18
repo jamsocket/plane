@@ -156,6 +156,10 @@ impl RequestHandler {
                         (hyper::StatusCode::UNAUTHORIZED, "Invalid subdomain")
                     }
                     ProxyError::BadRequest => (hyper::StatusCode::BAD_REQUEST, "Bad request"),
+                    ProxyError::RequestError(err) => {
+                        tracing::warn!(?err, "Error proxying request to backend.");
+                        (hyper::StatusCode::BAD_GATEWAY, "Connect error")
+                    }
                     err => {
                         tracing::error!(?err, "Unhandled error handling request.");
                         (hyper::StatusCode::INTERNAL_SERVER_ERROR, "Internal error")
