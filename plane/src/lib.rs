@@ -24,6 +24,8 @@ pub mod proxy;
 pub mod serialization;
 pub mod signals;
 pub mod typed_socket;
+#[allow(unused)] // for now, to disable clippy noise
+mod typed_unix_socket;
 pub mod types;
 pub mod util;
 

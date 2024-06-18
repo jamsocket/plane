@@ -73,7 +73,7 @@ pub struct ExponentialBackoff {
 }
 
 impl ExponentialBackoff {
-    fn new(
+    pub fn new(
         initial_duration: Duration,
         max_duration: Duration,
         multiplier: f64,
