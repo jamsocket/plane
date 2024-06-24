@@ -101,7 +101,7 @@ pub async fn drone_loop<R: Runtime>(
                 }) => {
                     tracing::info!(
                         backend_id = backend_id.as_value(),
-                        action = ?action,
+                        action = action.as_value(),
                         "Received action."
                     );
 

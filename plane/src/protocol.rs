@@ -52,6 +52,39 @@ pub enum BackendAction {
     },
 }
 
+impl valuable::Valuable for BackendAction {
+    fn as_value(&self) -> valuable::Value {
+        valuable::Value::Mappable(self)
+    }
+
+    fn visit(&self, visit: &mut dyn valuable::Visit) {
+        match self {
+            BackendAction::Spawn {
+                key, static_token, ..
+            } => {
+                visit.visit_entry(valuable::Value::String("key"), key.as_value());
+                visit.visit_entry(
+                    valuable::Value::String("static_token"),
+                    static_token.as_value(),
+                );
+            }
+            BackendAction::Terminate { kind, reason } => {
+                visit.visit_entry(valuable::Value::String("kind"), kind.as_value());
+                visit.visit_entry(valuable::Value::String("reason"), reason.as_value());
+            }
+        }
+    }
+}
+
+impl valuable::Mappable for BackendAction {
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            BackendAction::Spawn { .. } => (2, Some(2)),
+            BackendAction::Terminate { .. } => (2, Some(2)),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
 pub struct BackendStateMessage {
     pub event_id: BackendEventId,
