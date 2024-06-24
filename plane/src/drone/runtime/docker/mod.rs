@@ -222,6 +222,16 @@ impl Runtime for DockerRuntime {
 
         match result {
             Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 409, ..
+            }) => {
+                tracing::warn!(
+                    %container_id,
+                    %backend_id,
+                    "Container could not be terminated, because it already was."
+                );
+                Ok(false)
+            }
+            Err(bollard::errors::Error::DockerResponseServerError {
                 status_code: 404, ..
             }) => {
                 tracing::warn!(
