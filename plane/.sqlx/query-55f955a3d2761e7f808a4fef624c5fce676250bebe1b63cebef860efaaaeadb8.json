@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into backend_state (backend_id, state, created_at)\n        values ($1, $2, now())\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "55f955a3d2761e7f808a4fef624c5fce676250bebe1b63cebef860efaaaeadb8"
+}

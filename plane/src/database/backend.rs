@@ -15,6 +15,7 @@ use chrono::{DateTime, Utc};
 use futures_util::Stream;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, net::SocketAddr, str::FromStr};
+use valuable::Valuable;
 
 pub struct BackendDatabase<'a> {
     db: &'a PlaneDatabase,
@@ -180,29 +181,54 @@ impl<'a> BackendDatabase<'a> {
     pub async fn update_state(
         &self,
         backend: &BackendName,
-        state: BackendState,
-    ) -> sqlx::Result<()> {
+        new_state: BackendState,
+    ) -> sqlx::Result<bool> {
         let mut txn = self.db.pool.begin().await?;
 
-        emit_with_key(&mut *txn, &backend.to_string(), &state).await?;
+        emit_with_key(&mut *txn, &backend.to_string(), &new_state).await?;
 
-        sqlx::query!(
+        let new_status = new_state.status();
+        let new_status_number = new_status.as_int();
+
+        let result = sqlx::query!(
             r#"
             update backend
             set
                 last_status = $2,
                 last_status_time = now(),
-                cluster_address = $3,
-                state = $4
+                last_status_number = $3,
+                cluster_address = $4,
+                state = $5
             where id = $1
+            and last_status_number < $3 or last_status_number is null
             "#,
             backend.to_string(),
-            state.status().to_string(),
-            state.address().map(|d| d.0.to_string()),
-            serde_json::to_value(&state).expect("BackendState should always be JSON-serializable."),
+            new_status.to_string(),
+            new_status_number,
+            new_state.address().map(|d| d.0.to_string()),
+            serde_json::to_value(&new_state)
+                .expect("BackendState should always be JSON-serializable."),
         )
         .execute(&mut *txn)
         .await?;
+
+        if result.rows_affected() == 0 {
+            let result = sqlx::query!(
+                r#"
+                select last_status
+                from backend
+                where id = $1
+                "#,
+                backend.to_string(),
+            )
+            .fetch_optional(&mut *txn)
+            .await?;
+
+            let last_status = result.map(|r| r.last_status);
+
+            tracing::warn!(last_status, new_status=%new_status, backend=backend.as_value(), "Not updating backend status");
+            return Ok(false);
+        }
 
         sqlx::query!(
             r#"
@@ -210,13 +236,14 @@ impl<'a> BackendDatabase<'a> {
             values ($1, $2)
             "#,
             backend.to_string(),
-            serde_json::to_value(&state).expect("BackendState should always be JSON-serializable."),
+            serde_json::to_value(&new_state)
+                .expect("BackendState should always be JSON-serializable."),
         )
         .execute(&mut *txn)
         .await?;
 
         // If the backend is terminated, we can delete its associated key.
-        if matches!(state, BackendState::Terminated { .. }) {
+        if matches!(new_state, BackendState::Terminated { .. }) {
             sqlx::query!(
                 r#"
                 delete from backend_key
@@ -230,7 +257,7 @@ impl<'a> BackendDatabase<'a> {
 
         txn.commit().await?;
 
-        Ok(())
+        Ok(true)
     }
 
     pub async fn list_backends(&self) -> sqlx::Result<Vec<BackendRow>> {

@@ -42,7 +42,7 @@ impl BackendStatus {
     /// another in the backend lifecycle.
     /// Gaps are intentionally left in these values to provide room for future
     /// statuses.
-    fn as_int(&self) -> i32 {
+    pub fn as_int(&self) -> i32 {
         match self {
             BackendStatus::Scheduled => 10,
             BackendStatus::Loading => 20,
