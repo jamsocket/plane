@@ -185,8 +185,6 @@ impl<'a> BackendDatabase<'a> {
     ) -> sqlx::Result<bool> {
         let mut txn = self.db.pool.begin().await?;
 
-        emit_with_key(&mut *txn, &backend.to_string(), &new_state).await?;
-
         let new_status = new_state.status();
         let new_status_number = new_status.as_int();
 
@@ -254,6 +252,8 @@ impl<'a> BackendDatabase<'a> {
             .execute(&mut *txn)
             .await?;
         }
+
+        emit_with_key(&mut *txn, &backend.to_string(), &new_state).await?;
 
         txn.commit().await?;
 
