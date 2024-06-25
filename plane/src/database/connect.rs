@@ -1,4 +1,5 @@
 use super::{
+    backend::emit_state_change,
     backend_actions::create_pending_action,
     backend_key::{KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER},
     drone::DroneForSpawn,
@@ -102,7 +103,7 @@ async fn create_backend_with_key(
     let mut txn = pool.begin().await?;
 
     let initial_status = BackendStatus::Scheduled;
-    let initial_state_json = serde_json::to_value(&BackendState::Scheduled).expect("valid json");
+    let initial_state = BackendState::Scheduled;
 
     let result = sqlx::query!(
         r#"
@@ -143,7 +144,7 @@ async fn create_backend_with_key(
         key.namespace,
         key.tag,
         PgInterval::try_from(KEY_LEASE_EXPIRATION).expect("valid constant interval"),
-        initial_state_json,
+        serde_json::to_value(&initial_state).expect("state is always serializable"),
         static_token.map(|t| t.to_string()),
         spawn_config.subdomain.as_ref().map(|s| s.to_string()),
         initial_status.as_int(),
@@ -161,16 +162,7 @@ async fn create_backend_with_key(
         }
     };
 
-    sqlx::query!(
-        r#"
-        insert into backend_state (backend_id, state, created_at)
-        values ($1, $2, now())
-        "#,
-        backend_id.to_string(),
-        initial_state_json
-    )
-    .execute(&mut *txn)
-    .await?;
+    emit_state_change(&mut txn, &backend_id, &initial_state).await?;
 
     let acquired_key = AcquiredKey {
         key: key.clone(),
