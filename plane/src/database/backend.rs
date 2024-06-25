@@ -14,6 +14,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures_util::Stream;
 use serde::{Deserialize, Serialize};
+use sqlx::PgConnection;
 use std::{fmt::Debug, net::SocketAddr, str::FromStr};
 use valuable::Valuable;
 
@@ -228,18 +229,6 @@ impl<'a> BackendDatabase<'a> {
             return Ok(false);
         }
 
-        sqlx::query!(
-            r#"
-            insert into backend_state (backend_id, state)
-            values ($1, $2)
-            "#,
-            backend.to_string(),
-            serde_json::to_value(&new_state)
-                .expect("BackendState should always be JSON-serializable."),
-        )
-        .execute(&mut *txn)
-        .await?;
-
         // If the backend is terminated, we can delete its associated key.
         if matches!(new_state, BackendState::Terminated { .. }) {
             sqlx::query!(
@@ -253,7 +242,7 @@ impl<'a> BackendDatabase<'a> {
             .await?;
         }
 
-        emit_with_key(&mut *txn, &backend.to_string(), &new_state).await?;
+        emit_state_change(&mut txn, backend, &new_state).await?;
 
         txn.commit().await?;
 
@@ -435,7 +424,10 @@ impl<'a> BackendDatabase<'a> {
     }
 
     pub async fn publish_metrics(&self, metrics: BackendMetricsMessage) -> sqlx::Result<()> {
-        emit_ephemeral_with_key(&self.db.pool, &metrics.backend_id.to_string(), &metrics).await
+        let mut txn = self.db.pool.begin().await?;
+        emit_ephemeral_with_key(&mut txn, &metrics.backend_id.to_string(), &metrics).await?;
+        txn.commit().await?;
+        Ok(())
     }
 
     pub async fn termination_candidates(
@@ -584,4 +576,26 @@ impl BackendRow {
     pub fn status_age(&self) -> chrono::Duration {
         self.as_of - self.last_status_time
     }
+}
+
+/// Update the backend_state table, without updating the backend table.
+pub async fn emit_state_change(
+    txn: &mut PgConnection,
+    backend: &BackendName,
+    new_state: &BackendState,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        r#"
+        insert into backend_state (backend_id, state)
+        values ($1, $2)
+        "#,
+        backend.to_string(),
+        serde_json::to_value(&new_state).expect("BackendState should always be JSON-serializable."),
+    )
+    .execute(&mut *txn)
+    .await?;
+
+    emit_with_key(txn, &backend.to_string(), new_state).await?;
+
+    Ok(())
 }

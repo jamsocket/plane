@@ -3,7 +3,7 @@ use crate::util::ExponentialBackoff;
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::{postgres::PgListener, PgExecutor, PgPool};
+use sqlx::{postgres::PgListener, PgConnection, PgPool};
 use std::{
     any::Any,
     collections::HashMap,
@@ -352,11 +352,11 @@ impl EventSubscriptionManager {
     }
 }
 
-pub async fn emit_impl<'c, T, E>(db: E, key: Option<&str>, payload: &T) -> Result<(), sqlx::Error>
-where
-    T: NotificationPayload,
-    E: PgExecutor<'c>,
-{
+pub async fn emit_impl<T: NotificationPayload>(
+    db: &mut PgConnection,
+    key: Option<&str>,
+    payload: &T,
+) -> Result<(), sqlx::Error> {
     let kind = T::kind().to_string();
     sqlx::query!(
         r#"
@@ -381,21 +381,17 @@ where
         serde_json::to_value(&payload).map_sqlx_error()?,
         EVENT_CHANNEL,
     )
-    .execute(db)
+    .execute(&mut *db)
     .await?;
 
     Ok(())
 }
 
-pub async fn emit_ephemeral_impl<'c, T, E>(
-    db: E,
+pub async fn emit_ephemeral_impl<T: NotificationPayload>(
+    db: &mut PgConnection,
     key: Option<&str>,
     payload: &T,
-) -> Result<(), sqlx::Error>
-where
-    T: NotificationPayload,
-    E: PgExecutor<'c>,
-{
+) -> Result<(), sqlx::Error> {
     let kind = T::kind().to_string();
     sqlx::query!(
         r#"
@@ -419,38 +415,32 @@ where
     Ok(())
 }
 
-pub async fn emit<'c, T, E>(db: E, payload: &T) -> Result<(), sqlx::Error>
-where
-    T: NotificationPayload,
-    E: PgExecutor<'c>,
-{
+pub async fn emit<T: NotificationPayload>(
+    db: &mut PgConnection,
+    payload: &T,
+) -> Result<(), sqlx::Error> {
     emit_impl(db, None, payload).await
 }
 
-pub async fn emit_with_key<'c, T, E>(db: E, key: &str, payload: &T) -> Result<(), sqlx::Error>
-where
-    T: NotificationPayload,
-    E: PgExecutor<'c>,
-{
+pub async fn emit_with_key<T: NotificationPayload>(
+    db: &mut PgConnection,
+    key: &str,
+    payload: &T,
+) -> Result<(), sqlx::Error> {
     emit_impl(db, Some(key), payload).await
 }
 
-pub async fn emit_ephemeral<'c, T, E>(db: E, payload: &T) -> Result<(), sqlx::Error>
-where
-    T: NotificationPayload,
-    E: PgExecutor<'c>,
-{
+pub async fn emit_ephemeral<T: NotificationPayload>(
+    db: &mut PgConnection,
+    payload: &T,
+) -> Result<(), sqlx::Error> {
     emit_ephemeral_impl(db, None, payload).await
 }
 
-pub async fn emit_ephemeral_with_key<'c, T, E>(
-    db: E,
+pub async fn emit_ephemeral_with_key<T: NotificationPayload>(
+    db: &mut PgConnection,
     key: &str,
     payload: &T,
-) -> Result<(), sqlx::Error>
-where
-    T: NotificationPayload,
-    E: PgExecutor<'c>,
-{
+) -> Result<(), sqlx::Error> {
     emit_ephemeral_impl(db, Some(key), payload).await
 }
