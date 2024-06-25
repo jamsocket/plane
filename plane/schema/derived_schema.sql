@@ -195,7 +195,7 @@ COMMENT ON COLUMN public.backend.subdomain IS 'Optional subdomain for session ba
 -- Name: COLUMN backend.last_status_number; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.backend.last_status_number IS 'Number associated with a status, used for ordering.';
+COMMENT ON COLUMN public.backend.last_status_number IS 'Number representation of last_status, used for ordering.';
 
 
 --
