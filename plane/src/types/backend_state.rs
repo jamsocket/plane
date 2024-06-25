@@ -40,6 +40,8 @@ impl BackendStatus {
     /// Returns an integer representation of the status. This is meant to be an
     /// opaque value that can be used for determining if one status comes before
     /// another in the backend lifecycle.
+    /// Gaps are intentionally left in these values to provide room for future
+    /// statuses.
     fn as_int(&self) -> i32 {
         match self {
             BackendStatus::Scheduled => 10,
