@@ -36,6 +36,25 @@ pub enum BackendStatus {
     Terminated,
 }
 
+impl BackendStatus {
+    /// Returns an integer representation of the status. This is meant to be an
+    /// opaque value that can be used for determining if one status comes before
+    /// another in the backend lifecycle.
+    /// Gaps are intentionally left in these values to provide room for future
+    /// statuses.
+    fn as_int(&self) -> i32 {
+        match self {
+            BackendStatus::Scheduled => 10,
+            BackendStatus::Loading => 20,
+            BackendStatus::Starting => 30,
+            BackendStatus::Waiting => 40,
+            BackendStatus::Ready => 50,
+            BackendStatus::Terminating => 60,
+            BackendStatus::Terminated => 70,
+        }
+    }
+}
+
 impl valuable::Valuable for BackendStatus {
     fn as_value(&self) -> valuable::Value {
         match self {
@@ -228,6 +247,10 @@ impl BackendState {
             BackendState::Terminating { .. } => BackendStatus::Terminating,
             BackendState::Terminated { .. } => BackendStatus::Terminated,
         }
+    }
+
+    pub fn status_int(&self) -> i32 {
+        self.status().as_int()
     }
 
     pub fn to_loading(&self) -> BackendState {
