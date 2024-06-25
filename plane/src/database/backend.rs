@@ -180,14 +180,14 @@ impl<'a> BackendDatabase<'a> {
     pub async fn update_state(
         &self,
         backend: &BackendName,
-        state: BackendState,
+        new_state: BackendState,
     ) -> sqlx::Result<bool> {
         let mut txn = self.db.pool.begin().await?;
 
-        emit_with_key(&mut *txn, &backend.to_string(), &state).await?;
+        emit_with_key(&mut *txn, &backend.to_string(), &new_state).await?;
 
-        let last_status = state.status();
-        let last_status_number = last_status.as_int();
+        let new_status = new_state.status();
+        let new_status_number = new_status.as_int();
 
         let result = sqlx::query!(
             r#"
@@ -202,16 +202,17 @@ impl<'a> BackendDatabase<'a> {
             and last_status_number < $3 or last_status_number is null
             "#,
             backend.to_string(),
-            last_status.to_string(),
-            last_status_number,
-            state.address().map(|d| d.0.to_string()),
-            serde_json::to_value(&state).expect("BackendState should always be JSON-serializable."),
+            new_status.to_string(),
+            new_status_number,
+            new_state.address().map(|d| d.0.to_string()),
+            serde_json::to_value(&new_state)
+                .expect("BackendState should always be JSON-serializable."),
         )
         .execute(&mut *txn)
         .await?;
 
         if result.rows_affected() == 0 {
-            let current_status = sqlx::query!(
+            let result = sqlx::query!(
                 r#"
                 select last_status
                 from backend
@@ -222,9 +223,9 @@ impl<'a> BackendDatabase<'a> {
             .fetch_optional(&mut *txn)
             .await?;
 
-            let current_status = current_status.map(|r| r.last_status);
+            let last_status = result.map(|r| r.last_status);
 
-            tracing::warn!(current_status, new_status=%last_status, "Not updating backend status");
+            tracing::warn!(last_status, new_status=%new_status, "Not updating backend status");
             return Ok(false);
         }
 
@@ -234,13 +235,14 @@ impl<'a> BackendDatabase<'a> {
             values ($1, $2)
             "#,
             backend.to_string(),
-            serde_json::to_value(&state).expect("BackendState should always be JSON-serializable."),
+            serde_json::to_value(&new_state)
+                .expect("BackendState should always be JSON-serializable."),
         )
         .execute(&mut *txn)
         .await?;
 
         // If the backend is terminated, we can delete its associated key.
-        if matches!(state, BackendState::Terminated { .. }) {
+        if matches!(new_state, BackendState::Terminated { .. }) {
             sqlx::query!(
                 r#"
                 delete from backend_key
