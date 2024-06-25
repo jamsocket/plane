@@ -101,6 +101,8 @@ async fn create_backend_with_key(
     let backend_id = spawn_config.id.clone().or_random();
     let mut txn = pool.begin().await?;
 
+    let initial_status = BackendStatus::Scheduled;
+
     let result = sqlx::query!(
         r#"
         with backend_insert as (
@@ -109,6 +111,7 @@ async fn create_backend_with_key(
                 cluster,
                 last_status,
                 last_status_time,
+                last_status_number,
                 drone_id,
                 expiration_time,
                 allowed_idle_seconds,
@@ -117,7 +120,7 @@ async fn create_backend_with_key(
                 static_token,
                 subdomain
             )
-            values ($1, $2, $3, now(), $4, now() + $5, $6, now(), $11, $12, $13)
+            values ($1, $2, $3, now(), $14, $4, now() + $5, $6, now(), $11, $12, $13)
             returning id
         )
         insert into backend_key (id, key_name, namespace, tag, expires_at, fencing_token)
@@ -126,7 +129,7 @@ async fn create_backend_with_key(
         "#,
         backend_id.to_string(),
         cluster.to_string(),
-        BackendStatus::Scheduled.to_string(),
+        initial_status.to_string(),
         drone_for_spawn.id.as_i32(),
         spawn_config
             .lifetime_limit_seconds
@@ -142,6 +145,7 @@ async fn create_backend_with_key(
         serde_json::to_value(&BackendState::Scheduled).expect("valid json"),
         static_token.map(|t| t.to_string()),
         spawn_config.subdomain.as_ref().map(|s| s.to_string()),
+        initial_status.as_int(),
     )
     .fetch_one(&mut *txn)
     .await;
