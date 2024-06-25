@@ -31,6 +31,7 @@ pub struct TestEnvironment {
     drop_futures: Arc<Mutex<Vec<Arc<dyn AsyncDrop>>>>,
     log_subscription: Arc<Mutex<Option<LogSubscription>>>,
     pub run_name: String,
+    #[allow(dead_code)] // Used in tests.
     pub cluster: ClusterName,
     pub pool: DronePoolName,
 }
@@ -201,6 +202,7 @@ impl TestEnvironment {
 }
 
 pub struct DnsServer {
+    #[allow(dead_code)] // Used in tests.
     pub port: u16,
     _handle: Option<tokio::task::JoinHandle<()>>,
 }

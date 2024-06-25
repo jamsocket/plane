@@ -34,6 +34,7 @@ echo "Starting pebble with DNS server $DNS_SERVER"
 
 pub struct Pebble {
     container: Container,
+    #[allow(dead_code)] // Used in tests
     pub directory_url: Url,
 }
 
