@@ -4,6 +4,7 @@ use trust_dns_server::proto::op::ResponseCode;
 #[derive(Debug)]
 pub struct DnsError {
     pub code: ResponseCode,
+    #[allow(unused)] // appears when debug-logged
     pub message: String,
 }
 
