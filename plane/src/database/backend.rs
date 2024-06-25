@@ -181,28 +181,52 @@ impl<'a> BackendDatabase<'a> {
         &self,
         backend: &BackendName,
         state: BackendState,
-    ) -> sqlx::Result<()> {
+    ) -> sqlx::Result<bool> {
         let mut txn = self.db.pool.begin().await?;
 
         emit_with_key(&mut *txn, &backend.to_string(), &state).await?;
 
-        sqlx::query!(
+        let last_status = state.status();
+        let last_status_number = last_status.as_int();
+
+        let result = sqlx::query!(
             r#"
             update backend
             set
                 last_status = $2,
                 last_status_time = now(),
-                cluster_address = $3,
-                state = $4
+                last_status_number = $3,
+                cluster_address = $4,
+                state = $5
             where id = $1
+            and last_status_number < $3 or last_status_number is null
             "#,
             backend.to_string(),
-            state.status().to_string(),
+            last_status.to_string(),
+            last_status_number,
             state.address().map(|d| d.0.to_string()),
             serde_json::to_value(&state).expect("BackendState should always be JSON-serializable."),
         )
         .execute(&mut *txn)
         .await?;
+
+        if result.rows_affected() == 0 {
+            let current_status = sqlx::query!(
+                r#"
+                select last_status
+                from backend
+                where id = $1
+                "#,
+                backend.to_string(),
+            )
+            .fetch_optional(&mut *txn)
+            .await?;
+
+            let current_status = current_status.map(|r| r.last_status);
+
+            tracing::warn!(current_status, "Not updating backend status");
+            return Ok(false);
+        }
 
         sqlx::query!(
             r#"
@@ -230,7 +254,7 @@ impl<'a> BackendDatabase<'a> {
 
         txn.commit().await?;
 
-        Ok(())
+        Ok(true)
     }
 
     pub async fn list_backends(&self) -> sqlx::Result<Vec<BackendRow>> {
