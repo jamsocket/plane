@@ -107,7 +107,8 @@ CREATE TABLE public.backend (
     allowed_idle_seconds integer,
     state jsonb NOT NULL,
     static_token character varying(256),
-    subdomain character varying(255)
+    subdomain character varying(255),
+    last_status_number integer
 );
 
 
@@ -188,6 +189,13 @@ COMMENT ON COLUMN public.backend.state IS 'The most recent state of the backend.
 --
 
 COMMENT ON COLUMN public.backend.subdomain IS 'Optional subdomain for session backend';
+
+
+--
+-- Name: COLUMN backend.last_status_number; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.backend.last_status_number IS 'Number associated with a status, used for ordering.';
 
 
 --
