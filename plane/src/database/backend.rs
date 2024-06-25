@@ -224,7 +224,7 @@ impl<'a> BackendDatabase<'a> {
 
             let current_status = current_status.map(|r| r.last_status);
 
-            tracing::warn!(current_status, "Not updating backend status");
+            tracing::warn!(current_status, new_status=%last_status, "Not updating backend status");
             return Ok(false);
         }
 
