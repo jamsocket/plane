@@ -319,7 +319,6 @@ impl EventSubscriptionManager {
 
         let mut listeners = self.listeners.write().expect("Listener map is poisoned.");
         let key = (kind.clone(), key.map(|s| s.to_string()));
-        tracing::info!(kind = key.0, key = key.1, "Subscribing to event");
 
         match listeners.entry(key.clone()) {
             std::collections::hash_map::Entry::Occupied(entry) => {
