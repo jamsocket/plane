@@ -81,7 +81,7 @@ impl Runtime for UnixSocketRuntime {
         match response {
             MessageToClient::SpawnResult(Ok(result)) => Ok(result),
             MessageToClient::SpawnResult(Err(e)) => Err(Error::msg(e)),
-            _ => unreachable!("Unexpected response from server"),
+            _ => Err(Error::msg("Unexpected response from server")),
         }
     }
 
@@ -93,7 +93,7 @@ impl Runtime for UnixSocketRuntime {
         match response {
             MessageToClient::TerminateResult(Ok(result)) => Ok(result),
             MessageToClient::TerminateResult(Err(e)) => Err(Error::msg(e)),
-            _ => unreachable!("Unexpected response from server"),
+            _ => Err(Error::msg("Unexpected response from server")),
         }
     }
 
@@ -130,9 +130,10 @@ impl Runtime for UnixSocketRuntime {
             .await
             .expect("Failed to send request");
         match response {
-            MessageToClient::WaitForBackendResult(Ok(())) => Ok(()),
-            MessageToClient::WaitForBackendResult(Err(e)) => Err(e),
-            _ => unreachable!("Unexpected response from server"),
+            MessageToClient::WaitForBackendResult(v) => v,
+            _ => Err(BackendError::Other(
+                "Unexpected response from server".to_string(),
+            )),
         }
     }
 }

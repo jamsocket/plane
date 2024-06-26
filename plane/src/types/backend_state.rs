@@ -226,6 +226,8 @@ impl valuable::Valuable for TerminationReason {
 pub enum BackendError {
     #[error("Timeout waiting for backend to start")]
     StartupTimeout,
+    #[error("{0}")]
+    Other(String),
 }
 
 impl BackendState {
