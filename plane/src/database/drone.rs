@@ -1,10 +1,11 @@
 use crate::{
     heartbeat_consts::UNHEALTHY_SECONDS,
-    names::DroneName,
+    names::{ControllerName, DroneName},
     types::{BackendStatus, ClusterName, DronePoolName, NodeId},
 };
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, query, PgPool};
+use std::str::FromStr;
 use std::time::Duration;
 
 pub struct DroneDatabase<'a> {
@@ -94,6 +95,67 @@ impl<'a> DroneDatabase<'a> {
         Ok(result.pool.into())
     }
 
+    pub async fn get_active_drones_for_pool(
+        &self,
+        cluster: &ClusterName,
+        pool: &DronePoolName,
+    ) -> sqlx::Result<Vec<DroneWithMetadata>> {
+        let result = query!(
+            r#"
+            select
+                drone.id as id,
+                drone.ready as ready,
+                drone.draining as draining,
+                drone.last_heartbeat as "last_heartbeat!",
+                drone.last_local_time as "last_local_time!",
+                drone.pool as pool,
+                node.name as name,
+                node.cluster as "cluster!",
+                node.plane_version as plane_version,
+                node.plane_hash as plane_hash,
+                node.controller as "controller!",
+                node.last_connection_start_time as "last_connection_start_time!"
+            from node
+            left join drone on node.id = drone.id
+            where
+                drone.ready = true
+                and controller is not null
+                and cluster = $1
+                and now() - drone.last_heartbeat < $2
+                and pool = $3
+                and last_local_time is not null
+                and last_connection_start_time is not null
+            order by drone.id
+            "#,
+            cluster.to_string(),
+            PgInterval::try_from(Duration::from_secs(UNHEALTHY_SECONDS as _))
+                .expect("valid interval"),
+            pool.to_string(),
+        )
+        .fetch_all(self.pool)
+        .await?;
+
+        let drones: Vec<DroneWithMetadata> = result
+            .into_iter()
+            .map(|r| DroneWithMetadata {
+                id: NodeId::from(r.id),
+                name: DroneName::try_from(r.name).expect("valid drone name"),
+                ready: r.ready,
+                draining: r.draining,
+                last_heartbeat: r.last_heartbeat,
+                last_local_time: r.last_local_time,
+                pool: r.pool.into(),
+                cluster: ClusterName::from_str(&r.cluster).expect("valid cluster name"),
+                plane_version: r.plane_version,
+                plane_hash: r.plane_hash,
+                controller: ControllerName::try_from(r.controller).expect("valid controller name"),
+                last_connection_start_time: r.last_connection_start_time,
+            })
+            .collect();
+
+        Ok(drones)
+    }
+
     /// TODO: simple algorithm until we collect more metrics.
     pub async fn pick_drone_for_spawn(
         &self,
@@ -162,4 +224,19 @@ pub struct DroneForSpawn {
     pub id: NodeId,
     pub drone: DroneName,
     pub last_local_time: DateTime<Utc>,
+}
+
+pub struct DroneWithMetadata {
+    pub id: NodeId,
+    pub name: DroneName,
+    pub ready: bool,
+    pub draining: bool,
+    pub last_heartbeat: DateTime<Utc>,
+    pub last_local_time: DateTime<Utc>,
+    pub pool: DronePoolName,
+    pub cluster: ClusterName,
+    pub plane_version: String,
+    pub plane_hash: String,
+    pub controller: ControllerName,
+    pub last_connection_start_time: DateTime<Utc>,
 }
