@@ -180,7 +180,9 @@ where
                     }
                     Ok(None) => {
                         tracing::info!("Connection closed by client");
-                        return Err(anyhow::anyhow!("Connection closed by server"));
+                        return Err::<(), anyhow::Error>(anyhow::anyhow!(
+                            "Connection closed by server"
+                        ));
                     }
                     Err(e) => {
                         tracing::error!("Error reading line: {}", e);
@@ -188,7 +190,6 @@ where
                     }
                 }
             }
-            Ok(())
         }
     };
 
@@ -221,6 +222,7 @@ where
                     }
                 }
             }
+            #[allow(unreachable_code)]
             Ok(())
         }
     };

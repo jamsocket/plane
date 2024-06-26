@@ -177,7 +177,9 @@ where
                     }
                     Ok(None) => {
                         tracing::error!("Connection closed by server");
-                        return Err(anyhow::anyhow!("Connection closed by server"));
+                        return Err::<(), anyhow::Error>(anyhow::anyhow!(
+                            "Connection closed by server"
+                        ));
                     }
                     Err(e) => {
                         tracing::error!("Error reading line: {}", e);
@@ -185,7 +187,6 @@ where
                     }
                 }
             }
-            Ok(())
         }
     };
 
