@@ -199,7 +199,7 @@ impl<'a> BackendDatabase<'a> {
                 cluster_address = $4,
                 state = $5
             where id = $1
-            and last_status_number < $3 or last_status_number is null
+            and (last_status_number < $3 or last_status_number is null)
             "#,
             backend.to_string(),
             new_status.to_string(),
