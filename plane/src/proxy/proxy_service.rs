@@ -3,6 +3,7 @@ use super::rewriter::RequestRewriterError;
 use super::route_map::RouteMap;
 use super::tls::TlsStream;
 use super::{ForwardableRequestInfo, Protocol};
+use crate::names::BackendName;
 use crate::proxy::cert_manager::CertWatcher;
 use crate::proxy::rewriter::RequestRewriter;
 use crate::proxy::tls::TlsAcceptor;
@@ -80,8 +81,8 @@ pub enum ProxyError {
     #[error("Error upgrading request: {0}")]
     UpgradeError(hyper::Error),
 
-    #[error("Error making request: {0}")]
-    RequestError(hyper::Error),
+    #[error("Error making request: {0} (backend: {1})")]
+    RequestError(hyper::Error, BackendName),
 
     #[error("Error making upgradable request: {0}")]
     UpgradableRequestError(hyper::Error),
@@ -156,8 +157,8 @@ impl RequestHandler {
                         (hyper::StatusCode::UNAUTHORIZED, "Invalid subdomain")
                     }
                     ProxyError::BadRequest => (hyper::StatusCode::BAD_REQUEST, "Bad request"),
-                    ProxyError::RequestError(err) => {
-                        tracing::warn!(?err, "Error proxying request to backend.");
+                    ProxyError::RequestError(err, backend) => {
+                        tracing::warn!(?err, %backend, "Error proxying request to backend.");
                         (hyper::StatusCode::BAD_GATEWAY, "Connect error")
                     }
                     err => {
@@ -330,7 +331,7 @@ impl RequestHandler {
                 .http_client
                 .request(req)
                 .await
-                .map_err(ProxyError::RequestError)?
+                .map_err(|e| ProxyError::RequestError(e, backend_id.clone()))?
         };
 
         let headers = response.headers_mut();
