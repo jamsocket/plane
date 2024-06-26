@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update backend\n            set\n                last_status = $2,\n                last_status_time = now(),\n                last_status_number = $3,\n                cluster_address = $4,\n                state = $5\n            where id = $1\n            and (last_status_number < $3 or last_status_number is null)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Varchar",
+        "Int4",
+        "Varchar",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "00a771e2e31f3e02568fad20b5d90eb2c2e4477448fa56017bf1bb02b0f78e57"
+}
