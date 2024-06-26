@@ -92,7 +92,7 @@ pub async fn create_pending_action(
         action: action.clone(),
     };
 
-    emit_with_key(&mut **txn, &drone_id.to_string(), &backend_action).await?;
+    emit_with_key(&mut *txn, &drone_id.to_string(), &backend_action).await?;
 
     sqlx::query!(
         r#"

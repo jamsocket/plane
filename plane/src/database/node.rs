@@ -100,7 +100,7 @@ impl<'a> NodeDatabase<'a> {
         .await?;
 
         emit(
-            &mut *txn,
+            &mut txn,
             &NodeConnectionStatusChangeNotification {
                 node_id: NodeId::from(result.id),
                 connected: true,
@@ -122,7 +122,7 @@ impl<'a> NodeDatabase<'a> {
         let mut txn = self.pool.begin().await?;
 
         emit(
-            &mut *txn,
+            &mut txn,
             &NodeConnectionStatusChangeNotification {
                 node_id,
                 connected: false,
