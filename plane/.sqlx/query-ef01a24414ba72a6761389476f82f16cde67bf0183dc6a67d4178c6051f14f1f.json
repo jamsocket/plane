@@ -1,0 +1,90 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select\n                drone.id as id,\n                drone.ready as ready,\n                drone.draining as draining,\n                drone.last_heartbeat as \"last_heartbeat!\",\n                drone.last_local_time as \"last_local_time!\",\n                drone.pool as pool,\n                node.name as name,\n                node.cluster as \"cluster!\",\n                node.plane_version as plane_version,\n                node.plane_hash as plane_hash,\n                node.controller as \"controller!\",\n                node.last_connection_start_time as \"last_connection_start_time!\"\n            from node\n            left join drone on node.id = drone.id\n            where\n                drone.ready = true\n                and controller is not null\n                and cluster = $1\n                and now() - drone.last_heartbeat < $2\n                and pool = $3\n                and last_local_time is not null\n                and last_connection_start_time is not null\n            order by drone.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "ready",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "draining",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "last_heartbeat!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "last_local_time!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "pool",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "cluster!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "plane_version",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "plane_hash",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "controller!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "last_connection_start_time!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Interval",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "ef01a24414ba72a6761389476f82f16cde67bf0183dc6a67d4178c6051f14f1f"
+}
