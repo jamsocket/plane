@@ -95,11 +95,15 @@ impl<'a> DroneDatabase<'a> {
         Ok(result.pool.into())
     }
 
-    pub async fn get_active_drones_for_pool(
+    pub async fn get_drones_for_pool(
         &self,
         cluster: &ClusterName,
         pool: &DronePoolName,
+        seen_in_last: Duration,
     ) -> sqlx::Result<Vec<DroneWithMetadata>> {
+        let Ok(seen_in_last) = PgInterval::try_from(seen_in_last) else {
+            return Err(sqlx::Error::Protocol("invalid interval".to_string()));
+        };
         let result = query!(
             r#"
             select
@@ -125,11 +129,11 @@ impl<'a> DroneDatabase<'a> {
                 and pool = $3
                 and last_local_time is not null
                 and last_connection_start_time is not null
-            order by drone.id
+            order by drone.id desc
+            limit 100
             "#,
             cluster.to_string(),
-            PgInterval::try_from(Duration::from_secs(UNHEALTHY_SECONDS as _))
-                .expect("valid interval"),
+            seen_in_last,
             pool.to_string(),
         )
         .fetch_all(self.pool)
