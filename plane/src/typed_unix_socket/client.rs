@@ -7,7 +7,6 @@ use std::{clone::Clone, fmt::Debug, path::Path, sync::Arc};
 use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncBufReadExt, BufReader, BufWriter};
 use tokio::sync::broadcast::error::RecvError;
-use tokio::task::JoinHandle;
 use tokio::time::error::Elapsed;
 use tokio::{
     net::UnixStream,
@@ -27,7 +26,7 @@ where
     tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     response_map: Arc<DashMap<String, oneshot::Sender<MessageToClient>>>,
     event_tx: broadcast::Sender<MessageToClient>,
-    loop_task: Arc<GuardHandle>,
+    _loop_task: Arc<GuardHandle>,
 }
 
 impl<MessageToServer, MessageToClient> TypedUnixSocketClient<MessageToServer, MessageToClient>
@@ -73,7 +72,7 @@ where
             tx,
             response_map,
             event_tx,
-            loop_task: Arc::new(loop_task),
+            _loop_task: Arc::new(loop_task),
         })
     }
 
@@ -178,7 +177,9 @@ where
                     }
                     Ok(None) => {
                         tracing::error!("Connection closed by server");
-                        return Err(anyhow::anyhow!("Connection closed by server"));
+                        return Err::<(), anyhow::Error>(anyhow::anyhow!(
+                            "Connection closed by server"
+                        ));
                     }
                     Err(e) => {
                         tracing::error!("Error reading line: {}", e);
@@ -186,7 +187,6 @@ where
                     }
                 }
             }
-            Ok(())
         }
     };
 

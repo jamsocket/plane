@@ -1,6 +1,6 @@
 use crate::util::GuardHandle;
 
-use super::{get_quick_backoff, WrappedMessage};
+use super::WrappedMessage;
 use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -26,7 +26,7 @@ where
     event_tx: broadcast::Sender<MessageToServer>,
     request_tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     response_tx: broadcast::Sender<WrappedMessage<MessageToClient>>,
-    loop_task: Arc<GuardHandle>,
+    _loop_task: Arc<GuardHandle>,
 }
 
 impl<MessageToServer, MessageToClient> TypedUnixSocketServer<MessageToServer, MessageToClient>
@@ -83,7 +83,7 @@ where
             event_tx,
             request_tx,
             response_tx,
-            loop_task: Arc::new(loop_task),
+            _loop_task: Arc::new(loop_task),
         })
     }
 
@@ -180,7 +180,9 @@ where
                     }
                     Ok(None) => {
                         tracing::info!("Connection closed by client");
-                        return Err(anyhow::anyhow!("Connection closed by server"));
+                        return Err::<(), anyhow::Error>(anyhow::anyhow!(
+                            "Connection closed by server"
+                        ));
                     }
                     Err(e) => {
                         tracing::error!("Error reading line: {}", e);
@@ -188,7 +190,6 @@ where
                     }
                 }
             }
-            Ok(())
         }
     };
 
@@ -221,6 +222,7 @@ where
                     }
                 }
             }
+            #[allow(unreachable_code)]
             Ok(())
         }
     };

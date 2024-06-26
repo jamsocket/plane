@@ -273,12 +273,13 @@ impl Runtime for DockerRuntime {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TerminateEvent {
     pub backend_id: BackendName,
     pub exit_code: Option<i32>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SpawnResult {
     pub container_id: ContainerId,
     pub port: u16,
