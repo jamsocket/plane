@@ -222,7 +222,7 @@ impl valuable::Valuable for TerminationReason {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Clone, Debug, Serialize, Deserialize, thiserror::Error)]
 pub enum BackendError {
     #[error("Timeout waiting for backend to start")]
     StartupTimeout,
