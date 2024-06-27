@@ -107,6 +107,7 @@ impl RouteMap {
             .push(token.clone(), route_info);
         let listener_lock = self.listeners.lock().expect("Listeners lock was poisoned.");
         if let Some(listener_lock) = listener_lock.get(&token) {
+            // We are just using the watch channel as a signal; this will ensure that anyone listening on `.changed()` resolves.
             listener_lock.send_modify(|()| ());
         };
     }
