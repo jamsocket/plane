@@ -95,6 +95,8 @@ impl<'a> DroneDatabase<'a> {
         Ok(result.pool.into())
     }
 
+    /// Returns a list of drones that are ready and have been seen in the last `seen_in_last` duration.
+    /// Limits the result to the most recent 100 drones.
     pub async fn get_drones_for_pool(
         &self,
         cluster: &ClusterName,
