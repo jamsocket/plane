@@ -9,7 +9,7 @@ use std::{
     num::NonZeroUsize,
     sync::{Mutex, RwLock},
 };
-use tokio::sync::broadcast::Sender;
+use tokio::sync::watch::Sender;
 use valuable::Valuable;
 
 const CACHE_SIZE: usize = 1_000;
@@ -60,7 +60,7 @@ impl RouteMap {
         let mut receiver = {
             let mut listener_lock = self.listeners.lock().expect("Listeners lock was poisoned.");
             let sender = listener_lock.entry(token.clone()).or_insert_with(|| {
-                let (sender, _) = tokio::sync::broadcast::channel(1);
+                let (sender, _) = tokio::sync::watch::channel(());
                 sender
             });
             sender.subscribe()
@@ -85,9 +85,9 @@ impl RouteMap {
         }
 
         receiver
-            .recv()
+            .changed()
             .await
-            .expect("Always able to receive from channel.");
+            .expect("Sender was dropped unexpectedly.");
         self.routes
             .lock()
             .expect("Routes lock was poisoned.")
@@ -107,9 +107,7 @@ impl RouteMap {
             .push(token.clone(), route_info);
         let listener_lock = self.listeners.lock().expect("Listeners lock was poisoned.");
         if let Some(listener_lock) = listener_lock.get(&token) {
-            if let Err(err) = listener_lock.send(()) {
-                tracing::error!(?err, "Error sending to listener.");
-            }
+            listener_lock.send_modify(|()| ());
         };
     }
 
