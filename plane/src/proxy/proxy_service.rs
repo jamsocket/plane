@@ -203,9 +203,17 @@ impl RequestHandler {
                 return Err(ProxyError::MissingHostHeader);
             };
 
+            let host = match host.parse() {
+                Ok(host) => host,
+                Err(err) => {
+                    tracing::warn!(?err, ?host, "Invalid host header.");
+                    return Err(ProxyError::BadRequest);
+                }
+            };
+
             let mut uri_parts = req.uri().clone().into_parts();
             uri_parts.scheme = Some("https".parse().expect("https is a valid scheme."));
-            uri_parts.authority = Some(host.parse().expect("HOST header is a valid authority."));
+            uri_parts.authority = Some(host);
             uri_parts.path_and_query = uri_parts
                 .path_and_query
                 .or_else(|| Some(PathAndQuery::from_static("")));
