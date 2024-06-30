@@ -267,11 +267,7 @@ impl EventSubscriptionManager {
         sqlx::query!(
             r#"
             delete from event
-            where id in (
-                select id
-                from event
-                where created_at < now() - make_interval(days => $1)
-            )
+            where created_at < now() - make_interval(days => $1)
             "#,
             min_age_days
         )
