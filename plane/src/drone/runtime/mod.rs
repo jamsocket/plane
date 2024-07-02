@@ -12,7 +12,7 @@ use std::net::SocketAddr;
 
 pub mod docker;
 #[allow(unused)] // for now, to disable clippy noise
-mod unix_socket;
+pub mod unix_socket;
 
 pub trait Runtime: Send + Sync + 'static {
     type RuntimeConfig;
