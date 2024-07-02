@@ -402,7 +402,7 @@ impl<'a> BackendDatabase<'a> {
             .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?;
         let partial = PartialRouteInfo {
             backend_id: backend_id.clone(),
-            secret_token: SecretToken::from("".to_string()),
+            secret_token: SecretToken::from(result.secret_token),
             cluster: ClusterName::from_str(&result.cluster)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))?,
             user: None,
