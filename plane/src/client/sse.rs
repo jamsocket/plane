@@ -220,9 +220,8 @@ mod tests {
 
         let stream = stream! {
             loop {
-                match timeout(Duration::from_millis(100), receiver.recv()).await {
-                    Ok(_) => break,
-                    Err(_) => ()
+                if let Ok(_) = timeout(Duration::from_millis(100), receiver.recv()).await {
+                    break;
                 };
 
                 let event = Event::default().json_data(&Count { value }).unwrap().id(value.to_string());

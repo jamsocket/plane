@@ -53,21 +53,20 @@ pub async fn handle_route_info_request(
             // subscription. It's a bit hacky, but for now we will just issue the query again.
             // We can't start the subscription first to avoid repeating the query, because we need to know the backend
             // ID to start the subscription.
-            match controller.db.backend().route_info_for_token(&token).await {
-                Ok(RouteInfoResult::Ready(route_info)) => {
-                    let response = RouteInfoResponse {
-                        token,
-                        route_info: Some(route_info),
-                    };
-                    if let Err(err) = socket
-                        .send(MessageToProxy::RouteInfoResponse(response))
-                        .await
-                    {
-                        tracing::error!(?err, "Error sending route info response to proxy.");
-                    }
-                    return;
+            if let Ok(RouteInfoResult::Ready(route_info)) =
+                controller.db.backend().route_info_for_token(&token).await
+            {
+                let response = RouteInfoResponse {
+                    token,
+                    route_info: Some(route_info),
+                };
+                if let Err(err) = socket
+                    .send(MessageToProxy::RouteInfoResponse(response))
+                    .await
+                {
+                    tracing::error!(?err, "Error sending route info response to proxy.");
                 }
-                _ => {}
+                return;
             }
 
             let socket = socket.sender(MessageToProxy::RouteInfoResponse);
@@ -137,7 +136,6 @@ pub async fn handle_route_info_request(
         }
         Err(err) => {
             tracing::error!(?err, "Error getting route info");
-            return;
         }
     };
 }
