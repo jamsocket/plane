@@ -48,9 +48,6 @@ pub struct UnixSocketRuntimeConfig {
 
 #[async_trait::async_trait]
 impl Runtime for UnixSocketRuntime {
-    // type RuntimeConfig = UnixSocketRuntimeConfig;
-    // type BackendConfig = DockerExecutorConfig;
-
     async fn prepare(&self, config: &serde_json::Value) -> Result<()> {
         let config: DockerExecutorConfig = serde_json::from_value(config.clone())?;
 

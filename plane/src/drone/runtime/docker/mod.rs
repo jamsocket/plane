@@ -164,9 +164,6 @@ async fn events_loop(
 
 #[async_trait::async_trait]
 impl Runtime for DockerRuntime {
-    // type RuntimeConfig = DockerRuntimeConfig;
-    // type BackendConfig = DockerExecutorConfig;
-
     async fn prepare(&self, config: &serde_json::Value) -> Result<()> {
         let config: DockerExecutorConfig = serde_json::from_value(config.clone())?;
         let image = &config.image;
