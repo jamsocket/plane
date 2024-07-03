@@ -42,10 +42,10 @@ mod key_manager;
 pub mod runtime;
 mod state_store;
 
-pub async fn drone_loop<R: Runtime>(
+pub async fn drone_loop(
     name: DroneName,
     mut connection: TypedSocketConnector<MessageFromDrone>,
-    executor: Executor<R>,
+    executor: Executor,
 ) {
     let executor = Arc::new(executor);
     let key_manager = Arc::new(Mutex::new(KeyManager::new(executor.clone())));
@@ -56,11 +56,13 @@ pub async fn drone_loop<R: Runtime>(
 
         {
             let socket = socket.sender(MessageFromDrone::BackendMetrics);
-            executor.runtime.metrics_callback(move |metrics_message| {
-                if let Err(err) = socket.send(metrics_message) {
-                    tracing::error!(?err, "Error sending metrics message.");
-                }
-            });
+            executor
+                .runtime
+                .metrics_callback(Box::new(move |metrics_message| {
+                    if let Err(err) = socket.send(metrics_message) {
+                        tracing::error!(?err, "Error sending metrics message.");
+                    }
+                }));
         };
 
         key_manager
@@ -204,7 +206,7 @@ impl Drone {
 
                 Box::new(DockerRuntime::new(docker_config).await?)
             }
-            (None, Some(ExecutorConfig::UnixSocket(mut unix_socket_config))) => {
+            (None, Some(ExecutorConfig::UnixSocket(unix_socket_config))) => {
                 Box::new(UnixSocketRuntime::new(unix_socket_config).await?)
             }
             (None, None) => {

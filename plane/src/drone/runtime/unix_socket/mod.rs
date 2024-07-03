@@ -48,10 +48,12 @@ pub struct UnixSocketRuntimeConfig {
 
 #[async_trait::async_trait]
 impl Runtime for UnixSocketRuntime {
-    type RuntimeConfig = UnixSocketRuntimeConfig;
-    type BackendConfig = DockerExecutorConfig;
+    // type RuntimeConfig = UnixSocketRuntimeConfig;
+    // type BackendConfig = DockerExecutorConfig;
 
-    async fn prepare(&self, config: &DockerExecutorConfig) -> Result<()> {
+    async fn prepare(&self, config: &serde_json::Value) -> Result<()> {
+        let config: DockerExecutorConfig = serde_json::from_value(config.clone())?;
+
         let response = self
             .client
             .send_request(MessageToServer::Prepare(config.clone()))
@@ -66,10 +68,12 @@ impl Runtime for UnixSocketRuntime {
     async fn spawn(
         &self,
         backend_id: &BackendName,
-        executable: DockerExecutorConfig,
+        executable: &serde_json::Value,
         acquired_key: Option<&AcquiredKey>,
         static_token: Option<&BearerToken>,
     ) -> Result<SpawnResult> {
+        let executable: DockerExecutorConfig = serde_json::from_value(executable.clone())?;
+
         let response = self
             .client
             .send_request(MessageToServer::Spawn(
@@ -98,7 +102,7 @@ impl Runtime for UnixSocketRuntime {
         }
     }
 
-    fn events(&self) -> impl Stream<Item = TerminateEvent> {
+    fn events(&self) -> Pin<Box<dyn Stream<Item = TerminateEvent> + Send>> {
         let mut event_rx = self.client.subscribe_events();
         Box::pin(async_stream::stream! {
             while let Ok(event) = event_rx.recv().await {
@@ -109,7 +113,7 @@ impl Runtime for UnixSocketRuntime {
         })
     }
 
-    fn metrics_callback<F: Fn(BackendMetricsMessage) + Send + Sync + 'static>(&self, sender: F) {
+    fn metrics_callback(&self, sender: Box<dyn Fn(BackendMetricsMessage) + Send + Sync + 'static>) {
         let mut event_rx = self.client.subscribe_events();
         tokio::spawn(async move {
             while let Ok(event) = event_rx.recv().await {

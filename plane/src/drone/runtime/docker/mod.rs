@@ -22,7 +22,7 @@ use bollard::{
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, pin::Pin};
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
@@ -164,10 +164,11 @@ async fn events_loop(
 
 #[async_trait::async_trait]
 impl Runtime for DockerRuntime {
-    type RuntimeConfig = DockerRuntimeConfig;
-    type BackendConfig = DockerExecutorConfig;
+    // type RuntimeConfig = DockerRuntimeConfig;
+    // type BackendConfig = DockerExecutorConfig;
 
-    async fn prepare(&self, config: &DockerExecutorConfig) -> Result<()> {
+    async fn prepare(&self, config: &serde_json::Value) -> Result<()> {
+        let config: DockerExecutorConfig = serde_json::from_value(config.clone())?;
         let image = &config.image;
         let credentials = config
             .credentials
@@ -189,10 +190,11 @@ impl Runtime for DockerRuntime {
     async fn spawn(
         &self,
         backend_id: &BackendName,
-        executable: DockerExecutorConfig,
+        executable: &serde_json::Value,
         acquired_key: Option<&AcquiredKey>,
         static_token: Option<&BearerToken>,
     ) -> Result<SpawnResult> {
+        let executable: DockerExecutorConfig = serde_json::from_value(executable.clone())?;
         let container_id =
             run_container(self, backend_id, executable, acquired_key, static_token).await?;
         let port = get_port(&self.docker, &container_id).await?;
@@ -247,17 +249,19 @@ impl Runtime for DockerRuntime {
         }
     }
 
-    fn events(&self) -> impl Stream<Item = TerminateEvent> {
-        BroadcastStream::new(self.events_sender.subscribe()).filter_map(|e| match e {
-            Ok(e) => Some(e),
-            Err(e) => {
-                tracing::error!(?e, "Error receiving Docker event.");
-                None
-            }
-        })
+    fn events(&self) -> Pin<Box<dyn Stream<Item = TerminateEvent> + Send>> {
+        Box::pin(
+            BroadcastStream::new(self.events_sender.subscribe()).filter_map(|e| match e {
+                Ok(e) => Some(e),
+                Err(e) => {
+                    tracing::error!(?e, "Error receiving Docker event.");
+                    None
+                }
+            }),
+        )
     }
 
-    fn metrics_callback<F: Fn(BackendMetricsMessage) + Send + Sync + 'static>(&self, sender: F) {
+    fn metrics_callback(&self, sender: Box<dyn Fn(BackendMetricsMessage) + Send + Sync + 'static>) {
         let mut lock = self
             .metrics_callback
             .lock()

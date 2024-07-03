@@ -1,4 +1,4 @@
-use super::{executor::Executor, runtime::Runtime};
+use super::executor::Executor;
 use crate::{
     log_types::LoggableTime,
     names::BackendName,
@@ -12,8 +12,8 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::sleep;
 use valuable::Valuable;
 
-pub struct KeyManager<R: Runtime> {
-    executor: Arc<Executor<R>>,
+pub struct KeyManager {
+    executor: Arc<Executor>,
 
     /// Map from a backend to the most recently acquired key for that backend,
     /// along with the handle for the task that is responsible for renewing the key
@@ -23,11 +23,11 @@ pub struct KeyManager<R: Runtime> {
     sender: Option<TypedSocketSender<RenewKeyRequest>>,
 }
 
-async fn renew_key_loop<R: Runtime>(
+async fn renew_key_loop(
     key: AcquiredKey,
     backend: BackendName,
     sender: Option<TypedSocketSender<RenewKeyRequest>>,
-    executor: Arc<Executor<R>>,
+    executor: Arc<Executor>,
 ) {
     loop {
         let now = Utc::now();
@@ -111,8 +111,8 @@ async fn renew_key_loop<R: Runtime>(
     }
 }
 
-impl<R: Runtime> KeyManager<R> {
-    pub fn new(executor: Arc<Executor<R>>) -> Self {
+impl KeyManager {
+    pub fn new(executor: Arc<Executor>) -> Self {
         Self {
             executor,
             handles: HashMap::new(),

@@ -16,17 +16,17 @@ use std::{
 };
 use valuable::Valuable;
 
-pub struct Executor<R: Runtime> {
-    pub runtime: Arc<R>,
+pub struct Executor {
+    pub runtime: Arc<Box<dyn Runtime>>,
     state_store: Arc<Mutex<StateStore>>,
-    backends: Arc<DashMap<BackendName, Arc<BackendManager<R>>>>,
+    backends: Arc<DashMap<BackendName, Arc<BackendManager>>>,
     ip: IpAddr,
     _backend_event_listener: GuardHandle,
 }
 
-impl<R: Runtime> Executor<R> {
-    pub async fn new(runtime: Arc<R>, state_store: StateStore, ip: IpAddr) -> Self {
-        let backends: Arc<DashMap<BackendName, Arc<BackendManager<R>>>> = Arc::default();
+impl Executor {
+    pub async fn new(runtime: Arc<Box<dyn Runtime>>, state_store: StateStore, ip: IpAddr) -> Self {
+        let backends: Arc<DashMap<BackendName, Arc<BackendManager>>> = Arc::default();
         let state_store = Arc::new(Mutex::new(state_store));
 
         #[allow(clippy::unwrap_used)]
@@ -71,7 +71,7 @@ impl<R: Runtime> Executor<R> {
     // This prevents bugs where an agent restart leaves the drone unable to
     // terminate old backends.
     async fn terminate_preexisting_backends(
-        runtime: Arc<R>,
+        runtime: Arc<Box<dyn Runtime>>,
         state_store: Arc<Mutex<StateStore>>,
     ) -> Result<()> {
         let backends = state_store
@@ -188,11 +188,9 @@ impl<R: Runtime> Executor<R> {
                     }
                 };
 
-                let backend_config: R::BackendConfig = serde_json::from_value(executable.clone())?;
-
                 let manager = BackendManager::new(
                     backend_id.clone(),
-                    backend_config,
+                    executable.clone(),
                     BackendState::default(),
                     self.runtime.clone(),
                     callback,

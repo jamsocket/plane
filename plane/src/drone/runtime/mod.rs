@@ -7,7 +7,6 @@ use crate::{
 use anyhow::Error;
 use docker::{SpawnResult, TerminateEvent};
 use futures_util::Stream;
-use serde::{de::DeserializeOwned, Serialize};
 use std::{net::SocketAddr, pin::Pin};
 
 pub mod docker;
@@ -16,15 +15,12 @@ pub mod unix_socket;
 
 #[async_trait::async_trait]
 pub trait Runtime: Send + Sync + 'static {
-    type RuntimeConfig;
-    type BackendConfig: Clone + Send + Sync + 'static + DeserializeOwned + Serialize;
-
-    async fn prepare(&self, config: &Self::BackendConfig) -> Result<(), Error>;
+    async fn prepare(&self, config: &serde_json::Value) -> Result<(), Error>;
 
     async fn spawn(
         &self,
         backend_id: &BackendName,
-        executable: Self::BackendConfig,
+        executable: &serde_json::Value,
         acquired_key: Option<&AcquiredKey>,
         static_token: Option<&BearerToken>,
     ) -> Result<SpawnResult, Error>;
