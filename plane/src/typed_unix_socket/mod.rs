@@ -10,7 +10,7 @@ pub struct WrappedMessage<T> {
     /// Optional ID for this message. If it is provided, this message belongs to a request/response pair
     /// (either as the request or the response). If it is not provided, this message is an event.
     id: Option<String>,
-    message: T,
+    pub message: T,
 }
 
 fn get_quick_backoff() -> ExponentialBackoff {
