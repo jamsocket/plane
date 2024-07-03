@@ -34,6 +34,10 @@ pub struct DroneOpts {
     #[clap(long)]
     docker_runtime: Option<String>,
 
+    // Optional path to a unix socket for connecting to an external executor.
+    #[clap(long)]
+    executor_socket: Option<PathBuf>,
+
     /// Optional log driver configuration, passed to Docker as the `LogConfig` field.
     #[clap(long)]
     log_config: Option<String>,
@@ -70,6 +74,8 @@ impl DroneOpts {
         let cleanup_min_age =
             Duration::try_seconds(self.auto_prune_containers_older_than_seconds as i64)
                 .expect("valid duration");
+
+        // TODO: construct UnixSocketRuntimeConfig here and then use it to make ExecutorConfig
 
         let docker_config = DockerRuntimeConfig {
             runtime: self.docker_runtime,

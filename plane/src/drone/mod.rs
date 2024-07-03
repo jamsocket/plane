@@ -2,7 +2,11 @@ use self::{
     executor::Executor,
     heartbeat::HeartbeatLoop,
     key_manager::KeyManager,
-    runtime::{docker::DockerRuntimeConfig, Runtime},
+    runtime::{
+        docker::DockerRuntimeConfig,
+        unix_socket::{UnixSocketRuntime, UnixSocketRuntimeConfig},
+        Runtime,
+    },
     state_store::StateStore,
 };
 use crate::{
@@ -176,7 +180,7 @@ impl Drone {
         let client = PlaneClient::new(config.controller_url);
 
         #[allow(deprecated)]
-        let runtime = match (config.docker_config, config.executor_config) {
+        let runtime: Box<dyn Runtime> = match (config.docker_config, config.executor_config) {
             (Some(_), Some(_)) => {
                 tracing::error!(
                     "Only one of `docker_config` and `executor_config` may be provided."
@@ -191,14 +195,17 @@ impl Drone {
                 docker_config.cleanup_min_age =
                     docker_config.cleanup_min_age.or(config.cleanup_min_age);
 
-                DockerRuntime::new(docker_config).await?
+                Box::new(DockerRuntime::new(docker_config).await?)
             }
             (None, Some(ExecutorConfig::Docker(mut docker_config))) => {
                 docker_config.auto_prune = docker_config.auto_prune.or(config.auto_prune);
                 docker_config.cleanup_min_age =
                     docker_config.cleanup_min_age.or(config.cleanup_min_age);
 
-                DockerRuntime::new(docker_config).await?
+                Box::new(DockerRuntime::new(docker_config).await?)
+            }
+            (None, Some(ExecutorConfig::UnixSocket(mut unix_socket_config))) => {
+                Box::new(UnixSocketRuntime::new(unix_socket_config).await?)
             }
             (None, None) => {
                 tracing::error!("Neither `docker_config` nor `executor_config` provided.");
@@ -242,6 +249,7 @@ impl Drone {
 #[serde(rename_all = "snake_case")]
 pub enum ExecutorConfig {
     Docker(DockerRuntimeConfig),
+    UnixSocket(UnixSocketRuntimeConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

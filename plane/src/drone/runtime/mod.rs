@@ -6,49 +6,43 @@ use crate::{
 };
 use anyhow::Error;
 use docker::{SpawnResult, TerminateEvent};
-use futures_util::{Future, Stream};
+use futures_util::Stream;
 use serde::{de::DeserializeOwned, Serialize};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, pin::Pin};
 
 pub mod docker;
 #[allow(unused)] // for now, to disable clippy noise
 pub mod unix_socket;
 
+#[async_trait::async_trait]
 pub trait Runtime: Send + Sync + 'static {
     type RuntimeConfig;
     type BackendConfig: Clone + Send + Sync + 'static + DeserializeOwned + Serialize;
 
-    fn prepare(
-        &self,
-        config: &Self::BackendConfig,
-    ) -> impl Future<Output = Result<(), Error>> + Send;
+    async fn prepare(&self, config: &Self::BackendConfig) -> Result<(), Error>;
 
-    fn spawn(
+    async fn spawn(
         &self,
         backend_id: &BackendName,
         executable: Self::BackendConfig,
         acquired_key: Option<&AcquiredKey>,
         static_token: Option<&BearerToken>,
-    ) -> impl Future<Output = Result<SpawnResult, Error>> + Send;
+    ) -> Result<SpawnResult, Error>;
 
     /// Attempts to terminate the backend. If `hard` is true, the runtime should make every effort
     /// to forcibly terminate the backend immediately; otherwise it should invoke graceful shutdown.
     /// If the backend is already terminated or does not exist, this should return `Ok(false)`.
-    fn terminate(
-        &self,
-        backend_id: &BackendName,
-        hard: bool,
-    ) -> impl Future<Output = Result<bool, Error>> + Send;
+    async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<bool, Error>;
 
     /// Provides a callback to be called when the executor has a new metrics message for
     /// any backend.
-    fn metrics_callback<F: Fn(BackendMetricsMessage) + Send + Sync + 'static>(&self, sender: F);
+    fn metrics_callback(&self, sender: Box<dyn Fn(BackendMetricsMessage) + Send + Sync + 'static>);
 
-    fn events(&self) -> impl Stream<Item = TerminateEvent> + Send;
+    fn events(&self) -> Pin<Box<dyn Stream<Item = TerminateEvent> + Send>>;
 
-    fn wait_for_backend(
+    async fn wait_for_backend(
         &self,
         backend: &BackendName,
         address: SocketAddr,
-    ) -> impl Future<Output = Result<(), BackendError>> + Send;
+    ) -> Result<(), BackendError>;
 }

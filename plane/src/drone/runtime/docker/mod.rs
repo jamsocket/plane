@@ -162,6 +162,7 @@ async fn events_loop(
     }
 }
 
+#[async_trait::async_trait]
 impl Runtime for DockerRuntime {
     type RuntimeConfig = DockerRuntimeConfig;
     type BackendConfig = DockerExecutorConfig;

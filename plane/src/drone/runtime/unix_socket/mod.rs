@@ -11,7 +11,7 @@ use crate::{
 };
 use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::PathBuf, pin::Pin};
 use tokio_stream::{Stream, StreamExt};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -41,11 +41,12 @@ pub struct UnixSocketRuntime {
     client: TypedUnixSocketClient<MessageToServer, MessageToClient>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UnixSocketRuntimeConfig {
-    socket_path: std::path::PathBuf,
+    socket_path: PathBuf,
 }
 
+#[async_trait::async_trait]
 impl Runtime for UnixSocketRuntime {
     type RuntimeConfig = UnixSocketRuntimeConfig;
     type BackendConfig = DockerExecutorConfig;
@@ -97,7 +98,7 @@ impl Runtime for UnixSocketRuntime {
         }
     }
 
-    fn events(&self) -> impl Stream<Item = TerminateEvent> + Send {
+    fn events(&self) -> impl Stream<Item = TerminateEvent> {
         let mut event_rx = self.client.subscribe_events();
         Box::pin(async_stream::stream! {
             while let Ok(event) = event_rx.recv().await {
