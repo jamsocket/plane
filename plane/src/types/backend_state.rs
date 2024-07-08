@@ -269,14 +269,8 @@ impl BackendState {
         }
     }
 
-    pub fn to_ready(&self) -> BackendState {
-        match self {
-            BackendState::Waiting { address } => BackendState::Ready { address: *address },
-            _ => {
-                tracing::error!("to_ready called on non-waiting backend");
-                self.clone()
-            }
-        }
+    pub fn to_ready(&self, address: BackendAddr) -> BackendState {
+        BackendState::Ready { address }
     }
 
     pub fn to_terminating(

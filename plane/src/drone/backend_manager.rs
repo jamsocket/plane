@@ -178,7 +178,7 @@ impl<R: Runtime> BackendManager<R> {
                             TerminationReason::StartupTimeout,
                         )
                     } else {
-                        state.to_ready()
+                        state.to_ready(address)
                     }
                 })
             }
