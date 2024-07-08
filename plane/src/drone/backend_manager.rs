@@ -195,17 +195,18 @@ impl<R: Runtime> BackendManager<R> {
                             .terminate(&backend_id, termination == TerminationKind::Hard)
                             .await
                         {
-                            Ok(_) => break,
+                            Ok(false) => return state.to_terminated(None),
+                            Ok(true) => {
+                                // Return a future that never resolves, so that only the container
+                                // terminating bumps us into the next state.
+                                return pending().await;
+                            }
                             Err(err) => {
                                 tracing::error!(?err, "failed to terminate backend");
                                 backoff.wait().await;
                             }
                         }
                     }
-
-                    // Return a future that never resolves, so that only the container
-                    // terminating bumps us into the next state.
-                    pending().await
                 })
             }
             BackendState::Terminated { .. } => StepStatusResult::DoNothing,
