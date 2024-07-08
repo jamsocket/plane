@@ -32,7 +32,7 @@ pub async fn handle_route_info_request(
         // 1. The route is ready, and we can send it back immediately.
         // 2. The route is not ready, and we need to wait for it to become ready.
         // 3. The route does not exist or has already terminated, and we can send back a `None`.
-        Ok(RouteInfoResult::Ready(route_info)) => {
+        Ok(RouteInfoResult::Available(route_info)) => {
             let response = RouteInfoResponse {
                 token,
                 route_info: Some(route_info),
@@ -44,7 +44,7 @@ pub async fn handle_route_info_request(
                 tracing::error!(?err, "Error sending route info response to proxy.");
             }
         }
-        Ok(RouteInfoResult::Waiting(partial_route_info)) => {
+        Ok(RouteInfoResult::Pending(partial_route_info)) => {
             let backend_id = partial_route_info.backend_id.clone();
             let mut sub: Subscription<BackendState> =
                 controller.db.subscribe_with_key(backend_id.as_str());
@@ -53,7 +53,7 @@ pub async fn handle_route_info_request(
             // subscription. It's a bit hacky, but for now we will just issue the query again.
             // We can't start the subscription first to avoid repeating the query, because we need to know the backend
             // ID to start the subscription.
-            if let Ok(RouteInfoResult::Ready(route_info)) =
+            if let Ok(RouteInfoResult::Available(route_info)) =
                 controller.db.backend().route_info_for_token(&token).await
             {
                 let response = RouteInfoResponse {
@@ -71,7 +71,27 @@ pub async fn handle_route_info_request(
 
             let socket = socket.sender(MessageToProxy::RouteInfoResponse);
             tokio::spawn(async move {
-                while let Some(result) = sub.next().await {
+                loop {
+                    // Note: this timeout is arbitrary to avoid a memory leak. Under normal system operation, the critical
+                    // timeout will be that of the backend failing to start. We use a large timeout to avoid it becoming
+                    // the critical timeout when the system is functioning.
+                    let result = match tokio::time::timeout(
+                        std::time::Duration::from_secs(30 * 60 /* 30 minutes */),
+                        sub.next(),
+                    )
+                    .await
+                    {
+                        Ok(Some(result)) => result,
+                        Ok(None) => {
+                            tracing::error!("Event subscription closed!");
+                            break;
+                        }
+                        Err(_) => {
+                            tracing::error!("Timeout waiting for backend state");
+                            break;
+                        }
+                    };
+
                     let Notification { payload, .. } = result;
 
                     match payload {

@@ -341,7 +341,7 @@ impl<'a> BackendDatabase<'a> {
         };
 
         if !ready {
-            return Ok(RouteInfoResult::Waiting(partial));
+            return Ok(RouteInfoResult::Pending(partial));
         }
 
         let Some(address) = result.cluster_address else {
@@ -354,7 +354,7 @@ impl<'a> BackendDatabase<'a> {
             return Ok(RouteInfoResult::NotFound);
         };
 
-        Ok(RouteInfoResult::Ready(
+        Ok(RouteInfoResult::Available(
             partial.set_address(BackendAddr(address)),
         ))
     }
@@ -415,7 +415,7 @@ impl<'a> BackendDatabase<'a> {
         };
 
         if !ready {
-            return Ok(RouteInfoResult::Waiting(partial));
+            return Ok(RouteInfoResult::Pending(partial));
         }
 
         let Some(address) = result.cluster_address else {
@@ -428,7 +428,7 @@ impl<'a> BackendDatabase<'a> {
             return Ok(RouteInfoResult::NotFound);
         };
 
-        Ok(RouteInfoResult::Ready(
+        Ok(RouteInfoResult::Available(
             partial.set_address(BackendAddr(address)),
         ))
     }
@@ -632,8 +632,12 @@ pub async fn emit_state_change(
 
 pub enum RouteInfoResult {
     NotFound,
-    Waiting(PartialRouteInfo),
-    Ready(RouteInfo),
+
+    /// The route is not yet available, because the backend is starting.
+    Pending(PartialRouteInfo),
+
+    /// The route info is available, and the backend is ready or terminated.
+    Available(RouteInfo),
 }
 
 pub struct PartialRouteInfo {
