@@ -262,6 +262,18 @@ impl<R: Runtime> BackendManager<R> {
             .expect("State lock is poisoned")
             .state
             .clone();
+
+        if let BackendState::Terminating { termination, .. } = state {
+            if termination == TerminationKind::Hard {
+                // We are already hard-terminating, don't change the kind.
+                return Ok(());
+            }
+            if termination == TerminationKind::Soft && kind == TerminationKind::Soft {
+                // We are already soft-terminating, don't change the kind.
+                return Ok(());
+            }
+        }
+
         self.set_state(state.to_terminating(kind, reason));
 
         Ok(())
