@@ -112,21 +112,6 @@ pub async fn handle_route_info_request(
 
                     match payload {
                         BackendState::Ready { address } => {
-                            let Some(address) = address else {
-                                tracing::error!("Received Ready notification without address");
-                                let response = RouteInfoResponse {
-                                    token,
-                                    route_info: None,
-                                };
-                                if let Err(err) = socket.send(response) {
-                                    tracing::error!(
-                                        ?err,
-                                        "Error sending route info response to proxy."
-                                    );
-                                }
-                                break;
-                            };
-
                             let route_info = partial_route_info.set_address(address);
                             let response = RouteInfoResponse {
                                 token,
