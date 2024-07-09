@@ -258,7 +258,7 @@ mod test {
             .register_event(
                 &backend_id,
                 &BackendState::Ready {
-                    address: Some(dummy_addr()),
+                    address: dummy_addr(),
                 },
                 Utc::now(),
             )
@@ -268,7 +268,7 @@ mod test {
         assert_eq!(
             result,
             BackendState::Ready {
-                address: Some(dummy_addr())
+                address: dummy_addr()
             }
         );
     }
@@ -280,7 +280,7 @@ mod test {
         let backend_id = BackendName::new_random();
 
         let ready_state = BackendState::Ready {
-            address: Some(dummy_addr()),
+            address: dummy_addr(),
         };
         {
             state_store
@@ -291,7 +291,7 @@ mod test {
             assert_eq!(
                 result,
                 BackendState::Ready {
-                    address: Some(dummy_addr())
+                    address: dummy_addr()
                 }
             );
         }
@@ -333,7 +333,7 @@ mod test {
         let backend_id = BackendName::new_random();
 
         let ready_state = BackendState::Ready {
-            address: Some(dummy_addr()),
+            address: dummy_addr(),
         };
         state_store
             .register_event(&backend_id, &ready_state, Utc::now())
@@ -348,7 +348,7 @@ mod test {
             assert_eq!(
                 event.state,
                 BackendState::Ready {
-                    address: Some(dummy_addr())
+                    address: dummy_addr()
                 }
             );
         }
@@ -391,7 +391,7 @@ mod test {
         let backend_id = BackendName::new_random();
 
         let ready_state = BackendState::Ready {
-            address: Some(dummy_addr()),
+            address: dummy_addr(),
         };
         state_store
             .register_event(&backend_id, &ready_state, Utc::now())
@@ -418,7 +418,7 @@ mod test {
             assert_eq!(
                 event.state,
                 BackendState::Ready {
-                    address: Some(dummy_addr())
+                    address: dummy_addr()
                 }
             );
         }
@@ -453,7 +453,7 @@ mod test {
             assert_eq!(
                 event.state,
                 BackendState::Ready {
-                    address: Some(dummy_addr())
+                    address: dummy_addr()
                 }
             );
         }
