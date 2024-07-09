@@ -953,6 +953,13 @@ CREATE UNIQUE INDEX idx_cluster_name ON public.node USING btree (cluster, name);
 
 
 --
+-- Name: idx_drone_last_heartbeat; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_drone_last_heartbeat ON public.drone USING btree (last_heartbeat);
+
+
+--
 -- Name: idx_event_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
