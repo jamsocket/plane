@@ -293,7 +293,7 @@ impl<'a> BackendDatabase<'a> {
     pub async fn route_info_for_static_token(
         &self,
         token: &BearerToken,
-    ) -> sqlx::Result<Option<RouteInfo>> {
+    ) -> sqlx::Result<RouteInfoResult> {
         let result = sqlx::query!(
             r#"
             select
@@ -312,39 +312,54 @@ impl<'a> BackendDatabase<'a> {
         .await?;
 
         let Some(result) = result else {
-            return Ok(None);
+            return Ok(RouteInfoResult::NotFound);
         };
 
-        let Some(address) = result.cluster_address else {
-            return Ok(None);
+        let ready = match result.last_status.as_str() {
+            "ready" => true,
+            "terminated" | "terminating" => {
+                return Ok(RouteInfoResult::NotFound);
+            }
+            _ => false,
         };
 
-        let Ok(address) = address.parse::<SocketAddr>() else {
-            tracing::warn!("Invalid cluster address: {}", address);
-            return Ok(None);
-        };
+        let backend_id = BackendName::try_from(result.id)
+            .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?;
 
-        Ok(Some(RouteInfo {
-            backend_id: BackendName::try_from(result.id)
-                .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?,
-            address: BackendAddr(address),
+        let partial = PartialRouteInfo {
+            backend_id: backend_id.clone(),
             secret_token: SecretToken::from("".to_string()),
-            user: None,
-            user_data: None,
             cluster: ClusterName::from_str(&result.cluster)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))?,
+            user: None,
+            user_data: None,
             subdomain: result
                 .subdomain
                 .map(Subdomain::try_from)
                 .transpose()
                 .map_err(|e| sqlx::Error::Decode(e.into()))?,
-        }))
+        };
+
+        if !ready {
+            return Ok(RouteInfoResult::Pending(partial));
+        }
+
+        let Some(address) = result.cluster_address else {
+            tracing::warn!(%backend_id, "Backend marked as ready, but no cluster address found.");
+            return Ok(RouteInfoResult::NotFound);
+        };
+
+        let Ok(address) = address.parse::<SocketAddr>() else {
+            tracing::warn!("Invalid cluster address: {}", address);
+            return Ok(RouteInfoResult::NotFound);
+        };
+
+        Ok(RouteInfoResult::Available(
+            partial.set_address(BackendAddr(address)),
+        ))
     }
 
-    pub async fn route_info_for_token(
-        &self,
-        token: &BearerToken,
-    ) -> sqlx::Result<Option<RouteInfo>> {
+    pub async fn route_info_for_token(&self, token: &BearerToken) -> sqlx::Result<RouteInfoResult> {
         if token.is_static() {
             return self.route_info_for_static_token(token).await;
         }
@@ -363,44 +378,59 @@ impl<'a> BackendDatabase<'a> {
             from token
             inner join backend
             on backend.id = token.backend_id
-            and backend.last_status = $2
             where token = $1
             limit 1
             "#,
             token.to_string(),
-            BackendStatus::Ready.to_string(),
         )
         .fetch_optional(&self.db.pool)
         .await?;
 
         let Some(result) = result else {
-            return Ok(None);
+            return Ok(RouteInfoResult::NotFound);
         };
 
-        let Some(address) = result.cluster_address else {
-            return Ok(None);
+        let ready = match result.last_status.as_str() {
+            "ready" => true,
+            "terminated" | "terminating" => {
+                return Ok(RouteInfoResult::NotFound);
+            }
+            _ => false,
         };
 
-        let Ok(address) = address.parse::<SocketAddr>() else {
-            tracing::warn!("Invalid cluster address: {}", address);
-            return Ok(None);
-        };
-
-        Ok(Some(RouteInfo {
-            backend_id: BackendName::try_from(result.backend_id)
-                .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?,
-            address: BackendAddr(address),
+        let backend_id = BackendName::try_from(result.backend_id)
+            .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?;
+        let partial = PartialRouteInfo {
+            backend_id: backend_id.clone(),
             secret_token: SecretToken::from(result.secret_token),
-            user: result.username,
-            user_data: Some(result.auth),
             cluster: ClusterName::from_str(&result.cluster)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))?,
+            user: None,
+            user_data: None,
             subdomain: result
                 .subdomain
                 .map(Subdomain::try_from)
                 .transpose()
                 .map_err(|e| sqlx::Error::Decode(e.into()))?,
-        }))
+        };
+
+        if !ready {
+            return Ok(RouteInfoResult::Pending(partial));
+        }
+
+        let Some(address) = result.cluster_address else {
+            tracing::warn!(%backend_id, "Backend marked as ready, but no cluster address found.");
+            return Ok(RouteInfoResult::NotFound);
+        };
+
+        let Ok(address) = address.parse::<SocketAddr>() else {
+            tracing::warn!(address, %backend_id, "Invalid cluster address.");
+            return Ok(RouteInfoResult::NotFound);
+        };
+
+        Ok(RouteInfoResult::Available(
+            partial.set_address(BackendAddr(address)),
+        ))
     }
 
     pub async fn update_keepalive(&self, backend_id: &BackendName) -> sqlx::Result<()> {
@@ -598,4 +628,37 @@ pub async fn emit_state_change(
     emit_with_key(txn, &backend.to_string(), new_state).await?;
 
     Ok(())
+}
+
+pub enum RouteInfoResult {
+    NotFound,
+
+    /// The route is not yet available, because the backend is starting.
+    Pending(PartialRouteInfo),
+
+    /// The route info is available, and the backend is ready or terminated.
+    Available(RouteInfo),
+}
+
+pub struct PartialRouteInfo {
+    pub backend_id: BackendName,
+    secret_token: SecretToken,
+    cluster: ClusterName,
+    user: Option<String>,
+    user_data: Option<serde_json::Value>,
+    subdomain: Option<Subdomain>,
+}
+
+impl PartialRouteInfo {
+    pub fn set_address(self, address: BackendAddr) -> RouteInfo {
+        RouteInfo {
+            backend_id: self.backend_id,
+            address,
+            secret_token: self.secret_token,
+            user: self.user,
+            user_data: self.user_data,
+            cluster: self.cluster,
+            subdomain: self.subdomain,
+        }
+    }
 }

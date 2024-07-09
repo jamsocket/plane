@@ -1,14 +1,17 @@
 use super::{error::ApiErrorKind, Controller};
 use crate::{
     controller::error::IntoApiError,
-    database::subscribe::{Notification, Subscription},
-    names::BackendName,
+    database::{
+        backend::RouteInfoResult,
+        subscribe::{Notification, Subscription},
+    },
+    names::{BackendName, Name},
     protocol::{
         CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy,
         RouteInfoRequest, RouteInfoResponse,
     },
     typed_socket::{server::new_server, TypedSocket},
-    types::{BackendState, ClusterName, NodeId},
+    types::{BackendState, BearerToken, ClusterName, NodeId},
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},
@@ -19,30 +22,157 @@ use std::net::{IpAddr, SocketAddr};
 use tokio::select;
 use valuable::Valuable;
 
-pub async fn handle_message_from_proxy(
-    message: MessageFromProxy,
+pub async fn handle_route_info_request(
+    token: BearerToken,
     controller: &Controller,
     socket: &mut TypedSocket<MessageToProxy>,
-    cluster: &ClusterName,
-    node_id: NodeId,
-) {
-    match message {
-        MessageFromProxy::RouteInfoRequest(RouteInfoRequest { token }) => {
-            let route_info = match controller.db.backend().route_info_for_token(&token).await {
-                Ok(route_info) => route_info,
-                Err(err) => {
-                    tracing::error!(?err, "Error getting route info");
-                    return;
-                }
+) -> anyhow::Result<()> {
+    match controller.db.backend().route_info_for_token(&token).await {
+        // When a proxy requests a route, either:
+        // 1. The route is ready, and we can send it back immediately.
+        // 2. The route is not ready, and we need to wait for it to become ready.
+        // 3. The route does not exist or has already terminated, and we can send back a `None`.
+        Ok(RouteInfoResult::Available(route_info)) => {
+            let response = RouteInfoResponse {
+                token,
+                route_info: Some(route_info),
             };
-
-            let response = RouteInfoResponse { token, route_info };
             if let Err(err) = socket
                 .send(MessageToProxy::RouteInfoResponse(response))
                 .await
             {
                 tracing::error!(?err, "Error sending route info response to proxy.");
             }
+        }
+        Ok(RouteInfoResult::Pending(partial_route_info)) => {
+            let backend_id = partial_route_info.backend_id.clone();
+            let mut sub: Subscription<BackendState> =
+                controller.db.subscribe_with_key(backend_id.as_str());
+
+            // There is a race condition if the status updated between when our last query hit and when we started the
+            // subscription. It's a bit hacky, but for now we will just issue the query again.
+            // We can't start the subscription first to avoid repeating the query, because we need to know the backend
+            // ID to start the subscription.
+            match controller.db.backend().route_info_for_token(&token).await? {
+                RouteInfoResult::Available(route_info) => {
+                    let response = RouteInfoResponse {
+                        token,
+                        route_info: Some(route_info),
+                    };
+                    if let Err(err) = socket
+                        .send(MessageToProxy::RouteInfoResponse(response))
+                        .await
+                    {
+                        tracing::error!(?err, "Error sending route info response to proxy.");
+                    }
+                    return Ok(());
+                }
+                RouteInfoResult::NotFound => {
+                    let response = RouteInfoResponse {
+                        token,
+                        route_info: None,
+                    };
+                    if let Err(err) = socket
+                        .send(MessageToProxy::RouteInfoResponse(response))
+                        .await
+                    {
+                        tracing::error!(?err, "Error sending route info response to proxy.");
+                    }
+                    return Ok(());
+                }
+                RouteInfoResult::Pending(_) => {
+                    // fall through
+                }
+            }
+
+            let socket = socket.sender(MessageToProxy::RouteInfoResponse);
+            tokio::spawn(async move {
+                loop {
+                    // Note: this timeout is arbitrary to avoid a memory leak. Under normal system operation, the critical
+                    // timeout will be that of the backend failing to start. We use a large timeout to avoid it becoming
+                    // the critical timeout when the system is functioning.
+                    let result = match tokio::time::timeout(
+                        std::time::Duration::from_secs(30 * 60 /* 30 minutes */),
+                        sub.next(),
+                    )
+                    .await
+                    {
+                        Ok(Some(result)) => result,
+                        Ok(None) => {
+                            tracing::error!("Event subscription closed!");
+                            break;
+                        }
+                        Err(_) => {
+                            tracing::error!("Timeout waiting for backend state");
+                            break;
+                        }
+                    };
+
+                    let Notification { payload, .. } = result;
+
+                    match payload {
+                        BackendState::Ready { address } => {
+                            let route_info = partial_route_info.set_address(address);
+                            let response = RouteInfoResponse {
+                                token,
+                                route_info: Some(route_info),
+                            };
+                            if let Err(err) = socket.send(response) {
+                                tracing::error!(
+                                    ?err,
+                                    "Error sending route info response to proxy."
+                                );
+                            }
+                            break;
+                        }
+                        BackendState::Terminated { .. } | BackendState::Terminating { .. } => {
+                            let response = RouteInfoResponse {
+                                token,
+                                route_info: None,
+                            };
+                            if let Err(err) = socket.send(response) {
+                                tracing::error!(
+                                    ?err,
+                                    "Error sending route info response to proxy."
+                                );
+                            }
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            });
+        }
+        Ok(RouteInfoResult::NotFound) => {
+            let response = RouteInfoResponse {
+                token,
+                route_info: None,
+            };
+            if let Err(err) = socket
+                .send(MessageToProxy::RouteInfoResponse(response))
+                .await
+            {
+                tracing::error!(?err, "Error sending route info response to proxy.");
+            }
+        }
+        Err(err) => {
+            tracing::error!(?err, "Error getting route info");
+        }
+    };
+
+    Ok(())
+}
+
+pub async fn handle_message_from_proxy(
+    message: MessageFromProxy,
+    controller: &Controller,
+    socket: &mut TypedSocket<MessageToProxy>,
+    cluster: &ClusterName,
+    node_id: NodeId,
+) -> anyhow::Result<()> {
+    match message {
+        MessageFromProxy::RouteInfoRequest(RouteInfoRequest { token }) => {
+            handle_route_info_request(token, controller, socket).await?;
         }
         MessageFromProxy::KeepAlive(backend_id) => {
             if let Err(err) = controller.db.backend().update_keepalive(&backend_id).await {
@@ -93,7 +223,7 @@ pub async fn handle_message_from_proxy(
                     {
                         tracing::error!(?err, "Error releasing cluster DNS");
                     };
-                    return;
+                    return Ok(());
                 }
             };
 
@@ -110,6 +240,8 @@ pub async fn handle_message_from_proxy(
             }
         }
     }
+
+    Ok(())
 }
 
 pub async fn proxy_socket_inner(
@@ -131,7 +263,7 @@ pub async fn proxy_socket_inner(
         select! {
             message_from_proxy_result = socket.recv() => {
                 match message_from_proxy_result {
-                    Some(message) => handle_message_from_proxy(message, &controller, &mut socket, &cluster, node_guard.id).await,
+                    Some(message) => handle_message_from_proxy(message, &controller, &mut socket, &cluster, node_guard.id).await?,
                     None => {
                         tracing::info!("Proxy socket closed");
                         break;
