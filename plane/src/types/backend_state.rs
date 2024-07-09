@@ -90,7 +90,7 @@ pub enum BackendState {
         address: BackendAddr,
     },
     Ready {
-        address: Option<BackendAddr>,
+        address: BackendAddr,
     },
     Terminating {
         last_status: BackendStatus,
@@ -234,7 +234,7 @@ impl BackendState {
     pub fn address(&self) -> Option<BackendAddr> {
         match self {
             BackendState::Waiting { address } => Some(*address),
-            BackendState::Ready { address } => *address,
+            BackendState::Ready { address } => Some(*address),
             _ => None,
         }
     }
@@ -269,16 +269,8 @@ impl BackendState {
         }
     }
 
-    pub fn to_ready(&self) -> BackendState {
-        match self {
-            BackendState::Waiting { address } => BackendState::Ready {
-                address: Some(*address),
-            },
-            _ => {
-                tracing::warn!("to_ready called on non-waiting backend");
-                BackendState::Ready { address: None }
-            }
-        }
+    pub fn to_ready(&self, address: BackendAddr) -> BackendState {
+        BackendState::Ready { address }
     }
 
     pub fn to_terminating(
