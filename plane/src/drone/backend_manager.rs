@@ -54,17 +54,17 @@ struct BackendManagerState {
 /// Every active backend should have a backend manager.
 /// All container- and image-level commands sent to Docker go through the backend manager.
 /// The backend manager owns the status for the backend it is responsible for.
-pub struct BackendManager<R: Runtime> {
+pub struct BackendManager {
     state: Mutex<BackendManagerState>,
 
     /// The ID of the backend this manager is responsible for.
     backend_id: BackendName,
 
     /// The Docker client to use for all Docker operations.
-    runtime: Arc<R>,
+    runtime: Arc<Box<dyn Runtime>>,
 
     /// The configuration to use when spawning the backend.
-    backend_config: R::BackendConfig,
+    backend_config: serde_json::Value,
 
     /// Function to call when the state changes.
     state_callback: StateCallback,
@@ -79,7 +79,7 @@ pub struct BackendManager<R: Runtime> {
     static_token: Option<BearerToken>,
 }
 
-impl<R: Runtime> Debug for BackendManager<R> {
+impl Debug for BackendManager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BackendManager")
             .field("backend_id", &self.backend_id)
@@ -87,13 +87,13 @@ impl<R: Runtime> Debug for BackendManager<R> {
     }
 }
 
-impl<R: Runtime> BackendManager<R> {
+impl BackendManager {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         backend_id: BackendName,
-        backend_config: R::BackendConfig,
+        backend_config: serde_json::Value,
         state: BackendState,
-        runtime: Arc<R>,
+        runtime: Arc<Box<dyn Runtime>>,
         state_callback: impl Fn(&BackendState) -> Result<(), Box<dyn Error>> + Send + Sync + 'static,
         ip: IpAddr,
         acquired_key: AcquiredKey,
@@ -147,7 +147,7 @@ impl<R: Runtime> BackendManager<R> {
                     let spawn_result = runtime
                         .spawn(
                             &backend_id,
-                            executor_config,
+                            &executor_config,
                             Some(&acquired_key),
                             static_token.as_ref(),
                         )

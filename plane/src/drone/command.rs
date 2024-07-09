@@ -1,3 +1,4 @@
+use super::{runtime::unix_socket::UnixSocketRuntimeConfig, ExecutorConfig};
 use crate::{
     drone::{runtime::docker::DockerRuntimeConfig, DroneConfig},
     names::{DroneName, OrRandom},
@@ -9,8 +10,6 @@ use chrono::Duration;
 use clap::Parser;
 use std::{net::IpAddr, path::PathBuf};
 use url::Url;
-
-use super::ExecutorConfig;
 
 #[derive(Parser)]
 pub struct DroneOpts {
@@ -33,6 +32,10 @@ pub struct DroneOpts {
 
     #[clap(long)]
     docker_runtime: Option<String>,
+
+    /// Optional path to a unix socket for connecting to an external executor.
+    #[clap(long)]
+    executor_socket: Option<PathBuf>,
 
     /// Optional log driver configuration, passed to Docker as the `LogConfig` field.
     #[clap(long)]
@@ -71,12 +74,16 @@ impl DroneOpts {
             Duration::try_seconds(self.auto_prune_containers_older_than_seconds as i64)
                 .expect("valid duration");
 
-        let docker_config = DockerRuntimeConfig {
-            runtime: self.docker_runtime,
-            log_config,
-            mount_base: self.mount_base,
-            auto_prune: Some(self.auto_prune_images),
-            cleanup_min_age: Some(cleanup_min_age),
+        let executor_config = if let Some(socket_path) = self.executor_socket {
+            ExecutorConfig::UnixSocket(UnixSocketRuntimeConfig { socket_path })
+        } else {
+            ExecutorConfig::Docker(DockerRuntimeConfig {
+                runtime: self.docker_runtime,
+                log_config,
+                mount_base: self.mount_base,
+                auto_prune: Some(self.auto_prune_images),
+                cleanup_min_age: Some(cleanup_min_age),
+            })
         };
 
         let ip: IpAddr = resolve_hostname(&self.ip)
@@ -93,7 +100,7 @@ impl DroneOpts {
             auto_prune: None,      // deprecated
             cleanup_min_age: None, // deprecated
             docker_config: None,   // deprecated
-            executor_config: Some(ExecutorConfig::Docker(docker_config)),
+            executor_config: Some(executor_config),
         };
 
         Ok(drone_config)

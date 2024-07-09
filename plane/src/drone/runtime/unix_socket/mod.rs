@@ -11,7 +11,7 @@ use crate::{
 };
 use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::PathBuf, pin::Pin};
 use tokio_stream::{Stream, StreamExt};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -41,16 +41,16 @@ pub struct UnixSocketRuntime {
     client: TypedUnixSocketClient<MessageToServer, MessageToClient>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UnixSocketRuntimeConfig {
-    socket_path: std::path::PathBuf,
+    pub socket_path: PathBuf,
 }
 
+#[async_trait::async_trait]
 impl Runtime for UnixSocketRuntime {
-    type RuntimeConfig = UnixSocketRuntimeConfig;
-    type BackendConfig = DockerExecutorConfig;
+    async fn prepare(&self, config: &serde_json::Value) -> Result<()> {
+        let config: DockerExecutorConfig = serde_json::from_value(config.clone())?;
 
-    async fn prepare(&self, config: &DockerExecutorConfig) -> Result<()> {
         let response = self
             .client
             .send_request(MessageToServer::Prepare(config.clone()))
@@ -65,10 +65,12 @@ impl Runtime for UnixSocketRuntime {
     async fn spawn(
         &self,
         backend_id: &BackendName,
-        executable: DockerExecutorConfig,
+        executable: &serde_json::Value,
         acquired_key: Option<&AcquiredKey>,
         static_token: Option<&BearerToken>,
     ) -> Result<SpawnResult> {
+        let executable: DockerExecutorConfig = serde_json::from_value(executable.clone())?;
+
         let response = self
             .client
             .send_request(MessageToServer::Spawn(
@@ -97,7 +99,7 @@ impl Runtime for UnixSocketRuntime {
         }
     }
 
-    fn events(&self) -> impl Stream<Item = TerminateEvent> + Send {
+    fn events(&self) -> Pin<Box<dyn Stream<Item = TerminateEvent> + Send>> {
         let mut event_rx = self.client.subscribe_events();
         Box::pin(async_stream::stream! {
             while let Ok(event) = event_rx.recv().await {
@@ -108,7 +110,7 @@ impl Runtime for UnixSocketRuntime {
         })
     }
 
-    fn metrics_callback<F: Fn(BackendMetricsMessage) + Send + Sync + 'static>(&self, sender: F) {
+    fn metrics_callback(&self, sender: Box<dyn Fn(BackendMetricsMessage) + Send + Sync + 'static>) {
         let mut event_rx = self.client.subscribe_events();
         tokio::spawn(async move {
             while let Ok(event) = event_rx.recv().await {

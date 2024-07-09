@@ -2,7 +2,11 @@ use self::{
     executor::Executor,
     heartbeat::HeartbeatLoop,
     key_manager::KeyManager,
-    runtime::{docker::DockerRuntimeConfig, Runtime},
+    runtime::{
+        docker::DockerRuntimeConfig,
+        unix_socket::{UnixSocketRuntime, UnixSocketRuntimeConfig},
+        Runtime,
+    },
     state_store::StateStore,
 };
 use crate::{
@@ -38,10 +42,10 @@ mod key_manager;
 pub mod runtime;
 mod state_store;
 
-pub async fn drone_loop<R: Runtime>(
+pub async fn drone_loop(
     name: DroneName,
     mut connection: TypedSocketConnector<MessageFromDrone>,
-    executor: Executor<R>,
+    executor: Executor,
 ) {
     let executor = Arc::new(executor);
     let key_manager = Arc::new(Mutex::new(KeyManager::new(executor.clone())));
@@ -52,11 +56,13 @@ pub async fn drone_loop<R: Runtime>(
 
         {
             let socket = socket.sender(MessageFromDrone::BackendMetrics);
-            executor.runtime.metrics_callback(move |metrics_message| {
-                if let Err(err) = socket.send(metrics_message) {
-                    tracing::error!(?err, "Error sending metrics message.");
-                }
-            });
+            executor
+                .runtime
+                .metrics_callback(Box::new(move |metrics_message| {
+                    if let Err(err) = socket.send(metrics_message) {
+                        tracing::error!(?err, "Error sending metrics message.");
+                    }
+                }));
         };
 
         key_manager
@@ -176,7 +182,7 @@ impl Drone {
         let client = PlaneClient::new(config.controller_url);
 
         #[allow(deprecated)]
-        let runtime = match (config.docker_config, config.executor_config) {
+        let runtime: Box<dyn Runtime> = match (config.docker_config, config.executor_config) {
             (Some(_), Some(_)) => {
                 tracing::error!(
                     "Only one of `docker_config` and `executor_config` may be provided."
@@ -191,14 +197,17 @@ impl Drone {
                 docker_config.cleanup_min_age =
                     docker_config.cleanup_min_age.or(config.cleanup_min_age);
 
-                DockerRuntime::new(docker_config).await?
+                Box::new(DockerRuntime::new(docker_config).await?)
             }
             (None, Some(ExecutorConfig::Docker(mut docker_config))) => {
                 docker_config.auto_prune = docker_config.auto_prune.or(config.auto_prune);
                 docker_config.cleanup_min_age =
                     docker_config.cleanup_min_age.or(config.cleanup_min_age);
 
-                DockerRuntime::new(docker_config).await?
+                Box::new(DockerRuntime::new(docker_config).await?)
+            }
+            (None, Some(ExecutorConfig::UnixSocket(unix_socket_config))) => {
+                Box::new(UnixSocketRuntime::new(unix_socket_config).await?)
             }
             (None, None) => {
                 tracing::error!("Neither `docker_config` nor `executor_config` provided.");
@@ -242,6 +251,7 @@ impl Drone {
 #[serde(rename_all = "snake_case")]
 pub enum ExecutorConfig {
     Docker(DockerRuntimeConfig),
+    UnixSocket(UnixSocketRuntimeConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
