@@ -108,7 +108,7 @@ impl<'a> DroneDatabase<'a> {
         let seen_in_last = if seen_in_last.subsec_nanos() % 1000 == 0 {
             seen_in_last
         } else {
-            let nanos = (seen_in_last.subsec_nanos() / 1000 + 1) * 1000;
+            let nanos = (seen_in_last.subsec_micros() + 1) * 1000;
             Duration::new(seen_in_last.as_secs(), nanos)
         };
 
