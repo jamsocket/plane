@@ -1,3 +1,4 @@
+use super::{runtime::unix_socket::UnixSocketRuntimeConfig, ExecutorConfig};
 use crate::{
     drone::{runtime::docker::DockerRuntimeConfig, DroneConfig},
     names::{DroneName, OrRandom},
@@ -9,8 +10,6 @@ use chrono::Duration;
 use clap::Parser;
 use std::{net::IpAddr, path::PathBuf};
 use url::Url;
-
-use super::{runtime::unix_socket::UnixSocketRuntimeConfig, ExecutorConfig};
 
 #[derive(Parser)]
 pub struct DroneOpts {
@@ -34,7 +33,7 @@ pub struct DroneOpts {
     #[clap(long)]
     docker_runtime: Option<String>,
 
-    // Optional path to a unix socket for connecting to an external executor.
+    /// Optional path to a unix socket for connecting to an external executor.
     #[clap(long)]
     executor_socket: Option<PathBuf>,
 
