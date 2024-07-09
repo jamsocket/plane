@@ -1,14 +1,8 @@
+use super::{SocketPath, WrappedMessage};
 use crate::util::GuardHandle;
-
-use super::WrappedMessage;
 use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::Debug,
-    fs,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{fmt::Debug, fs, path::Path, sync::Arc};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     net::{UnixListener, UnixStream},
@@ -22,10 +16,10 @@ where
     MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
     MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
 {
-    socket_path: PathBuf,
     event_tx: broadcast::Sender<MessageToServer>,
     request_tx: broadcast::Sender<WrappedMessage<MessageToServer>>,
     response_tx: broadcast::Sender<WrappedMessage<MessageToClient>>,
+    _socket_path: Arc<SocketPath>,
     _loop_task: Arc<GuardHandle>,
 }
 
@@ -79,10 +73,10 @@ where
         };
 
         Ok(Self {
-            socket_path,
             event_tx,
             request_tx,
             response_tx,
+            _socket_path: Arc::new(SocketPath(socket_path)),
             _loop_task: Arc::new(loop_task),
         })
     }
@@ -116,19 +110,6 @@ where
         let message_msg = WrappedMessage { id: None, message };
         self.response_tx.send(message_msg)?;
         Ok(())
-    }
-}
-
-impl<MessageToServer, MessageToClient> Drop
-    for TypedUnixSocketServer<MessageToServer, MessageToClient>
-where
-    MessageToServer: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-    MessageToClient: Send + Sync + 'static + Clone + Debug + Serialize + for<'de> Deserialize<'de>,
-{
-    fn drop(&mut self) {
-        if let Err(e) = fs::remove_file(&self.socket_path) {
-            tracing::error!("Error removing socket file: {}", e);
-        }
     }
 }
 

@@ -1,6 +1,8 @@
 use crate::util::ExponentialBackoff;
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 
 pub mod client;
 pub mod server;
@@ -20,6 +22,16 @@ fn get_quick_backoff() -> ExponentialBackoff {
         1.1,
         Duration::milliseconds(100),
     )
+}
+
+pub struct SocketPath(pub PathBuf);
+
+impl Drop for SocketPath {
+    fn drop(&mut self) {
+        if let Err(e) = fs::remove_file(&self.0) {
+            tracing::error!("Error removing socket file: {}", e);
+        }
+    }
 }
 
 #[cfg(test)]
