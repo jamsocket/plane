@@ -95,7 +95,7 @@ impl<'a> DroneDatabase<'a> {
         Ok(result.pool.into())
     }
 
-    /// Returns a list of drones that are ready and have been seen in the last `seen_in_last` duration.
+    /// Returns a list of drones that have been seen in the last `seen_in_last` duration.
     /// Limits the result to the most recent 100 drones.
     pub async fn get_drones_for_pool(
         &self,
@@ -103,6 +103,15 @@ impl<'a> DroneDatabase<'a> {
         pool: &DronePoolName,
         seen_in_last: Duration,
     ) -> sqlx::Result<Vec<DroneWithMetadata>> {
+        // Converting to a PgInterval fails if the duration has nanosecond granularity.
+        // So let's round up to the nearest microsecond.
+        let seen_in_last = if seen_in_last.subsec_nanos() % 1000 == 0 {
+            seen_in_last
+        } else {
+            let nanos = (seen_in_last.subsec_micros() + 1) * 1000;
+            Duration::new(seen_in_last.as_secs(), nanos)
+        };
+
         let Ok(seen_in_last) = PgInterval::try_from(seen_in_last) else {
             return Err(sqlx::Error::Protocol("invalid interval".to_string()));
         };
@@ -124,8 +133,7 @@ impl<'a> DroneDatabase<'a> {
             from node
             left join drone on node.id = drone.id
             where
-                drone.ready = true
-                and controller is not null
+                controller is not null
                 and cluster = $1
                 and now() - drone.last_heartbeat < $2
                 and pool = $3

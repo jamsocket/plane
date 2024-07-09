@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            select\n                drone.id as id,\n                drone.ready as ready,\n                drone.draining as draining,\n                drone.last_heartbeat as \"last_heartbeat!\",\n                drone.last_local_time as \"last_local_time!\",\n                drone.pool as pool,\n                node.name as name,\n                node.cluster as \"cluster!\",\n                node.plane_version as plane_version,\n                node.plane_hash as plane_hash,\n                node.controller as \"controller!\",\n                node.last_connection_start_time as \"last_connection_start_time!\"\n            from node\n            left join drone on node.id = drone.id\n            where\n                drone.ready = true\n                and controller is not null\n                and cluster = $1\n                and now() - drone.last_heartbeat < $2\n                and pool = $3\n                and last_local_time is not null\n                and last_connection_start_time is not null\n            order by drone.id desc\n            limit 100\n            ",
+  "query": "\n            select\n                drone.id as id,\n                drone.ready as ready,\n                drone.draining as draining,\n                drone.last_heartbeat as \"last_heartbeat!\",\n                drone.last_local_time as \"last_local_time!\",\n                drone.pool as pool,\n                node.name as name,\n                node.cluster as \"cluster!\",\n                node.plane_version as plane_version,\n                node.plane_hash as plane_hash,\n                node.controller as \"controller!\",\n                node.last_connection_start_time as \"last_connection_start_time!\"\n            from node\n            left join drone on node.id = drone.id\n            where\n                controller is not null\n                and cluster = $1\n                and now() - drone.last_heartbeat < $2\n                and pool = $3\n                and last_local_time is not null\n                and last_connection_start_time is not null\n            order by drone.id desc\n            limit 100\n            ",
   "describe": {
     "columns": [
       {
@@ -86,5 +86,5 @@
       true
     ]
   },
-  "hash": "051c7989e10af66145582f52eeddaebef2b8b92dee44f74c35545491f98ea1f5"
+  "hash": "975eca765a9f57dce179862ed63c50be88f6f3f8ac4dc908bc185b37506de40b"
 }
