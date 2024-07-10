@@ -1,18 +1,22 @@
 use crate::database::{subscribe::EventSubscriptionManager, PlaneDatabase};
 use anyhow::Result;
 
-const CLEANUP_LOOP_INTERVAL_SECONDS: u64 = 60 * 15;
+const CLEANUP_LOOP_INTERVAL_SECONDS: u64 = 60 * 3;
+const DEFAULT_BATCH_SIZE: i32 = 100;
 
 pub async fn run_cleanup(
     db: &PlaneDatabase,
     min_age_days: Option<i32>,
-    cleanup_batch_size: i32,
+    cleanup_batch_size: Option<i32>,
 ) -> Result<()> {
     tracing::info!("Running cleanup");
 
     if let Some(min_age_days) = min_age_days {
         db.backend()
-            .cleanup(min_age_days, cleanup_batch_size)
+            .cleanup(
+                min_age_days,
+                cleanup_batch_size.unwrap_or(DEFAULT_BATCH_SIZE),
+            )
             .await?;
         EventSubscriptionManager::clean_up_events(&db.pool, min_age_days).await?;
     }
@@ -27,7 +31,7 @@ pub async fn run_cleanup(
 pub async fn run_cleanup_loop(
     db: PlaneDatabase,
     min_age_days: Option<i32>,
-    cleanup_batch_size: i32,
+    cleanup_batch_size: Option<i32>,
 ) {
     // Each controller runs a cleanup loop. To avoid having them all run at the same time, we
     // introduce a random offset to the start time.

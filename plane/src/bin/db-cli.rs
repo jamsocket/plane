@@ -45,9 +45,8 @@ enum Command {
         #[clap(long)]
         min_age_days: Option<i32>,
 
-        /// The number of rows to delete in a single batch.
-        #[clap(long, default_value = "100")]
-        cleanup_batch_size: i32,
+        /// The number of rows to delete in a single batch (uses a default value if not provided).
+        cleanup_batch_size: Option<i32>,
     },
     MarkBackendLost {
         #[arg(required = true)]

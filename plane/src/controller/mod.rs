@@ -165,7 +165,7 @@ impl ControllerServer {
         controller_url: Url,
         default_cluster: Option<ClusterName>,
         cleanup_min_age_days: Option<i32>,
-        cleanup_batch_size: i32,
+        cleanup_batch_size: Option<i32>,
     ) -> Result<Self> {
         let bind_addr = listener.local_addr()?;
 
@@ -312,12 +312,7 @@ pub struct ControllerConfig {
     pub controller_url: Url,
     pub default_cluster: Option<ClusterName>,
     pub cleanup_min_age_days: Option<i32>,
-    #[serde(default = "default_cleanup_batch_size")]
-    pub cleanup_batch_size: i32,
-}
-
-fn default_cleanup_batch_size() -> i32 {
-    100
+    pub cleanup_batch_size: Option<i32>,
 }
 
 pub async fn run_controller(config: ControllerConfig) -> Result<()> {
