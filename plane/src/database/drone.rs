@@ -128,13 +128,12 @@ impl<'a> DroneDatabase<'a> {
                 node.cluster as "cluster!",
                 node.plane_version as plane_version,
                 node.plane_hash as plane_hash,
-                node.controller as "controller!",
+                node.controller as controller,
                 node.last_connection_start_time as "last_connection_start_time!"
             from node
             left join drone on node.id = drone.id
             where
-                controller is not null
-                and cluster = $1
+                cluster = $1
                 and now() - drone.last_heartbeat < $2
                 and pool = $3
                 and last_local_time is not null
@@ -162,7 +161,9 @@ impl<'a> DroneDatabase<'a> {
                 cluster: ClusterName::from_str(&r.cluster).expect("valid cluster name"),
                 plane_version: r.plane_version,
                 plane_hash: r.plane_hash,
-                controller: ControllerName::try_from(r.controller).expect("valid controller name"),
+                controller: r
+                    .controller
+                    .map(|c| ControllerName::try_from(c).expect("valid controller name")),
                 last_connection_start_time: r.last_connection_start_time,
             })
             .collect();
@@ -251,6 +252,6 @@ pub struct DroneWithMetadata {
     pub cluster: ClusterName,
     pub plane_version: String,
     pub plane_hash: String,
-    pub controller: ControllerName,
+    pub controller: Option<ControllerName>,
     pub last_connection_start_time: DateTime<Utc>,
 }
