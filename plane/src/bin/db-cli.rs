@@ -44,6 +44,10 @@ enum Command {
         /// If not provided, only expired tokens will be removed, and other data will be retained.
         #[clap(long)]
         min_age_days: Option<i32>,
+
+        /// The number of rows to delete in a single batch.
+        #[clap(long, default_value = "100")]
+        cleanup_batch_size: i32,
     },
     MarkBackendLost {
         #[arg(required = true)]
@@ -234,8 +238,11 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                 println!("No such drone: {} on {}", drone, cluster);
             }
         }
-        Command::Cleanup { min_age_days } => {
-            plane::cleanup::run_cleanup(&db, min_age_days).await?;
+        Command::Cleanup {
+            min_age_days,
+            cleanup_batch_size,
+        } => {
+            plane::cleanup::run_cleanup(&db, min_age_days, cleanup_batch_size).await?;
         }
     };
 

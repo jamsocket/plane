@@ -153,6 +153,7 @@ impl ControllerServer {
             config.controller_url,
             config.default_cluster,
             config.cleanup_min_age_days,
+            config.cleanup_batch_size,
         )
         .await
     }
@@ -164,13 +165,15 @@ impl ControllerServer {
         controller_url: Url,
         default_cluster: Option<ClusterName>,
         cleanup_min_age_days: Option<i32>,
+        cleanup_batch_size: i32,
     ) -> Result<Self> {
         let bind_addr = listener.local_addr()?;
 
         let cleanup_handle = {
             let db = db.clone();
             GuardHandle::new(async move {
-                cleanup::run_cleanup_loop(db.clone(), cleanup_min_age_days).await
+                cleanup::run_cleanup_loop(db.clone(), cleanup_min_age_days, cleanup_batch_size)
+                    .await
             })
         };
 
@@ -309,6 +312,12 @@ pub struct ControllerConfig {
     pub controller_url: Url,
     pub default_cluster: Option<ClusterName>,
     pub cleanup_min_age_days: Option<i32>,
+    #[serde(default = "default_cleanup_batch_size")]
+    pub cleanup_batch_size: i32,
+}
+
+fn default_cleanup_batch_size() -> i32 {
+    100
 }
 
 pub async fn run_controller(config: ControllerConfig) -> Result<()> {

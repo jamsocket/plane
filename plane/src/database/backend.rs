@@ -503,7 +503,7 @@ impl<'a> BackendDatabase<'a> {
         Ok(candidates)
     }
 
-    pub async fn cleanup(&self, min_age_days: i32) -> sqlx::Result<()> {
+    pub async fn cleanup(&self, min_age_days: i32, batch_size: i32) -> sqlx::Result<()> {
         tracing::info!("Cleaning up terminated backends.");
         let mut txn = self.db.pool.begin().await?;
 
@@ -514,11 +514,13 @@ impl<'a> BackendDatabase<'a> {
                 where
                     last_status = $1
                     and now() - last_status_time > make_interval(days => $2)
+                limit $3
             );
             "#,
         )
         .bind(BackendStatus::Terminated.to_string())
         .bind(min_age_days)
+        .bind(batch_size)
         .execute(&mut *txn)
         .await?;
 
@@ -543,6 +545,18 @@ impl<'a> BackendDatabase<'a> {
         .await?;
 
         let backend_action_deleted = backend_action_result.rows_affected();
+
+        let backend_key_result = sqlx::query(
+            r#"
+            delete from backend_key
+            where backend_key.id in (select id from deleted_backend)
+            and expires_at < now();
+            "#,
+        )
+        .execute(&mut *txn)
+        .await?;
+
+        let backend_key_deleted = backend_key_result.rows_affected();
 
         let backend_state_result = sqlx::query(
             r#"
@@ -573,6 +587,7 @@ impl<'a> BackendDatabase<'a> {
             backend_action_deleted,
             backend_state_deleted,
             backend_deleted,
+            backend_key_deleted,
             "Finished cleanup."
         );
 
