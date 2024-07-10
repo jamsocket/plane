@@ -48,6 +48,7 @@ impl ControllerOpts {
             controller_url,
             default_cluster: self.default_cluster,
             cleanup_min_age_days: self.cleanup_min_age_days,
+            cleanup_batch_size: None,
         })
     }
 }
