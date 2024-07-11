@@ -15,6 +15,9 @@ jobs:
             components: 
             target: wasm32-unknown-unknown
             override: true
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
