@@ -12,8 +12,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
-            components: 
-            target: wasm32-unknown-unknown
+            components: clippy
             override: true
       - uses: Swatinem/rust-cache@v2
         with:
@@ -21,4 +20,4 @@ jobs:
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+          args: --all-features --all-targets
