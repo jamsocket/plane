@@ -16,9 +16,8 @@ use plane::{
 use std::{
     net::{IpAddr, Ipv4Addr},
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
-use tokio::sync::Mutex;
 use tracing::subscriber::DefaultGuard;
 use tracing_appender::non_blocking::WorkerGuard;
 use url::Url;
@@ -59,16 +58,16 @@ impl TestEnvironment {
     pub async fn cleanup(&self) {
         // Stop the log subscription before dumping the database
         // (otherwise, it logs a bunch of things that are not related to the test.)
-        self.log_subscription.lock().await.take();
+        self.log_subscription.lock().unwrap().take();
 
         // Dump the database.
-        if let Some(db) = self.db.lock().await.take() {
+        if let Some(db) = self.db.lock().unwrap().take() {
             db.drop_future().await.unwrap();
         }
 
         // Drop anything that registered a future.
         let new_drop_futures = {
-            let mut drop_futures_lock = self.drop_futures.lock().await;
+            let mut drop_futures_lock = self.drop_futures.lock().unwrap();
             std::mem::take(&mut *drop_futures_lock)
         };
 
@@ -78,7 +77,7 @@ impl TestEnvironment {
     }
 
     pub async fn db(&mut self) -> PlaneDatabase {
-        let mut db_lock = self.db.lock().await;
+        let mut db_lock = self.db.lock().unwrap();
         if db_lock.is_none() {
             let db = DevDatabase::start(self)
                 .await
@@ -184,7 +183,7 @@ impl TestEnvironment {
 
     pub async fn pebble(&mut self, dns_port: u16) -> Arc<Pebble> {
         let pebble = Arc::new(Pebble::new(self, dns_port, None).await.unwrap());
-        self.drop_futures.lock().await.push(pebble.clone());
+        self.drop_futures.lock().unwrap().push(pebble.clone());
         pebble
     }
 
@@ -198,7 +197,7 @@ impl TestEnvironment {
                 .await
                 .unwrap(),
         );
-        self.drop_futures.lock().await.push(pebble.clone());
+        self.drop_futures.lock().unwrap().push(pebble.clone());
         pebble
     }
 }
