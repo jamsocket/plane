@@ -27,7 +27,7 @@ const TEST_CLUSTER: &str = "plane.test";
 #[derive(Clone)]
 pub struct TestEnvironment {
     pub scratch_dir: PathBuf,
-    db: Arc<Mutex<Option<DevDatabase>>>,
+    db: Arc<tokio::sync::Mutex<Option<DevDatabase>>>, // held across await, see: https://tokio.rs/tokio/tutorial/shared-state#on-using-stdsyncmutex-and-tokiosyncmutex
     drop_futures: Arc<Mutex<Vec<Arc<dyn AsyncDrop>>>>,
     log_subscription: Arc<Mutex<Option<LogSubscription>>>,
     pub run_name: String,
@@ -61,7 +61,7 @@ impl TestEnvironment {
         self.log_subscription.lock().unwrap().take();
 
         // Dump the database.
-        if let Some(db) = self.db.lock().unwrap().take() {
+        if let Some(db) = self.db.lock().await.take() {
             db.drop_future().await.unwrap();
         }
 
@@ -77,7 +77,7 @@ impl TestEnvironment {
     }
 
     pub async fn db(&mut self) -> PlaneDatabase {
-        let mut db_lock = self.db.lock().unwrap();
+        let mut db_lock = self.db.lock().await;
         if db_lock.is_none() {
             let db = DevDatabase::start(self)
                 .await
