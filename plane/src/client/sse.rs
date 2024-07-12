@@ -220,7 +220,7 @@ mod tests {
 
         let stream = stream! {
             loop {
-                if let Ok(_) = timeout(Duration::from_millis(100), receiver.recv()).await {
+                if (timeout(Duration::from_millis(100), receiver.recv()).await).is_ok() {
                     break;
                 };
 

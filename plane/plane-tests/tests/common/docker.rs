@@ -112,11 +112,8 @@ impl Container {
 
         while let Some(next) = stream.next().await {
             let chunk = next?;
-            match chunk {
-                LogOutput::StdOut { message } => {
-                    stdout_buffer.extend(message);
-                }
-                _ => {}
+            if let LogOutput::StdOut { message } = chunk {
+                stdout_buffer.extend(message);
             }
         }
 
