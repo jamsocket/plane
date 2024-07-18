@@ -3,7 +3,7 @@ use clap::error::ErrorKind;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 
-pub const MAX_NAME_LENGTH: usize = 45;
+const MAX_NAME_LENGTH: usize = 45;
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum NameError {
@@ -48,7 +48,7 @@ macro_rules! entity_name {
         )]
         pub struct $name(String);
 
-        impl Name for $name {
+        impl $crate::names::Name for $name {
             fn as_str(&self) -> &str {
                 &self.0
             }
@@ -73,22 +73,25 @@ macro_rules! entity_name {
         }
 
         impl TryFrom<String> for $name {
-            type Error = NameError;
+            type Error = $crate::names::NameError;
 
-            fn try_from(s: String) -> Result<Self, NameError> {
+            fn try_from(s: String) -> Result<Self, $crate::names::NameError> {
                 if let Some(prefix) = $prefix {
                     if !s.starts_with(prefix) {
-                        return Err(NameError::InvalidPrefix(s, prefix.to_string()));
+                        return Err($crate::names::NameError::InvalidPrefix(
+                            s,
+                            prefix.to_string(),
+                        ));
                     }
                 }
 
-                if s.len() > MAX_NAME_LENGTH {
-                    return Err(NameError::TooLong(s.len()));
+                if s.len() > $crate::names::MAX_NAME_LENGTH {
+                    return Err($crate::names::NameError::TooLong(s.len()));
                 }
 
                 for (i, c) in s.chars().enumerate() {
                     if !(c.is_ascii_lowercase() || c.is_ascii_digit()) && c != '-' {
-                        return Err(NameError::InvalidCharacter(c, i));
+                        return Err($crate::names::NameError::InvalidCharacter(c, i));
                     }
                 }
 
@@ -97,9 +100,9 @@ macro_rules! entity_name {
         }
 
         impl clap::builder::ValueParserFactory for $name {
-            type Parser = NameParser<$name>;
+            type Parser = $crate::names::NameParser<$name>;
             fn value_parser() -> Self::Parser {
-                NameParser::<$name>::new()
+                $crate::names::NameParser::<$name>::new()
             }
         }
     };
