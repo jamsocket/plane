@@ -55,9 +55,9 @@ macro_rules! entity_name {
 
             fn new_random() -> Self {
                 if let Some(prefix) = $prefix {
-                    Self(crate::util::random_prefixed_string(prefix))
+                    Self($crate::util::random_prefixed_string(prefix))
                 } else {
-                    Self(crate::util::random_string())
+                    Self($crate::util::random_string())
                 }
             }
 
