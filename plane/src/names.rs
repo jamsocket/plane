@@ -3,7 +3,7 @@ use clap::error::ErrorKind;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 
-const MAX_NAME_LENGTH: usize = 45;
+pub const MAX_NAME_LENGTH: usize = 45;
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum NameError {
