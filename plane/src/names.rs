@@ -33,6 +33,7 @@ pub trait Name:
     fn prefix() -> Option<&'static str>;
 }
 
+#[macro_export]
 macro_rules! entity_name {
     ($name:ident, $prefix:expr) => {
         #[derive(
