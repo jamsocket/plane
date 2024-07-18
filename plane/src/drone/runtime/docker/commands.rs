@@ -136,7 +136,7 @@ pub fn validate_mount_path(path: &Path) -> Result<()> {
 }
 
 pub fn get_container_config_from_executor_config(
-    backend_id: &BackendName,
+    backend_id: Option<&BackendName>,
     exec_config: DockerExecutorConfig,
     runtime: Option<&str>,
     key: Option<&AcquiredKey>,
@@ -146,7 +146,10 @@ pub fn get_container_config_from_executor_config(
 ) -> Result<bollard::container::Config<String>> {
     let mut env = exec_config.env;
     env.insert("PORT".to_string(), CONTAINER_PORT.to_string());
-    env.insert("SESSION_BACKEND_ID".to_string(), backend_id.to_string());
+
+    if let Some(backend_id) = backend_id {
+        env.insert("SESSION_BACKEND_ID".to_string(), backend_id.to_string());
+    }
 
     if let Some(key) = key {
         env.insert(
@@ -205,7 +208,7 @@ pub fn get_container_config_from_executor_config(
 
     Ok(bollard::container::Config {
         image: Some(exec_config.image.clone()),
-        labels: Some(create_labels(backend_id)),
+        labels: backend_id.map(create_labels),
         env: Some(env),
         exposed_ports: Some(
             vec![(format!("{}/tcp", CONTAINER_PORT), HashMap::new())]
@@ -271,7 +274,7 @@ pub async fn run_container(
     };
 
     let config = get_container_config_from_executor_config(
-        backend_id,
+        Some(backend_id),
         exec_config,
         docker.config.runtime.as_deref(),
         acquired_key,
@@ -328,7 +331,7 @@ mod tests {
         exec_config.mount = mount;
 
         get_container_config_from_executor_config(
-            &backend_name,
+            Some(&backend_name),
             exec_config,
             None,
             acquired_key.as_ref(),
@@ -361,7 +364,7 @@ mod tests {
         exec_config.network_name = network_name.map(|n| n.to_string());
 
         get_container_config_from_executor_config(
-            &backend_name,
+            Some(&backend_name),
             exec_config,
             None,
             acquired_key.as_ref(),

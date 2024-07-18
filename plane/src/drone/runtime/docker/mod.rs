@@ -64,7 +64,7 @@ pub struct DockerRuntimeConfig {
 pub type MetricsCallback = Box<dyn Fn(BackendMetricsMessage) + Send + Sync + 'static>;
 
 pub struct DockerRuntime {
-    docker: Docker,
+    pub docker: Docker,
     config: DockerRuntimeConfig,
     metrics_callback: Arc<Mutex<Option<MetricsCallback>>>,
     events_sender: Sender<TerminateEvent>,
