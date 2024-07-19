@@ -103,7 +103,7 @@ async fn test_resource_limits() {
     }
 
     let mut config = get_container_config_from_executor_config(
-        &backend_name,
+        Some(&backend_name),
         executor_config.clone(),
         None,
         None,
