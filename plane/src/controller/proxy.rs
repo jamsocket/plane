@@ -178,7 +178,11 @@ pub async fn handle_message_from_proxy(
             if let Err(err) = controller.db.backend().update_keepalive(&backend_id).await {
                 tracing::error!(?err, ?backend_id, ?node_id, "Error updating keepalive");
 
-                socket.send(MessageToProxy::BackendRemoved { backend: backend_id }).await?;
+                socket
+                    .send(MessageToProxy::BackendRemoved {
+                        backend: backend_id,
+                    })
+                    .await?;
             }
         }
         MessageFromProxy::CertManagerRequest(cert_manager_request) => {
