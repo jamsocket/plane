@@ -645,6 +645,7 @@ pub async fn emit_state_change(
     Ok(())
 }
 
+#[derive(Debug)]
 pub enum RouteInfoResult {
     NotFound,
 
@@ -655,6 +656,7 @@ pub enum RouteInfoResult {
     Available(RouteInfo),
 }
 
+#[derive(Debug)]
 pub struct PartialRouteInfo {
     pub backend_id: BackendName,
     secret_token: SecretToken,
