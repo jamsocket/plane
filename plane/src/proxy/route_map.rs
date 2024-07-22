@@ -113,9 +113,7 @@ impl RouteMap {
     }
 
     pub fn receive(&self, response: RouteInfoResponse) {
-        if response.route_info.is_some() {
-            self.insert(response.token, response.route_info);
-        }
+        self.insert(response.token, response.route_info);
     }
 
     pub fn remove_backend(&self, backend: &BackendName) {
