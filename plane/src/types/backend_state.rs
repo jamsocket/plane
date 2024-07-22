@@ -150,6 +150,7 @@ impl valuable::Valuable for BackendState {
                 );
                 visit.visit_entry(valuable::Value::String("address"), address.as_value());
             }
+            #[allow(deprecated)]
             BackendState::Terminating {
                 last_status,
                 termination,
@@ -349,6 +350,7 @@ impl BackendState {
                 reason: Some(*reason),
                 exit_code,
             },
+            #[allow(deprecated)]
             BackendState::Terminating {
                 last_status,
                 termination,
