@@ -433,7 +433,7 @@ impl<'a> BackendDatabase<'a> {
         ))
     }
 
-    pub async fn update_keepalive(&self, backend_id: &BackendName) -> sqlx::Result<()> {
+    pub async fn update_keepalive(&self, backend_id: &BackendName) -> sqlx::Result<bool> {
         let result = sqlx::query!(
             r#"
             update backend
@@ -447,10 +447,10 @@ impl<'a> BackendDatabase<'a> {
         .await?;
 
         if result.rows_affected() == 0 {
-            return Err(sqlx::Error::RowNotFound);
+            return Ok(false);
         }
 
-        Ok(())
+        Ok(true)
     }
 
     pub async fn publish_metrics(&self, metrics: BackendMetricsMessage) -> sqlx::Result<()> {

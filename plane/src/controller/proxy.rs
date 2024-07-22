@@ -175,8 +175,29 @@ pub async fn handle_message_from_proxy(
             handle_route_info_request(token, controller, socket).await?;
         }
         MessageFromProxy::KeepAlive(backend_id) => {
-            if let Err(err) = controller.db.backend().update_keepalive(&backend_id).await {
-                tracing::error!(?err, ?backend_id, "Error updating keepalive");
+            match controller.db.backend().update_keepalive(&backend_id).await {
+                Ok(true) => (),
+                Ok(false) => {
+                    tracing::error!(
+                        ?backend_id,
+                        ?node_id,
+                        "Tried to update keepalive for non-existent backend"
+                    );
+
+                    socket
+                        .send(MessageToProxy::BackendRemoved {
+                            backend: backend_id,
+                        })
+                        .await?;
+                }
+                Err(err) => {
+                    tracing::error!(
+                        ?err,
+                        ?backend_id,
+                        ?node_id,
+                        "Unhandled database error updating keepalive"
+                    );
+                }
             }
         }
         MessageFromProxy::CertManagerRequest(cert_manager_request) => {
