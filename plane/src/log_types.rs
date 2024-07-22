@@ -35,7 +35,7 @@ impl From<OffsetDateTime> for LoggableTime {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd)]
 pub struct BackendAddr(pub SocketAddr);
 
 impl valuable::Valuable for BackendAddr {

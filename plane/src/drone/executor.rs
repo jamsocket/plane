@@ -3,7 +3,7 @@ use crate::{
     drone::runtime::Runtime,
     names::BackendName,
     protocol::{BackendAction, BackendEventId, BackendStateMessage},
-    types::{BackendState, BackendStatus, TerminationKind, TerminationReason},
+    types::{BackendState, BackendStatus, TerminationReason},
     util::{ExponentialBackoff, GuardHandle},
 };
 use anyhow::Result;
@@ -93,7 +93,7 @@ impl Executor {
                     .expect("State store lock poisoned.")
                     .register_event(
                         &backend_id,
-                        &state.to_terminating(TerminationKind::Hard, TerminationReason::KeyExpired),
+                        &state.to_hard_terminating(TerminationReason::KeyExpired),
                         Utc::now(),
                     )
                     .unwrap_or_else(|_| {

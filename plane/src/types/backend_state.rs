@@ -6,7 +6,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{fmt::Display, net::SocketAddr};
-use valuable::Valuable;
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, PartialOrd)]
 #[serde(rename_all = "lowercase")]
@@ -32,6 +31,10 @@ pub enum BackendStatus {
     /// Proxies should stop sending traffic to it, but we should not yet release the key.
     Terminating,
 
+    /// The backend has been sent a SIGKILL, either because the user sent a hard termination
+    /// request or the lock was past the hard-termination deadline.
+    HardTerminating,
+
     /// The backend has exited or been swept.
     Terminated,
 }
@@ -50,6 +53,7 @@ impl BackendStatus {
             BackendStatus::Waiting => 40,
             BackendStatus::Ready => 50,
             BackendStatus::Terminating => 60,
+            BackendStatus::HardTerminating => 65,
             BackendStatus::Terminated => 70,
         }
     }
@@ -64,6 +68,7 @@ impl valuable::Valuable for BackendStatus {
             BackendStatus::Waiting => valuable::Value::String("waiting"),
             BackendStatus::Ready => valuable::Value::String("ready"),
             BackendStatus::Terminating => valuable::Value::String("terminating"),
+            BackendStatus::HardTerminating => valuable::Value::String("hard-terminating"),
             BackendStatus::Terminated => valuable::Value::String("terminated"),
         }
     }
@@ -93,8 +98,15 @@ pub enum BackendState {
         address: BackendAddr,
     },
     Terminating {
+        /// Last status before either soft or hard termination.
         last_status: BackendStatus,
+        #[deprecated(note = "Use HardTerminating instead")]
         termination: TerminationKind,
+        reason: TerminationReason,
+    },
+    HardTerminating {
+        /// Last status before either soft or hard termination.
+        last_status: BackendStatus,
         reason: TerminationReason,
     },
     Terminated {
@@ -157,6 +169,20 @@ impl valuable::Valuable for BackendState {
                 );
                 visit.visit_entry(valuable::Value::String("reason"), reason.as_value());
             }
+            BackendState::HardTerminating {
+                last_status,
+                reason,
+            } => {
+                visit.visit_entry(
+                    valuable::Value::String("status"),
+                    valuable::Value::String("hard-terminating"),
+                );
+                visit.visit_entry(
+                    valuable::Value::String("last_status"),
+                    last_status.as_value(),
+                );
+                visit.visit_entry(valuable::Value::String("reason"), reason.as_value());
+            }
             BackendState::Terminated {
                 last_status,
                 termination,
@@ -184,6 +210,8 @@ impl valuable::Valuable for BackendState {
 
 impl valuable::Mappable for BackendState {
     fn size_hint(&self) -> (usize, Option<usize>) {
+        // These numbers should match the number of calls to visit_entry in visit.
+        // (This is use as a hint; differences are not a correctness issue.)
         match self {
             BackendState::Scheduled => (1, Some(1)),
             BackendState::Loading => (1, Some(1)),
@@ -191,6 +219,7 @@ impl valuable::Mappable for BackendState {
             BackendState::Waiting { .. } => (2, Some(2)),
             BackendState::Ready { .. } => (1, Some(2)),
             BackendState::Terminating { .. } => (1, Some(4)),
+            BackendState::HardTerminating { .. } => (1, Some(3)),
             BackendState::Terminated { .. } => (2, Some(5)),
         }
     }
@@ -247,6 +276,7 @@ impl BackendState {
             BackendState::Waiting { .. } => BackendStatus::Waiting,
             BackendState::Ready { .. } => BackendStatus::Ready,
             BackendState::Terminating { .. } => BackendStatus::Terminating,
+            BackendState::HardTerminating { .. } => BackendStatus::HardTerminating,
             BackendState::Terminated { .. } => BackendStatus::Terminated,
         }
     }
@@ -273,41 +303,34 @@ impl BackendState {
         BackendState::Ready { address }
     }
 
-    pub fn to_terminating(
-        &self,
-        termination: TerminationKind,
-        reason: TerminationReason,
-    ) -> BackendState {
+    pub fn to_hard_terminating(&self, reason: TerminationReason) -> BackendState {
+        if self.status() >= BackendStatus::HardTerminating {
+            tracing::warn!(?reason, state=?self, "to_hard_terminating called on backend in later state.");
+            return self.clone();
+        }
+
         match self {
-            BackendState::Terminated { .. } => {
-                tracing::warn!(?reason, termination=termination.as_value(), state=?self, "to_terminating called on terminated backend");
-                self.clone()
-            }
-            // a soft terminating backend can be transitioned to a hard terminating backend
-            BackendState::Terminating {
-                last_status,
-                termination: termination_kind,
-                ..
-            } => {
-                if termination_kind == &termination {
-                    tracing::warn!(?reason, termination=termination.as_value(), state=?self, "to_terminating called on terminating backend with the same termination_kind");
-                    return self.clone();
-                }
-                if termination_kind != &TerminationKind::Hard {
-                    tracing::warn!(?reason, termination=termination.as_value(), state=?self, "to_terminating called on terminating backend with soft termination kind");
-                    return self.clone();
-                }
-                BackendState::Terminating {
-                    last_status: *last_status,
-                    termination,
-                    reason,
-                }
-            }
-            _ => BackendState::Terminating {
-                last_status: self.status(),
-                termination,
+            BackendState::Terminating { last_status, .. } => BackendState::HardTerminating {
+                last_status: *last_status,
                 reason,
             },
+            _ => BackendState::HardTerminating {
+                last_status: self.status(),
+                reason,
+            },
+        }
+    }
+
+    pub fn to_terminating(&self, reason: TerminationReason) -> BackendState {
+        if self.status() >= BackendStatus::Terminating {
+            tracing::warn!(?reason, state=?self, "to_hard_terminating called on backend in later state.");
+            return self.clone();
+        }
+
+        BackendState::Terminating {
+            last_status: self.status(),
+            termination: TerminationKind::Soft,
+            reason,
         }
     }
 
@@ -317,6 +340,15 @@ impl BackendState {
                 tracing::warn!(?exit_code, state=?self, "to_terminated called on terminated backend");
                 self.clone()
             }
+            BackendState::HardTerminating {
+                last_status,
+                reason,
+            } => BackendState::Terminated {
+                last_status: *last_status,
+                termination: Some(TerminationKind::Hard),
+                reason: Some(*reason),
+                exit_code,
+            },
             BackendState::Terminating {
                 last_status,
                 termination,
@@ -393,7 +425,8 @@ impl BackendStatusStreamEntry {
 
         let termination_kind = match state {
             BackendState::Terminated { termination, .. } => termination,
-            BackendState::Terminating { termination, .. } => Some(termination),
+            BackendState::Terminating { .. } => Some(TerminationKind::Soft),
+            BackendState::HardTerminating { .. } => Some(TerminationKind::Hard),
             _ => None,
         };
 
