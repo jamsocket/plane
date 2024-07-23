@@ -317,7 +317,7 @@ impl<'a> BackendDatabase<'a> {
 
         let ready = match result.last_status.as_str() {
             "ready" => true,
-            "terminated" | "terminating" => {
+            "terminated" | "terminating" | "hard-terminating" => {
                 return Ok(RouteInfoResult::NotFound);
             }
             _ => false,
@@ -392,7 +392,7 @@ impl<'a> BackendDatabase<'a> {
 
         let ready = match result.last_status.as_str() {
             "ready" => true,
-            "terminated" | "terminating" => {
+            "terminated" | "terminating" | "hard-terminating" => {
                 return Ok(RouteInfoResult::NotFound);
             }
             _ => false,
