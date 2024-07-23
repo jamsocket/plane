@@ -44,7 +44,7 @@ mod wait_backend;
 /// The existence of this label is used to determine whether a container is managed by Plane.
 const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
-fn backend_id_to_container_id(backend_id: &BackendName) -> ContainerId {
+pub fn backend_id_to_container_id(backend_id: &BackendName) -> ContainerId {
     ContainerId::from(format!("plane-{}", backend_id))
 }
 

@@ -52,7 +52,7 @@ pub async fn pull_image(
     Ok(())
 }
 
-fn create_labels(backend_id: &BackendName) -> HashMap<String, String> {
+pub fn create_labels(backend_id: &BackendName) -> HashMap<String, String> {
     vec![(
         super::PLANE_DOCKER_LABEL.to_string(),
         backend_id.to_string(),
