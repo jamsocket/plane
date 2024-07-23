@@ -10,8 +10,10 @@ The statuses are:
 - `starting`: The drone has loaded the image and is starting the container.
 - `waiting`: The container has started. The drone is waiting for it to listen on an HTTP port.
 - `ready`: The container is listening on an HTTP port. The drone is ready to route traffic to it.
-- `terminating`: The drone has sent a request to terminate the backend. If the request was a “soft” request,
-  the backend may remain in this state for a grace period (by default 10 seoconds) before being hard-terminated.
+- `terminating`: The drone has sent a “soft” request to terminate the backend.
+  The backend may remain in this state for a grace period (by default 10 seoconds) before being hard-terminated,
+  unless it exits on its own first.
+- `hard-terminating`: The drone has sent a “hard” request to terminate the backend.
 - `terminated`: The drone has terminated the backend. This is considered the only terminal state.
 
 A backend may skip over some of these statuses, but will only transition to statuses lower in the list, never

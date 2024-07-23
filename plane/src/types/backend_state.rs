@@ -33,6 +33,7 @@ pub enum BackendStatus {
 
     /// The backend has been sent a SIGKILL, either because the user sent a hard termination
     /// request or the lock was past the hard-termination deadline.
+    #[serde(rename = "hard-terminating")]
     HardTerminating,
 
     /// The backend has exited or been swept.
