@@ -104,6 +104,7 @@ pub enum BackendState {
         termination: TerminationKind,
         reason: TerminationReason,
     },
+    #[serde(rename = "hard-terminating")]
     HardTerminating {
         /// Last status before either soft or hard termination.
         last_status: BackendStatus,
@@ -304,6 +305,19 @@ impl BackendState {
         BackendState::Ready { address }
     }
 
+    pub fn to_terminating(&self, reason: TerminationReason) -> BackendState {
+        if self.status() >= BackendStatus::Terminating {
+            tracing::warn!(?reason, state=?self, "to_terminating called on backend in later state.");
+            return self.clone();
+        }
+
+        BackendState::Terminating {
+            last_status: self.status(),
+            termination: TerminationKind::Soft,
+            reason,
+        }
+    }
+
     pub fn to_hard_terminating(&self, reason: TerminationReason) -> BackendState {
         if self.status() >= BackendStatus::HardTerminating {
             tracing::warn!(?reason, state=?self, "to_hard_terminating called on backend in later state.");
@@ -319,19 +333,6 @@ impl BackendState {
                 last_status: self.status(),
                 reason,
             },
-        }
-    }
-
-    pub fn to_terminating(&self, reason: TerminationReason) -> BackendState {
-        if self.status() >= BackendStatus::Terminating {
-            tracing::warn!(?reason, state=?self, "to_hard_terminating called on backend in later state.");
-            return self.clone();
-        }
-
-        BackendState::Terminating {
-            last_status: self.status(),
-            termination: TerminationKind::Soft,
-            reason,
         }
     }
 
@@ -422,6 +423,7 @@ impl BackendStatusStreamEntry {
         let termination_reason = match state {
             BackendState::Terminated { reason, .. } => reason,
             BackendState::Terminating { reason, .. } => Some(reason),
+            BackendState::HardTerminating { reason, .. } => Some(reason),
             _ => None,
         };
 

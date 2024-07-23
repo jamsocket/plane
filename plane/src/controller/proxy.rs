@@ -125,7 +125,9 @@ pub async fn handle_route_info_request(
                             }
                             break;
                         }
-                        BackendState::Terminated { .. } | BackendState::Terminating { .. } => {
+                        BackendState::Terminated { .. }
+                        | BackendState::Terminating { .. }
+                        | BackendState::HardTerminating { .. } => {
                             let response = RouteInfoResponse {
                                 token,
                                 route_info: None,
