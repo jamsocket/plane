@@ -87,6 +87,34 @@ impl Debug for BackendManager {
     }
 }
 
+fn handle_terminating(
+    runtime: Arc<Box<dyn Runtime>>,
+    backend_id: &BackendName,
+    state: BackendState,
+    hard_terminate: bool,
+) -> StepStatusResult {
+    let backend_id = backend_id.clone();
+
+    StepStatusResult::future_status(async move {
+        let mut backoff = ExponentialBackoff::default();
+
+        loop {
+            match runtime.terminate(&backend_id, hard_terminate).await {
+                Ok(false) => return state.to_terminated(None),
+                Ok(true) => {
+                    // Return a future that never resolves, so that only the container
+                    // terminating bumps us into the next state.
+                    return pending().await;
+                }
+                Err(err) => {
+                    tracing::error!(?err, "failed to terminate backend");
+                    backoff.wait().await;
+                }
+            }
+        }
+    })
+}
+
 impl BackendManager {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -173,41 +201,18 @@ impl BackendManager {
                         runtime.wait_for_backend(&backend_id, address.0).await
                     {
                         tracing::error!("Backend startup timeout");
-                        state.to_terminating(
-                            TerminationKind::Hard,
-                            TerminationReason::StartupTimeout,
-                        )
+                        state.to_hard_terminating(TerminationReason::StartupTimeout)
                     } else {
                         state.to_ready(address)
                     }
                 })
             }
             BackendState::Ready { .. } => StepStatusResult::DoNothing,
-            BackendState::Terminating { termination, .. } => {
-                let docker = self.runtime.clone();
-                let backend_id = self.backend_id.clone();
-
-                StepStatusResult::future_status(async move {
-                    let mut backoff = ExponentialBackoff::default();
-
-                    loop {
-                        match docker
-                            .terminate(&backend_id, termination == TerminationKind::Hard)
-                            .await
-                        {
-                            Ok(false) => return state.to_terminated(None),
-                            Ok(true) => {
-                                // Return a future that never resolves, so that only the container
-                                // terminating bumps us into the next state.
-                                return pending().await;
-                            }
-                            Err(err) => {
-                                tracing::error!(?err, "failed to terminate backend");
-                                backoff.wait().await;
-                            }
-                        }
-                    }
-                })
+            BackendState::Terminating { .. } => {
+                handle_terminating(self.runtime.clone(), &self.backend_id, state, false)
+            }
+            BackendState::HardTerminating { .. } => {
+                handle_terminating(self.runtime.clone(), &self.backend_id, state, true)
             }
             BackendState::Terminated { .. } => StepStatusResult::DoNothing,
         }
@@ -262,7 +267,12 @@ impl BackendManager {
             .expect("State lock is poisoned")
             .state
             .clone();
-        self.set_state(state.to_terminating(kind, reason));
+
+        let new_state = match kind {
+            TerminationKind::Soft => state.to_terminating(reason),
+            TerminationKind::Hard => state.to_hard_terminating(reason),
+        };
+        self.set_state(new_state);
 
         Ok(())
     }

@@ -234,7 +234,7 @@ mod test {
     use crate::{
         log_types::BackendAddr,
         names::Name,
-        types::{BackendStatus, TerminationKind, TerminationReason},
+        types::{BackendStatus, TerminationReason},
     };
     use std::{
         net::{SocketAddr, SocketAddrV4},
@@ -300,7 +300,7 @@ mod test {
             state_store
                 .register_event(
                     &backend_id,
-                    &ready_state.to_terminating(TerminationKind::Hard, TerminationReason::External),
+                    &ready_state.to_hard_terminating(TerminationReason::External),
                     Utc::now(),
                 )
                 .unwrap();
@@ -308,9 +308,8 @@ mod test {
             let result = state_store.backend_state(&backend_id).unwrap();
             assert_eq!(
                 result,
-                BackendState::Terminating {
+                BackendState::HardTerminating {
                     last_status: BackendStatus::Ready,
-                    termination: TerminationKind::Hard,
                     reason: TerminationReason::External,
                 }
             );
@@ -357,7 +356,7 @@ mod test {
             state_store
                 .register_event(
                     &backend_id,
-                    &ready_state.to_terminating(TerminationKind::Hard, TerminationReason::Swept),
+                    &ready_state.to_hard_terminating(TerminationReason::Swept),
                     Utc::now(),
                 )
                 .unwrap();
@@ -365,16 +364,15 @@ mod test {
             let result = state_store.backend_state(&backend_id).unwrap();
             assert_eq!(
                 result,
-                ready_state.to_terminating(TerminationKind::Hard, TerminationReason::Swept)
+                ready_state.to_hard_terminating(TerminationReason::Swept)
             );
 
             let event = recv.try_recv().unwrap();
             assert_eq!(event.backend_id, backend_id);
             assert_eq!(
                 event.state,
-                BackendState::Terminating {
+                BackendState::HardTerminating {
                     last_status: BackendStatus::Ready,
-                    termination: TerminationKind::Hard,
                     reason: TerminationReason::Swept,
                 }
             );
@@ -400,7 +398,7 @@ mod test {
         state_store
             .register_event(
                 &backend_id,
-                &ready_state.to_terminating(TerminationKind::Hard, TerminationReason::Swept),
+                &ready_state.to_hard_terminating(TerminationReason::Swept),
                 Utc::now(),
             )
             .unwrap();
@@ -429,9 +427,8 @@ mod test {
             assert_eq!(event.event_id, BackendEventId::from(2));
             assert_eq!(
                 event.state,
-                BackendState::Terminating {
+                BackendState::HardTerminating {
                     last_status: BackendStatus::Ready,
-                    termination: TerminationKind::Hard,
                     reason: TerminationReason::Swept,
                 }
             );
@@ -463,9 +460,8 @@ mod test {
             assert_eq!(event.backend_id, backend_id);
             assert_eq!(
                 event.state,
-                BackendState::Terminating {
+                BackendState::HardTerminating {
                     last_status: BackendStatus::Ready,
-                    termination: TerminationKind::Hard,
                     reason: TerminationReason::Swept,
                 }
             );
@@ -489,9 +485,8 @@ mod test {
             assert_eq!(event.backend_id, backend_id);
             assert_eq!(
                 event.state,
-                BackendState::Terminating {
+                BackendState::HardTerminating {
                     last_status: BackendStatus::Ready,
-                    termination: TerminationKind::Hard,
                     reason: TerminationReason::Swept,
                 }
             );
