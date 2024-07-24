@@ -52,7 +52,7 @@ pub async fn pull_image(
     Ok(())
 }
 
-pub fn create_labels() -> HashMap<String, String> {
+fn create_labels() -> HashMap<String, String> {
     HashMap::from([(super::PLANE_DOCKER_LABEL.to_string(), "true".to_string())])
 }
 
