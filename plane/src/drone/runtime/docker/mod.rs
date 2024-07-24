@@ -113,8 +113,8 @@ async fn events_loop(
             tracing::warn!(?e.actor, "Ignoring event without name attribute.");
             continue;
         };
-        let Ok(backend_id) = BackendName::try_from(container_id) else {
-            tracing::warn!(?e.actor, "Ignoring event with invalid backend ID.");
+        let Ok(backend_id) = BackendName::try_from(container_id.clone()) else {
+            tracing::warn!(?e.actor, ?container_id, "Ignoring event with invalid backend ID.");
             continue;
         };
 
