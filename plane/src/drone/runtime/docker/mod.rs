@@ -44,10 +44,6 @@ mod wait_backend;
 /// The existence of this label is used to determine whether a container is managed by Plane.
 const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
-pub fn backend_id_to_container_id(backend_id: &BackendName) -> ContainerId {
-    ContainerId::from(format!("plane-{}", backend_id))
-}
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DockerRuntimeConfig {
     pub runtime: Option<String>,
@@ -109,18 +105,22 @@ async fn events_loop(
             tracing::warn!("Received event without attributes.");
             continue;
         };
-        let Some(backend_id) = attributes.get(PLANE_DOCKER_LABEL) else {
+        if !attributes.contains_key(PLANE_DOCKER_LABEL) {
             tracing::warn!(?e.actor, "Ignoring event without Plane backend ID label.");
+            continue;
+        };
+        let Some(container_id) = attributes.get("name").cloned().map(ContainerId::from) else {
+            tracing::warn!(?e.actor, "Ignoring event without name attribute.");
+            continue;
+        };
+        let Ok(backend_id) = BackendName::try_from(container_id) else {
+            tracing::warn!(?e.actor, "Ignoring event with invalid backend ID.");
             continue;
         };
 
         if e.action.as_deref() == Some("start") {
-            tracing::info!(backend_id = backend_id.as_value(), "Received start event.");
+            tracing::info!(?backend_id, "Received start event.");
 
-            let Ok(backend_id) = BackendName::try_from(backend_id.to_string()) else {
-                tracing::warn!(?e.actor, "Ignoring start event with invalid backend ID.");
-                continue;
-            };
             let docker = docker.clone();
             let metrics_callback = metrics_callback.clone();
             tracing::info!(%backend_id, "Spawning metrics loop.");
@@ -135,17 +135,6 @@ async fn events_loop(
 
         let exit_code = attributes.get("exitCode");
         let exit_code = exit_code.and_then(|s| s.parse::<i32>().ok());
-        let backend_id = match BackendName::try_from(backend_id.to_string()) {
-            Ok(backend_id) => backend_id,
-            Err(err) => {
-                tracing::warn!(
-                    ?err,
-                    backend_id = backend_id.as_value(),
-                    "Ignoring event with invalid backend ID."
-                );
-                continue;
-            }
-        };
 
         tracing::info!(
             exit_code,
@@ -203,7 +192,7 @@ impl Runtime for DockerRuntime {
     }
 
     async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<bool, anyhow::Error> {
-        let container_id = backend_id_to_container_id(backend_id);
+        let container_id: ContainerId = backend_id.into();
 
         let result = if hard {
             self.docker

@@ -1,4 +1,4 @@
-use crate::types::NodeKind;
+use crate::{drone::runtime::docker::types::ContainerId, types::NodeKind};
 use clap::error::ErrorKind;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
@@ -163,6 +163,19 @@ entity_name!(DroneName, Some("dr"));
 entity_name!(AcmeDnsServerName, Some("ns"));
 entity_name!(BackendActionName, Some("ak"));
 
+impl TryFrom<ContainerId> for BackendName {
+    type Error = NameError;
+
+    fn try_from(value: ContainerId) -> Result<Self, Self::Error> {
+        value
+            .as_str()
+            .strip_prefix("plane-")
+            .ok_or_else(|| NameError::InvalidPrefix(value.to_string(), "plane-".to_string()))?
+            .to_string()
+            .try_into()
+    }
+}
+
 pub trait NodeName: Name {
     fn kind(&self) -> NodeKind;
 }
@@ -277,5 +290,17 @@ mod tests {
     fn test_too_long() {
         let name = "co-".to_string() + &"a".repeat(100 - 3);
         assert_eq!(Err(NameError::TooLong(100)), ControllerName::try_from(name));
+    }
+
+    #[test]
+    fn test_backend_name_from_invalid_container_id() {
+        let container_id = ContainerId::from("invalid-123".to_string());
+        assert_eq!(
+            Err(NameError::InvalidPrefix(
+                "invalid-123".to_string(),
+                "plane-".to_string()
+            )),
+            BackendName::try_from(container_id)
+        );
     }
 }
