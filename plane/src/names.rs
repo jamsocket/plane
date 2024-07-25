@@ -151,7 +151,7 @@ impl<T: Name> clap::builder::TypedValueParser for NameParser<T> {
             .ok_or_else(|| clap::Error::new(ErrorKind::InvalidUtf8))?;
         match T::try_from(st.to_string()) {
             Ok(val) => Ok(val),
-            Err(err) => Err(cmd.clone().error(ErrorKind::InvalidValue, &err.to_string())),
+            Err(err) => Err(cmd.clone().error(ErrorKind::InvalidValue, err.to_string())),
         }
     }
 }
