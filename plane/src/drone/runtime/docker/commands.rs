@@ -1,4 +1,4 @@
-use super::{backend_id_to_container_id, types::ContainerId, DockerRuntime};
+use super::{types::ContainerId, DockerRuntime};
 use crate::{
     names::BackendName,
     protocol::AcquiredKey,
@@ -52,13 +52,8 @@ pub async fn pull_image(
     Ok(())
 }
 
-pub fn create_labels(backend_id: &BackendName) -> HashMap<String, String> {
-    vec![(
-        super::PLANE_DOCKER_LABEL.to_string(),
-        backend_id.to_string(),
-    )]
-    .into_iter()
-    .collect()
+fn create_labels() -> HashMap<String, String> {
+    HashMap::from([(super::PLANE_DOCKER_LABEL.to_string(), "true".to_string())])
 }
 
 fn create_port_bindings() -> HashMap<String, Option<Vec<PortBinding>>> {
@@ -208,7 +203,7 @@ pub fn get_container_config_from_executor_config(
 
     Ok(bollard::container::Config {
         image: Some(exec_config.image.clone()),
-        labels: backend_id.map(create_labels),
+        labels: Some(create_labels()),
         env: Some(env),
         exposed_ports: Some(
             vec![(format!("{}/tcp", CONTAINER_PORT), HashMap::new())]
@@ -266,7 +261,7 @@ pub async fn run_container(
     acquired_key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
 ) -> Result<ContainerId> {
-    let container_id = backend_id_to_container_id(backend_id);
+    let container_id: ContainerId = backend_id.into();
 
     let options = bollard::container::CreateContainerOptions {
         name: container_id.to_string(),

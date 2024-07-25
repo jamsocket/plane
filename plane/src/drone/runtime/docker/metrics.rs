@@ -1,4 +1,4 @@
-use super::{backend_id_to_container_id, types::ContainerId, MetricsCallback};
+use super::{types::ContainerId, MetricsCallback};
 use crate::{database::backend::BackendMetricsMessage, names::BackendName};
 use bollard::{container::StatsOptions, Docker};
 use futures_util::Stream;
@@ -22,7 +22,7 @@ pub async fn metrics_loop(
     docker: Docker,
     callback: Arc<Mutex<Option<MetricsCallback>>>,
 ) {
-    let container_id = backend_id_to_container_id(&backend_id);
+    let container_id = ContainerId::from(&backend_id);
 
     let mut stream = stream_metrics(&docker, &container_id);
 
