@@ -1,5 +1,5 @@
-use super::{get_quick_backoff, WrappedMessage};
-use crate::util::{random_token, GuardHandle};
+use super::WrappedMessage;
+use crate::util::{random_token, ExponentialBackoff, GuardHandle};
 use anyhow::{Error, Result};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -47,14 +47,11 @@ where
             let response_map = Arc::clone(&response_map);
             let event_tx = event_tx.clone();
             GuardHandle::new(async move {
-                let mut backoff = get_quick_backoff();
                 loop {
                     let Ok(stream) = timeout(CONNECT_TIMEOUT, connect(&socket_path)).await else {
-                        tracing::error!("Timeout connecting to server");
-                        backoff.wait().await;
-                        continue;
+                        tracing::error!("Timeout connecting to server; shutting down");
+                        break;
                     };
-                    backoff.reset();
                     if handle_connection(stream, rx, Arc::clone(&response_map), event_tx.clone())
                         .await
                         .is_ok()
@@ -109,7 +106,12 @@ where
 
 async fn connect<P: AsRef<Path>>(socket_path: P) -> UnixStream {
     let socket_path = socket_path.as_ref().to_path_buf();
-    let mut backoff = get_quick_backoff();
+    let mut backoff = ExponentialBackoff::new(
+        chrono::Duration::milliseconds(10),
+        chrono::Duration::seconds(1),
+        1.5,
+        chrono::Duration::seconds(1),
+    );
     loop {
         match UnixStream::connect(&socket_path).await {
             Ok(stream) => return stream,
