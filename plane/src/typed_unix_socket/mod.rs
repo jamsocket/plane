@@ -1,5 +1,3 @@
-use crate::util::ExponentialBackoff;
-use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -13,15 +11,6 @@ pub struct WrappedMessage<T> {
     /// (either as the request or the response). If it is not provided, this message is an event.
     id: Option<String>,
     pub message: T,
-}
-
-fn get_quick_backoff() -> ExponentialBackoff {
-    ExponentialBackoff::new(
-        Duration::milliseconds(10),
-        Duration::milliseconds(100),
-        1.1,
-        Duration::milliseconds(100),
-    )
 }
 
 pub struct SocketPath(pub PathBuf);
