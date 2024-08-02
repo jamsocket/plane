@@ -20,6 +20,7 @@ impl Drop for SocketPath {
         if let Err(e) = fs::remove_file(&self.0) {
             tracing::error!("Error removing socket file: {}", e);
         }
+        tracing::debug!("Socket file removed {:?}", self.0);
     }
 }
 

@@ -35,6 +35,7 @@ where
             fs::remove_file(&socket_path)?;
         }
         let listener = UnixListener::bind(&socket_path)?;
+        tracing::debug!(?socket_path, "Unix socket created");
         let (event_tx, _) = broadcast::channel(100);
         let (request_tx, _) = broadcast::channel(100);
         let (response_tx, _) = broadcast::channel(100);
