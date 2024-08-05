@@ -154,8 +154,12 @@ where
                                 }
                             }
                             WrappedMessage { id: None, message } => {
-                                if let Err(e) = event_tx.send(message) {
-                                    tracing::error!("Error sending event: {}", e);
+                                if let Err(e) = event_tx.send(message.clone()) {
+                                    tracing::error!(
+                                        "Error sending event: message={:?}, error={:?}",
+                                        message,
+                                        e
+                                    );
                                 }
                             }
                         }
