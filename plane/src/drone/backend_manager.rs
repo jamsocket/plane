@@ -197,13 +197,16 @@ impl BackendManager {
                 let backend_id = self.backend_id.clone();
                 let runtime = self.runtime.clone();
                 StepStatusResult::future_status(async move {
-                    if let Err(BackendError::StartupTimeout) =
-                        runtime.wait_for_backend(&backend_id, address.0).await
-                    {
-                        tracing::error!("Backend startup timeout");
-                        state.to_hard_terminating(TerminationReason::StartupTimeout)
-                    } else {
-                        state.to_ready(address)
+                    match runtime.wait_for_backend(&backend_id, address.0).await {
+                        Ok(()) => state.to_ready(address),
+                        Err(BackendError::StartupTimeout) => {
+                            tracing::error!("Backend startup timeout");
+                            state.to_hard_terminating(TerminationReason::StartupTimeout)
+                        }
+                        Err(BackendError::Other(msg)) => {
+                            tracing::error!("Failed to wait for backend: {}", msg);
+                            state.to_hard_terminating(TerminationReason::ErrorWaiting)
+                        }
                     }
                 })
             }
