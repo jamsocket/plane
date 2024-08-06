@@ -142,19 +142,19 @@ where
                         {
                             Ok(msg) => msg,
                             Err(e) => {
-                                tracing::error!("Error deserializing message: {}", e);
+                                tracing::error!(?line, "Error deserializing message: {}", e);
                                 continue;
                             }
                         };
                         match msg {
                             WrappedMessage { id: Some(_), .. } => {
-                                if let Err(e) = request_tx.send(msg) {
-                                    tracing::error!("Error sending request: {}", e);
+                                if let Err(e) = request_tx.send(msg.clone()) {
+                                    tracing::error!(?msg, "Error sending request: {}", e);
                                 }
                             }
                             WrappedMessage { id: None, message } => {
-                                if let Err(e) = event_tx.send(message) {
-                                    tracing::error!("Error sending event: {}", e);
+                                if let Err(e) = event_tx.send(message.clone()) {
+                                    tracing::error!(?message, "Error sending event: {}", e);
                                 }
                             }
                         }
@@ -184,18 +184,18 @@ where
                         let response_str = match serde_json::to_string(&response) {
                             Ok(response_str) => response_str,
                             Err(e) => {
-                                tracing::error!("Error serializing response: {}", e);
+                                tracing::error!(?response, "Error serializing response: {}", e);
                                 continue;
                             }
                         };
                         if let Err(e) = writer.write_all(response_str.as_bytes()).await {
-                            tracing::error!("Error writing response: {}", e);
+                            tracing::error!(?response, "Error writing response: {}", e);
                         }
                         if let Err(e) = writer.write_all(b"\n").await {
-                            tracing::error!("Error writing newline: {}", e);
+                            tracing::error!(?response, "Error writing newline: {}", e);
                         }
                         if let Err(e) = writer.flush().await {
-                            tracing::error!("Error flushing writer: {}", e);
+                            tracing::error!(?response, "Error flushing writer: {}", e);
                         }
                     }
                     Err(e) => {
