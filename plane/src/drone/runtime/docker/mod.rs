@@ -42,7 +42,7 @@ mod wait_backend;
 
 /// The label used to identify containers managed by Plane.
 /// The existence of this label is used to determine whether a container is managed by Plane.
-const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
+pub const PLANE_DOCKER_LABEL: &str = "dev.plane.backend";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DockerRuntimeConfig {
