@@ -236,7 +236,7 @@ pub enum TerminationReason {
     KeyExpired,
     Lost,
     StartupTimeout,
-    ErrorWaiting,
+    InternalError,
 }
 
 impl valuable::Valuable for TerminationReason {
@@ -247,7 +247,7 @@ impl valuable::Valuable for TerminationReason {
             TerminationReason::KeyExpired => valuable::Value::String("key_expired"),
             TerminationReason::Lost => valuable::Value::String("lost"),
             TerminationReason::StartupTimeout => valuable::Value::String("startup_timeout"),
-            TerminationReason::ErrorWaiting => valuable::Value::String("error_waiting"),
+            TerminationReason::InternalError => valuable::Value::String("internal_error"),
         }
     }
 
