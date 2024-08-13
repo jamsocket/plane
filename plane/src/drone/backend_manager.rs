@@ -205,7 +205,7 @@ impl BackendManager {
                         }
                         Err(BackendError::Other(msg)) => {
                             tracing::error!("Failed to wait for backend: {}", msg);
-                            state.to_hard_terminating(TerminationReason::ErrorWaiting)
+                            state.to_hard_terminating(TerminationReason::InternalError)
                         }
                     }
                 })
