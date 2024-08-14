@@ -64,7 +64,7 @@ where
                             tracing::error!("Error handling connection");
                         }
                         Err(e) => {
-                            tracing::error!("Error accepting connection: {}", e);
+                            tracing::error!(%e, "Error accepting connection.");
                         }
                     }
                     response_rx = response_tx.subscribe();
@@ -142,19 +142,19 @@ where
                         {
                             Ok(msg) => msg,
                             Err(e) => {
-                                tracing::error!(?line, "Error deserializing message: {}", e);
+                                tracing::error!(%e, ?line, "Error deserializing message.");
                                 continue;
                             }
                         };
                         match msg {
                             WrappedMessage { id: Some(_), .. } => {
                                 if let Err(e) = request_tx.send(msg.clone()) {
-                                    tracing::error!(?msg, "Error sending request: {}", e);
+                                    tracing::error!(%e, ?msg, "Error sending request.");
                                 }
                             }
                             WrappedMessage { id: None, message } => {
                                 if let Err(e) = event_tx.send(message.clone()) {
-                                    tracing::error!(?message, "Error sending event: {}", e);
+                                    tracing::error!(%e, msg = ?message, "Error sending event.");
                                 }
                             }
                         }
@@ -166,7 +166,7 @@ where
                         ));
                     }
                     Err(e) => {
-                        tracing::error!("Error reading line: {}", e);
+                        tracing::error!(%e, "Error reading line.");
                         return Err(anyhow::anyhow!("Error reading line: {}", e));
                     }
                 }
@@ -184,22 +184,22 @@ where
                         let response_str = match serde_json::to_string(&response) {
                             Ok(response_str) => response_str,
                             Err(e) => {
-                                tracing::error!(?response, "Error serializing response: {}", e);
+                                tracing::error!(%e, ?response, "Error serializing response.");
                                 continue;
                             }
                         };
                         if let Err(e) = writer.write_all(response_str.as_bytes()).await {
-                            tracing::error!(?response, "Error writing response: {}", e);
+                            tracing::error!(%e, ?response, "Error writing response.");
                         }
                         if let Err(e) = writer.write_all(b"\n").await {
-                            tracing::error!(?response, "Error writing newline: {}", e);
+                            tracing::error!(%e, ?response, "Error writing newline.");
                         }
                         if let Err(e) = writer.flush().await {
-                            tracing::error!(?response, "Error flushing writer: {}", e);
+                            tracing::error!(%e, ?response, "Error flushing writer.");
                         }
                     }
                     Err(e) => {
-                        tracing::error!("Error receiving response: {}", e);
+                        tracing::error!(%e, "Error receiving response.");
                     }
                 }
             }
