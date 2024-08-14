@@ -114,9 +114,12 @@ async fn connect<P: AsRef<Path>>(socket_path: P) -> UnixStream {
     );
     loop {
         match UnixStream::connect(&socket_path).await {
-            Ok(stream) => return stream,
+            Ok(stream) => {
+                tracing::info!(?socket_path, "Connected to server.");
+                return stream;
+            }
             Err(e) => {
-                tracing::error!("Error connecting to server: {}", e);
+                tracing::error!(%e, "Error connecting to server.");
                 backoff.wait().await;
             }
         }
@@ -153,7 +156,7 @@ where
                         {
                             Ok(msg) => msg,
                             Err(e) => {
-                                tracing::error!("Error deserializing message: {}", e);
+                                tracing::error!(%e, ?line, "Error deserializing message.");
                                 continue;
                             }
                         };
@@ -163,16 +166,21 @@ where
                                 message,
                             } => {
                                 if let Some((_, tx)) = response_map.remove(&id) {
-                                    if let Err(e) = tx.send(message) {
-                                        tracing::error!("Error sending response: {:?}", e);
+                                    if let Err(e) = tx.send(message.clone()) {
+                                        // There's no need to log the message as e is the message itself
+                                        tracing::error!(?e, "Error sending response.");
                                     }
                                 } else {
-                                    tracing::error!("No sender found for response ID: {:?}", id);
+                                    tracing::error!(
+                                        ?id,
+                                        msg = ?message,
+                                        "No sender found for response ID."
+                                    );
                                 }
                             }
                             WrappedMessage { id: None, message } => {
-                                if let Err(e) = event_tx.send(message) {
-                                    tracing::error!("Error sending event: {}", e);
+                                if let Err(e) = event_tx.send(message.clone()) {
+                                    tracing::error!(%e, msg = ?message, "Error sending event.");
                                 }
                             }
                         }
@@ -184,7 +192,7 @@ where
                         ));
                     }
                     Err(e) => {
-                        tracing::error!("Error reading line: {}", e);
+                        tracing::error!(%e, "Error reading line.");
                         return Err(anyhow::anyhow!("Error reading line: {}", e));
                     }
                 }
@@ -201,25 +209,25 @@ where
                     let msg = match serde_json::to_string(&msg) {
                         Ok(msg) => msg,
                         Err(e) => {
-                            tracing::error!("Error serializing message: {}", e);
+                            tracing::error!(%e, ?msg, "Error serializing message.");
                             continue;
                         }
                     };
                     if let Err(e) = writer.write_all(msg.as_bytes()).await {
-                        tracing::error!("Error writing message: {}", e);
+                        tracing::error!(%e, ?msg, "Error writing message.");
                     }
                     if let Err(e) = writer.write_all(b"\n").await {
-                        tracing::error!("Error writing newline: {}", e);
+                        tracing::error!(%e, ?msg, "Error writing newline.");
                     }
                     if let Err(e) = writer.flush().await {
-                        tracing::error!("Error flushing writer: {}", e);
+                        tracing::error!(%e, ?msg, "Error flushing writer.");
                     }
                 }
                 Err(RecvError::Closed) => {
                     break;
                 }
                 Err(e) => {
-                    tracing::error!("Error receiving message: {}", e);
+                    tracing::error!(%e, "Error receiving message.");
                 }
             }
         }
