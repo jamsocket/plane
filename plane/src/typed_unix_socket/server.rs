@@ -32,7 +32,9 @@ where
     pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Error> {
         let socket_path = socket_path.as_ref().to_path_buf();
         if socket_path.exists() {
-            fs::remove_file(&socket_path)?;
+            if let Err(e) = fs::remove_file(&socket_path) {
+                tracing::error!(%e, ?socket_path, "Error removing existing socket file before binding.");
+            }
         }
         let listener = UnixListener::bind(&socket_path)?;
         let (event_tx, _) = broadcast::channel(100);

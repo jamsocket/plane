@@ -18,7 +18,7 @@ pub struct SocketPath(pub PathBuf);
 impl Drop for SocketPath {
     fn drop(&mut self) {
         if let Err(e) = fs::remove_file(&self.0) {
-            tracing::error!("Error removing socket file: {}", e);
+            tracing::error!(%e, "Error removing socket file on drop.");
         }
     }
 }
