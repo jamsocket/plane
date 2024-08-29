@@ -1,3 +1,4 @@
+use super::ControllerConfig;
 use crate::{
     names::{ControllerName, Name},
     types::ClusterName,
@@ -6,7 +7,6 @@ use anyhow::Result;
 use clap::Parser;
 use std::net::IpAddr;
 use url::Url;
-use super::ControllerConfig;
 
 #[derive(Parser)]
 pub struct ControllerOpts {

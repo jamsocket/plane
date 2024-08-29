@@ -162,6 +162,7 @@ impl ControllerServer {
         .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_with_listener(
         db: PlaneDatabase,
         listener: TcpListener,
@@ -225,8 +226,7 @@ impl ControllerServer {
         if let Some(forward_auth_url) = forward_auth {
             tracing::info!(?forward_auth_url, "Forward auth enabled");
             let forward_url = forward_auth_url.clone();
-            control_routes =
-                control_routes.layer(from_fn_with_state(forward_url, forward_layer));
+            control_routes = control_routes.layer(from_fn_with_state(forward_url, forward_layer));
         }
 
         let cors_public = CorsLayer::new()

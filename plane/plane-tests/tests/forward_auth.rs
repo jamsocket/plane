@@ -23,7 +23,10 @@ async fn forward_auth_rejects(env: TestEnvironment) {
 
     let res = task.await.unwrap();
 
-    assert!(matches!(res, Err(PlaneClientError::UnexpectedStatus(StatusCode::UNAUTHORIZED))));
+    assert!(matches!(
+        res,
+        Err(PlaneClientError::UnexpectedStatus(StatusCode::UNAUTHORIZED))
+    ));
 }
 
 #[plane_test]
@@ -60,10 +63,13 @@ async fn forward_auth_forwards_path(env: TestEnvironment) {
     });
 
     let req = mock_auth_server.expect().await.unwrap();
-    
+
     let http_req = req.request();
 
-    assert_eq!(http_req.headers().get("x-original-path").unwrap(), "/status");
+    assert_eq!(
+        http_req.headers().get("x-original-path").unwrap(),
+        "/status"
+    );
 }
 
 #[plane_test]
@@ -84,9 +90,11 @@ async fn forward_auth_forwards_bearer_token(env: TestEnvironment) {
     });
 
     let req = mock_auth_server.expect().await.unwrap();
-    
+
     let http_req = req.request();
 
-    assert_eq!(http_req.headers().get("authorization").unwrap(), "Bearer test");
+    assert_eq!(
+        http_req.headers().get("authorization").unwrap(),
+        "Bearer test"
+    );
 }
-

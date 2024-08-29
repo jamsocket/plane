@@ -1,7 +1,10 @@
 use anyhow::Result;
 use axum::{body::Body, http::Request};
 use std::sync::{Arc, Mutex};
-use tokio::{sync::{mpsc, oneshot}, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 use url::Url;
 
 #[allow(unused)]
