@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.75"
 async-trait = "0.1.74"
+axum = "0.7.5"
 bollard = "0.17.0"
 chrono = { version = "0.4.31", features = ["serde"] }
 futures-util = "0.3.29"

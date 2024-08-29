@@ -23,10 +23,12 @@ use anyhow::{Context, Result};
 use axum::{
     extract::State,
     http::{header, Method},
+    middleware::from_fn_with_state,
     response::Response,
     routing::{get, post},
     Json, Router, Server,
 };
+use forward_auth::forward_layer;
 use futures_util::never::Never;
 use serde::{Deserialize, Serialize};
 use std::net::{SocketAddr, TcpListener};
@@ -51,10 +53,11 @@ mod dns;
 mod drain;
 mod drone;
 pub mod error;
+mod forward_auth;
 mod proxy;
 mod terminate;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct StatusResponse {
     pub status: String,
     pub version: String,
@@ -154,6 +157,7 @@ impl ControllerServer {
             config.default_cluster,
             config.cleanup_min_age_days,
             config.cleanup_batch_size,
+            config.forward_auth,
         )
         .await
     }
@@ -166,6 +170,7 @@ impl ControllerServer {
         default_cluster: Option<ClusterName>,
         cleanup_min_age_days: Option<i32>,
         cleanup_batch_size: Option<i32>,
+        forward_auth: Option<Url>,
     ) -> Result<Self> {
         let bind_addr = listener.local_addr()?;
 
@@ -196,7 +201,7 @@ impl ControllerServer {
         //
         // These routes should not be exposed on the open internet without an authorization
         // barrier (such as a reverse proxy) in front.
-        let control_routes = Router::new()
+        let mut control_routes = Router::new()
             .route("/status", get(status))
             .route("/c/:cluster/state", get(handle_cluster_state))
             .route("/c/:cluster/drone-socket", get(handle_drone_socket))
@@ -216,6 +221,14 @@ impl ControllerServer {
                 "/b/revoke",
                 post(handle_revoke), // (TODO) does not notify proxies, see handler function for details
             );
+
+        if let Some(forward_auth_url) = forward_auth {
+            tracing::info!(?forward_auth_url, "Forward auth enabled");
+            let forward_url = forward_auth_url.clone();
+            control_routes =
+                control_routes.layer(from_fn_with_state(forward_url, forward_layer));
+        }
+
         let cors_public = CorsLayer::new()
             .allow_methods(vec![Method::GET, Method::POST])
             .allow_headers(vec![header::CONTENT_TYPE])
@@ -313,6 +326,7 @@ pub struct ControllerConfig {
     pub default_cluster: Option<ClusterName>,
     pub cleanup_min_age_days: Option<i32>,
     pub cleanup_batch_size: Option<i32>,
+    pub forward_auth: Option<Url>,
 }
 
 pub async fn run_controller(config: ControllerConfig) -> Result<()> {

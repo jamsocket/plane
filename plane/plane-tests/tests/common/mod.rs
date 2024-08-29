@@ -4,6 +4,7 @@ use plane::{client::PlaneClient, names::BackendName, types::BackendStatus};
 use std::{panic::AssertUnwindSafe, time::Duration};
 use tokio::time::timeout;
 
+pub mod auth_mock;
 pub mod async_drop;
 pub mod docker;
 pub mod resources;
