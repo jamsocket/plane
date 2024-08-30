@@ -5,8 +5,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use http::StatusCode;
-use hyper::{Client, Uri};
+use hyper::{Client, StatusCode, Uri};
 use url::Url;
 
 pub fn clone_request_with_empty_body(parts: &request::Parts) -> request::Request<Body> {

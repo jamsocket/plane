@@ -1773,7 +1773,6 @@ dependencies = [
  "dashmap",
  "data-encoding",
  "futures-util",
- "http 1.1.0",
  "http-body 0.4.6",
  "hyper 0.14.28",
  "lru",
