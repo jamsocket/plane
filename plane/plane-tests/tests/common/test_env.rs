@@ -104,6 +104,28 @@ impl TestEnvironment {
             None,
             None,
             None,
+            None,
+        )
+        .await
+        .expect("Unable to construct controller.")
+    }
+
+    pub async fn controller_with_forward_auth(&mut self, forward_auth: &Url) -> ControllerServer {
+        let db = self.db().await;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url: Url = format!("http://{}", listener.local_addr().unwrap())
+            .parse()
+            .unwrap();
+
+        ControllerServer::run_with_listener(
+            db.clone(),
+            listener,
+            ControllerName::new_random(),
+            url,
+            None,
+            None,
+            None,
+            Some(forward_auth.clone()),
         )
         .await
         .expect("Unable to construct controller.")

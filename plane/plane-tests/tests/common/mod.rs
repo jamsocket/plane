@@ -5,6 +5,7 @@ use std::{panic::AssertUnwindSafe, time::Duration};
 use tokio::time::timeout;
 
 pub mod async_drop;
+pub mod auth_mock;
 pub mod docker;
 pub mod resources;
 pub mod test_env;

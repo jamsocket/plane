@@ -1,3 +1,4 @@
+use super::ControllerConfig;
 use crate::{
     names::{ControllerName, Name},
     types::ClusterName,
@@ -6,8 +7,6 @@ use anyhow::Result;
 use clap::Parser;
 use std::net::IpAddr;
 use url::Url;
-
-use super::ControllerConfig;
 
 #[derive(Parser)]
 pub struct ControllerOpts {
@@ -28,6 +27,13 @@ pub struct ControllerOpts {
 
     #[clap(long)]
     cleanup_min_age_days: Option<i32>,
+
+    /// HTTP(S) URL to forward /ctrl/ requests to in order to check if they are authorized.
+    /// The requests are stripped of their body and only include the original headers (and method),
+    /// plus an additional `x-original-path` header with the original path
+    /// (after stripping `/ctrl` and everything before it).
+    #[clap(long)]
+    forward_auth: Option<Url>,
 }
 
 impl ControllerOpts {
@@ -49,6 +55,7 @@ impl ControllerOpts {
             default_cluster: self.default_cluster,
             cleanup_min_age_days: self.cleanup_min_age_days,
             cleanup_batch_size: None,
+            forward_auth: self.forward_auth,
         })
     }
 }
