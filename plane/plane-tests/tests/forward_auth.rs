@@ -13,10 +13,7 @@ async fn forward_auth_rejects(env: TestEnvironment) {
         .await;
     let client = controller.client();
 
-    let task = tokio::spawn(async move {
-        let a = client.status().await;
-        a
-    });
+    let task = tokio::spawn(async move { client.status().await });
 
     let mut req = mock_auth_server.expect().await.unwrap();
     req.reject();
@@ -37,10 +34,7 @@ async fn forward_auth_accepts(env: TestEnvironment) {
         .await;
     let client = controller.client();
 
-    let task = tokio::spawn(async move {
-        let a = client.status().await;
-        a
-    });
+    let task = tokio::spawn(async move { client.status().await });
 
     let mut req = mock_auth_server.expect().await.unwrap();
     req.accept();
