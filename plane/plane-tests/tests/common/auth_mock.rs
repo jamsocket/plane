@@ -1,7 +1,8 @@
 use anyhow::Result;
 use axum::{body::Body, http::Request};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::{
+    sync::Mutex,
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
@@ -98,7 +99,7 @@ impl MockAuthServer {
     /// Expect the server to have received an auth request, and returns a handle that can be used to
     /// accept or reject the request.
     pub async fn expect(&mut self) -> Result<AuthRequest> {
-        let mut waiting = self.waiting.lock().unwrap();
+        let mut waiting = self.waiting.lock().await;
         let auth_request = waiting.recv().await.unwrap();
         Ok(auth_request)
     }
