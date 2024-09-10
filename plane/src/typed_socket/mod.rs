@@ -41,7 +41,7 @@ impl<T> Debug for TypedSocketSender<T> {
 pub enum TypedSocketError {
     #[error("Socket closed")]
     Closed,
-    #[error("Socket disconnected")]
+    #[error("Socket queue full")]
     Clogged,
 }
 
