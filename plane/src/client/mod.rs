@@ -131,7 +131,7 @@ impl PlaneClient {
             .controller_address
             .join(&format!("/ctrl/b/{}/soft-terminate", backend_id));
 
-        authed_post(&self.client, &addr, &()).await?;
+        let _: () = authed_post(&self.client, &addr, &()).await?;
         Ok(())
     }
 
@@ -140,14 +140,14 @@ impl PlaneClient {
             .controller_address
             .join(&format!("/ctrl/b/{}/hard-terminate", backend_id));
 
-        authed_post(&self.client, &addr, &()).await?;
+        let _: () = authed_post(&self.client, &addr, &()).await?;
         Ok(())
     }
 
     pub async fn revoke(&self, request: &RevokeRequest) -> Result<(), PlaneClientError> {
         let addr = self.controller_address.join("/ctrl/revoke");
 
-        authed_post(&self.client, &addr, &request).await?;
+        let _: () = authed_post(&self.client, &addr, &request).await?;
         Ok(())
     }
 
