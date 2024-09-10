@@ -31,7 +31,6 @@ async fn dns_api(env: TestEnvironment) {
         .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::CertLeaseRequest,
         ))
-        .await
         .unwrap();
 
     let MessageToProxy::CertManagerResponse(CertManagerResponse::CertLeaseResponse {
@@ -47,7 +46,6 @@ async fn dns_api(env: TestEnvironment) {
                 txt_value: "foobaz".to_string(),
             },
         ))
-        .await
         .unwrap();
 
     let MessageToProxy::CertManagerResponse(CertManagerResponse::SetTxtRecordResponse {
@@ -61,7 +59,6 @@ async fn dns_api(env: TestEnvironment) {
         .send(MessageFromDns::TxtRecordRequest {
             cluster: env.cluster.clone(),
         })
-        .await
         .unwrap();
 
     let MessageToDns::TxtRecordResponse { cluster, txt_value } = dns_client.recv().await.unwrap();

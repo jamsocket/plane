@@ -61,11 +61,9 @@ pub async fn handle_message_from_drone(
                 .update_state(&backend_event.backend_id, backend_event.state)
                 .await?;
 
-            sender
-                .send(MessageToDrone::AckEvent {
-                    event_id: backend_event.event_id,
-                })
-                .await?;
+            sender.send(MessageToDrone::AckEvent {
+                event_id: backend_event.event_id,
+            })?;
         }
         MessageFromDrone::AckAction { action_id } => {
             controller
@@ -96,9 +94,7 @@ pub async fn handle_message_from_drone(
                 deadlines: Some(deadlines),
             };
 
-            sender
-                .send(MessageToDrone::RenewKeyResponse(renew_key_response))
-                .await?;
+            sender.send(MessageToDrone::RenewKeyResponse(renew_key_response))?;
         }
     }
 
@@ -154,7 +150,7 @@ pub async fn process_pending_actions(
     let mut count = 0;
     for pending_action in db.backend_actions().pending_actions(*drone_id).await? {
         let message = MessageToDrone::Action(pending_action);
-        socket.send(message).await?;
+        socket.send(message)?;
         count += 1;
     }
 
@@ -205,7 +201,7 @@ pub async fn drone_socket_inner(
                 match backend_action_result {
                     Some(backend_action) => {
                         let message = MessageToDrone::Action(backend_action.payload);
-                        if let Err(err) = socket.send(message).await {
+                        if let Err(err) = socket.send(message) {
                             tracing::error!(?err, "Error sending backend action to drone");
                         }
                     }

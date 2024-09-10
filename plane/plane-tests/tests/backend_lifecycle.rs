@@ -146,7 +146,6 @@ async fn backend_lifecycle(env: TestEnvironment) {
         .send(MessageFromProxy::RouteInfoRequest(RouteInfoRequest {
             token: response.token.clone(),
         }))
-        .await
         .unwrap();
 
     let result = proxy.recv().with_timeout(10).await.unwrap().unwrap();
@@ -179,7 +178,6 @@ async fn backend_lifecycle(env: TestEnvironment) {
     tracing::info!("Sending keepalive.");
     proxy
         .send(MessageFromProxy::KeepAlive(response.backend_id.clone()))
-        .await
         .unwrap();
 
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;

@@ -81,7 +81,7 @@ impl AcmeDnsServer {
                             outbound = recv.recv() => {
                                 match outbound {
                                     Ok(message) => {
-                                        if let Err(err) = socket.send(message).await {
+                                        if let Err(err) = socket.send(message) {
                                             tracing::warn!(?err, "Error sending message to DNS server.");
                                         }
                                     }

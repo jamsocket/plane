@@ -72,7 +72,6 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
             .send(MessageFromDrone::Heartbeat(Heartbeat {
                 local_time: LoggableTime(Utc::now()),
             }))
-            .await
             .unwrap();
 
         // Wait for the drone to be registered.
@@ -132,7 +131,6 @@ async fn backend_action_resent_if_not_acked(env: TestEnvironment) {
 
         drone_connection
             .send(MessageFromDrone::AckAction { action_id })
-            .await
             .unwrap();
 
         // Drone connections should always be closed to prevent a warning, but this
