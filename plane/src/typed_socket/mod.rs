@@ -39,9 +39,9 @@ impl<T> Debug for TypedSocketSender<T> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum TypedSocketError {
-    #[error("Socket closed")]
+    #[error("Receiver closed")]
     Closed,
-    #[error("Socket queue full")]
+    #[error("Receiver queue full")]
     Clogged,
 }
 
