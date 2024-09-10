@@ -42,13 +42,13 @@ pub enum TypedSocketError {
     #[error("Socket closed")]
     Closed,
     #[error("Socket disconnected")]
-    Disconnected,
+    Clogged,
 }
 
 impl<A> From<TrySendError<A>> for TypedSocketError {
     fn from(e: TrySendError<A>) -> Self {
         match e {
-            TrySendError::Full(_) => Self::Disconnected,
+            TrySendError::Full(_) => Self::Clogged,
             TrySendError::Closed(_) => Self::Closed,
         }
     }
