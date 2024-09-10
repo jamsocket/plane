@@ -21,7 +21,6 @@ async fn request_dns_lease(env: TestEnvironment) {
         .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::CertLeaseRequest,
         ))
-        .await
         .unwrap();
 
     let MessageToProxy::CertManagerResponse(CertManagerResponse::CertLeaseResponse {
@@ -47,7 +46,6 @@ async fn request_dns_lease_fails_when_held(env: TestEnvironment) {
         .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::CertLeaseRequest,
         ))
-        .await
         .unwrap();
 
     let MessageToProxy::CertManagerResponse(CertManagerResponse::CertLeaseResponse {
@@ -68,7 +66,6 @@ async fn request_dns_lease_fails_when_held(env: TestEnvironment) {
         .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::CertLeaseRequest,
         ))
-        .await
         .unwrap();
 
     let MessageToProxy::CertManagerResponse(CertManagerResponse::CertLeaseResponse {
@@ -82,7 +79,6 @@ async fn request_dns_lease_fails_when_held(env: TestEnvironment) {
         .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::ReleaseCertLease,
         ))
-        .await
         .unwrap();
 
     // Avoid race.
@@ -92,7 +88,6 @@ async fn request_dns_lease_fails_when_held(env: TestEnvironment) {
         .send(MessageFromProxy::CertManagerRequest(
             CertManagerRequest::CertLeaseRequest,
         ))
-        .await
         .unwrap();
 
     let MessageToProxy::CertManagerResponse(CertManagerResponse::CertLeaseResponse {

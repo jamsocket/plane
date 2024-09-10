@@ -37,10 +37,7 @@ pub async fn handle_route_info_request(
                 token,
                 route_info: Some(route_info),
             };
-            if let Err(err) = socket
-                .send(MessageToProxy::RouteInfoResponse(response))
-                .await
-            {
+            if let Err(err) = socket.send(MessageToProxy::RouteInfoResponse(response)) {
                 tracing::error!(?err, "Error sending route info response to proxy.");
             }
         }
@@ -59,10 +56,7 @@ pub async fn handle_route_info_request(
                         token,
                         route_info: Some(route_info),
                     };
-                    if let Err(err) = socket
-                        .send(MessageToProxy::RouteInfoResponse(response))
-                        .await
-                    {
+                    if let Err(err) = socket.send(MessageToProxy::RouteInfoResponse(response)) {
                         tracing::error!(?err, "Error sending route info response to proxy.");
                     }
                     return Ok(());
@@ -72,10 +66,7 @@ pub async fn handle_route_info_request(
                         token,
                         route_info: None,
                     };
-                    if let Err(err) = socket
-                        .send(MessageToProxy::RouteInfoResponse(response))
-                        .await
-                    {
+                    if let Err(err) = socket.send(MessageToProxy::RouteInfoResponse(response)) {
                         tracing::error!(?err, "Error sending route info response to proxy.");
                     }
                     return Ok(());
@@ -150,10 +141,7 @@ pub async fn handle_route_info_request(
                 token,
                 route_info: None,
             };
-            if let Err(err) = socket
-                .send(MessageToProxy::RouteInfoResponse(response))
-                .await
-            {
+            if let Err(err) = socket.send(MessageToProxy::RouteInfoResponse(response)) {
                 tracing::error!(?err, "Error sending route info response to proxy.");
             }
         }
@@ -186,11 +174,9 @@ pub async fn handle_message_from_proxy(
                         "Tried to update keepalive for non-existent backend"
                     );
 
-                    socket
-                        .send(MessageToProxy::BackendRemoved {
-                            backend: backend_id,
-                        })
-                        .await?;
+                    socket.send(MessageToProxy::BackendRemoved {
+                        backend: backend_id,
+                    })?;
                 }
                 Err(err) => {
                     tracing::error!(
@@ -255,10 +241,7 @@ pub async fn handle_message_from_proxy(
                 "Sending cert manager response"
             );
 
-            if let Err(err) = socket
-                .send(MessageToProxy::CertManagerResponse(response))
-                .await
-            {
+            if let Err(err) = socket.send(MessageToProxy::CertManagerResponse(response)) {
                 tracing::error!(?err, "Error sending cert manager response to proxy.");
             }
         }
@@ -307,7 +290,7 @@ pub async fn proxy_socket_inner(
                                 continue;
                             }
                         };
-                        socket.send(MessageToProxy::BackendRemoved { backend: backend_id }).await?;
+                        socket.send(MessageToProxy::BackendRemoved { backend: backend_id })?;
                     },
                     Some(_) => (),
                     None => {

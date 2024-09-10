@@ -322,8 +322,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
 
             conn.send(MessageFromProxy::CertManagerRequest(
                 CertManagerRequest::CertLeaseRequest,
-            ))
-            .await?;
+            ))?;
 
             let response = conn.recv().await.expect("Failed to receive response");
 
@@ -346,8 +345,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
                 CertManagerRequest::SetTxtRecord {
                     txt_value: message.clone(),
                 },
-            ))
-            .await?;
+            ))?;
 
             let response = conn.recv().await.expect("Failed to receive response");
 

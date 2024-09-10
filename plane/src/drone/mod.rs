@@ -16,7 +16,7 @@ use crate::{
     names::DroneName,
     protocol::{BackendAction, MessageFromDrone, MessageToDrone, RenewKeyResponse},
     signals::wait_for_shutdown_signal,
-    typed_socket::client::TypedSocketConnector,
+    typed_socket::{client::TypedSocketConnector, TypedSocketSender},
     types::{BackendState, ClusterName, DronePoolName},
 };
 use anyhow::{anyhow, Result};
@@ -98,74 +98,88 @@ pub async fn drone_loop(
                 break;
             };
 
-            match message {
-                MessageToDrone::Action(BackendActionMessage {
-                    action_id,
-                    backend_id,
-                    action,
-                    ..
-                }) => {
-                    tracing::info!(
-                        backend_id = backend_id.as_value(),
-                        action = action.as_value(),
-                        "Received action."
-                    );
+            let key_manager = key_manager.clone();
+            tokio::spawn(handle_message(
+                message,
+                key_manager,
+                socket.sender(|x| x),
+                executor.clone(),
+            ));
+        }
+    }
 
-                    if let BackendAction::Spawn { key, .. } = &action {
-                        if key.deadlines.soft_terminate_at.0 < Utc::now() {
-                            tracing::warn!(
-                                backend_id = backend_id.as_value(),
-                                "Received spawn request with deadline in the past. Ignoring."
-                            );
-                        }
+    pub async fn handle_message(
+        message: MessageToDrone,
+        key_manager: Arc<Mutex<KeyManager>>,
+        sender: TypedSocketSender<MessageFromDrone>,
+        executor: Arc<Executor>,
+    ) {
+        match message {
+            MessageToDrone::Action(BackendActionMessage {
+                action_id,
+                backend_id,
+                action,
+                ..
+            }) => {
+                tracing::info!(
+                    backend_id = backend_id.as_value(),
+                    action = action.as_value(),
+                    "Received action."
+                );
 
-                        // Register the key with the key manager, ensuring that it will be refreshed.
-                        let result = key_manager
-                            .lock()
-                            .expect("Key manager lock poisoned.")
-                            .register_key(backend_id.clone(), key.clone());
-
-                        if !result {
-                            tracing::warn!(
-                                backend = backend_id.as_value(),
-                                "Key already registered for backend. Ignoring spawn request."
-                            );
-                            continue;
-                        }
+                if let BackendAction::Spawn { key, .. } = &action {
+                    if key.deadlines.soft_terminate_at.0 < Utc::now() {
+                        tracing::warn!(
+                            backend_id = backend_id.as_value(),
+                            "Received spawn request with deadline in the past. Ignoring."
+                        );
                     }
 
-                    if let Err(err) = executor.apply_action(&backend_id, &action).await {
-                        tracing::error!(?err, "Error applying action.");
-                        continue;
-                    }
+                    // Register the key with the key manager, ensuring that it will be refreshed.
+                    let result = key_manager
+                        .lock()
+                        .expect("Key manager lock poisoned.")
+                        .register_key(backend_id.clone(), key.clone());
 
-                    if let Err(err) = socket.send(MessageFromDrone::AckAction { action_id }).await {
-                        tracing::error!(?err, "Error sending ack.");
-                        continue;
+                    if !result {
+                        tracing::warn!(
+                            backend = backend_id.as_value(),
+                            "Key already registered for backend. Ignoring spawn request."
+                        );
+                        return;
                     }
                 }
-                MessageToDrone::AckEvent { event_id } => {
-                    if let Err(err) = executor.ack_event(event_id) {
-                        tracing::error!(?err, "Error acking event.");
-                    }
-                }
-                MessageToDrone::RenewKeyResponse(renew_key_response) => {
-                    let RenewKeyResponse { backend, deadlines } = renew_key_response;
-                    tracing::info!(
-                        backend_id = backend.as_value(),
-                        deadlines = deadlines.as_value(),
-                        "Received key renewal response."
-                    );
 
-                    if let Some(deadlines) = deadlines {
-                        key_manager
-                            .lock()
-                            .expect("Key manager lock poisoned.")
-                            .update_deadlines(&backend, deadlines);
-                    } else {
-                        // TODO: we could begin the graceful termiation here.
-                        tracing::warn!("Key renewal failed.");
-                    }
+                if let Err(err) = executor.apply_action(&backend_id, &action).await {
+                    tracing::error!(?err, "Error applying action.");
+                    return;
+                }
+
+                if let Err(err) = sender.send(MessageFromDrone::AckAction { action_id }) {
+                    tracing::error!(?err, "Error acking action.");
+                }
+            }
+            MessageToDrone::AckEvent { event_id } => {
+                if let Err(err) = executor.ack_event(event_id) {
+                    tracing::error!(?err, "Error acking event.");
+                }
+            }
+            MessageToDrone::RenewKeyResponse(renew_key_response) => {
+                let RenewKeyResponse { backend, deadlines } = renew_key_response;
+                tracing::info!(
+                    backend_id = backend.as_value(),
+                    deadlines = deadlines.as_value(),
+                    "Received key renewal response."
+                );
+
+                if let Some(deadlines) = deadlines {
+                    key_manager
+                        .lock()
+                        .expect("Key manager lock poisoned.")
+                        .update_deadlines(&backend, deadlines);
+                } else {
+                    // TODO: we could begin the graceful termiation here.
+                    tracing::warn!("Key renewal failed.");
                 }
             }
         }

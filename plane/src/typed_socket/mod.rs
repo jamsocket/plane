@@ -39,16 +39,16 @@ impl<T> Debug for TypedSocketSender<T> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum TypedSocketError {
-    #[error("Socket closed")]
+    #[error("Receiver closed")]
     Closed,
-    #[error("Socket disconnected")]
-    Disconnected,
+    #[error("Receiver queue full")]
+    Clogged,
 }
 
 impl<A> From<TrySendError<A>> for TypedSocketError {
     fn from(e: TrySendError<A>) -> Self {
         match e {
-            TrySendError::Full(_) => Self::Disconnected,
+            TrySendError::Full(_) => Self::Clogged,
             TrySendError::Closed(_) => Self::Closed,
         }
     }
@@ -67,10 +67,9 @@ impl<A: Debug> TypedSocketSender<A> {
 }
 
 impl<T: ChannelMessage> TypedSocket<T> {
-    pub async fn send(&mut self, message: T) -> Result<(), PlaneClientError> {
+    pub fn send(&mut self, message: T) -> Result<(), PlaneClientError> {
         self.send
-            .send(SocketAction::Send(message))
-            .await
+            .try_send(SocketAction::Send(message))
             .map_err(|_| PlaneClientError::SendFailed)?;
         Ok(())
     }

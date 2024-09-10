@@ -154,7 +154,7 @@ async fn new_client<T: ChannelMessage>(
                                     continue;
                                 }
                             };
-                            if let Err(e) = send_to_client.send(result).await {
+                            if let Err(e) = send_to_client.try_send(result) {
                                 tracing::error!(%e, "Error sending message.");
                             }
                         }
