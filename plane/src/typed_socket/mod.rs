@@ -68,10 +68,11 @@ impl<A: Debug> TypedSocketSender<A> {
 
 impl<T: ChannelMessage> TypedSocket<T> {
     pub async fn send(&mut self, message: T) -> Result<(), PlaneClientError> {
-        self.send
-            .send(SocketAction::Send(message))
-            .await
-            .map_err(|_| PlaneClientError::SendFailed)?;
+        if let Err(e) = self.send.send(SocketAction::Send(message)).await {
+            tracing::error!(?e, "Failed to send message on websocket. Closing receiver.");
+            self.recv.close();
+            return Err(PlaneClientError::SendFailed);
+        }
         Ok(())
     }
 

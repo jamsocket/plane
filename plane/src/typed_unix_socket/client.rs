@@ -145,7 +145,6 @@ where
 
     // Task to handle receiving messages
     let recv_future = {
-        let event_tx = event_tx.clone();
         let response_map = Arc::clone(&response_map);
         async move {
             loop {
