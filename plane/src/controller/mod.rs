@@ -31,6 +31,7 @@ use axum::{
 use forward_auth::forward_layer;
 use futures_util::never::Never;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::net::{SocketAddr, TcpListener};
 use tokio::{
     sync::oneshot::{self},
@@ -78,6 +79,18 @@ pub async fn status(
         version: PLANE_VERSION.to_string(),
         hash: PLANE_GIT_HASH.to_string(),
     }))
+}
+
+pub async fn health(State(controller): State<Controller>) -> Result<Json<Value>, Response> {
+    controller
+        .db
+        .health_check()
+        .await
+        .or_internal_error("Database health check failed")?;
+
+    Ok(Json(json!({
+        "status": "ok"
+    })))
 }
 
 struct HeartbeatSender {
@@ -243,6 +256,7 @@ impl ControllerServer {
                 "/b/:backend/status-stream",
                 get(handle_backend_status_stream),
             )
+            .route("/health", get(health))
             .layer(cors_public.clone());
 
         let app = Router::new()

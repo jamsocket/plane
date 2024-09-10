@@ -70,7 +70,7 @@ async fn test_resource_limits() {
     let docker = bollard::Docker::connect_with_local_defaults().unwrap();
     let backend_name = BackendName::new_random();
     let _container_id = ContainerId::from(format!("plane-test-{}", backend_name));
-    let mut executor_config = DockerExecutorConfig::from_image_with_defaults("debian:bookworm");
+    let mut executor_config = DockerExecutorConfig::from_image_with_defaults("alpine:latest");
 
     let resource_limits: ResourceLimits = serde_json::from_value(serde_json::json!( {
         "cpu_period": 1000000,
