@@ -131,7 +131,7 @@ impl PlaneClient {
             .controller_address
             .join(&format!("/ctrl/b/{}/soft-terminate", backend_id));
 
-            let _: () = authed_post(&self.client, &addr, &()).await?;
+        let _: () = authed_post(&self.client, &addr, &()).await?;
         Ok(())
     }
 
