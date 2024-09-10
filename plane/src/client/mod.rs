@@ -194,6 +194,12 @@ impl PlaneClient {
         let cluster_state: ClusterState = authed_get(&self.client, &url).await?;
         Ok(cluster_state)
     }
+
+    pub async fn health_check(&self) -> Result<(), PlaneClientError> {
+        let url = self.controller_address.join("/pub/health");
+        self.client.get(url.url).send().await?;
+        Ok(())
+    }
 }
 
 async fn get_response<T: DeserializeOwned>(response: Response) -> Result<T, PlaneClientError> {

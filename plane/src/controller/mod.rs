@@ -78,9 +78,7 @@ pub async fn status(
     }))
 }
 
-pub async fn health(
-    State(controller): State<Controller>,
-) -> Result<Json<Value>, Response> {
+pub async fn health(State(controller): State<Controller>) -> Result<Json<Value>, Response> {
     controller
         .db
         .health_check()
