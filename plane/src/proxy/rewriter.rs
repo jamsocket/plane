@@ -6,7 +6,7 @@ use crate::{
 use hyper::{
     header::HOST,
     http::{request, uri},
-    Body, HeaderMap, Request, Uri,
+    HeaderMap, Request, Uri,
 };
 use reqwest::header::HeaderValue;
 use std::{borrow::BorrowMut, net::SocketAddr, str::FromStr};

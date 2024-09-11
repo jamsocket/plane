@@ -10,9 +10,8 @@ use crate::proxy::tls::TlsAcceptor;
 use crate::SERVER_NAME;
 use axum::http::uri::PathAndQuery;
 use futures_util::{Future, FutureExt};
-use hyper::server::conn::AddrIncoming;
 use hyper::{
-    client::HttpConnector, server::conn::AddrStream, service::Service, Body, Request, Response,
+    service::Service, Request, Response,
 };
 use std::convert::Infallible;
 use std::net::SocketAddr;

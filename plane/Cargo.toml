@@ -14,7 +14,7 @@ acme2-eab = "0.5.4"
 anyhow = "1.0.75"
 async-stream = "0.3.5"
 async-trait = "0.1.74"
-axum = { version = "0.6.20", features = ["ws"] }
+axum = { version = "0.7", features = ["ws"] }
 bollard = "0.17.0"
 chrono = { version = "0.4.31", features = ["serde"] }
 clap = { version = "4.4.10", features = ["derive"] }
@@ -22,13 +22,13 @@ colored = "2.0.4"
 dashmap = "5.5.3"
 data-encoding = "2.4.0"
 futures-util = "0.3.29"
-http-body = "0.4.6"
-hyper = { version = "0.14.27", features = ["server"] }
+http-body = "1"
+hyper = { version = "1", features = ["server"] }
 lru = "0.12.1"
 openssl = "0.10.66"
 pem = "3.0.2"
 rand = "0.8.5"
-reqwest = { version = "0.11.22", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 ring = "0.17.5"
 rusqlite = { version = "0.31.0", features = ["bundled", "serde_json"] }
 rustls-pemfile = "2.0.0"
@@ -40,15 +40,15 @@ sqlx = { version = "0.8.0", features = ["runtime-tokio", "tls-rustls", "postgres
 thiserror = "1.0.50"
 time = "0.3.30"
 tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread", "signal"] }
-tokio-rustls = "0.24.1"
+tokio-rustls = "0.26"
 tokio-stream = { version="0.1.14", features=["sync"] }
-tokio-tungstenite = { version = "0.20.1", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.21", features = ["rustls-tls-webpki-roots"] }
 tower = "0.4.13"
-tower-http = { version = "0.4.4", features = ["trace", "cors"] }
+tower-http = { version = "0.5", features = ["trace", "cors"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "valuable"] }
 trust-dns-server = "0.23.2"
-tungstenite = "0.20.1"
+tungstenite = "0.21"
 url = { version="2.4.1", features=["serde"] }
 valuable = { version = "0.1.0", features = ["derive"] }
 x509-parser = "0.15.1"

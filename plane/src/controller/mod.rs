@@ -26,16 +26,15 @@ use axum::{
     middleware::from_fn_with_state,
     response::Response,
     routing::{get, post},
-    Json, Router, Server,
+    Json, Router,
 };
 use forward_auth::forward_layer;
 use futures_util::never::Never;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::net::{SocketAddr, TcpListener};
+use std::net::SocketAddr;
 use tokio::{
-    sync::oneshot::{self},
-    task::JoinHandle,
+    net::TcpListener, sync::oneshot::{self}, task::JoinHandle
 };
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
 use tower_http::{
@@ -146,13 +145,13 @@ pub struct ControllerServer {
     heartbeat_handle: HeartbeatSender,
     // server_handle is wrapped in an Option<> because we need to take ownership of it to join it
     // when gracefully terminating.
-    server_handle: Option<JoinHandle<hyper::Result<()>>>,
+    server_handle: Option<JoinHandle<Result<(), std::io::Error>>>,
     _cleanup_handle: GuardHandle,
 }
 
 impl ControllerServer {
     pub async fn run(config: ControllerConfig) -> Result<Self> {
-        let listener = TcpListener::bind(config.bind_addr)?;
+        let listener = TcpListener::bind(config.bind_addr).await?;
 
         tracing::info!("Attempting to connect to database...");
 
@@ -239,7 +238,8 @@ impl ControllerServer {
         if let Some(forward_auth_url) = forward_auth {
             tracing::info!(?forward_auth_url, "Forward auth enabled");
             let forward_url = forward_auth_url.clone();
-            control_routes = control_routes.layer(from_fn_with_state(forward_url, forward_layer));
+            let l = from_fn_with_state(forward_url, forward_layer);
+            control_routes = control_routes.layer(l);
         }
 
         let cors_public = CorsLayer::new()
@@ -265,13 +265,17 @@ impl ControllerServer {
             .layer(trace_layer)
             .with_state(controller);
 
-        let server_handle = tokio::spawn(
-            Server::from_tcp(listener)?
-                .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-                .with_graceful_shutdown(async {
-                    graceful_terminate_receiver.await.ok();
-                }),
-        );
+        let server = axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(async {
+            graceful_terminate_receiver.await.ok();
+        });
+
+        let server_handle = tokio::spawn(async {
+            server.await
+        });
 
         Ok(Self {
             graceful_terminate_sender: Some(graceful_terminate_sender),
