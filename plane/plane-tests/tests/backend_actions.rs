@@ -1,6 +1,5 @@
 use chrono::Utc;
 use common::test_env::TestEnvironment;
-use hyper::StatusCode;
 use plane::{
     client::PlaneClientError,
     database::backend::BackendActionMessage,
@@ -14,6 +13,7 @@ use plane::{
 };
 use plane_test_macro::plane_test;
 use std::time::Duration;
+use reqwest::StatusCode;
 
 mod common;
 

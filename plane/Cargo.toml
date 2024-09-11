@@ -28,7 +28,7 @@ lru = "0.12.1"
 openssl = "0.10.66"
 pem = "3.0.2"
 rand = "0.8.5"
-reqwest = { version = "0.11.22", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 ring = "0.17.5"
 rusqlite = { version = "0.31.0", features = ["bundled", "serde_json"] }
 rustls-pemfile = "2.0.0"

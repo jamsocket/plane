@@ -3,8 +3,7 @@ use super::Controller;
 use crate::controller::error::IntoApiError;
 use crate::database::connect::ConnectError;
 use crate::types::{ConnectRequest, ConnectResponse, RevokeRequest};
-use axum::{extract::State, response::Response, Json};
-use reqwest::StatusCode;
+use axum::{extract::State, response::Response, Json, http::StatusCode};
 
 fn connect_error_to_response(connect_error: &ConnectError) -> Response {
     match connect_error {

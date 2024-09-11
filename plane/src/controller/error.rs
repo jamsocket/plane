@@ -3,7 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use reqwest::StatusCode;
+use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{
     error::Error,

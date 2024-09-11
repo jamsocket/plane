@@ -4,11 +4,10 @@ use crate::{
     types::{BearerToken, ClusterName},
 };
 use hyper::{
-    header::HOST,
+    header::{HOST, HeaderValue},
     http::{request, uri},
     Body, HeaderMap, Request, Uri,
 };
-use reqwest::header::HeaderValue;
 use std::{borrow::BorrowMut, net::SocketAddr, str::FromStr};
 use tungstenite::http::uri::PathAndQuery;
 

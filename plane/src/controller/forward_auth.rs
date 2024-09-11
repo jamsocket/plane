@@ -1,35 +1,73 @@
+//! When we update to the latest hyper, these will both use the same versions of the `http`
+//! crate. Until then, implementing conversions between the crates gives us some flexibility
+//! around versions.
+
 use axum::{
-    body::{Body, BoxBody, Bytes},
+    body::{BoxBody, Bytes},
     extract::State,
-    http::{request, HeaderValue, Request},
+    http::{header::HeaderMap, request, Method, Request},
     middleware::Next,
     response::Response,
 };
-use hyper::{Client, StatusCode, Uri};
+use hyper::{StatusCode, Uri};
+use reqwest::Client;
 use url::Url;
 
-pub fn clone_request_with_empty_body(parts: &request::Parts) -> request::Request<Body> {
+pub fn convert_method(method: &Method) -> reqwest::Method {
+    match method {
+        &Method::GET => reqwest::Method::GET,
+        &Method::POST => reqwest::Method::POST,
+        &Method::PUT => reqwest::Method::PUT,
+        &Method::DELETE => reqwest::Method::DELETE,
+        &Method::HEAD => reqwest::Method::HEAD,
+        &Method::OPTIONS => reqwest::Method::OPTIONS,
+        &Method::CONNECT => reqwest::Method::CONNECT,
+        &Method::PATCH => reqwest::Method::PATCH,
+        &Method::TRACE => reqwest::Method::TRACE,
+        _ => reqwest::Method::GET,
+    }
+}
+
+pub fn convert_url(url: &Uri) -> Url {
+    let url = url.to_string();
+    Url::parse(&url).expect("Url is always valid.")
+}
+
+pub fn convert_header_map(headers: &HeaderMap) -> reqwest::header::HeaderMap {
+    let mut new_headers = reqwest::header::HeaderMap::new();
+
+    for (key, value) in headers.iter() {
+        new_headers.insert(
+            reqwest::header::HeaderName::from_bytes(key.as_str().as_bytes())
+                .expect("HeaderName is always valid."),
+            value
+                .to_str()
+                .expect("Header value is always valid.")
+                .parse()
+                .unwrap(),
+        );
+    }
+
+    new_headers
+}
+
+pub fn clone_request_with_empty_body(parts: &request::Parts) -> reqwest::Request {
     // Copy method and URL.
-    let mut builder = request::Builder::new()
-        .method(parts.method.clone())
-        .uri(parts.uri.clone());
+    let method = convert_method(&parts.method);
+    let url = convert_url(&parts.uri);
+    let mut request = reqwest::Request::new(method, url);
 
     // Copy headers.
-    let headers = builder
-        .headers_mut()
-        .expect("Can always call headers_mut() on a new builder.");
+    let headers = request.headers_mut();
 
-    headers.extend(parts.headers.clone());
+    headers.extend(convert_header_map(&parts.headers));
 
     headers.insert(
         "x-original-path",
-        HeaderValue::from_str(parts.uri.path()).expect("Path is always valid."),
+        reqwest::header::HeaderValue::from_str(parts.uri.path()).expect("Path is always valid."),
     );
 
-    // Construct with an empty body.
-    builder
-        .body(Body::empty())
-        .expect("Request is always valid.")
+    request
 }
 
 pub async fn forward_layer<B>(
@@ -43,15 +81,15 @@ pub async fn forward_layer<B>(
 
     let uri = forward_url
         .to_string()
-        .parse::<Uri>()
+        .parse::<Url>()
         .expect("Url should always parse as hyper Uri.");
-    *forward_req.uri_mut() = uri;
+    *forward_req.url_mut() = uri;
 
     // Create a client
     let client = Client::new();
 
     // Forward the request
-    let forwarded_resp = client.request(forward_req).await;
+    let forwarded_resp = client.execute(forward_req).await;
 
     let forwarded_resp = match forwarded_resp {
         Ok(resp) => resp,

@@ -1,10 +1,9 @@
 use super::PlaneClientError;
 use crate::util::ExponentialBackoff;
-use hyper::header::{ACCEPT, CONNECTION};
+use reqwest::header::{ACCEPT, CONNECTION, HeaderValue};
 use reqwest::{Client, Response};
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
-use tungstenite::http::HeaderValue;
 use url::Url;
 
 struct RawSseStream {
