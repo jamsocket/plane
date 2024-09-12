@@ -11,6 +11,8 @@ use crate::SERVER_NAME;
 use axum::http::uri::PathAndQuery;
 use futures_util::{Future, FutureExt};
 use http_body_util::{BodyExt, Empty};
+use hyper::body::Incoming;
+use hyper::upgrade::Upgraded;
 use hyper::{
     body::{Body, Bytes},
     service::Service,
@@ -22,12 +24,13 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::{atomic::AtomicBool, Arc};
+use std::task::Context;
 use std::{
     future::ready,
     io::ErrorKind,
     task::{self, Poll},
 };
-use tokio::io::copy_bidirectional;
+use tokio::io::{copy_bidirectional, AsyncRead, AsyncWrite};
 use tokio::task::JoinHandle;
 use tokio_rustls::rustls::ServerConfig;
 use url::Url;
@@ -100,6 +103,9 @@ pub enum ProxyError {
     #[error("Error making request: {0} (backend: {1})")]
     RequestError(hyper::Error, BackendName),
 
+    #[error("Error making upgradable (legacy type error) request: {0}")]
+    UpgradableRequestLegacyError(hyper_util::client::legacy::Error),
+
     #[error("Error making upgradable request: {0}")]
     UpgradableRequestError(hyper::Error),
 }
@@ -150,6 +156,76 @@ struct RequestHandler {
     https_redirect: bool,
     remote_meta: ForwardableRequestInfo,
     root_redirect_url: Option<Url>,
+}
+
+struct WrappedUpgrade {
+    upgrade: Upgraded,
+}
+
+/// Adapted from:
+/// https://github.com/hyperium/hyper/blob/e3e707ea2abaeb98e42c31259d867547c7890a35/benches/support/tokiort.rs#L102-L124
+impl AsyncRead for WrappedUpgrade {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        tbuf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        //let init = tbuf.initialized().len();
+        let filled = tbuf.filled().len();
+        let sub_filled = unsafe {
+            let mut buf = hyper::rt::ReadBuf::uninit(tbuf.unfilled_mut());
+
+            match hyper::rt::Read::poll_read(self.project().inner, cx, buf.unfilled()) {
+                Poll::Ready(Ok(())) => buf.filled().len(),
+                other => return other,
+            }
+        };
+
+        let n_filled = filled + sub_filled;
+        // At least sub_filled bytes had to have been initialized.
+        let n_init = sub_filled;
+        unsafe {
+            tbuf.assume_init(n_init);
+            tbuf.set_filled(n_filled);
+        }
+
+        Poll::Ready(Ok(()))
+    }
+}
+
+/// Adapted from:
+/// https://github.com/hyperium/hyper/blob/e3e707ea2abaeb98e42c31259d867547c7890a35/benches/support/tokiort.rs#L194-L228
+impl AsyncWrite for WrappedUpgrade {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        hyper::rt::Write::poll_write(self.project().inner, cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        hyper::rt::Write::poll_flush(self.project().inner, cx)
+    }
+
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        hyper::rt::Write::poll_shutdown(self.project().inner, cx)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        hyper::rt::Write::is_write_vectored(&self.inner)
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[std::io::IoSlice<'_>],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        hyper::rt::Write::poll_write_vectored(self.project().inner, cx, bufs)
+    }
 }
 
 impl RequestHandler {
@@ -297,12 +373,13 @@ impl RequestHandler {
 
         let mut response = if request_rewriter.should_upgrade() {
             let (req, req_clone) = request_rewriter.into_request_pair(&route_info);
+
             let response = self
                 .state
                 .http_client
                 .request(req_clone)
                 .await
-                .map_err(ProxyError::UpgradableRequestError)?;
+                .map_err(ProxyError::UpgradableRequestLegacyError)?;
             let response_clone = clone_response_empty_body(&response);
 
             let mut response_upgrade = hyper::upgrade::on(response)
@@ -324,6 +401,14 @@ impl RequestHandler {
                     .lock()
                     .expect("Monitor lock was poisoned.")
                     .inc_connection(&backend_id);
+
+                let response_upgrade = WrappedUpgrade {
+                    upgrade: response_upgrade,
+                };
+
+                let req_upgrade = WrappedUpgrade {
+                    upgrade: req_upgrade,
+                };
 
                 match copy_bidirectional(&mut req_upgrade, &mut response_upgrade).await {
                     Ok(_) => (),
@@ -383,7 +468,7 @@ impl RequestHandler {
     }
 }
 
-fn clone_response_empty_body(response: &Response<ProxyBody>) -> Response<ProxyBody> {
+fn clone_response_empty_body(response: &Response<Incoming>) -> Response<ProxyBody> {
     let mut builder = Response::builder();
 
     builder
