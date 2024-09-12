@@ -1,14 +1,17 @@
-use super::{subdomain::subdomain_from_host, ForwardableRequestInfo};
+use super::{
+    proxy_service::{empty_proxy_body, ProxyBody},
+    subdomain::subdomain_from_host,
+    ForwardableRequestInfo,
+};
 use crate::{
     protocol::RouteInfo,
     types::{BearerToken, ClusterName},
 };
 use hyper::{
-    header::HOST,
+    header::{HeaderValue, HOST},
     http::{request, uri},
     HeaderMap, Request, Uri,
 };
-use reqwest::header::HeaderValue;
 use std::{borrow::BorrowMut, net::SocketAddr, str::FromStr};
 use tungstenite::http::uri::PathAndQuery;
 
@@ -36,14 +39,14 @@ impl From<hyper::header::ToStrError> for RequestRewriterError {
 pub struct RequestRewriter {
     parts: request::Parts,
     uri_parts: uri::Parts,
-    body: Body,
+    body: ProxyBody,
     bearer_token: BearerToken,
     prefix_uri: Uri,
     remote_meta: ForwardableRequestInfo,
 }
 
 impl RequestRewriter {
-    pub fn new(request: Request<Body>, remote_meta: ForwardableRequestInfo) -> Option<Self> {
+    pub fn new(request: Request<ProxyBody>, remote_meta: ForwardableRequestInfo) -> Option<Self> {
         let (parts, body) = request.into_parts();
 
         let mut uri_parts = parts.uri.clone().into_parts();
@@ -108,7 +111,7 @@ impl RequestRewriter {
         subdomain_from_host(hostname, cluster)
     }
 
-    fn into_parts(self) -> (request::Parts, Body, Uri, ForwardableRequestInfo) {
+    fn into_parts(self) -> (request::Parts, ProxyBody, Uri, ForwardableRequestInfo) {
         let Self {
             mut parts,
             uri_parts,
@@ -124,7 +127,7 @@ impl RequestRewriter {
         (parts, body, prefix_uri, remote_meta)
     }
 
-    pub fn into_request(self, route_info: &RouteInfo) -> Request<Body> {
+    pub fn into_request(self, route_info: &RouteInfo) -> Request<ProxyBody> {
         let (mut parts, body, prefix_uri, remote_meta) = self.into_parts();
 
         let headers = parts.headers.borrow_mut();
@@ -133,7 +136,10 @@ impl RequestRewriter {
         Request::from_parts(parts, body)
     }
 
-    pub fn into_request_pair(self, route_info: &RouteInfo) -> (Request<Body>, Request<Body>) {
+    pub fn into_request_pair(
+        self,
+        route_info: &RouteInfo,
+    ) -> (Request<ProxyBody>, Request<ProxyBody>) {
         let (parts, body, prefix_uri, remote_meta) = self.into_parts();
         let req2 = clone_request_with_empty_body(&parts, route_info, &prefix_uri, remote_meta);
         let req1 = Request::from_parts(parts, body);
@@ -162,7 +168,7 @@ fn clone_request_with_empty_body(
     route_info: &RouteInfo,
     prefix_uri: &Uri,
     remote_meta: ForwardableRequestInfo,
-) -> request::Request<Body> {
+) -> request::Request<ProxyBody> {
     let mut builder = request::Builder::new()
         .method(parts.method.clone())
         .uri(parts.uri.clone());
@@ -175,7 +181,7 @@ fn clone_request_with_empty_body(
     set_headers_from_route_info(headers, route_info, prefix_uri, remote_meta);
 
     builder
-        .body(Body::empty())
+        .body(empty_proxy_body())
         .expect("Request is always valid.")
 }
 

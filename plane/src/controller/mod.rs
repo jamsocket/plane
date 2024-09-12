@@ -28,13 +28,15 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use forward_auth::forward_layer;
+// use forward_auth::forward_layer;
 use futures_util::never::Never;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tokio::{
-    net::TcpListener, sync::oneshot::{self}, task::JoinHandle
+    net::TcpListener,
+    sync::oneshot::{self},
+    task::JoinHandle,
 };
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
 use tower_http::{
@@ -235,12 +237,12 @@ impl ControllerServer {
                 post(handle_revoke), // (TODO) does not notify proxies, see handler function for details
             );
 
-        if let Some(forward_auth_url) = forward_auth {
-            tracing::info!(?forward_auth_url, "Forward auth enabled");
-            let forward_url = forward_auth_url.clone();
-            let l = from_fn_with_state(forward_url, forward_layer);
-            control_routes = control_routes.layer(l);
-        }
+        // if let Some(forward_auth_url) = forward_auth {
+        //     tracing::info!(?forward_auth_url, "Forward auth enabled");
+        //     let forward_url = forward_auth_url.clone();
+        //     let l = from_fn_with_state(forward_url, forward_layer);
+        //     control_routes = control_routes.layer(l);
+        // }
 
         let cors_public = CorsLayer::new()
             .allow_methods(vec![Method::GET, Method::POST])
@@ -273,9 +275,7 @@ impl ControllerServer {
             graceful_terminate_receiver.await.ok();
         });
 
-        let server_handle = tokio::spawn(async {
-            server.await
-        });
+        let server_handle = tokio::spawn(async { server.await });
 
         Ok(Self {
             graceful_terminate_sender: Some(graceful_terminate_sender),

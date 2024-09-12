@@ -10,9 +10,14 @@ use crate::proxy::tls::TlsAcceptor;
 use crate::SERVER_NAME;
 use axum::http::uri::PathAndQuery;
 use futures_util::{Future, FutureExt};
+use http_body_util::{BodyExt, Empty};
 use hyper::{
-    service::Service, Request, Response,
+    body::{Body, Bytes},
+    service::Service,
+    Request, Response,
 };
+use hyper_util::client::legacy::connect::HttpConnector;
+use hyper_util::client::legacy::Client;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::pin::Pin;
@@ -28,6 +33,18 @@ use tokio_rustls::rustls::ServerConfig;
 use url::Url;
 
 const PLANE_BACKEND_ID_HEADER: &str = "x-plane-backend-id";
+
+pub type ProxyBody = Box<dyn Body<Data = Bytes, Error = hyper::Error> + Unpin + Send>;
+
+pub fn to_proxy_body(body: impl Body<Data = Bytes, Error = Infallible>) -> ProxyBody {
+    body.boxed()
+}
+
+pub fn empty_proxy_body() -> ProxyBody {
+    Empty::new().boxed()
+}
+
+// pub type ProxyBody = Box<Incoming>;
 
 const DEFAULT_CORS_HEADERS: &[(&str, &str)] = &[
     ("Access-Control-Allow-Origin", "*"),
@@ -97,7 +114,7 @@ impl From<RequestRewriterError> for ProxyError {
 
 pub struct ProxyState {
     pub route_map: RouteMap,
-    http_client: hyper::Client<HttpConnector>,
+    http_client: Client<HttpConnector, ProxyBody>,
     pub monitor: ConnectionMonitorHandle,
     connected: AtomicBool,
 }
@@ -112,7 +129,7 @@ impl ProxyState {
     pub fn new() -> Self {
         Self {
             route_map: RouteMap::new(),
-            http_client: hyper::Client::builder().build_http::<hyper::Body>(),
+            http_client: Client::new(),
             monitor: ConnectionMonitorHandle::new(),
             connected: AtomicBool::new(false),
         }
@@ -138,8 +155,8 @@ struct RequestHandler {
 impl RequestHandler {
     async fn handle_request(
         self: Arc<Self>,
-        req: hyper::Request<hyper::Body>,
-    ) -> Result<hyper::Response<hyper::Body>, Infallible> {
+        req: hyper::Request<ProxyBody>,
+    ) -> Result<hyper::Response<ProxyBody>, Infallible> {
         let result = self.handle_request_inner(req).await;
         match result {
             Ok(response) => Ok(response),
@@ -165,10 +182,11 @@ impl RequestHandler {
                         (hyper::StatusCode::INTERNAL_SERVER_ERROR, "Internal error")
                     }
                 };
+                let body: ProxyBody = to_proxy_body(body.to_string());
                 Ok(response_builder()
                     .status(status_code)
                     .header(hyper::header::SERVER, SERVER_NAME)
-                    .body(hyper::Body::from(body.to_string()))
+                    .body(body)
                     .expect("Static response is always valid"))
             }
         }
@@ -176,20 +194,20 @@ impl RequestHandler {
 
     async fn handle_request_inner(
         self: Arc<Self>,
-        req: hyper::Request<hyper::Body>,
-    ) -> Result<hyper::Response<hyper::Body>, ProxyError> {
+        req: hyper::Request<ProxyBody>,
+    ) -> Result<hyper::Response<ProxyBody>, ProxyError> {
         // Handle "/ready"
         if req.uri().path() == "/ready" {
             if self.state.connected() {
                 return Ok(response_builder()
                     .status(hyper::StatusCode::OK)
                     .header(hyper::header::SERVER, SERVER_NAME)
-                    .body("Plane Proxy server (ready)".into())?);
+                    .body(to_proxy_body("Plane Proxy server (ready)".to_string()))?);
             } else {
                 return Ok(response_builder()
                     .status(hyper::StatusCode::SERVICE_UNAVAILABLE)
                     .header(hyper::header::SERVER, SERVER_NAME)
-                    .body("Plane Proxy server (not ready)".into())?);
+                    .body(to_proxy_body("Plane Proxy server (not ready)".to_string()))?);
             }
         }
 
@@ -217,11 +235,13 @@ impl RequestHandler {
                 .path_and_query
                 .or_else(|| Some(PathAndQuery::from_static("")));
             let uri = hyper::Uri::from_parts(uri_parts).expect("URI parts are valid.");
-            return Ok(response_builder()
+            let result = response_builder()
                 .status(hyper::StatusCode::MOVED_PERMANENTLY)
                 .header(hyper::header::LOCATION, uri.to_string())
                 .header(hyper::header::SERVER, SERVER_NAME)
-                .body(hyper::Body::empty())?);
+                .body(empty_proxy_body());
+
+            return Ok(result?);
         }
 
         if req.uri().path() == "/" {
@@ -230,7 +250,7 @@ impl RequestHandler {
                     .status(hyper::StatusCode::MOVED_PERMANENTLY)
                     .header(hyper::header::LOCATION, root_redirect_url.to_string())
                     .header(hyper::header::SERVER, SERVER_NAME)
-                    .body(hyper::Body::empty())?);
+                    .body(empty_proxy_body())?);
             }
         }
 
@@ -239,8 +259,8 @@ impl RequestHandler {
 
     async fn handle_proxy_request(
         self: Arc<Self>,
-        req: hyper::Request<hyper::Body>,
-    ) -> Result<hyper::Response<hyper::Body>, ProxyError> {
+        req: hyper::Request<ProxyBody>,
+    ) -> Result<hyper::Response<ProxyBody>, ProxyError> {
         let Some(mut request_rewriter) = RequestRewriter::new(req, self.remote_meta) else {
             tracing::warn!("Request rewriter failed to create.");
             return Err(ProxyError::BadRequest);
@@ -363,7 +383,7 @@ impl RequestHandler {
     }
 }
 
-fn clone_response_empty_body(response: &Response<Body>) -> Response<Body> {
+fn clone_response_empty_body(response: &Response<ProxyBody>) -> Response<ProxyBody> {
     let mut builder = Response::builder();
 
     builder
@@ -382,16 +402,12 @@ pub struct ProxyService {
     handler: Arc<RequestHandler>,
 }
 
-impl Service<Request<Body>> for ProxyService {
-    type Response = Response<Body>;
+impl Service<Request<ProxyBody>> for ProxyService {
+    type Response = Response<ProxyBody>;
     type Error = Infallible;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, req: Request<Body>) -> Self::Future {
+    fn call(&mut self, req: Request<ProxyBody>) -> Self::Future {
         Box::pin(self.handler.clone().handle_request(req))
     }
 }

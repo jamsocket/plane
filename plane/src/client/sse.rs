@@ -244,9 +244,9 @@ mod tests {
             let app = Router::new()
                 .route("/counter", get(handle_sse))
                 .with_state(disconnect_sender.clone());
-            let server = axum::Server::from_tcp(listener)
-                .unwrap()
-                .serve(app.into_make_service());
+
+            let server = axum::serve(listener, app.into_make_service());
+
             let handle = tokio::spawn(server);
 
             Self {

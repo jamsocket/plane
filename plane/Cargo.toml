@@ -23,7 +23,9 @@ dashmap = "5.5.3"
 data-encoding = "2.4.0"
 futures-util = "0.3.29"
 http-body = "1"
+http-body-util = "0.1.2"
 hyper = { version = "1", features = ["server"] }
+hyper-util = { version = "0.1.8", features = ["client", "client-legacy", "http1", "http2", "server", "server-auto", "tokio"] }
 lru = "0.12.1"
 openssl = "0.10.66"
 pem = "3.0.2"
@@ -31,8 +33,8 @@ rand = "0.8.5"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 ring = "0.17.5"
 rusqlite = { version = "0.31.0", features = ["bundled", "serde_json"] }
+rustls = "0.23.13"
 rustls-pemfile = "2.0.0"
-rustls-pki-types = "1.0.0"
 serde = { version = "1.0.190", features = ["derive"] }
 serde_json = "1.0.107"
 serde_with = "3.4.0"

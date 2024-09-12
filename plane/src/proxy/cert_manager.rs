@@ -11,6 +11,7 @@ use acme2_eab::{
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use std::{
+    fmt::{Debug, Formatter},
     ops::Sub,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -42,6 +43,12 @@ const RENEWAL_WINDOW: Duration = Duration::from_secs(24 * 60 * 60 * 30); // 30 d
 pub struct CertWatcher {
     receiver: Receiver<Option<CertificatePair>>,
     certified_key: Mutex<Option<Arc<CertifiedKey>>>,
+}
+
+impl Debug for CertWatcher {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CertWatcher").finish()
+    }
 }
 
 impl CertWatcher {
