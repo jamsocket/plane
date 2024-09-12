@@ -20,6 +20,7 @@ use hyper::{
 };
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client;
+use hyper_util::rt::TokioExecutor;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::pin::Pin;
@@ -31,6 +32,7 @@ use std::{
     task::{self, Poll},
 };
 use tokio::io::{copy_bidirectional, AsyncRead, AsyncWrite};
+use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio_rustls::rustls::ServerConfig;
 use url::Url;
@@ -517,12 +519,14 @@ impl ProxyMakeService {
         F: Future<Output = ()> + Send + 'static,
     {
         let addr: SocketAddr = ([0, 0, 0, 0], port).into();
-        tracing::info!(%addr, "Listening for HTTP connections.");
-        let server = hyper::Server::bind(&addr)
-            .serve(self)
-            .with_graceful_shutdown(shutdown_future);
+
         let handle = tokio::spawn(async {
-            let _ = server.await;
+            let listener = TcpListener::bind(addr).await?;
+            tracing::info!(%addr, "Listening for HTTP connections.");
+
+            let builder = hyper_util::server::conn::auto::Builder::new(TokioExecutor::new());
+
+            builder.serve_connection_with_upgrades(listener, self).await;
         });
 
         Ok(handle)
@@ -587,10 +591,6 @@ impl<'a> Service<&'a TlsStream> for ProxyMakeService {
     type Response = ProxyService;
     type Error = ProxyError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
 
     fn call(&mut self, req: &'a TlsStream) -> Self::Future {
         let remote_ip = req.remote_ip;
