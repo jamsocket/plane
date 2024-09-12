@@ -74,6 +74,8 @@ impl CertificatePair {
         // let key = any_supported_type(&private_key)?;
         // let key = crypto::ring::sign::any_supported_type();
 
+        let key = todo!();
+
         let certified_key = CertifiedKey::new(certs, key);
 
         Ok(Self {
