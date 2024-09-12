@@ -77,6 +77,11 @@ fn response_builder() -> hyper::http::response::Builder {
     request
 }
 
+fn box_response_body(response: Response<Incoming>) -> Response<ProxyBody> {
+    let (parts, body) = response.into_parts();
+    Response::from_parts(parts, Box::new(body))
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ProxyError {
     #[error("Invalid or expired connection token")]
@@ -101,7 +106,7 @@ pub enum ProxyError {
     UpgradeError(hyper::Error),
 
     #[error("Error making request: {0} (backend: {1})")]
-    RequestError(hyper::Error, BackendName),
+    RequestError(hyper_util::client::legacy::Error, BackendName),
 
     #[error("Error making upgradable (legacy type error) request: {0}")]
     UpgradableRequestLegacyError(hyper_util::client::legacy::Error),
@@ -382,14 +387,14 @@ impl RequestHandler {
                 .map_err(ProxyError::UpgradableRequestLegacyError)?;
             let response_clone = clone_response_empty_body(&response);
 
-            let mut response_upgrade = hyper::upgrade::on(response)
+            let response_upgrade = hyper::upgrade::on(response)
                 .await
                 .map_err(ProxyError::UpgradeError)?;
             let monitor = self.state.monitor.monitor();
             let backend_id = backend_id.clone();
 
             tokio::spawn(async move {
-                let mut req_upgrade = match hyper::upgrade::on(req).await {
+                let req_upgrade = match hyper::upgrade::on(req).await {
                     Ok(req) => req,
                     Err(error) => {
                         tracing::error!(?error, "Error upgrading connection.");
@@ -402,11 +407,11 @@ impl RequestHandler {
                     .expect("Monitor lock was poisoned.")
                     .inc_connection(&backend_id);
 
-                let response_upgrade = WrappedUpgrade {
+                let mut response_upgrade = WrappedUpgrade {
                     upgrade: response_upgrade,
                 };
 
-                let req_upgrade = WrappedUpgrade {
+                let mut req_upgrade = WrappedUpgrade {
                     upgrade: req_upgrade,
                 };
 
@@ -439,11 +444,14 @@ impl RequestHandler {
         } else {
             let req = request_rewriter.into_request(&route_info);
             self.state.monitor.touch_backend(&backend_id);
-            self.state
+            let response = self
+                .state
                 .http_client
                 .request(req)
                 .await
-                .map_err(|e| ProxyError::RequestError(e, backend_id.clone()))?
+                .map_err(|e| ProxyError::RequestError(e, backend_id.clone()))?;
+
+            box_response_body(response)
         };
 
         let headers = response.headers_mut();
