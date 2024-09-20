@@ -183,7 +183,7 @@ mod tests {
     use hyper::HeaderMap;
     use serde::{Deserialize, Serialize};
     use std::{convert::Infallible, time::Duration};
-    use tokio::{sync::broadcast, task::JoinHandle, time::timeout};
+    use tokio::{net::TcpListener, sync::broadcast, task::JoinHandle, time::timeout};
 
     #[derive(Serialize, Deserialize, Debug)]
     struct Count {
@@ -192,7 +192,7 @@ mod tests {
 
     struct DemoSseServer {
         port: u16,
-        handle: Option<JoinHandle<std::result::Result<(), hyper::Error>>>,
+        handle: Option<JoinHandle<std::result::Result<(), std::io::Error>>>,
         disconnect_sender: broadcast::Sender<()>,
     }
 
@@ -235,9 +235,9 @@ mod tests {
     }
 
     impl DemoSseServer {
-        fn new() -> Self {
+        async fn new() -> Self {
             let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
-            let listener = std::net::TcpListener::bind(addr).unwrap();
+            let listener = TcpListener::bind(addr).await.unwrap();
             let port = listener.local_addr().unwrap().port();
             let (disconnect_sender, _) = broadcast::channel::<()>(1);
 
@@ -247,7 +247,7 @@ mod tests {
 
             let server = axum::serve(listener, app.into_make_service());
 
-            let handle = tokio::spawn(server);
+            let handle = tokio::spawn(async move { server.await });
 
             Self {
                 port,
@@ -268,7 +268,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_simple_sse() {
-        let server = DemoSseServer::new();
+        let server = DemoSseServer::new().await;
 
         let client = reqwest::Client::new();
         let mut stream = super::sse_request::<Count>(server.url(), client)
@@ -283,7 +283,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sse_reconnect() {
-        let server = DemoSseServer::new();
+        let server = DemoSseServer::new().await;
 
         let client = reqwest::Client::new();
         let mut stream = super::sse_request::<Count>(server.url(), client)

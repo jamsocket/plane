@@ -15,6 +15,7 @@ anyhow = "1.0.75"
 async-stream = "0.3.5"
 async-trait = "0.1.74"
 axum = { version = "0.7", features = ["ws"] }
+# axum-server = { version = "0.7.1", features = ["tokio-rustls", "tls-rustls", "rustls"] }
 bollard = "0.17.0"
 chrono = { version = "0.4.31", features = ["serde"] }
 clap = { version = "4.4.10", features = ["derive"] }

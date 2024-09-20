@@ -18,6 +18,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+use tokio::net::TcpListener;
 use tracing::subscriber::DefaultGuard;
 use tracing_appender::non_blocking::WorkerGuard;
 use url::Url;
@@ -91,7 +92,7 @@ impl TestEnvironment {
 
     pub async fn controller(&mut self) -> ControllerServer {
         let db = self.db().await;
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url: Url = format!("http://{}", listener.local_addr().unwrap())
             .parse()
             .unwrap();
@@ -112,7 +113,7 @@ impl TestEnvironment {
 
     pub async fn controller_with_forward_auth(&mut self, forward_auth: &Url) -> ControllerServer {
         let db = self.db().await;
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url: Url = format!("http://{}", listener.local_addr().unwrap())
             .parse()
             .unwrap();

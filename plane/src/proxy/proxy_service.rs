@@ -8,6 +8,7 @@ use crate::proxy::cert_manager::CertWatcher;
 use crate::proxy::rewriter::RequestRewriter;
 use crate::SERVER_NAME;
 use axum::http::uri::PathAndQuery;
+use axum::serve::IncomingStream;
 use futures_util::{Future, FutureExt};
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty};
@@ -20,7 +21,7 @@ use hyper::{
 };
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client;
-use hyper_util::rt::TokioExecutor;
+use hyper_util::rt::{TokioExecutor, TokioIo};
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::pin::Pin;
@@ -32,6 +33,7 @@ use tokio::io::{copy_bidirectional, AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio_rustls::rustls::ServerConfig;
+use tokio_rustls::TlsAcceptor;
 use url::Url;
 
 const PLANE_BACKEND_ID_HEADER: &str = "x-plane-backend-id";
@@ -169,76 +171,6 @@ struct RequestHandler {
     https_redirect: bool,
     remote_meta: ForwardableRequestInfo,
     root_redirect_url: Option<Url>,
-}
-
-struct WrappedUpgrade {
-    upgrade: Upgraded,
-}
-
-/// Adapted from:
-/// https://github.com/hyperium/hyper/blob/e3e707ea2abaeb98e42c31259d867547c7890a35/benches/support/tokiort.rs#L102-L124
-impl AsyncRead for WrappedUpgrade {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        tbuf: &mut tokio::io::ReadBuf<'_>,
-    ) -> Poll<Result<(), std::io::Error>> {
-        //let init = tbuf.initialized().len();
-        let filled = tbuf.filled().len();
-        let sub_filled = unsafe {
-            let mut buf = hyper::rt::ReadBuf::uninit(tbuf.unfilled_mut());
-
-            match hyper::rt::Read::poll_read(self.project().inner, cx, buf.unfilled()) {
-                Poll::Ready(Ok(())) => buf.filled().len(),
-                other => return other,
-            }
-        };
-
-        let n_filled = filled + sub_filled;
-        // At least sub_filled bytes had to have been initialized.
-        let n_init = sub_filled;
-        unsafe {
-            tbuf.assume_init(n_init);
-            tbuf.set_filled(n_filled);
-        }
-
-        Poll::Ready(Ok(()))
-    }
-}
-
-/// Adapted from:
-/// https://github.com/hyperium/hyper/blob/e3e707ea2abaeb98e42c31259d867547c7890a35/benches/support/tokiort.rs#L194-L228
-impl AsyncWrite for WrappedUpgrade {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, std::io::Error>> {
-        hyper::rt::Write::poll_write(self.project().inner, cx, buf)
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-        hyper::rt::Write::poll_flush(self.project().inner, cx)
-    }
-
-    fn poll_shutdown(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), std::io::Error>> {
-        hyper::rt::Write::poll_shutdown(self.project().inner, cx)
-    }
-
-    fn is_write_vectored(&self) -> bool {
-        hyper::rt::Write::is_write_vectored(&self.inner)
-    }
-
-    fn poll_write_vectored(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        bufs: &[std::io::IoSlice<'_>],
-    ) -> Poll<Result<usize, std::io::Error>> {
-        hyper::rt::Write::poll_write_vectored(self.project().inner, cx, bufs)
-    }
 }
 
 impl RequestHandler {
@@ -415,13 +347,9 @@ impl RequestHandler {
                     .expect("Monitor lock was poisoned.")
                     .inc_connection(&backend_id);
 
-                let mut response_upgrade = WrappedUpgrade {
-                    upgrade: response_upgrade,
-                };
+                let mut response_upgrade = TokioIo::new(response_upgrade);
 
-                let mut req_upgrade = WrappedUpgrade {
-                    upgrade: req_upgrade,
-                };
+                let mut req_upgrade = TokioIo::new(req_upgrade);
 
                 match copy_bidirectional(&mut req_upgrade, &mut response_upgrade).await {
                     Ok(_) => (),
@@ -495,7 +423,7 @@ fn clone_response_empty_body(response: &Response<Incoming>) -> Response<ProxyBod
     builder = builder.status(response.status());
 
     builder
-        .body(Body::empty())
+        .body(empty_proxy_body())
         .expect("Response is always valid.")
 }
 
@@ -519,6 +447,8 @@ pub struct ProxyMakeService {
     pub root_redirect_url: Option<Url>,
 }
 
+fn p(a: &impl tokio::io::AsyncRead) {}
+
 impl ProxyMakeService {
     pub fn serve_http<F>(self, port: u16, shutdown_future: F) -> Result<JoinHandle<()>, ProxyError>
     where
@@ -526,13 +456,20 @@ impl ProxyMakeService {
     {
         let addr: SocketAddr = ([0, 0, 0, 0], port).into();
 
-        let handle = tokio::spawn(async {
-            let listener = TcpListener::bind(addr).await?;
-            tracing::info!(%addr, "Listening for HTTP connections.");
+        // let handle = tokio::spawn(async {
+        //     let listener = TcpListener::bind(addr).await.unwrap(); // todo: unwrap
 
-            let builder = hyper_util::server::conn::auto::Builder::new(TokioExecutor::new());
-            builder.serve_connection_with_upgrades(listener, self).await;
-        });
+        //     p(&listener);
+        //     todo!();
+
+        //     let listener = TokioIo::new(listener);
+        //     tracing::info!(%addr, "Listening for HTTP connections.");
+
+        //     let builder = hyper_util::server::conn::auto::Builder::new(TokioExecutor::new());
+        //     builder.serve_connection_with_upgrades(listener, self).await;
+        // });
+
+        let handle = tokio::spawn(async move {});
 
         Ok(handle)
     }
@@ -546,30 +483,38 @@ impl ProxyMakeService {
     where
         F: Future<Output = ()> + Send + 'static,
     {
-        let handle = tokio::spawn(async {
+        let handle = tokio::spawn(async move {
             let server_config = ServerConfig::builder()
-                .with_safe_defaults()
                 .with_no_client_auth()
                 .with_cert_resolver(Arc::new(cert_watcher));
 
             let addr: SocketAddr = ([0, 0, 0, 0], port).into();
             let tcp_listener = TcpListener::bind(addr).await.unwrap();
 
-            let tls_listener = TlsListener::new(server_config, tcp_listener);
+            // let incoming = AddrIncoming::bind(&addr).map_err(ProxyError::BindError)?;
+            tracing::info!(%addr, "Listening for HTTPS connections.");
 
-            // // let incoming = AddrIncoming::bind(&addr).map_err(ProxyError::BindError)?;
-            // tracing::info!(%addr, "Listening for HTTPS connections.");
+            while let s = tcp_listener.accept().await {
+                let s = match s {
+                    Ok(s) => s,
+                    Err(err) => {
+                        tracing::error!(?err, "Error accepting connection.");
+                        continue;
+                    }
+                };
+            }
 
-            // let tls_acceptor = TlsAcceptor::new(Arc::new(server_config), incoming);
+            // let server = hyper_util::server::conn::auto::Builder::new(TokioExecutor::new());
 
-            let builder = hyper_util::server::conn::auto::Builder::new(TokioExecutor::new());
-            let server = builder.serve_connection_with_upgrades(tls_listener, self);
-            // TODO: graceful shutdown
+            // axum::serve(tls_acceptor, self).await
+            // let server = axum_server::bind_rustls(addr, config);
 
             // let server = hyper::Server::builder(tls_acceptor)
             //     .serve(self)
             //     .with_graceful_shutdown(shutdown_future);
-            let _ = server.await;
+            // let handle = tokio::spawn(async {
+            //     let _ = server.await;
+            // });
         });
 
         Ok(handle)
@@ -596,6 +541,27 @@ impl ProxyMakeService {
 //     }
 // }
 
+// impl<'a> Service<tower_service::Service<IncomingStream<'a>>> for ProxyMakeService {
+//     type Response = ProxyService;
+//     type Error = ProxyError;
+//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+//     fn call(&self, req: tower_service::Service<IncomingStream<'a>>) -> Self::Future {
+//         // let remote_ip = req.remote_addr().ip();
+//         // let handler = Arc::new(RequestHandler {
+//         //     state: self.state.clone(),
+//         //     https_redirect: self.https_redirect,
+//         //     remote_meta: ForwardableRequestInfo {
+//         //         ip: remote_ip,
+//         //         protocol: Protocol::Http,
+//         //     },
+//         //     root_redirect_url: self.root_redirect_url.clone(),
+//         // });
+//         // ready(Ok(ProxyService { handler })).boxed()
+//         todo!()
+//     }
+// }
+
 // impl<'a> Service<&'a TlsStream> for ProxyMakeService {
 //     type Response = ProxyService;
 //     type Error = ProxyError;
@@ -616,12 +582,22 @@ impl ProxyMakeService {
 //     }
 // }
 
-impl<'a> Service<&'a hyper::Request<hyper::body::Incoming>> for ProxyMakeService {
-    type Response = ProxyService;
+// impl<'a> Service<&'a hyper::Request<hyper::body::Incoming>> for ProxyMakeService {
+//     type Response = ProxyService;
+//     type Error = ProxyError;
+//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+//     fn call(&self, req: &'a hyper::Request<hyper::body::Incoming>) -> Self::Future {
+//         todo!()
+//     }
+// }
+
+impl Service<hyper::Request<hyper::body::Incoming>> for ProxyMakeService {
+    type Response = hyper::Response<ProxyBody>;
     type Error = ProxyError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn call(&self, req: &'a hyper::Request<hyper::body::Incoming>) -> Self::Future {
+    fn call(&self, req: hyper::Request<hyper::body::Incoming>) -> Self::Future {
         todo!()
     }
 }
