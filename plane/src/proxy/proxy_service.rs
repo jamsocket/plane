@@ -1,19 +1,16 @@
 use super::connection_monitor::ConnectionMonitorHandle;
 use super::rewriter::RequestRewriterError;
 use super::route_map::RouteMap;
-// use super::tls::TlsStream;
-use super::{ForwardableRequestInfo, Protocol};
+use super::ForwardableRequestInfo;
 use crate::names::BackendName;
 use crate::proxy::cert_manager::CertWatcher;
 use crate::proxy::rewriter::RequestRewriter;
 use crate::SERVER_NAME;
 use axum::http::uri::PathAndQuery;
-use axum::serve::IncomingStream;
-use futures_util::{Future, FutureExt};
+use futures_util::Future;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty};
 use hyper::body::Incoming;
-use hyper::upgrade::Upgraded;
 use hyper::{
     body::{Body, Bytes},
     service::Service,
@@ -23,12 +20,11 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use std::convert::Infallible;
+use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::{atomic::AtomicBool, Arc};
-use std::task::Context;
-use std::{io::ErrorKind, task::Poll};
-use tokio::io::{copy_bidirectional, AsyncRead, AsyncWrite};
+use tokio::io::copy_bidirectional;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio_rustls::rustls::ServerConfig;
@@ -494,7 +490,10 @@ impl ProxyMakeService {
             // let incoming = AddrIncoming::bind(&addr).map_err(ProxyError::BindError)?;
             tracing::info!(%addr, "Listening for HTTPS connections.");
 
+            let acceptor = TlsAcceptor::from(server_config);
+
             loop {
+                let acceptor = acceptor.clone();
                 let s = tcp_listener.accept().await;
                 println!("accepted");
 
@@ -506,106 +505,35 @@ impl ProxyMakeService {
                     }
                 };
 
-                let acceptor = TlsAcceptor::from(server_config.clone());
                 let (stream, _) = s;
                 let stream = acceptor.accept(stream).await.unwrap();
                 println!("stream: {:?}", stream);
+
+                let stream = TokioIo::new(stream);
+
+                hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(stream, DummyService)
+                    .await
+                    .unwrap();
             }
-
-            // let server = hyper_util::server::conn::auto::Builder::new(TokioExecutor::new());
-
-            // axum::serve(tls_acceptor, self).await
-            // let server = axum_server::bind_rustls(addr, config);
-
-            // let server = hyper::Server::builder(tls_acceptor)
-            //     .serve(self)
-            //     .with_graceful_shutdown(shutdown_future);
-            // let handle = tokio::spawn(async {
-            //     let _ = server.await;
-            // });
         });
 
         Ok(handle)
     }
 }
 
-// impl<'a> Service<&'a AddrStream> for ProxyMakeService {
-//     type Response = ProxyService;
-//     type Error = ProxyError;
-//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+struct DummyService;
 
-//     fn call(&mut self, req: &'a AddrStream) -> Self::Future {
-//         let remote_ip = req.remote_addr().ip();
-//         let handler = Arc::new(RequestHandler {
-//             state: self.state.clone(),
-//             https_redirect: self.https_redirect,
-//             remote_meta: ForwardableRequestInfo {
-//                 ip: remote_ip,
-//                 protocol: Protocol::Http,
-//             },
-//             root_redirect_url: self.root_redirect_url.clone(),
-//         });
-//         ready(Ok(ProxyService { handler })).boxed()
-//     }
-// }
-
-// impl<'a> Service<tower_service::Service<IncomingStream<'a>>> for ProxyMakeService {
-//     type Response = ProxyService;
-//     type Error = ProxyError;
-//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-//     fn call(&self, req: tower_service::Service<IncomingStream<'a>>) -> Self::Future {
-//         // let remote_ip = req.remote_addr().ip();
-//         // let handler = Arc::new(RequestHandler {
-//         //     state: self.state.clone(),
-//         //     https_redirect: self.https_redirect,
-//         //     remote_meta: ForwardableRequestInfo {
-//         //         ip: remote_ip,
-//         //         protocol: Protocol::Http,
-//         //     },
-//         //     root_redirect_url: self.root_redirect_url.clone(),
-//         // });
-//         // ready(Ok(ProxyService { handler })).boxed()
-//         todo!()
-//     }
-// }
-
-// impl<'a> Service<&'a TlsStream> for ProxyMakeService {
-//     type Response = ProxyService;
-//     type Error = ProxyError;
-//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-//     fn call(&self, req: &'a TlsStream) -> Self::Future {
-//         let remote_ip = req.remote_ip;
-//         let handler = Arc::new(RequestHandler {
-//             state: self.state.clone(),
-//             https_redirect: false,
-//             remote_meta: ForwardableRequestInfo {
-//                 ip: remote_ip,
-//                 protocol: Protocol::Https,
-//             },
-//             root_redirect_url: self.root_redirect_url.clone(),
-//         });
-//         ready(Ok(ProxyService { handler })).boxed()
-//     }
-// }
-
-// impl<'a> Service<&'a hyper::Request<hyper::body::Incoming>> for ProxyMakeService {
-//     type Response = ProxyService;
-//     type Error = ProxyError;
-//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-//     fn call(&self, req: &'a hyper::Request<hyper::body::Incoming>) -> Self::Future {
-//         todo!()
-//     }
-// }
-
-impl Service<hyper::Request<hyper::body::Incoming>> for ProxyMakeService {
-    type Response = hyper::Response<ProxyBody>;
+impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for DummyService {
+    type Response = Response<ProxyBody>;
     type Error = ProxyError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn call(&self, req: hyper::Request<hyper::body::Incoming>) -> Self::Future {
-        todo!()
+    fn call(&self, _req: hyper::Request<hyper::body::Incoming>) -> Self::Future {
+        Box::pin(async move {
+            Ok(Response::builder()
+                .body(to_proxy_body("dummy".to_string()))
+                .unwrap())
+        })
     }
 }

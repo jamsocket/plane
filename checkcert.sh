@@ -1,3 +1,3 @@
 #!/bin/bash
 
-openssl s_client -connect localhost:9433 -showcerts
+openssl s_client -connect localhost:9443 -showcerts
