@@ -1819,7 +1819,6 @@ dependencies = [
  "sqlx",
  "thiserror",
  "time",
- "tls-listener",
  "tokio",
  "tokio-rustls 0.26.0",
  "tokio-stream",
@@ -2876,19 +2875,6 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
-
-[[package]]
-name = "tls-listener"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83a296135fdab7b3a1f708c338c50bab570bcd77d44080cde9341df45c0c6d73"
-dependencies = [
- "futures-util",
- "pin-project-lite",
- "thiserror",
- "tokio",
- "tokio-rustls 0.26.0",
-]
 
 [[package]]
 name = "tokio"

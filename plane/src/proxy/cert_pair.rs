@@ -65,16 +65,12 @@ impl CertificatePair {
         let validity_start = validity.not_before.to_datetime();
         let validity_end = validity.not_after.to_datetime();
 
-        // let certs = certs
-        //     .into_iter()
-        //     .map(|cert| CertificateDer::from_slice(cert.to_vec()))
-        //     .collect();
+        let certs = certs
+            .into_iter()
+            .map(|cert| CertificateDer::from(cert.to_vec()))
+            .collect();
 
-        // let private_key = PrivateKey(key.secret_der().to_vec()); // NB. rustls 0.22 gets rid of this; the PrivateKeyDer is passed to any_supported_type directly.
-        // let key = any_supported_type(&private_key)?;
-        // let key = crypto::ring::sign::any_supported_type();
-
-        let key = todo!();
+        let key = rustls::crypto::ring::sign::any_supported_type(&key)?;
 
         let certified_key = CertifiedKey::new(certs, key);
 

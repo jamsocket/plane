@@ -5,6 +5,7 @@ use crate::proxy::proxy_service::ProxyMakeService;
 use crate::proxy::shutdown_signal::ShutdownSignal;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
+use rustls::crypto::CryptoProvider;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -136,6 +137,9 @@ pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
     .serve_http(config.port_config.http_port, shutdown_signal.subscribe())?;
 
     let https_handle = if let Some(https_port) = config.port_config.https_port {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("Failed to install rustls crypto provider");
         tracing::info!("Waiting for initial certificate.");
 
         let https_handle = ProxyMakeService {
@@ -154,10 +158,11 @@ pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
     shutdown_signal.shutdown();
     tracing::info!("Shutting down proxy server.");
 
-    http_handle.await?;
-    if let Some(https_handle) = https_handle {
-        https_handle.await?;
-    }
+    // todo: graceful shutdown
+    // http_handle.await?;
+    // if let Some(https_handle) = https_handle {
+    //     https_handle.await?;
+    // }
 
     Ok(())
 }

@@ -28,7 +28,6 @@ use std::pin::Pin;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::task::Context;
 use std::{io::ErrorKind, task::Poll};
-use tls_listener::TlsListener;
 use tokio::io::{copy_bidirectional, AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
@@ -487,6 +486,7 @@ impl ProxyMakeService {
             let server_config = ServerConfig::builder()
                 .with_no_client_auth()
                 .with_cert_resolver(Arc::new(cert_watcher));
+            let server_config = Arc::new(server_config);
 
             let addr: SocketAddr = ([0, 0, 0, 0], port).into();
             let tcp_listener = TcpListener::bind(addr).await.unwrap();
@@ -494,7 +494,10 @@ impl ProxyMakeService {
             // let incoming = AddrIncoming::bind(&addr).map_err(ProxyError::BindError)?;
             tracing::info!(%addr, "Listening for HTTPS connections.");
 
-            while let s = tcp_listener.accept().await {
+            loop {
+                let s = tcp_listener.accept().await;
+                println!("accepted");
+
                 let s = match s {
                     Ok(s) => s,
                     Err(err) => {
@@ -502,6 +505,11 @@ impl ProxyMakeService {
                         continue;
                     }
                 };
+
+                let acceptor = TlsAcceptor::from(server_config.clone());
+                let (stream, _) = s;
+                let stream = acceptor.accept(stream).await.unwrap();
+                println!("stream: {:?}", stream);
             }
 
             // let server = hyper_util::server::conn::auto::Builder::new(TokioExecutor::new());

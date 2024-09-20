@@ -42,7 +42,6 @@ serde_with = "3.4.0"
 sqlx = { version = "0.8.0", features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "migrate", "json", "ipnetwork"] }
 thiserror = "1.0.50"
 time = "0.3.30"
-tls-listener = { version = "0.10.1", features = ["rustls"] }
 tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread", "signal"] }
 tokio-rustls = "0.26"
 tokio-stream = { version="0.1.14", features=["sync"] }
