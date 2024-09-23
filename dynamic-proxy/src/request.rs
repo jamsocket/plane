@@ -14,8 +14,8 @@ where
     T: Body<Data = Bytes>,
     T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
-    parts: Parts,
-    body: T,
+    pub parts: Parts,
+    pub body: T,
 }
 
 impl<T> MutableRequest<T>

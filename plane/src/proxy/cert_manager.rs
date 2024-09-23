@@ -10,6 +10,10 @@ use acme2_eab::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
+use dynamic_proxy::tokio_rustls::rustls::{
+    server::{ClientHello, ResolvesServerCert},
+    sign::CertifiedKey,
+};
 use std::{
     ops::Sub,
     path::{Path, PathBuf},
@@ -19,10 +23,6 @@ use std::{
 use tokio::sync::{
     broadcast,
     watch::{Receiver, Sender},
-};
-use tokio_rustls::rustls::{
-    server::{ClientHello, ResolvesServerCert},
-    sign::CertifiedKey,
 };
 use valuable::Valuable;
 
@@ -84,6 +84,12 @@ impl CertWatcher {
                 .expect("Failed to receive from channel.");
             self.update_certified_key();
         }
+    }
+}
+
+impl std::fmt::Debug for CertWatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CertWatcher")
     }
 }
 

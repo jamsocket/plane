@@ -21,6 +21,7 @@ clap = { version = "4.4.10", features = ["derive"] }
 colored = "2.0.4"
 dashmap = "5.5.3"
 data-encoding = "2.4.0"
+dynamic-proxy = { path="../dynamic-proxy" }
 futures-util = "0.3.29"
 http-body = "0.4.6"
 hyper = { version = "0.14.27", features = ["server"] }

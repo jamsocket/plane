@@ -1,4 +1,4 @@
-use super::{cert_manager::CertManager, proxy_service::ProxyState};
+use super::{cert_manager::CertManager, proxy_server::ProxyState};
 use crate::{
     client::PlaneClient,
     names::ProxyName,
@@ -41,13 +41,16 @@ impl ProxyConnection {
                     });
 
                     let sender = conn.sender(MessageFromProxy::RouteInfoRequest);
-                    state.route_map.set_sender(move |m: RouteInfoRequest| {
-                        if let Err(e) = sender.send(m) {
-                            tracing::error!(?e, "Error sending route info request.");
-                        }
-                    });
+                    state
+                        .inner
+                        .route_map
+                        .set_sender(move |m: RouteInfoRequest| {
+                            if let Err(e) = sender.send(m) {
+                                tracing::error!(?e, "Error sending route info request.");
+                            }
+                        });
                     let sender = conn.sender(MessageFromProxy::KeepAlive);
-                    state.monitor.set_listener(move |backend| {
+                    state.inner.monitor.set_listener(move |backend| {
                         if let Err(err) = sender.send(backend.clone()) {
                             tracing::error!(?err, "Error sending keepalive.");
                         }
@@ -56,7 +59,7 @@ impl ProxyConnection {
                     while let Some(message) = conn.recv().await {
                         match message {
                             MessageToProxy::RouteInfoResponse(response) => {
-                                state.route_map.receive(response);
+                                state.inner.route_map.receive(response);
                             }
                             MessageToProxy::CertManagerResponse(response) => {
                                 tracing::info!(
@@ -66,7 +69,7 @@ impl ProxyConnection {
                                 cert_manager.receive(response);
                             }
                             MessageToProxy::BackendRemoved { backend } => {
-                                state.route_map.remove_backend(&backend);
+                                state.inner.route_map.remove_backend(&backend);
                             }
                         }
                     }

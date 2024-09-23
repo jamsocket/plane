@@ -1,13 +1,14 @@
 use self::proxy_connection::ProxyConnection;
 use crate::names::ProxyName;
 use crate::proxy::cert_manager::watcher_manager_pair;
-use crate::proxy::proxy_service::ProxyMakeService;
-use crate::proxy::shutdown_signal::ShutdownSignal;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
+use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
+use std::time::Duration;
+use tokio::net::TcpListener;
 use url::Url;
 
 pub mod cert_manager;
@@ -15,12 +16,11 @@ mod cert_pair;
 pub mod command;
 mod connection_monitor;
 pub mod proxy_connection;
-mod proxy_service;
-mod rewriter;
+// mod proxy_service;
+mod proxy_server;
+// mod rewriter;
+mod request;
 mod route_map;
-mod shutdown_signal;
-mod subdomain;
-mod tls;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Protocol {
@@ -35,19 +35,6 @@ impl Protocol {
             Protocol::Https => "https",
         }
     }
-}
-
-/// Information about the incoming request that is forwarded to the request in
-/// X-Forwarded-* headers.
-#[derive(Debug, Clone, Copy)]
-pub struct ForwardableRequestInfo {
-    /// The IP address of the client that made the request.
-    /// Forwarded as X-Forwarded-For.
-    ip: IpAddr,
-
-    /// The protocol of the incoming request.
-    /// Forwarded as X-Forwarded-Proto.
-    protocol: Protocol,
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -120,7 +107,6 @@ pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
     .await?;
 
     let proxy_connection = ProxyConnection::new(config.name, client, config.cluster, cert_manager);
-    let shutdown_signal = ShutdownSignal::new();
 
     let https_redirect = config.port_config.https_port.is_some();
 
@@ -128,35 +114,40 @@ pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
         cert_watcher.wait_for_initial_cert().await?;
     }
 
-    let http_handle = ProxyMakeService {
-        state: proxy_connection.state(),
-        https_redirect,
-        root_redirect_url: config.root_redirect_url.clone(),
-    }
-    .serve_http(config.port_config.http_port, shutdown_signal.subscribe())?;
+    let tcp_addr = SocketAddr::new(
+        IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+        config.port_config.http_port,
+    );
+    let tcp_listener = TcpListener::bind(tcp_addr).await?;
+    let http_server =
+        SimpleHttpServer::new(proxy_connection.state(), tcp_listener, HttpsConfig::http())?;
 
-    let https_handle = if let Some(https_port) = config.port_config.https_port {
+    let https_server = if let Some(https_port) = config.port_config.https_port {
         tracing::info!("Waiting for initial certificate.");
 
-        let https_handle = ProxyMakeService {
-            state: proxy_connection.state(),
-            https_redirect: false,
-            root_redirect_url: config.root_redirect_url,
-        }
-        .serve_https(https_port, cert_watcher, shutdown_signal.subscribe())?;
+        let tcp_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), https_port);
+        let tcp_listener = TcpListener::bind(tcp_addr).await?;
+        let https_server = SimpleHttpServer::new(
+            proxy_connection.state(),
+            tcp_listener,
+            HttpsConfig::from_resolver(cert_watcher),
+        )?;
 
-        Some(https_handle)
+        Some(https_server)
     } else {
         None
     };
 
     wait_for_shutdown_signal().await;
-    shutdown_signal.shutdown();
     tracing::info!("Shutting down proxy server.");
 
-    http_handle.await?;
-    if let Some(https_handle) = https_handle {
-        https_handle.await?;
+    http_server
+        .graceful_shutdown_with_timeout(Duration::from_secs(10))
+        .await;
+    if let Some(https_server) = https_server {
+        https_server
+            .graceful_shutdown_with_timeout(Duration::from_secs(10))
+            .await;
     }
 
     Ok(())
