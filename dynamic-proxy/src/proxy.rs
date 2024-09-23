@@ -87,9 +87,7 @@ impl ProxyClient {
         request: Request<SimpleBody>,
     ) -> Result<(Response<SimpleBody>, Option<UpgradeHandler>), ProxyError> {
         if should_upgrade(&request) {
-            println!("Upgrading request");
             let (response, upgrade_handler) = self.handle_upgrade(request).await?;
-            println!("Upgraded request");
             Ok((response, Some(upgrade_handler)))
         } else {
             let result = self.upstream_request(request).await?;

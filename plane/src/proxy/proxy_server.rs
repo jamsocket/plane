@@ -94,10 +94,11 @@ impl Service<Request<Incoming>> for ProxyState {
 
             let (res, upgrade_handler) = inner.proxy_client.request(request).await.unwrap();
 
-            let upgrade_handler = upgrade_handler.unwrap();
-            tokio::spawn(async move {
-                upgrade_handler.run().await.unwrap();
-            });
+            if let Some(upgrade_handler) = upgrade_handler {
+                tokio::spawn(async move {
+                    upgrade_handler.run().await.unwrap();
+                });
+            }
 
             Ok(res)
         })
