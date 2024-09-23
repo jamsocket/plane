@@ -4,18 +4,15 @@ use super::{
 };
 use chrono::Duration;
 use plane::{
+    client::PlaneClient,
     controller::ControllerServer,
     database::PlaneDatabase,
     dns::run_dns_with_listener,
-    drone::{
-        runtime::{
-            docker::DockerRuntimeConfig,
-            unix_socket::{MessageToClient, MessageToServer, UnixSocketRuntimeConfig},
-        },
-        Drone, DroneConfig, ExecutorConfig,
-    },
-    names::{AcmeDnsServerName, ControllerName, DroneName, Name},
+    drone::runtime::unix_socket::{MessageToClient, MessageToServer, UnixSocketRuntimeConfig},
+    drone::{runtime::docker::DockerRuntimeConfig, Drone, DroneConfig, ExecutorConfig},
+    names::{AcmeDnsServerName, ControllerName, DroneName, Name, ProxyName},
     proxy::AcmeEabConfiguration,
+    proxy::{cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection},
     typed_unix_socket::{server::TypedUnixSocketServer, WrappedMessage},
     types::{ClusterName, DronePoolName},
     util::random_string,
