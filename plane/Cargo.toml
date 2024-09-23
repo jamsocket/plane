@@ -30,7 +30,6 @@ openssl = "0.10.66"
 pem = "3.0.2"
 rand = "0.8.5"
 reqwest = { version = "0.11.22", features = ["json", "rustls-tls"], default-features = false }
-ring = "0.17.5"
 rusqlite = { version = "0.31.0", features = ["bundled", "serde_json"] }
 rustls-pemfile = "2.0.0"
 rustls-pki-types = "1.0.0"
@@ -41,7 +40,6 @@ sqlx = { version = "0.8.0", features = ["runtime-tokio", "tls-rustls", "postgres
 thiserror = "1.0.50"
 time = "0.3.30"
 tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread", "signal"] }
-tokio-rustls = "0.24.1"
 tokio-stream = { version="0.1.14", features=["sync"] }
 tokio-tungstenite = { version = "0.20.1", features = ["rustls-tls-webpki-roots"] }
 tower = "0.4.13"

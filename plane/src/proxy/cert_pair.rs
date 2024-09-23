@@ -4,10 +4,8 @@ use dynamic_proxy::rustls::{
     crypto::aws_lc_rs::sign::any_supported_type, pki_types::PrivateKeyDer,
 };
 use dynamic_proxy::tokio_rustls::rustls::sign::CertifiedKey;
-
 use pem::Pem;
 use rustls_pki_types::CertificateDer;
-// use rustls_pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs1KeyDer};
 use serde::{Deserialize, Serialize};
 use std::{fs::Permissions, io, os::unix::fs::PermissionsExt, path::Path};
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
