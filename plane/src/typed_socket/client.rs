@@ -8,6 +8,10 @@ use std::marker::PhantomData;
 use tokio::net::TcpStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tungstenite::handshake::client::generate_key;
+use tungstenite::http::{
+    header::{HeaderValue, AUTHORIZATION},
+    Method, Request,
+};
 use tungstenite::{error::ProtocolError, Message};
 
 type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -88,9 +92,9 @@ impl<T: ChannelMessage> TypedSocketConnector<T> {
 }
 
 /// Creates a WebSocket request from an AuthorizedAddress.
-fn auth_url_to_request(addr: &AuthorizedAddress) -> Result<hyper::Request<()>, PlaneClientError> {
-    let mut request = hyper::Request::builder()
-        .method(hyper::Method::GET)
+fn auth_url_to_request(addr: &AuthorizedAddress) -> Result<Request<()>, PlaneClientError> {
+    let mut request = Request::builder()
+        .method(Method::GET)
         .uri(addr.url.as_str())
         .header(
             "Host",
@@ -108,8 +112,8 @@ fn auth_url_to_request(addr: &AuthorizedAddress) -> Result<hyper::Request<()>, P
 
     if let Some(bearer_header) = addr.bearer_header() {
         request = request.header(
-            hyper::header::AUTHORIZATION,
-            hyper::header::HeaderValue::from_str(&bearer_header).expect("Bearer header is valid"),
+            AUTHORIZATION,
+            HeaderValue::from_str(&bearer_header).expect("Bearer header is valid"),
         );
     }
 

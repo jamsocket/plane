@@ -1,7 +1,9 @@
 use super::PlaneClientError;
 use crate::util::ExponentialBackoff;
-use hyper::header::{ACCEPT, CONNECTION};
-use reqwest::{Client, Response};
+use reqwest::{
+    header::{ACCEPT, CONNECTION},
+    Client, Response,
+};
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 use tungstenite::http::HeaderValue;
@@ -180,7 +182,7 @@ mod tests {
         Router,
     };
     use futures_util::stream::Stream;
-    use hyper::HeaderMap;
+    use reqwest::header::HeaderMap;
     use serde::{Deserialize, Serialize};
     use std::{convert::Infallible, time::Duration};
     use tokio::{sync::broadcast, task::JoinHandle, time::timeout};
@@ -192,7 +194,7 @@ mod tests {
 
     struct DemoSseServer {
         port: u16,
-        handle: Option<JoinHandle<std::result::Result<(), hyper::Error>>>,
+        handle: Option<JoinHandle<std::result::Result<(), anyhow::Error>>>,
         disconnect_sender: broadcast::Sender<()>,
     }
 
@@ -247,7 +249,7 @@ mod tests {
             let server = axum::Server::from_tcp(listener)
                 .unwrap()
                 .serve(app.into_make_service());
-            let handle = tokio::spawn(server);
+            let handle = tokio::spawn(async move { server.await.map_err(anyhow::Error::new) });
 
             Self {
                 port,
