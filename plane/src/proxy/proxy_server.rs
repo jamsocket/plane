@@ -95,9 +95,21 @@ impl Service<Request<Incoming>> for ProxyState {
             let (res, upgrade_handler) = inner.proxy_client.request(request).await.unwrap();
 
             if let Some(upgrade_handler) = upgrade_handler {
+                let monitor = inner.monitor.monitor();
+                monitor
+                    .lock()
+                    .expect("Monitor lock poisoned")
+                    .inc_connection(&route_info.backend_id);
                 tokio::spawn(async move {
                     upgrade_handler.run().await.unwrap();
+
+                    monitor
+                        .lock()
+                        .expect("Monitor lock poisoned")
+                        .dec_connection(&route_info.backend_id);
                 });
+            } else {
+                inner.monitor.touch_backend(&route_info.backend_id);
             }
 
             Ok(res)
