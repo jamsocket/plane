@@ -1,4 +1,6 @@
-use crate::{body::SimpleBody, graceful_shutdown::GracefulShutdown};
+use crate::{
+    body::SimpleBody, graceful_shutdown::GracefulShutdown, https_redirect::HttpsRedirectService,
+};
 use anyhow::Result;
 use hyper::{body::Incoming, service::Service, Request, Response};
 use hyper_util::{
@@ -6,7 +8,7 @@ use hyper_util::{
     server::conn::auto::Builder as ServerBuilder,
 };
 use rustls::{server::ResolvesServerCert, ServerConfig};
-use std::{sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, select, task::JoinSet};
 use tokio_rustls::TlsAcceptor;
 
@@ -200,5 +202,82 @@ impl SimpleHttpServer {
 impl Drop for SimpleHttpServer {
     fn drop(&mut self) {
         self.handle.abort();
+    }
+}
+
+pub struct ServerWithHttpRedirect {
+    http_server: SimpleHttpServer,
+    https_server: Option<SimpleHttpServer>,
+}
+
+pub struct ServerWithHttpRedirectHttpsConfig {
+    pub https_port: u16,
+    pub resolver: Arc<dyn ResolvesServerCert>,
+}
+
+pub struct ServerWithHttpRedirectConfig {
+    pub http_port: u16,
+    pub https_config: Option<ServerWithHttpRedirectHttpsConfig>,
+}
+
+impl ServerWithHttpRedirect {
+    pub async fn new<S>(service: S, server_config: ServerWithHttpRedirectConfig) -> Result<Self>
+    where
+        S: Service<Request<Incoming>, Response = Response<SimpleBody>>
+            + Clone
+            + Send
+            + Sync
+            + 'static,
+        S::Future: Send + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    {
+        if let Some(https_config) = server_config.https_config {
+            // Serve HTTPS
+            let https_listener =
+                TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], https_config.https_port)))
+                    .await?;
+            let https_server = SimpleHttpServer::new(
+                service,
+                https_listener,
+                HttpsConfig::Https {
+                    resolver: https_config.resolver,
+                },
+            )?;
+
+            // Redirect HTTP to HTTPS
+            let http_listener =
+                TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], server_config.http_port)))
+                    .await?;
+            let http_server =
+                SimpleHttpServer::new(HttpsRedirectService, http_listener, HttpsConfig::Http)?;
+
+            Ok(Self {
+                http_server,
+                https_server: Some(https_server),
+            })
+        } else {
+            let listener =
+                TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], server_config.http_port)))
+                    .await?;
+            let http_server = SimpleHttpServer::new(service, listener, HttpsConfig::Http)?;
+
+            Ok(Self {
+                http_server,
+                https_server: None,
+            })
+        }
+    }
+
+    pub async fn graceful_shutdown_with_timeout(self, timeout: Duration) {
+        if let Some(https_server) = self.https_server {
+            tokio::join!(
+                self.http_server.graceful_shutdown_with_timeout(timeout),
+                https_server.graceful_shutdown_with_timeout(timeout)
+            );
+        } else {
+            self.http_server
+                .graceful_shutdown_with_timeout(timeout)
+                .await;
+        }
     }
 }

@@ -3,10 +3,14 @@ use crate::names::ProxyName;
 use crate::proxy::cert_manager::watcher_manager_pair;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
-use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
+use dynamic_proxy::server::{
+    HttpsConfig, ServerWithHttpRedirect, ServerWithHttpRedirectConfig,
+    ServerWithHttpRedirectHttpsConfig, SimpleHttpServer,
+};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use url::Url;
@@ -112,47 +116,36 @@ pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
 
     let proxy_connection = ProxyConnection::new(config.name, client, config.cluster, cert_manager);
 
-    let https_redirect = config.port_config.https_port.is_some();
-
-    if config.port_config.https_port.is_some() {
-        cert_watcher.wait_for_initial_cert().await?;
-    }
-
-    let tcp_addr = SocketAddr::new(
-        IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
-        config.port_config.http_port,
-    );
-    let tcp_listener = TcpListener::bind(tcp_addr).await?;
-    let http_server =
-        SimpleHttpServer::new(proxy_connection.state(), tcp_listener, HttpsConfig::http())?;
-
-    let https_server = if let Some(https_port) = config.port_config.https_port {
+    let server = if let Some(https_port) = config.port_config.https_port {
         tracing::info!("Waiting for initial certificate.");
+        cert_watcher.wait_for_initial_cert().await?;
 
-        let tcp_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), https_port);
-        let tcp_listener = TcpListener::bind(tcp_addr).await?;
-        let https_server = SimpleHttpServer::new(
-            proxy_connection.state(),
-            tcp_listener,
-            HttpsConfig::from_resolver(cert_watcher),
-        )?;
+        let https_config = ServerWithHttpRedirectHttpsConfig {
+            https_port,
+            resolver: Arc::new(cert_watcher),
+        };
 
-        Some(https_server)
+        let server_config = ServerWithHttpRedirectConfig {
+            http_port: config.port_config.http_port,
+            https_config: Some(https_config),
+        };
+
+        ServerWithHttpRedirect::new(proxy_connection.state(), server_config).await?
     } else {
-        None
+        let server_config = ServerWithHttpRedirectConfig {
+            http_port: config.port_config.http_port,
+            https_config: None,
+        };
+
+        ServerWithHttpRedirect::new(proxy_connection.state(), server_config).await?
     };
 
     wait_for_shutdown_signal().await;
     tracing::info!("Shutting down proxy server.");
 
-    http_server
+    server
         .graceful_shutdown_with_timeout(Duration::from_secs(10))
         .await;
-    if let Some(https_server) = https_server {
-        https_server
-            .graceful_shutdown_with_timeout(Duration::from_secs(10))
-            .await;
-    }
 
     Ok(())
 }

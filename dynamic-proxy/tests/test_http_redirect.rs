@@ -18,11 +18,10 @@ fn get_client() -> reqwest::Client {
 }
 
 async fn do_request(url: &str) -> Response {
-    let service = HttpsRedirectService::new("foo.bar.baz".to_string());
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let https_config = HttpsConfig::http();
-    let _server = SimpleHttpServer::new(service, listener, https_config);
+    let _server = SimpleHttpServer::new(HttpsRedirectService, listener, https_config);
 
     // url needs to have port
     let mut url = Url::parse(url).unwrap();

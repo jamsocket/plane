@@ -1,20 +1,14 @@
 use crate::body::{simple_empty_body, SimpleBody};
-use http::{header, Request, Response, StatusCode};
+use http::{
+    header,
+    uri::{Authority, Scheme},
+    Request, Response, StatusCode, Uri,
+};
 use hyper::{body::Incoming, service::Service};
-use std::{future::ready, pin::Pin, sync::Arc};
+use std::{future::ready, pin::Pin, str::FromStr};
 
 #[derive(Debug, Clone)]
-pub struct HttpsRedirectService {
-    base_url: Arc<String>,
-}
-
-impl HttpsRedirectService {
-    pub fn new(base_url: String) -> Self {
-        Self {
-            base_url: Arc::new(base_url),
-        }
-    }
-}
+pub struct HttpsRedirectService;
 
 impl Service<Request<Incoming>> for HttpsRedirectService {
     type Response = Response<SimpleBody>;
@@ -22,14 +16,33 @@ impl Service<Request<Incoming>> for HttpsRedirectService {
     type Future = Pin<Box<std::future::Ready<Result<Response<SimpleBody>, http::Error>>>>;
 
     fn call(&self, request: Request<Incoming>) -> Self::Future {
-        let request_uri = request.uri();
-        let path_and_query = request_uri.path_and_query();
-        let path = path_and_query.map(|pq| pq.as_str()).unwrap_or("/");
+        // Get the host header.
+        let hostname = request.headers().get(header::HOST).unwrap();
+        // Parse the host header into an authority.
+        let authority = Authority::from_str(hostname.to_str().unwrap())
+            .expect("Valid host is valid authority.");
+        // Strip the path.
+        let authority =
+            Authority::from_str(authority.host()).expect("Valid host is valid authority.");
 
-        let base_url = self.base_url.as_str();
+        let request_uri = request.uri().clone();
+
+        // Set the scheme to HTTPS
+        let mut parts = request_uri.into_parts();
+        parts.scheme = Some(Scheme::HTTPS);
+
+        // Remove the port from the authority if it exists
+        // let authority = parts.authority.map(|d| d.host().to_string()).unwrap();
+        // parts.authority = Some(Authority::from_str(authority).unwrap());
+
+        parts.authority = Some(authority);
+
+        // Build the new URI
+        let new_uri = Uri::from_parts(parts).unwrap();
+
         let response = Response::builder()
             .status(StatusCode::FOUND)
-            .header(header::LOCATION, format!("https://{base_url}{path}"))
+            .header(header::LOCATION, new_uri.to_string())
             .body(simple_empty_body());
 
         Box::pin(ready(response))
