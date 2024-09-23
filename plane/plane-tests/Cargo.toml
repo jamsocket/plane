@@ -9,6 +9,7 @@ async-trait = "0.1.74"
 axum = "0.7.5"
 bollard = "0.17.0"
 chrono = { version = "0.4.31", features = ["serde"] }
+dynamic-proxy = { path = "../../dynamic-proxy" }
 futures-util = "0.3.29"
 hyper = { version = "0.14.27", features = ["server"] }
 plane = { path = "../plane-dynamic", package = "plane-dynamic" }

@@ -3,23 +3,16 @@ use super::{
     resources::{database::DevDatabase, pebble::Pebble},
 };
 use chrono::Duration;
+use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use plane::{
-    controller::ControllerServer,
-    database::PlaneDatabase,
-    dns::run_dns_with_listener,
-    drone::runtime::unix_socket::{MessageToClient, MessageToServer, UnixSocketRuntimeConfig},
-    drone::{runtime::docker::DockerRuntimeConfig, Drone, DroneConfig, ExecutorConfig},
-    names::{AcmeDnsServerName, ControllerName, DroneName, Name},
-    proxy::AcmeEabConfiguration,
-    typed_unix_socket::{server::TypedUnixSocketServer, WrappedMessage},
-    types::{ClusterName, DronePoolName},
-    util::random_string,
+    client::PlaneClient, controller::ControllerServer, database::PlaneDatabase, dns::run_dns_with_listener, drone::{runtime::{docker::DockerRuntimeConfig, unix_socket::{MessageToClient, MessageToServer, UnixSocketRuntimeConfig}}, Drone, DroneConfig, ExecutorConfig}, names::{AcmeDnsServerName, ControllerName, DroneName, Name, ProxyName}, proxy::{cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection, AcmeEabConfiguration}, typed_unix_socket::{server::TypedUnixSocketServer, WrappedMessage}, types::{ClusterName, DronePoolName}, util::random_string
 };
 use std::{
-    net::{IpAddr, Ipv4Addr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+use tokio::net::TcpListener;
 use tokio::sync::broadcast::Receiver;
 use tracing::subscriber::DefaultGuard;
 use tracing_appender::non_blocking::WorkerGuard;
@@ -111,6 +104,36 @@ impl TestEnvironment {
         )
         .await
         .expect("Unable to construct controller.")
+    }
+
+    pub async fn proxy(
+        &mut self,
+        controller: &ControllerServer,
+    ) -> Result<Proxy, Box<dyn std::error::Error>> {
+        let cluster: ClusterName = "localhost:9090".parse().unwrap();
+
+        let client = PlaneClient::new(controller.url().clone());
+
+        let (_, cert_manager) = watcher_manager_pair(cluster.clone(), None, None)
+            .await
+            .unwrap();
+
+        let proxy_connection =
+            ProxyConnection::new(ProxyName::new_random(), client, cluster, cert_manager);
+
+        let addr: SocketAddr = ([0, 0, 0, 0], 0).into();
+        tracing::info!(%addr, "Listening for HTTP connections.");
+        let tcp_listener = TcpListener::bind(addr).await.unwrap();
+        let port = tcp_listener.local_addr().unwrap().port();
+
+        // Spawn the server on a separate task
+        let server =
+            SimpleHttpServer::new(proxy_connection.state(), tcp_listener, HttpsConfig::Http)?;
+
+        Ok(Proxy {
+            port,
+            _server: server,
+        })
     }
 
     pub async fn controller_with_forward_auth(&mut self, forward_auth: &Url) -> ControllerServer {
@@ -251,6 +274,12 @@ impl TestEnvironment {
         self.drop_futures.lock().unwrap().push(pebble.clone());
         pebble
     }
+}
+
+pub struct Proxy {
+    #[allow(dead_code)] // Used in tests.
+    pub port: u16,
+    _server: SimpleHttpServer,
 }
 
 #[allow(dead_code)] // Used in tests.

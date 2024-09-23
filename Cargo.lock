@@ -2081,6 +2081,7 @@ dependencies = [
  "axum 0.7.6",
  "bollard",
  "chrono",
+ "dynamic-proxy",
  "futures-util",
  "hyper 0.14.28",
  "plane-dynamic",
