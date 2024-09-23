@@ -39,7 +39,11 @@ impl Protocol {
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct ServerPortConfig {
+    /// The port to listen on for HTTP requests.
+    /// If https_port is provided, this
     pub http_port: u16,
+
+    /// The port to listen on for HTTPS requests.
     pub https_port: Option<u16>,
 }
 
