@@ -8,6 +8,7 @@ use http::{
 use http_body::Body;
 use std::{net::SocketAddr, str::FromStr};
 
+/// Represents an HTTP request (from hyper) with helpers for mutating it.
 pub struct MutableRequest<T>
 where
     T: Body<Data = Bytes> + Send + Sync + 'static,
@@ -35,6 +36,7 @@ where
         Request::from_parts(self.parts, to_simple_body(self.body))
     }
 
+    /// Rewrite the request so that it points to the given upstream address.
     pub fn set_upstream_address(&mut self, address: SocketAddr) {
         let uri = std::mem::take(&mut self.parts.uri);
         let mut uri_parts = uri.into_parts();
@@ -46,9 +48,19 @@ where
         self.parts.uri = Uri::from_parts(uri_parts).expect("URI should always be valid.");
     }
 
+    /// Add a header to the request.
+    ///
+    /// If the header is invalid, it will be ignored and logged.
     pub fn add_header(&mut self, key: &str, value: &str) {
-        let key = HeaderName::from_str(key).unwrap();
-        let value = HeaderValue::from_str(value).unwrap();
+        let Ok(key) = HeaderName::from_str(key) else {
+            tracing::error!("Attempted to set invalid header name: {}", key);
+            return;
+        };
+        let Ok(value) = HeaderValue::from_str(value) else {
+            // Not logging the value, which could be sensitive.
+            tracing::error!("Attempted to set invalid header value with key: {}", key);
+            return;
+        };
         self.parts.headers.append(key, value);
     }
 
