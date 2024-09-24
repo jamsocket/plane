@@ -7,9 +7,16 @@ use plane::{
     controller::ControllerServer,
     database::PlaneDatabase,
     dns::run_dns_with_listener,
-    drone::{runtime::docker::DockerRuntimeConfig, Drone, DroneConfig, ExecutorConfig},
+    drone::{
+        runtime::{
+            docker::DockerRuntimeConfig,
+            unix_socket::{MessageToClient, MessageToServer, UnixSocketRuntimeConfig},
+        },
+        Drone, DroneConfig, ExecutorConfig,
+    },
     names::{AcmeDnsServerName, ControllerName, DroneName, Name},
     proxy::AcmeEabConfiguration,
+    typed_unix_socket::{server::TypedUnixSocketServer, WrappedMessage},
     types::{ClusterName, DronePoolName},
     util::random_string,
 };
@@ -18,6 +25,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+use tokio::sync::broadcast::Receiver;
 use tracing::subscriber::DefaultGuard;
 use tracing_appender::non_blocking::WorkerGuard;
 use url::Url;
@@ -184,6 +192,32 @@ impl TestEnvironment {
             .await
     }
 
+    pub async fn drone_with_socket(&mut self, controller: &ControllerServer) -> DroneWithSocket {
+        let socket_path = self.scratch_dir.join("plane.sock");
+
+        let executor_config = ExecutorConfig::UnixSocket(UnixSocketRuntimeConfig {
+            socket_path: socket_path.clone(),
+        });
+
+        #[allow(deprecated)] // `docker_config` field is deprecated.
+        let drone_config = DroneConfig {
+            name: DroneName::new_random(),
+            cluster: TEST_CLUSTER.parse().unwrap(),
+            ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            db_path: Some(self.scratch_dir.join("drone.db")),
+            pool: self.pool.clone(),
+            auto_prune: None,
+            cleanup_min_age: None,
+            executor_config: Some(executor_config),
+            docker_config: None,
+            controller_url: controller.url().clone(),
+        };
+
+        let drone = Drone::run(drone_config).await.unwrap();
+
+        DroneWithSocket::new(socket_path, drone).await
+    }
+
     pub async fn dns(&mut self, controller: &ControllerServer) -> DnsServer {
         let client = controller.client();
         let listener = tokio::net::TcpListener::bind((Ipv4Addr::UNSPECIFIED, 0))
@@ -221,6 +255,57 @@ impl TestEnvironment {
         );
         self.drop_futures.lock().unwrap().push(pebble.clone());
         pebble
+    }
+}
+
+#[allow(dead_code)] // Used in tests.
+pub struct DroneWithSocket {
+    pub socket_server: TypedUnixSocketServer<MessageToServer, MessageToClient>,
+    pub drone: Drone,
+    pub message_receiver: Receiver<MessageToServer>,
+    pub request_receiver: Receiver<WrappedMessage<MessageToServer>>,
+}
+
+#[allow(dead_code)] // Used in tests.
+impl DroneWithSocket {
+    async fn new(socket_path: PathBuf, drone: Drone) -> Self {
+        let socket_server =
+            TypedUnixSocketServer::<MessageToServer, MessageToClient>::new(&socket_path)
+                .await
+                .unwrap();
+
+        let message_receiver = socket_server.subscribe_events();
+        let request_receiver = socket_server.subscribe_requests();
+
+        Self {
+            socket_server,
+            drone,
+            message_receiver,
+            request_receiver,
+        }
+    }
+
+    pub async fn receive_message(&mut self) -> MessageToServer {
+        self.message_receiver.recv().await.unwrap()
+    }
+
+    pub async fn receive_request(&mut self) -> WrappedMessage<MessageToServer> {
+        self.request_receiver.recv().await.unwrap()
+    }
+
+    pub async fn send_response(
+        &self,
+        request: &WrappedMessage<MessageToServer>,
+        response: MessageToClient,
+    ) {
+        self.socket_server
+            .send_response(request, response)
+            .await
+            .unwrap();
+    }
+
+    pub async fn send_message(&self, message: MessageToClient) {
+        self.socket_server.send_message(message).await.unwrap();
     }
 }
 
