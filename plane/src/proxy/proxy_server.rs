@@ -3,7 +3,7 @@ use super::{
     request::{get_and_maybe_remove_bearer_token, subdomain_from_host},
     route_map::RouteMap,
 };
-use crate::{names::Name, protocol::RouteInfo};
+use crate::{names::Name, protocol::RouteInfo, SERVER_NAME};
 use bytes::Bytes;
 use dynamic_proxy::{
     body::{simple_empty_body, SimpleBody},
@@ -125,7 +125,7 @@ impl Service<Request<Incoming>> for ProxyState {
                 inner.monitor.touch_backend(&route_info.backend_id);
             }
 
-            apply_cors_headers(&mut res);
+            apply_general_headers(&mut res);
             res.headers_mut().insert(
                 "x-plane-backend-id",
                 HeaderValue::from_str(&route_info.backend_id.to_string())
@@ -209,12 +209,14 @@ fn status_code_to_response(
         .body(simple_empty_body())
         .expect("Failed to build response");
 
-    apply_cors_headers(&mut response);
+    apply_general_headers(&mut response);
 
     Ok(response)
 }
 
-fn apply_cors_headers(response: &mut Response<SimpleBody>) {
+/// Mutates a request to add static headers present on all responses
+/// (error or valid).
+fn apply_general_headers(response: &mut Response<SimpleBody>) {
     let headers = response.headers_mut();
     headers.insert(
         header::ACCESS_CONTROL_ALLOW_ORIGIN,
@@ -232,4 +234,5 @@ fn apply_cors_headers(response: &mut Response<SimpleBody>) {
         header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
         HeaderValue::from_static("true"),
     );
+    headers.insert(header::SERVER, HeaderValue::from_static(SERVER_NAME));
 }
