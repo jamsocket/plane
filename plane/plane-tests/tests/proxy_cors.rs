@@ -15,7 +15,7 @@ use std::str::FromStr;
 mod common;
 
 #[plane_test]
-async fn proxy_forbidden_request_has_cors_headers(env: TestEnvironment) {
+async fn proxy_gone_request_has_cors_headers(env: TestEnvironment) {
     let mut proxy = MockProxy::new().await;
     let port = proxy.port();
     let url = format!("http://plane.test:{port}/abc123/");
@@ -37,7 +37,7 @@ async fn proxy_forbidden_request_has_cors_headers(env: TestEnvironment) {
         .await;
 
     let response = handle.await.unwrap().unwrap();
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(response.status(), StatusCode::GONE);
     assert_eq!(
         response
             .headers()

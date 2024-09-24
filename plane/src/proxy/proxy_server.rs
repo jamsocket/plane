@@ -70,7 +70,7 @@ impl Service<Request<Incoming>> for ProxyState {
         let bearer_token = get_and_maybe_remove_bearer_token(&mut uri_parts);
 
         let Some(bearer_token) = bearer_token else {
-            return Box::pin(ready(status_code_to_response(StatusCode::UNAUTHORIZED)));
+            return Box::pin(ready(status_code_to_response(StatusCode::BAD_REQUEST)));
         };
 
         let Ok(uri) = Uri::from_parts(uri_parts) else {
@@ -85,7 +85,7 @@ impl Service<Request<Incoming>> for ProxyState {
             let route_info = inner.route_map.lookup(&bearer_token).await;
 
             let Some(route_info) = route_info else {
-                return status_code_to_response(StatusCode::FORBIDDEN);
+                return status_code_to_response(StatusCode::GONE);
             };
 
             if let Err(status_code) = prepare_request(&mut request, &route_info, &original_path) {

@@ -15,7 +15,7 @@ use std::str::FromStr;
 mod common;
 
 #[plane_test]
-async fn proxy_bad_request_includes_server_header(env: TestEnvironment) {
+async fn proxy_error_response_includes_server_header(env: TestEnvironment) {
     let mut proxy = MockProxy::new().await;
     let url = format!("http://{}/abc/", proxy.addr());
     let handle = tokio::spawn(async { reqwest::get(url).await.expect("Failed to send request") });
@@ -29,7 +29,7 @@ async fn proxy_bad_request_includes_server_header(env: TestEnvironment) {
         .await;
 
     let response = handle.await.unwrap();
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(response.status(), StatusCode::GONE);
     assert!(response
         .headers()
         .get("server")
@@ -40,7 +40,7 @@ async fn proxy_bad_request_includes_server_header(env: TestEnvironment) {
 }
 
 #[plane_test]
-async fn proxy_valid_request_includes_server_header(env: TestEnvironment) {
+async fn proxy_valid_response_includes_server_header(env: TestEnvironment) {
     let server = SimpleAxumServer::new().await;
 
     let mut proxy = MockProxy::new().await;
