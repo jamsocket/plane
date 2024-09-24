@@ -17,9 +17,7 @@ mod cert_pair;
 pub mod command;
 mod connection_monitor;
 pub mod proxy_connection;
-// mod proxy_service;
 pub mod proxy_server;
-// mod rewriter;
 mod request;
 mod route_map;
 

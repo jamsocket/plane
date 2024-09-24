@@ -10,9 +10,9 @@ pub mod docker;
 pub mod localhost_resolver;
 pub mod proxy_mock;
 pub mod resources;
-pub mod simple_axum_server;
+pub mod simple_axum_server; // NOTE: copied from dynamic-proxy
 pub mod test_env;
-pub mod timeout; // NOTE: copied from dynamic-proxy
+pub mod timeout;
 
 pub fn run_test<F, Fut>(name: &str, time_limit: Duration, test_function: F)
 where

@@ -73,7 +73,10 @@ impl Service<Request<Incoming>> for ProxyState {
             return Box::pin(ready(status_code_to_response(StatusCode::UNAUTHORIZED)));
         };
 
-        request.parts.uri = Uri::from_parts(uri_parts).unwrap();
+        let Ok(uri) = Uri::from_parts(uri_parts) else {
+            return Box::pin(ready(status_code_to_response(StatusCode::BAD_REQUEST)));
+        };
+        request.parts.uri = uri;
 
         let inner = self.inner.clone();
 
