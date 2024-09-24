@@ -11,6 +11,9 @@ use hyper_util::{
 };
 use std::time::Duration;
 
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// A client for proxying HTTP requests to an upstream server.
 pub struct ProxyClient {
     client: Client<HttpConnector, SimpleBody>,
     timeout: Duration,
@@ -36,10 +39,14 @@ impl ProxyClient {
         let client = Client::builder(TokioExecutor::new()).build(HttpConnector::new());
         Self {
             client,
-            timeout: Duration::from_secs(10),
+            timeout: DEFAULT_TIMEOUT,
         }
     }
 
+    /// Sends an HTTP request to the upstream server and returns the response.
+    /// If the request establishes a websocket connection, an upgrade handler is returned.
+    /// In this case, you must call and await `.run()` on the upgrade handler (i.e. in a tokio task)
+    /// to ensure that messages are properly sent and received.
     pub async fn request(
         &self,
         request: Request<SimpleBody>,
