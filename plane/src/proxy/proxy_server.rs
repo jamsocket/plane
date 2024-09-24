@@ -3,9 +3,16 @@ use super::{
     request::{get_and_maybe_remove_bearer_token, subdomain_from_host},
     route_map::RouteMap,
 };
+use crate::{names::Name, protocol::RouteInfo};
+use bytes::Bytes;
 use dynamic_proxy::{
     body::{simple_empty_body, SimpleBody},
-    hyper::{body::Incoming, header, service::Service, Request, Response, StatusCode, Uri},
+    hyper::{
+        body::{Body, Incoming},
+        header,
+        service::Service,
+        Request, Response, StatusCode, Uri,
+    },
     proxy::ProxyClient,
     request::MutableRequest,
 };
@@ -59,6 +66,7 @@ impl Service<Request<Incoming>> for ProxyState {
 
         // extract the bearer token from the request
         let mut uri_parts = request.parts.uri.clone().into_parts();
+        let original_path = request.parts.uri.path().to_string();
         let bearer_token = get_and_maybe_remove_bearer_token(&mut uri_parts);
 
         let Some(bearer_token) = bearer_token else {
@@ -77,28 +85,10 @@ impl Service<Request<Incoming>> for ProxyState {
                 return status_code_to_response(StatusCode::UNAUTHORIZED);
             };
 
-            // Check cluster and subdomain.
-            let Some(host) = request
-                .parts
-                .headers
-                .get(header::HOST)
-                .and_then(|h| h.to_str().ok())
-            else {
-                return status_code_to_response(StatusCode::BAD_REQUEST);
-            };
-
-            let Ok(request_subdomain) = subdomain_from_host(host, &route_info.cluster) else {
-                // The host header does not match the expected cluster.
-                return status_code_to_response(StatusCode::FORBIDDEN);
-            };
-
-            if let Some(subdomain) = route_info.subdomain {
-                if request_subdomain != Some(&subdomain) {
-                    return status_code_to_response(StatusCode::FORBIDDEN);
-                }
+            if let Err(status_code) = prepare_request(&mut request, &route_info, &original_path) {
+                return status_code_to_response(status_code);
             }
 
-            request.set_upstream_address(route_info.address.0);
             let request = request.into_request_with_simple_body();
 
             let (res, upgrade_handler) = inner.proxy_client.request(request).await.unwrap();
@@ -124,6 +114,70 @@ impl Service<Request<Incoming>> for ProxyState {
             Ok(res)
         })
     }
+}
+
+fn prepare_request<T>(
+    request: &mut MutableRequest<T>,
+    route_info: &RouteInfo,
+    original_path: &str,
+) -> Result<(), StatusCode>
+where
+    T: Body<Data = Bytes> + Send + Sync,
+    T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    // Check cluster and subdomain.
+    let Some(host) = request
+        .parts
+        .headers
+        .get(header::HOST)
+        .and_then(|h| h.to_str().ok())
+    else {
+        return Err(StatusCode::BAD_REQUEST);
+    };
+
+    let Ok(request_subdomain) = subdomain_from_host(host, &route_info.cluster) else {
+        // The host header does not match the expected cluster.
+        return Err(StatusCode::FORBIDDEN);
+    };
+
+    if let Some(subdomain) = &route_info.subdomain {
+        if request_subdomain != Some(subdomain) {
+            return Err(StatusCode::FORBIDDEN);
+        }
+    }
+
+    request.set_upstream_address(route_info.address.0);
+
+    // Remove x-verified-* headers from inbound request.
+    {
+        let headers = request.headers_mut();
+        let mut headers_to_remove = Vec::new();
+        headers.iter_mut().for_each(|(name, _)| {
+            if name.as_str().starts_with("x-verified-") {
+                headers_to_remove.push(name.clone());
+            }
+        });
+
+        for header in headers_to_remove {
+            headers.remove(&header);
+        }
+    }
+
+    // Set special Plane headers.
+    if let Some(username) = &route_info.user {
+        request.add_header("x-verified-username", username);
+    }
+
+    if let Some(user_data) = &route_info.user_data {
+        let user_data_str = serde_json::to_string(user_data).unwrap_or_default();
+        request.add_header("x-verified-user-data", &user_data_str);
+    }
+
+    request.add_header("x-verified-path", original_path);
+    request.add_header("x-verified-backend", route_info.backend_id.as_str());
+    request.add_header("x-verified-secret", route_info.secret_token.as_str());
+
+    Ok(())
 }
 
 fn status_code_to_response(

@@ -2,7 +2,7 @@ use bytes::Bytes;
 use http::{
     request::Parts,
     uri::{Authority, Scheme},
-    HeaderName, HeaderValue, Request, Uri,
+    HeaderMap, HeaderName, HeaderValue, Request, Uri,
 };
 use http_body::Body;
 use std::{net::SocketAddr, str::FromStr};
@@ -11,7 +11,7 @@ use crate::body::{to_simple_body, SimpleBody};
 
 pub struct MutableRequest<T>
 where
-    T: Body<Data = Bytes>,
+    T: Body<Data = Bytes> + Send + Sync + 'static,
     T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
     pub parts: Parts,
@@ -51,6 +51,10 @@ where
         let key = HeaderName::from_str(key).unwrap();
         let value = HeaderValue::from_str(value).unwrap();
         self.parts.headers.append(key, value);
+    }
+
+    pub fn headers_mut(&mut self) -> &mut HeaderMap {
+        &mut self.parts.headers
     }
 }
 
