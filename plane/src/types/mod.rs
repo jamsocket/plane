@@ -111,7 +111,7 @@ impl Deref for DronePoolName {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, Default, valuable::Valuable)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, Default, valuable::Valuable, PartialEq)]
 pub enum PullPolicy {
     #[default]
     IfNotPresent,
@@ -194,7 +194,7 @@ impl ResourceLimits {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, valuable::Valuable)]
+#[derive(Clone, Serialize, Deserialize, Debug, valuable::Valuable, PartialEq)]
 #[serde(untagged)]
 pub enum DockerRegistryAuth {
     UsernamePassword { username: String, password: String },
@@ -213,14 +213,14 @@ impl From<DockerRegistryAuth> for DockerCredentials {
 }
 
 // A spawn requestor can provide a mount parameter, which can be a string or a boolean.
-#[derive(Debug, Clone, Serialize, Deserialize, valuable::Valuable)]
+#[derive(Debug, Clone, Serialize, Deserialize, valuable::Valuable, PartialEq)]
 #[serde(untagged)]
 pub enum Mount {
     Bool(bool),
     Path(PathBuf),
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, valuable::Valuable)]
+#[derive(Clone, Serialize, Deserialize, Debug, valuable::Valuable, PartialEq)]
 pub struct DockerExecutorConfig {
     pub image: String,
     pub pull_policy: Option<PullPolicy>,
