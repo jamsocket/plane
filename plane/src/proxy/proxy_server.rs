@@ -16,13 +16,17 @@ use dynamic_proxy::{
     proxy::ProxyClient,
     request::MutableRequest,
 };
-use std::future::{ready, Future};
+use std::{
+    future::{ready, Future},
+    sync::atomic::{AtomicBool, Ordering},
+};
 use std::{pin::Pin, sync::Arc};
 
 pub struct ProxyStateInner {
     pub route_map: RouteMap,
     pub proxy_client: ProxyClient,
     pub monitor: ConnectionMonitorHandle,
+    pub connected: AtomicBool,
 }
 
 #[derive(Clone)]
@@ -42,11 +46,20 @@ impl ProxyState {
             route_map: RouteMap::new(),
             proxy_client: ProxyClient::new(),
             monitor: ConnectionMonitorHandle::new(),
+            connected: AtomicBool::new(false),
         };
 
         Self {
             inner: Arc::new(inner),
         }
+    }
+
+    pub fn set_ready(&self, ready: bool) {
+        self.inner.connected.store(ready, Ordering::Relaxed);
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.inner.connected.load(Ordering::Relaxed)
     }
 }
 
@@ -62,6 +75,15 @@ impl Service<Request<Incoming>> for ProxyState {
     >;
 
     fn call(&self, request: Request<Incoming>) -> Self::Future {
+        // Handle "/ready"
+        if request.uri().path() == "/ready" {
+            if self.is_ready() {
+                return Box::pin(ready(status_code_to_response(StatusCode::OK)));
+            } else {
+                return Box::pin(ready(status_code_to_response(StatusCode::SERVICE_UNAVAILABLE)));
+            }
+        }
+
         let mut request = MutableRequest::from_request(request);
 
         // extract the bearer token from the request

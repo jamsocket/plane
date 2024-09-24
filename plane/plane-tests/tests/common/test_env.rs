@@ -150,6 +150,7 @@ impl TestEnvironment {
         Ok(Proxy {
             port,
             _server: server,
+            _connection: proxy_connection,
         })
     }
 
@@ -297,6 +298,7 @@ pub struct Proxy {
     #[allow(dead_code)] // Used in tests.
     pub port: u16,
     _server: SimpleHttpServer,
+    _connection: ProxyConnection,
 }
 
 #[allow(dead_code)] // Used in tests.

@@ -49,6 +49,10 @@ impl MockProxy {
         self.addr.port()
     }
 
+    pub fn set_ready(&self, ready: bool) {
+        self.proxy_state.set_ready(ready);
+    }
+
     pub async fn recv_route_info_request(&mut self) -> RouteInfoRequest {
         self.route_info_request_receiver
             .recv()

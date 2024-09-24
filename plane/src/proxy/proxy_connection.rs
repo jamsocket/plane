@@ -21,6 +21,7 @@ impl ProxyConnection {
         cluster: ClusterName,
         mut cert_manager: CertManager,
     ) -> Self {
+        tracing::info!("Creating proxy connection");
         let state = Arc::new(ProxyState::new());
 
         let handle = {
@@ -30,7 +31,9 @@ impl ProxyConnection {
                 let mut proxy_connection = client.proxy_connection(&cluster);
 
                 loop {
+                    state.set_ready(false);
                     let mut conn = proxy_connection.connect_with_retry(&name).await;
+                    state.set_ready(true);
 
                     let sender = conn.sender(MessageFromProxy::CertManagerRequest);
                     cert_manager.set_request_sender(move |m| {
