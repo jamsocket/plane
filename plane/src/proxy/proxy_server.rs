@@ -3,21 +3,21 @@ use super::{
     route_map::RouteMap,
 };
 use dynamic_proxy::{
-    body::SimpleBody,
-    hyper::{body::Incoming, service::Service, Request, Response, Uri},
+    body::{simple_empty_body, SimpleBody},
+    hyper::{body::Incoming, service::Service, Request, Response, StatusCode, Uri},
     proxy::ProxyClient,
     request::MutableRequest,
 };
-use std::{future::Future, sync::atomic::AtomicBool};
+use std::future::{ready, Future};
 use std::{pin::Pin, sync::Arc};
 
 pub struct ProxyStateInner {
     pub route_map: RouteMap,
     pub proxy_client: ProxyClient,
     pub monitor: ConnectionMonitorHandle,
-    pub connected: AtomicBool,
 }
 
+#[derive(Clone)]
 pub struct ProxyState {
     pub inner: Arc<ProxyStateInner>,
 }
@@ -34,24 +34,11 @@ impl ProxyState {
             route_map: RouteMap::new(),
             proxy_client: ProxyClient::new(),
             monitor: ConnectionMonitorHandle::new(),
-            connected: AtomicBool::new(false),
         };
 
         Self {
             inner: Arc::new(inner),
         }
-    }
-
-    pub fn set_connected(&self, connected: bool) {
-        self.inner
-            .connected
-            .store(connected, std::sync::atomic::Ordering::Relaxed);
-    }
-
-    pub fn connected(&self) -> bool {
-        self.inner
-            .connected
-            .load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 
@@ -73,8 +60,12 @@ impl Service<Request<Incoming>> for ProxyState {
         let mut uri_parts = request.parts.uri.clone().into_parts();
         let bearer_token = get_and_maybe_remove_bearer_token(&mut uri_parts);
 
-        // TODO
-        let bearer_token = bearer_token.unwrap();
+        let Some(bearer_token) = bearer_token else {
+            return Box::pin(ready(Ok(Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .body(simple_empty_body())
+                .unwrap())));
+        };
 
         request.parts.uri = Uri::from_parts(uri_parts).unwrap();
 

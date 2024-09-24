@@ -7,9 +7,11 @@ use tokio::time::timeout;
 pub mod async_drop;
 pub mod auth_mock;
 pub mod docker;
+pub mod proxy_mock;
 pub mod resources;
+pub mod simple_axum_server;
 pub mod test_env;
-pub mod timeout;
+pub mod timeout; // NOTE: copied from dynamic-proxy
 
 pub fn run_test<F, Fut>(name: &str, time_limit: Duration, test_function: F)
 where

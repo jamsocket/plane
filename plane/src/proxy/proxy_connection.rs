@@ -31,7 +31,6 @@ impl ProxyConnection {
 
                 loop {
                     let mut conn = proxy_connection.connect_with_retry(&name).await;
-                    state.set_connected(true);
 
                     let sender = conn.sender(MessageFromProxy::CertManagerRequest);
                     cert_manager.set_request_sender(move |m| {
@@ -73,8 +72,6 @@ impl ProxyConnection {
                             }
                         }
                     }
-
-                    state.set_connected(false);
                 }
             })
         };

@@ -22,3 +22,8 @@ tracing = "0.1.40"
 tracing-appender = "0.2.2"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 url = "2.4.1"
+
+[dev-dependencies]
+http = "1.1.0"
+http-body-util = "0.1.2"
+serde = "1.0.210"

@@ -50,6 +50,10 @@ pub fn get_and_maybe_remove_bearer_token(parts: &mut uri::Parts) -> Option<Beare
         None => (full_path, "/"),
     };
 
+    if token.is_empty() {
+        return None;
+    }
+
     let token = BearerToken::from(token.to_string());
 
     if token.is_static() {

@@ -4,15 +4,12 @@ use crate::proxy::cert_manager::watcher_manager_pair;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
 use dynamic_proxy::server::{
-    HttpsConfig, ServerWithHttpRedirect, ServerWithHttpRedirectConfig,
-    ServerWithHttpRedirectHttpsConfig, SimpleHttpServer,
+    ServerWithHttpRedirect, ServerWithHttpRedirectConfig, ServerWithHttpRedirectHttpsConfig,
 };
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::net::TcpListener;
 use url::Url;
 
 pub mod cert_manager;
@@ -21,7 +18,7 @@ pub mod command;
 mod connection_monitor;
 pub mod proxy_connection;
 // mod proxy_service;
-mod proxy_server;
+pub mod proxy_server;
 // mod rewriter;
 mod request;
 mod route_map;
