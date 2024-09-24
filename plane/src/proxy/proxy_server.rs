@@ -99,19 +99,24 @@ impl Service<Request<Incoming>> for ProxyState {
                     .lock()
                     .expect("Monitor lock poisoned")
                     .inc_connection(&route_info.backend_id);
+                let backend_id = route_info.backend_id.clone();
                 tokio::spawn(async move {
                     upgrade_handler.run().await.unwrap();
 
                     monitor
                         .lock()
                         .expect("Monitor lock poisoned")
-                        .dec_connection(&route_info.backend_id);
+                        .dec_connection(&backend_id);
                 });
             } else {
                 inner.monitor.touch_backend(&route_info.backend_id);
             }
 
             apply_cors_headers(&mut res);
+            res.headers_mut().insert(
+                "x-plane-backend-id",
+                HeaderValue::from_str(&route_info.backend_id.to_string()).unwrap(),
+            );
 
             Ok(res)
         })

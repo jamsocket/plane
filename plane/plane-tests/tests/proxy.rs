@@ -280,3 +280,45 @@ async fn proxy_backend_passes_forwarded_headers(env: TestEnvironment) {
     assert_eq!(headers.get("x-forwarded-for").unwrap(), "127.0.0.1");
     assert_eq!(headers.get("x-forwarded-proto").unwrap(), "http");
 }
+
+#[plane_test]
+async fn proxy_returns_backend_id_in_header(env: TestEnvironment) {
+    let server = SimpleAxumServer::new().await;
+
+    let mut proxy = MockProxy::new().await;
+    let port = proxy.port();
+    let cluster = ClusterName::from_str(&format!("plane.test:{}", port)).unwrap();
+    let url = format!("http://plane.test:{port}/abc123/");
+    let client = localhost_client();
+    let handle = tokio::spawn(client.get(url).send());
+
+    let backend_id = BackendName::new_random();
+    let route_info_request = proxy.recv_route_info_request().await;
+    assert_eq!(
+        route_info_request.token,
+        BearerToken::from("abc123".to_string())
+    );
+
+    proxy
+        .send_route_info_response(RouteInfoResponse {
+            token: BearerToken::from("abc123".to_string()),
+            route_info: Some(RouteInfo {
+                backend_id: backend_id.clone(),
+                address: BackendAddr(server.addr()),
+                secret_token: SecretToken::from("secret".to_string()),
+                cluster,
+                user: None,
+                user_data: None,
+                subdomain: None,
+            }),
+        })
+        .await;
+
+    let response = handle.await.unwrap().unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let headers = response.headers();
+    assert_eq!(
+        headers.get("x-plane-backend-id").unwrap().to_str().unwrap(),
+        &backend_id.to_string()
+    );
+}
