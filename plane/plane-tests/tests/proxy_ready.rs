@@ -32,8 +32,14 @@ async fn proxy_ready(env: TestEnvironment) {
 async fn proxy_becomes_ready(env: TestEnvironment) {
     let controller = env.controller().await;
     let proxy = env.proxy(&controller).await.unwrap();
-    
+
     let url = format!("http://127.0.0.1:{}/ready", proxy.port);
+    let response = reqwest::get(&url).await.expect("Failed to send request");
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+    // Wait for the proxy to become ready.
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     let response = reqwest::get(&url).await.expect("Failed to send request");
     assert_eq!(response.status(), StatusCode::OK);
 }

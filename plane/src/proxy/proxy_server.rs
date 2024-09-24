@@ -80,7 +80,9 @@ impl Service<Request<Incoming>> for ProxyState {
             if self.is_ready() {
                 return Box::pin(ready(status_code_to_response(StatusCode::OK)));
             } else {
-                return Box::pin(ready(status_code_to_response(StatusCode::SERVICE_UNAVAILABLE)));
+                return Box::pin(ready(status_code_to_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                )));
             }
         }
 
