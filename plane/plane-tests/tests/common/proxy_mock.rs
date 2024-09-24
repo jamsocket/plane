@@ -45,6 +45,10 @@ impl MockProxy {
         self.addr
     }
 
+    pub fn port(&self) -> u16 {
+        self.addr.port()
+    }
+
     pub async fn recv_route_info_request(&mut self) -> RouteInfoRequest {
         self.route_info_request_receiver
             .recv()

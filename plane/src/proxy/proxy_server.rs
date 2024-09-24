@@ -1,10 +1,11 @@
 use super::{
-    connection_monitor::ConnectionMonitorHandle, request::get_and_maybe_remove_bearer_token,
+    connection_monitor::ConnectionMonitorHandle,
+    request::{get_and_maybe_remove_bearer_token, subdomain_from_host},
     route_map::RouteMap,
 };
 use dynamic_proxy::{
     body::{simple_empty_body, SimpleBody},
-    hyper::{body::Incoming, service::Service, Request, Response, StatusCode, Uri},
+    hyper::{body::Incoming, header, service::Service, Request, Response, StatusCode, Uri},
     proxy::ProxyClient,
     request::MutableRequest,
 };
@@ -61,10 +62,7 @@ impl Service<Request<Incoming>> for ProxyState {
         let bearer_token = get_and_maybe_remove_bearer_token(&mut uri_parts);
 
         let Some(bearer_token) = bearer_token else {
-            return Box::pin(ready(Ok(Response::builder()
-                .status(StatusCode::UNAUTHORIZED)
-                .body(simple_empty_body())
-                .unwrap())));
+            return Box::pin(ready(status_code_to_response(StatusCode::UNAUTHORIZED)));
         };
 
         request.parts.uri = Uri::from_parts(uri_parts).unwrap();
@@ -76,11 +74,29 @@ impl Service<Request<Incoming>> for ProxyState {
             let route_info = inner.route_map.lookup(&bearer_token).await;
 
             let Some(route_info) = route_info else {
-                return Ok(Response::builder()
-                    .status(StatusCode::UNAUTHORIZED)
-                    .body(simple_empty_body())
-                    .unwrap());
+                return status_code_to_response(StatusCode::UNAUTHORIZED);
             };
+
+            // Check cluster and subdomain.
+            let Some(host) = request
+                .parts
+                .headers
+                .get(header::HOST)
+                .and_then(|h| h.to_str().ok())
+            else {
+                return status_code_to_response(StatusCode::BAD_REQUEST);
+            };
+
+            let Ok(request_subdomain) = subdomain_from_host(host, &route_info.cluster) else {
+                // The host header does not match the expected cluster.
+                return status_code_to_response(StatusCode::FORBIDDEN);
+            };
+
+            if let Some(subdomain) = route_info.subdomain {
+                if request_subdomain != Some(&subdomain) {
+                    return status_code_to_response(StatusCode::FORBIDDEN);
+                }
+            }
 
             request.set_upstream_address(route_info.address.0);
             let request = request.into_request_with_simple_body();
@@ -108,4 +124,13 @@ impl Service<Request<Incoming>> for ProxyState {
             Ok(res)
         })
     }
+}
+
+fn status_code_to_response(
+    status_code: StatusCode,
+) -> Result<Response<SimpleBody>, Box<dyn std::error::Error + Send + Sync>> {
+    Ok(Response::builder()
+        .status(status_code)
+        .body(simple_empty_body())
+        .unwrap())
 }

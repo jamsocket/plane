@@ -1,6 +1,5 @@
-use std::{net::SocketAddr, str::FromStr};
-
 use common::{
+    localhost_resolver::localhost_client,
     proxy_mock::MockProxy,
     simple_axum_server::{RequestInfo, SimpleAxumServer},
     test_env::TestEnvironment,
@@ -9,10 +8,11 @@ use plane::{
     log_types::BackendAddr,
     names::{BackendName, Name},
     protocol::{RouteInfo, RouteInfoResponse},
-    types::{BearerToken, ClusterName, SecretToken},
+    types::{BearerToken, ClusterName, SecretToken, Subdomain},
 };
 use plane_test_macro::plane_test;
 use reqwest::StatusCode;
+use std::{net::SocketAddr, str::FromStr};
 use tokio::net::TcpListener;
 
 mod common;
@@ -57,8 +57,11 @@ async fn proxy_bad_bearer_token(env: TestEnvironment) {
 #[plane_test]
 async fn proxy_backend_unreachable(env: TestEnvironment) {
     let mut proxy = MockProxy::new().await;
-    let url = format!("http://{}/abc123/", proxy.addr());
-    let handle = tokio::spawn(async { reqwest::get(url).await.expect("Failed to send request") });
+    let port = proxy.port();
+    let cluster = ClusterName::from_str(&format!("plane.test:{}", port)).unwrap();
+    let url = format!("http://plane.test:{port}/abc123/");
+    let client = localhost_client();
+    let handle = tokio::spawn(client.get(url).send());
 
     let route_info_request = proxy.recv_route_info_request().await;
     assert_eq!(
@@ -73,7 +76,7 @@ async fn proxy_backend_unreachable(env: TestEnvironment) {
                 backend_id: BackendName::new_random(),
                 address: BackendAddr(SocketAddr::from(([123, 234, 123, 234], 12345))),
                 secret_token: SecretToken::from("secret".to_string()),
-                cluster: ClusterName::from_str("test").unwrap(),
+                cluster,
                 user: None,
                 user_data: None,
                 subdomain: None,
@@ -81,7 +84,7 @@ async fn proxy_backend_unreachable(env: TestEnvironment) {
         })
         .await;
 
-    let response = handle.await.unwrap();
+    let response = handle.await.unwrap().unwrap();
 
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
 }
@@ -95,8 +98,11 @@ async fn proxy_backend_timeout(env: TestEnvironment) {
     let addr = listener.local_addr().unwrap();
 
     let mut proxy = MockProxy::new().await;
-    let url = format!("http://{}/abc123/", proxy.addr());
-    let handle = tokio::spawn(async { reqwest::get(url).await.expect("Failed to send request") });
+    let port = proxy.port();
+    let cluster = ClusterName::from_str(&format!("plane.test:{}", port)).unwrap();
+    let url = format!("http://plane.test:{port}/abc123/");
+    let client = localhost_client();
+    let handle = tokio::spawn(client.get(url).send());
 
     let route_info_request = proxy.recv_route_info_request().await;
     assert_eq!(
@@ -111,7 +117,7 @@ async fn proxy_backend_timeout(env: TestEnvironment) {
                 backend_id: BackendName::new_random(),
                 address: BackendAddr(addr),
                 secret_token: SecretToken::from("secret".to_string()),
-                cluster: ClusterName::from_str("test").unwrap(),
+                cluster,
                 user: None,
                 user_data: None,
                 subdomain: None,
@@ -119,7 +125,7 @@ async fn proxy_backend_timeout(env: TestEnvironment) {
         })
         .await;
 
-    let response = handle.await.unwrap();
+    let response = handle.await.unwrap().unwrap();
 
     assert_eq!(response.status(), StatusCode::GATEWAY_TIMEOUT);
 }
@@ -129,8 +135,11 @@ async fn proxy_backend_accepts(env: TestEnvironment) {
     let server = SimpleAxumServer::new().await;
 
     let mut proxy = MockProxy::new().await;
-    let url = format!("http://{}/abc123/", proxy.addr());
-    let handle = tokio::spawn(async { reqwest::get(url).await.expect("Failed to send request") });
+    let port = proxy.port();
+    let cluster = ClusterName::from_str(&format!("plane.test:{}", port)).unwrap();
+    let url = format!("http://plane.test:{port}/abc123/");
+    let client = localhost_client();
+    let handle = tokio::spawn(client.get(url).send());
 
     let route_info_request = proxy.recv_route_info_request().await;
     assert_eq!(
@@ -145,7 +154,7 @@ async fn proxy_backend_accepts(env: TestEnvironment) {
                 backend_id: BackendName::new_random(),
                 address: BackendAddr(server.addr()),
                 secret_token: SecretToken::from("secret".to_string()),
-                cluster: ClusterName::from_str("test").unwrap(),
+                cluster,
                 user: None,
                 user_data: None,
                 subdomain: None,
@@ -153,9 +162,81 @@ async fn proxy_backend_accepts(env: TestEnvironment) {
         })
         .await;
 
-    let response = handle.await.unwrap();
+    let response = handle.await.unwrap().unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let request_info: RequestInfo = response.json().await.unwrap();
     assert_eq!(request_info.path, "/");
     assert_eq!(request_info.method, "GET");
+}
+
+#[plane_test]
+async fn proxy_expected_subdomain_not_present(env: TestEnvironment) {
+    let server = SimpleAxumServer::new().await;
+
+    let mut proxy = MockProxy::new().await;
+    let port = proxy.port();
+    let cluster = ClusterName::from_str(&format!("plane.test:{}", port)).unwrap();
+    let url = format!("http://plane.test:{port}/abc123/");
+    let client = localhost_client();
+    let handle = tokio::spawn(client.get(url).send());
+
+    let route_info_request = proxy.recv_route_info_request().await;
+    assert_eq!(
+        route_info_request.token,
+        BearerToken::from("abc123".to_string())
+    );
+
+    proxy
+        .send_route_info_response(RouteInfoResponse {
+            token: BearerToken::from("abc123".to_string()),
+            route_info: Some(RouteInfo {
+                backend_id: BackendName::new_random(),
+                address: BackendAddr(server.addr()),
+                secret_token: SecretToken::from("secret".to_string()),
+                cluster,
+                user: None,
+                user_data: None,
+                subdomain: Some(Subdomain::from_str("missing-subdomain").unwrap()),
+            }),
+        })
+        .await;
+
+    let response = handle.await.unwrap().unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+#[plane_test]
+async fn proxy_expected_subdomain_is_present(env: TestEnvironment) {
+    let server = SimpleAxumServer::new().await;
+
+    let mut proxy = MockProxy::new().await;
+    let port = proxy.port();
+    let cluster = ClusterName::from_str(&format!("plane.test:{}", port)).unwrap();
+    let url = format!("http://mysubdomain.plane.test:{port}/abc123/");
+    let client = localhost_client();
+    let handle = tokio::spawn(client.get(url).send());
+
+    let route_info_request = proxy.recv_route_info_request().await;
+    assert_eq!(
+        route_info_request.token,
+        BearerToken::from("abc123".to_string())
+    );
+
+    proxy
+        .send_route_info_response(RouteInfoResponse {
+            token: BearerToken::from("abc123".to_string()),
+            route_info: Some(RouteInfo {
+                backend_id: BackendName::new_random(),
+                address: BackendAddr(server.addr()),
+                secret_token: SecretToken::from("secret".to_string()),
+                cluster,
+                user: None,
+                user_data: None,
+                subdomain: Some(Subdomain::from_str("mysubdomain").unwrap()),
+            }),
+        })
+        .await;
+
+    let response = handle.await.unwrap().unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
 }

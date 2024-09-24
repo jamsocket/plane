@@ -7,6 +7,7 @@ use tokio::time::timeout;
 pub mod async_drop;
 pub mod auth_mock;
 pub mod docker;
+pub mod localhost_resolver;
 pub mod proxy_mock;
 pub mod resources;
 pub mod simple_axum_server;
