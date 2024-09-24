@@ -63,7 +63,7 @@ impl ProxyClient {
                     Response::builder()
                         .status(StatusCode::GATEWAY_TIMEOUT)
                         .body(simple_empty_body())
-                        .unwrap(),
+                        .expect("Failed to build response"),
                     None,
                 ));
             }
@@ -73,7 +73,7 @@ impl ProxyClient {
                     Response::builder()
                         .status(StatusCode::BAD_GATEWAY)
                         .body(simple_empty_body())
-                        .unwrap(),
+                        .expect("Failed to build response"),
                     None,
                 ));
             }
