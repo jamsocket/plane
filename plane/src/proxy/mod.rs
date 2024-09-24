@@ -6,6 +6,7 @@ use anyhow::Result;
 use dynamic_proxy::server::{
     ServerWithHttpRedirect, ServerWithHttpRedirectConfig, ServerWithHttpRedirectHttpsConfig,
 };
+use proxy_server::ProxyState;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -109,7 +110,18 @@ pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
     )
     .await?;
 
-    let proxy_connection = ProxyConnection::new(config.name, client, config.cluster, cert_manager);
+    let state = Arc::new(ProxyState::new(
+        config.root_redirect_url.map(|u| u.to_string()),
+    ));
+
+    // This returns a guard, we need to keep it in scope so that the connection is not terminated.
+    let _proxy_connection = ProxyConnection::new(
+        config.name,
+        client,
+        config.cluster,
+        cert_manager,
+        state.clone(),
+    );
 
     let server = if let Some(https_port) = config.port_config.https_port {
         tracing::info!("Waiting for initial certificate.");
@@ -125,14 +137,14 @@ pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
             https_config: Some(https_config),
         };
 
-        ServerWithHttpRedirect::new(proxy_connection.state(), server_config).await?
+        ServerWithHttpRedirect::new(state, server_config).await?
     } else {
         let server_config = ServerWithHttpRedirectConfig {
             http_port: config.port_config.http_port,
             https_config: None,
         };
 
-        ServerWithHttpRedirect::new(proxy_connection.state(), server_config).await?
+        ServerWithHttpRedirect::new(state, server_config).await?
     };
 
     wait_for_shutdown_signal().await;

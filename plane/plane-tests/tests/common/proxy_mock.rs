@@ -16,7 +16,15 @@ pub struct MockProxy {
 #[allow(unused)]
 impl MockProxy {
     pub async fn new() -> Self {
-        let proxy_state = ProxyState::new();
+        Self::new_inner(None).await
+    }
+
+    pub async fn new_with_root_redirect(root_redirect_url: String) -> Self {
+        Self::new_inner(Some(root_redirect_url)).await
+    }
+
+    async fn new_inner(root_redirect_url: Option<String>) -> Self {
+        let proxy_state = ProxyState::new(root_redirect_url);
         let (route_info_request_sender, route_info_request_receiver) = mpsc::channel(1);
 
         proxy_state.inner.route_map.set_sender(move |m| {

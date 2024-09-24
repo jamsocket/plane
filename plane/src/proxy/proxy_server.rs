@@ -27,6 +27,9 @@ pub struct ProxyStateInner {
     pub proxy_client: ProxyClient,
     pub monitor: ConnectionMonitorHandle,
     pub connected: AtomicBool,
+
+    /// If set, the "root" path (/) will redirect to this URL.
+    pub root_redirect_url: Option<String>,
 }
 
 #[derive(Clone)]
@@ -36,17 +39,18 @@ pub struct ProxyState {
 
 impl Default for ProxyState {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 
 impl ProxyState {
-    pub fn new() -> Self {
+    pub fn new(root_redirect_url: Option<String>) -> Self {
         let inner = ProxyStateInner {
             route_map: RouteMap::new(),
             proxy_client: ProxyClient::new(),
             monitor: ConnectionMonitorHandle::new(),
             connected: AtomicBool::new(false),
+            root_redirect_url,
         };
 
         Self {
@@ -86,6 +90,22 @@ impl Service<Request<Incoming>> for ProxyState {
             }
         }
 
+        if request.uri().path() == "/" {
+            if let Some(root_redirect_url) = &self.inner.root_redirect_url {
+                let mut response = Response::builder()
+                    .status(StatusCode::MOVED_PERMANENTLY)
+                    .header(header::LOCATION, root_redirect_url)
+                    .body(simple_empty_body())
+                    .expect("Failed to build response");
+
+                apply_general_headers(&mut response);
+
+                return Box::pin(ready(Ok(response)));
+            } else {
+                return Box::pin(ready(status_code_to_response(StatusCode::BAD_REQUEST)));
+            }
+        }
+
         let mut request = MutableRequest::from_request(request);
 
         // extract the bearer token from the request
@@ -94,6 +114,7 @@ impl Service<Request<Incoming>> for ProxyState {
         let bearer_token = get_and_maybe_remove_bearer_token(&mut uri_parts);
 
         let Some(bearer_token) = bearer_token else {
+            // This should have already been handled by the root redirect above.
             return Box::pin(ready(status_code_to_response(StatusCode::BAD_REQUEST)));
         };
 

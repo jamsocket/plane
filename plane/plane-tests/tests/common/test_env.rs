@@ -18,7 +18,8 @@ use plane::{
     },
     names::{AcmeDnsServerName, ControllerName, DroneName, Name, ProxyName},
     proxy::{
-        cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection, AcmeEabConfiguration,
+        cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection,
+        proxy_server::ProxyState, AcmeEabConfiguration,
     },
     typed_unix_socket::{server::TypedUnixSocketServer, WrappedMessage},
     types::{ClusterName, DronePoolName},
@@ -131,12 +132,19 @@ impl TestEnvironment {
 
         let client = PlaneClient::new(controller.url().clone());
 
+        let state = Arc::new(ProxyState::new(Some("https://plane.test".to_string())));
+
         let (_, cert_manager) = watcher_manager_pair(cluster.clone(), None, None)
             .await
             .unwrap();
 
-        let proxy_connection =
-            ProxyConnection::new(ProxyName::new_random(), client, cluster, cert_manager);
+        let proxy_connection = ProxyConnection::new(
+            ProxyName::new_random(),
+            client,
+            cluster,
+            cert_manager,
+            state.clone(),
+        );
 
         let addr: SocketAddr = ([0, 0, 0, 0], 0).into();
         tracing::info!(%addr, "Listening for HTTP connections.");
@@ -144,8 +152,7 @@ impl TestEnvironment {
         let port = tcp_listener.local_addr().unwrap().port();
 
         // Spawn the server on a separate task
-        let server =
-            SimpleHttpServer::new(proxy_connection.state(), tcp_listener, HttpsConfig::Http)?;
+        let server = SimpleHttpServer::new(state, tcp_listener, HttpsConfig::Http)?;
 
         Ok(Proxy {
             port,

@@ -18,7 +18,7 @@ use tokio::net::TcpListener;
 mod common;
 
 #[plane_test]
-async fn proxy_no_bearer_token(env: TestEnvironment) {
+async fn proxy_root_no_redirect(env: TestEnvironment) {
     let mut proxy = MockProxy::new().await;
     let url = format!("http://{}", proxy.addr());
     let handle = tokio::spawn(async { reqwest::get(url).await.expect("Failed to send request") });
@@ -28,6 +28,26 @@ async fn proxy_no_bearer_token(env: TestEnvironment) {
     let response = handle.await.unwrap();
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert!(response.headers().get("location").is_none());
+}
+
+#[plane_test]
+async fn proxy_root_redirect(env: TestEnvironment) {
+    let proxy = MockProxy::new_with_root_redirect("https://plane.test/".to_string()).await;
+    let url = format!("http://{}", proxy.addr());
+
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+
+    let response = client.get(url).send().await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
+    assert_eq!(
+        response.headers().get("location").unwrap(),
+        "https://plane.test/"
+    );
 }
 
 #[plane_test]

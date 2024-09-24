@@ -20,9 +20,9 @@ impl ProxyConnection {
         client: PlaneClient,
         cluster: ClusterName,
         mut cert_manager: CertManager,
+        state: Arc<ProxyState>,
     ) -> Self {
         tracing::info!("Creating proxy connection");
-        let state = Arc::new(ProxyState::new());
 
         let handle = {
             let state = state.clone();
