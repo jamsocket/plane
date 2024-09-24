@@ -30,6 +30,10 @@ pub fn split_response<T>(response: Response<T>) -> (Response<SimpleBody>, Respon
     (response1, response2)
 }
 
+/// Wraps connection state that is needed to upgrade a connection so it can be passed back
+/// from the connection handler.
+///
+/// The receiver should call `.run` to turn this into a future, and then await it.
 pub struct UpgradeHandler {
     pub request: Request<SimpleBody>,
     pub response: Response<SimpleBody>,
