@@ -115,7 +115,6 @@ async fn backend_lifecycle_socket(env: TestEnvironment) {
     tracing::info!("Got starting status.");
 
     let message = drone.receive_request().await;
-    // assert_eq!(MessageToServer::Spawn(executor_config), message.message);
 
     let MessageToServer::Spawn(backend_name, exec_config, _acquired_key, bearer_token) =
         &message.message

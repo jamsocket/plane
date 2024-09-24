@@ -258,7 +258,7 @@ impl TestEnvironment {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // Used in tests.
 pub struct DroneWithSocket {
     pub socket_server: TypedUnixSocketServer<MessageToServer, MessageToClient>,
     pub drone: Drone,
@@ -266,7 +266,7 @@ pub struct DroneWithSocket {
     pub request_receiver: Receiver<WrappedMessage<MessageToServer>>,
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // Used in tests.
 impl DroneWithSocket {
     async fn new(socket_path: PathBuf, drone: Drone) -> Self {
         let socket_server =
