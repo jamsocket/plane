@@ -7,6 +7,7 @@ use axum::{
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
+/// A websocket echo server that echos messages back to the client.
 pub struct WebSocketEchoServer {
     handle: tokio::task::JoinHandle<()>,
     addr: SocketAddr,

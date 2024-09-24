@@ -4,6 +4,7 @@ use http_body_util::{BodyExt, Full};
 use hyper::{body::Incoming, service::Service, Request, Response};
 use std::{convert::Infallible, future::Future, pin::Pin};
 
+/// A service that returns a greeting with the X-Forwarded-For and X-Forwarded-Proto headers.
 #[derive(Clone)]
 pub struct HelloWorldService;
 

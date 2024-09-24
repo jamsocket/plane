@@ -12,6 +12,9 @@ use hyper_util::rt::TokioIo;
 use std::{convert::Infallible, future::Future, pin::Pin};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+/// A service that upgrades the connection and echos messages back to the client.
+/// (Note: this does not use the actual websocket protocol on the wire, but is sufficient to
+/// test the upgrade path.)
 #[derive(Clone)]
 pub struct SimpleUpgradeService;
 

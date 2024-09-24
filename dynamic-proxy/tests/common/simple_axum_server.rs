@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::net::TcpListener;
 
+/// A simple server that returns the request info as json.
 pub struct SimpleAxumServer {
     handle: tokio::task::JoinHandle<()>,
     addr: SocketAddr,

@@ -6,6 +6,8 @@ use std::sync::Arc;
 
 const CERTIFICATE_SUBJECT_ALT_NAME: &str = "plane.test";
 
+/// A certificate resolver that generates its own certificate on creation,
+/// and uses that for all requests.
 #[derive(Debug)]
 pub struct StaticCertificateResolver {
     certified_key: Arc<CertifiedKey>,
