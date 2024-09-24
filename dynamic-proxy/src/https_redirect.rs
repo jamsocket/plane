@@ -61,7 +61,7 @@ impl Service<Request<Incoming>> for HttpsRedirectService {
                 Response::builder()
                     .status(status)
                     .body(simple_empty_body())
-                    .unwrap()
+                    .expect("Response is always valid")
             }
         };
 
