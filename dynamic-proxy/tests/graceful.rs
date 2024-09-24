@@ -7,9 +7,16 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::time::Duration;
 
-mod common;
-
 // Ref: https://github.com/hyperium/hyper-util/blob/master/examples/server_graceful.rs
+
+async fn slow_hello_world(
+    _: hyper::Request<hyper::body::Incoming>,
+) -> Result<hyper::Response<dynamic_proxy::body::SimpleBody>, Infallible> {
+    tokio::time::sleep(Duration::from_secs(1)).await; // emulate slow request
+    let body = http_body_util::Full::<Bytes>::from("Hello, world!".to_owned());
+    let body = to_simple_body(body);
+    Ok(hyper::Response::new(body))
+}
 
 #[tokio::test]
 async fn test_graceful_shutdown() {
@@ -18,12 +25,7 @@ async fn test_graceful_shutdown() {
     let listener = TcpListener::bind(addr).await.unwrap();
     let addr = listener.local_addr().unwrap();
     let server = SimpleHttpServer::new(
-        hyper::service::service_fn(|_| async move {
-            tokio::time::sleep(Duration::from_secs(1)).await; // emulate slow request
-            let body = http_body_util::Full::<Bytes>::from("Hello, world!".to_owned());
-            let body = to_simple_body(body);
-            Ok::<_, Infallible>(hyper::Response::new(body))
-        }),
+        hyper::service::service_fn(slow_hello_world),
         listener,
         HttpsConfig::Http,
     )

@@ -216,6 +216,10 @@ impl SimpleHttpServer {
 
 impl Drop for SimpleHttpServer {
     fn drop(&mut self) {
+        if self.graceful_shutdown.is_some() {
+            tracing::warn!("Shutting down SimpleHttpServer without a call to graceful_shutdown. Connections will be dropped abruptly!");
+        }
+
         self.handle.abort();
     }
 }
