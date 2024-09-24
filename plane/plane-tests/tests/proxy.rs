@@ -51,7 +51,7 @@ async fn proxy_bad_bearer_token(env: TestEnvironment) {
 
     let response = handle.await.unwrap();
 
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
 #[plane_test]

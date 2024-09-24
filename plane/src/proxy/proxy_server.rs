@@ -9,7 +9,7 @@ use dynamic_proxy::{
     body::{simple_empty_body, SimpleBody},
     hyper::{
         body::{Body, Incoming},
-        header,
+        header::{self, HeaderValue},
         service::Service,
         Request, Response, StatusCode, Uri,
     },
@@ -82,7 +82,7 @@ impl Service<Request<Incoming>> for ProxyState {
             let route_info = inner.route_map.lookup(&bearer_token).await;
 
             let Some(route_info) = route_info else {
-                return status_code_to_response(StatusCode::UNAUTHORIZED);
+                return status_code_to_response(StatusCode::FORBIDDEN);
             };
 
             if let Err(status_code) = prepare_request(&mut request, &route_info, &original_path) {
@@ -183,8 +183,32 @@ where
 fn status_code_to_response(
     status_code: StatusCode,
 ) -> Result<Response<SimpleBody>, Box<dyn std::error::Error + Send + Sync>> {
-    Ok(Response::builder()
+    let mut response = Response::builder()
         .status(status_code)
         .body(simple_empty_body())
-        .unwrap())
+        .unwrap();
+
+    apply_cors_headers(&mut response);
+
+    Ok(response)
+}
+
+fn apply_cors_headers(response: &mut Response<SimpleBody>) {
+    let headers = response.headers_mut();
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_ORIGIN,
+        HeaderValue::from_static("*"),
+    );
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_METHODS,
+        HeaderValue::from_static("*"),
+    );
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_HEADERS,
+        HeaderValue::from_static("*"),
+    );
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+        HeaderValue::from_static("true"),
+    );
 }
