@@ -8,7 +8,6 @@ use plane::proxy::AcmeEabConfiguration;
 use reqwest::Client;
 use serde_json::json;
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
 use std::time::{Duration, SystemTime};
 use url::Url;
 
@@ -96,11 +95,11 @@ impl Pebble {
     ) -> Result<Pebble> {
         let scratch_dir = env.scratch_dir.clone();
 
-        #[cfg(target_os = "macos")]
-        avoid_weird_mac_bug(&env.run_name, &scratch_dir).await?;
-
         let pebble_dir = scratch_dir.canonicalize()?.join("pebble");
         std::fs::create_dir_all(&pebble_dir)?;
+
+        #[cfg(target_os = "macos")]
+        avoid_weird_mac_bug(&env.run_name, &scratch_dir).await?;
 
         let mut pebble_config = json!({
             "pebble": {
@@ -191,7 +190,7 @@ impl Pebble {
 /// the scratch directory itself (i.e. the parent of the pebble directory) seems to prevent this
 /// from happening.
 #[cfg(target_os = "macos")]
-pub async fn avoid_weird_mac_bug(name: &str, scratch_dir: &Path) -> Result<()> {
+pub async fn avoid_weird_mac_bug(name: &str, scratch_dir: &std::path::Path) -> Result<()> {
     println!(
         "Creating dummy container for macos {}",
         scratch_dir.to_str().unwrap()
