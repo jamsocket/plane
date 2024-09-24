@@ -17,11 +17,15 @@ use std::{
 use tokio::{net::TcpListener, select, task::JoinSet};
 use tokio_rustls::TlsAcceptor;
 
+/// A simple server that wraps a hyper service and handles requests.
+/// The server can be configured to listen for either HTTP and HTTPS,
+/// and supports graceful shutdown and x-forwarded-* headers.
 pub struct SimpleHttpServer {
     handle: tokio::task::JoinHandle<JoinSet<()>>,
     graceful_shutdown: Option<GracefulShutdown>,
 }
 
+#[must_use] // Otherwise, the tasks we started would be stopped as soon as the graceful shutdown is initiated.
 async fn listen_loop<S>(
     listener: TcpListener,
     service: S,
@@ -69,6 +73,7 @@ where
     join_set
 }
 
+#[must_use] // Otherwise, the tasks we started would be stopped as soon as the graceful shutdown is initiated.
 async fn listen_loop_tls<S>(
     listener: TcpListener,
     service: S,
@@ -201,9 +206,11 @@ impl SimpleHttpServer {
             .graceful_shutdown
             .take()
             .expect("self.graceful_shutdown is always set");
-        tokio::time::timeout(timeout, graceful_shutdown.shutdown())
-            .await
-            .unwrap();
+        let result = tokio::time::timeout(timeout, graceful_shutdown.shutdown()).await;
+
+        if let Err(e) = result {
+            tracing::warn!(?e, "Timed out waiting for graceful shutdown, aborting.");
+        }
     }
 }
 
@@ -320,11 +327,12 @@ where
         let mut request = request;
         request.headers_mut().insert(
             "X-Forwarded-For",
-            HeaderValue::from_str(&format!("{}", self.forwarded_for)).unwrap(),
+            HeaderValue::from_str(&format!("{}", self.forwarded_for))
+                .expect("X-Forwarded-For is always valid"),
         );
         request.headers_mut().insert(
             "X-Forwarded-Proto",
-            HeaderValue::from_str(self.forwarded_proto).unwrap(),
+            HeaderValue::from_str(self.forwarded_proto).expect("X-Forwarded-Proto is always valid"),
         );
         self.inner.call(request)
     }
