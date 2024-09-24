@@ -9,6 +9,7 @@ use plane::{
 };
 use plane_test_macro::plane_test;
 use reqwest::StatusCode;
+use tokio::net::TcpListener;
 
 mod common;
 
@@ -79,4 +80,42 @@ async fn proxy_backend_unreachable(env: TestEnvironment) {
     let response = handle.await.unwrap();
 
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+}
+
+#[plane_test]
+async fn proxy_backend_timeout(env: TestEnvironment) {
+    // We will start a listener, but never respond on it, to simulate a timeout.
+    let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let mut proxy = MockProxy::new().await;
+    let url = format!("http://{}/abc123/", proxy.addr());
+    let handle = tokio::spawn(async { reqwest::get(url).await.expect("Failed to send request") });
+
+    let route_info_request = proxy.recv_route_info_request().await;
+    assert_eq!(
+        route_info_request.token,
+        BearerToken::from("abc123".to_string())
+    );
+
+    proxy
+        .send_route_info_response(RouteInfoResponse {
+            token: BearerToken::from("abc123".to_string()),
+            route_info: Some(RouteInfo {
+                backend_id: BackendName::new_random(),
+                address: BackendAddr(addr),
+                secret_token: SecretToken::from("secret".to_string()),
+                cluster: ClusterName::from_str("test").unwrap(),
+                user: None,
+                user_data: None,
+                subdomain: None,
+            }),
+        })
+        .await;
+
+    let response = handle.await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::GATEWAY_TIMEOUT);
 }
