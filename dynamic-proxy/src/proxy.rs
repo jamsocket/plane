@@ -9,7 +9,7 @@ use hyper_util::{
     client::legacy::{connect::HttpConnector, Client},
     rt::TokioExecutor,
 };
-use std::time::Duration;
+use std::{convert::Infallible, time::Duration};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -52,7 +52,7 @@ impl ProxyClient {
         request: Request<SimpleBody>,
     ) -> Result<
         (Response<SimpleBody>, Option<UpgradeHandler>),
-        Box<dyn std::error::Error + Send + Sync>,
+        Infallible,
     > {
         let url = request.uri().to_string();
 

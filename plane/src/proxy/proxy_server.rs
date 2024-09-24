@@ -94,7 +94,15 @@ impl Service<Request<Incoming>> for ProxyState {
 
             let request = request.into_request_with_simple_body();
 
-            let (mut res, upgrade_handler) = inner.proxy_client.request(request).await.unwrap();
+            let result = inner.proxy_client.request(request).await;
+
+            let (mut res, upgrade_handler) = match result {
+                Ok((res, upgrade_handler)) => (res, upgrade_handler),
+                Err(e) => {
+                    tracing::error!("Error proxying request: {}", e);
+                    return status_code_to_response(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            };
 
             if let Some(upgrade_handler) = upgrade_handler {
                 let monitor = inner.monitor.monitor();
@@ -104,7 +112,9 @@ impl Service<Request<Incoming>> for ProxyState {
                     .inc_connection(&route_info.backend_id);
                 let backend_id = route_info.backend_id.clone();
                 tokio::spawn(async move {
-                    upgrade_handler.run().await.unwrap();
+                    if let Err(err) = upgrade_handler.run().await {
+                        tracing::error!("Error running upgrade handler: {}", err);
+                    };
 
                     monitor
                         .lock()
@@ -118,7 +128,7 @@ impl Service<Request<Incoming>> for ProxyState {
             apply_cors_headers(&mut res);
             res.headers_mut().insert(
                 "x-plane-backend-id",
-                HeaderValue::from_str(&route_info.backend_id.to_string()).unwrap(),
+                HeaderValue::from_str(&route_info.backend_id.to_string()).expect("Backend ID is always a valid header value"),
             );
 
             Ok(res)
@@ -196,7 +206,7 @@ fn status_code_to_response(
     let mut response = Response::builder()
         .status(status_code)
         .body(simple_empty_body())
-        .unwrap();
+        .expect("Failed to build response");
 
     apply_cors_headers(&mut response);
 
