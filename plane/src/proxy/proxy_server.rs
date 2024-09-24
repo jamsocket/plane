@@ -128,7 +128,8 @@ impl Service<Request<Incoming>> for ProxyState {
             apply_cors_headers(&mut res);
             res.headers_mut().insert(
                 "x-plane-backend-id",
-                HeaderValue::from_str(&route_info.backend_id.to_string()).expect("Backend ID is always a valid header value"),
+                HeaderValue::from_str(&route_info.backend_id.to_string())
+                    .expect("Backend ID is always a valid header value"),
             );
 
             Ok(res)

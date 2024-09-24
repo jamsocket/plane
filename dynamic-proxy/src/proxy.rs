@@ -50,10 +50,7 @@ impl ProxyClient {
     pub async fn request(
         &self,
         request: Request<SimpleBody>,
-    ) -> Result<
-        (Response<SimpleBody>, Option<UpgradeHandler>),
-        Infallible,
-    > {
+    ) -> Result<(Response<SimpleBody>, Option<UpgradeHandler>), Infallible> {
         let url = request.uri().to_string();
 
         let res = self.handle_request(request).await;
