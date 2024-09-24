@@ -38,7 +38,7 @@ impl HttpsRedirectService {
         let new_uri = Uri::from_parts(parts).expect("URI is always valid");
 
         let response = Response::builder()
-            .status(StatusCode::FOUND)
+            .status(StatusCode::MOVED_PERMANENTLY)
             .header(header::LOCATION, new_uri.to_string())
             .body(simple_empty_body());
 

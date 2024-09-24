@@ -37,7 +37,7 @@ async fn do_request(url: &str) -> Response {
 async fn test_https_redirect() {
     let response = do_request("http://foo.bar.baz").await;
 
-    assert_eq!(response.status(), StatusCode::FOUND);
+    assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
     assert_eq!(
         response.headers().get(header::LOCATION).unwrap(),
         "https://foo.bar.baz/"
@@ -48,7 +48,7 @@ async fn test_https_redirect() {
 async fn test_https_redirect_with_slash_path() {
     let response = do_request("http://foo.bar.baz/").await;
 
-    assert_eq!(response.status(), StatusCode::FOUND);
+    assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
     assert_eq!(
         response.headers().get(header::LOCATION).unwrap(),
         "https://foo.bar.baz/"
@@ -59,7 +59,7 @@ async fn test_https_redirect_with_slash_path() {
 async fn test_https_redirect_with_path() {
     let response = do_request("http://foo.bar.baz/abc/123").await;
 
-    assert_eq!(response.status(), StatusCode::FOUND);
+    assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
     assert_eq!(
         response.headers().get(header::LOCATION).unwrap(),
         "https://foo.bar.baz/abc/123"
@@ -70,7 +70,7 @@ async fn test_https_redirect_with_path() {
 async fn test_https_redirect_with_query_params() {
     let response = do_request("http://foo.bar.baz/?a=1&b=2").await;
 
-    assert_eq!(response.status(), StatusCode::FOUND);
+    assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
     assert_eq!(
         response.headers().get(header::LOCATION).unwrap(),
         "https://foo.bar.baz/?a=1&b=2"
