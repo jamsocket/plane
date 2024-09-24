@@ -17,6 +17,12 @@ use std::{
 use tokio::{net::TcpListener, select, task::JoinSet};
 use tokio_rustls::TlsAcceptor;
 
+/// Header which passes the client's IP address to the backend.
+const X_FORWARDED_FOR: &str = "x-forwarded-for";
+
+/// Header which passes the client's protocol (http or https) to the backend.
+const X_FORWARDED_PROTO: &str = "x-forwarded-proto";
+
 /// A simple server that wraps a hyper service and handles requests.
 /// The server can be configured to listen for either HTTP and HTTPS,
 /// and supports graceful shutdown and x-forwarded-* headers.
@@ -330,12 +336,12 @@ where
     fn call(&self, request: Request<ReqBody>) -> Self::Future {
         let mut request = request;
         request.headers_mut().insert(
-            "X-Forwarded-For",
+            X_FORWARDED_FOR,
             HeaderValue::from_str(&format!("{}", self.forwarded_for))
                 .expect("X-Forwarded-For is always valid"),
         );
         request.headers_mut().insert(
-            "X-Forwarded-Proto",
+            X_FORWARDED_PROTO,
             HeaderValue::from_str(self.forwarded_proto).expect("X-Forwarded-Proto is always valid"),
         );
         self.inner.call(request)
