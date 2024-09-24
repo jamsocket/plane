@@ -91,7 +91,7 @@ impl Service<Request<Incoming>> for ProxyState {
 
             let request = request.into_request_with_simple_body();
 
-            let (res, upgrade_handler) = inner.proxy_client.request(request).await.unwrap();
+            let (mut res, upgrade_handler) = inner.proxy_client.request(request).await.unwrap();
 
             if let Some(upgrade_handler) = upgrade_handler {
                 let monitor = inner.monitor.monitor();
@@ -110,6 +110,8 @@ impl Service<Request<Incoming>> for ProxyState {
             } else {
                 inner.monitor.touch_backend(&route_info.backend_id);
             }
+
+            apply_cors_headers(&mut res);
 
             Ok(res)
         })
