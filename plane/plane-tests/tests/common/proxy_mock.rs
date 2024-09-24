@@ -10,9 +10,10 @@ pub struct MockProxy {
     proxy_state: ProxyState,
     route_info_request_receiver: mpsc::Receiver<RouteInfoRequest>,
     addr: SocketAddr,
-    server: SimpleHttpServer,
+    _server: SimpleHttpServer,
 }
 
+#[allow(unused)]
 impl MockProxy {
     pub async fn new() -> Self {
         let proxy_state = ProxyState::new();
@@ -36,7 +37,7 @@ impl MockProxy {
             proxy_state,
             route_info_request_receiver,
             addr,
-            server,
+            _server: server,
         }
     }
 
