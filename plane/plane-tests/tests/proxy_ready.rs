@@ -34,6 +34,7 @@ async fn proxy_becomes_ready(env: TestEnvironment) {
     let proxy = env.proxy(&controller).await.unwrap();
 
     let url = format!("http://127.0.0.1:{}/ready", proxy.port);
+    // NB. This is a race, we can remove it if this test starts to flake.
     let response = reqwest::get(&url).await.expect("Failed to send request");
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
 
