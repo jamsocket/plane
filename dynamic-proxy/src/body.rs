@@ -1,3 +1,5 @@
+//! Provides a concrete, boxed body and error type.
+
 use bytes::Bytes;
 use http_body::Body;
 use http_body_util::combinators::BoxBody;
@@ -10,10 +12,9 @@ pub type SimpleBody = BoxBody<Bytes, BoxedError>;
 pub fn to_simple_body<B>(body: B) -> SimpleBody
 where
     B: Body<Data = Bytes> + Send + Sync + 'static,
-    B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    B::Error: Into<BoxedError>,
 {
-    body.map_err(|e| e.into() as Box<dyn std::error::Error + Send + Sync + 'static>)
-        .boxed()
+    body.map_err(|e| e.into() as BoxedError).boxed()
 }
 
 pub fn simple_empty_body() -> SimpleBody {
