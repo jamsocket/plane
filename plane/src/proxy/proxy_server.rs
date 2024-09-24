@@ -76,8 +76,10 @@ impl Service<Request<Incoming>> for ProxyState {
             let route_info = inner.route_map.lookup(&bearer_token).await;
 
             let Some(route_info) = route_info else {
-                // TODO
-                panic!("Route info not found for bearer token");
+                return Ok(Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .body(simple_empty_body())
+                    .unwrap());
             };
 
             request.set_upstream_address(route_info.address.0);
