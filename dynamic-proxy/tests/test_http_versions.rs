@@ -20,7 +20,10 @@ async fn test_http1() {
     let res = client.get(url).send().await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     assert_eq!(res.version(), reqwest::Version::HTTP_11);
-    assert_eq!(res.text().await.unwrap(), "Hello, world!");
+    assert_eq!(
+        res.text().await.unwrap(),
+        "Hello, world! X-Forwarded-For: 127.0.0.1, X-Forwarded-Proto: http"
+    );
 }
 
 #[tokio::test]
@@ -40,5 +43,8 @@ async fn test_http2() {
     let res = client.get(url).send().await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     assert_eq!(res.version(), reqwest::Version::HTTP_2);
-    assert_eq!(res.text().await.unwrap(), "Hello, world!");
+    assert_eq!(
+        res.text().await.unwrap(),
+        "Hello, world! X-Forwarded-For: 127.0.0.1, X-Forwarded-Proto: http"
+    );
 }

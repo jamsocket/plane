@@ -2,13 +2,18 @@ use crate::{
     body::SimpleBody, graceful_shutdown::GracefulShutdown, https_redirect::HttpsRedirectService,
 };
 use anyhow::Result;
+use http::HeaderValue;
 use hyper::{body::Incoming, service::Service, Request, Response};
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::conn::auto::Builder as ServerBuilder,
 };
 use rustls::{server::ResolvesServerCert, ServerConfig};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{net::TcpListener, select, task::JoinSet};
 use tokio_rustls::TlsAcceptor;
 
@@ -36,14 +41,15 @@ where
             _ = recv.changed() => break,
         };
 
-        let stream = match stream {
-            Ok((stream, _)) => stream,
+        let (stream, remote_addr) = match stream {
+            Ok((stream, remote_addr)) => (stream, remote_addr),
             Err(e) => {
                 tracing::warn!(?e, "Failed to accept connection.");
                 continue;
             }
         };
-        let service = service.clone();
+        let remote_ip = remote_addr.ip();
+        let service = WrappedService::new(service.clone(), remote_ip, "http");
 
         let server = ServerBuilder::new(TokioExecutor::new());
         let io = TokioIo::new(stream);
@@ -87,14 +93,15 @@ where
             _ = recv.changed() => break,
         };
 
-        let stream = match stream {
-            Ok((stream, _)) => stream,
+        let (stream, remote_addr) = match stream {
+            Ok((stream, remote_addr)) => (stream, remote_addr),
             Err(e) => {
                 tracing::warn!(?e, "Failed to accept connection.");
                 continue;
             }
         };
-        let service = service.clone();
+        let remote_ip = remote_addr.ip();
+        let service = WrappedService::new(service.clone(), remote_ip, "https");
         let tls_acceptor = tls_acceptor.clone();
 
         let graceful_shutdown = graceful_shutdown.clone();
@@ -181,6 +188,7 @@ impl SimpleHttpServer {
     }
 
     pub async fn graceful_shutdown(mut self) {
+        println!("Shutting down");
         let graceful_shutdown = self
             .graceful_shutdown
             .take()
@@ -279,5 +287,45 @@ impl ServerWithHttpRedirect {
                 .graceful_shutdown_with_timeout(timeout)
                 .await;
         }
+    }
+}
+
+/// A service that wraps another service and sets
+/// X-Forwarded-For and X-Forwarded-Proto headers.
+struct WrappedService<S> {
+    inner: S,
+    forwarded_for: IpAddr,
+    forwarded_proto: &'static str,
+}
+
+impl<S> WrappedService<S> {
+    pub fn new(inner: S, forwarded_for: IpAddr, forwarded_proto: &'static str) -> Self {
+        Self {
+            inner,
+            forwarded_for,
+            forwarded_proto,
+        }
+    }
+}
+
+impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for WrappedService<S>
+where
+    S: Service<Request<ReqBody>, Response = Response<ResBody>>,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn call(&self, request: Request<ReqBody>) -> Self::Future {
+        let mut request = request;
+        request.headers_mut().insert(
+            "X-Forwarded-For",
+            HeaderValue::from_str(&format!("{}", self.forwarded_for)).unwrap(),
+        );
+        request.headers_mut().insert(
+            "X-Forwarded-Proto",
+            HeaderValue::from_str(self.forwarded_proto).unwrap(),
+        );
+        self.inner.call(request)
     }
 }

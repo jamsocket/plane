@@ -14,11 +14,29 @@ impl Service<Request<Incoming>> for HelloWorldService {
 
     fn call(&self, request: Request<Incoming>) -> Self::Future {
         Box::pin(async {
+            let x_forwarded_for = request
+                .headers()
+                .get("x-forwarded-for")
+                .map(|h| h.to_str().unwrap().to_string())
+                .unwrap_or_default();
+            let x_forwarded_proto = request
+                .headers()
+                .get("x-forwarded-proto")
+                .map(|h| h.to_str().unwrap().to_string())
+                .unwrap_or_default();
+
             let _ = request.collect().await.unwrap().to_bytes();
+
+            let body = format!(
+                "Hello, world! X-Forwarded-For: {}, X-Forwarded-Proto: {}",
+                x_forwarded_for, x_forwarded_proto
+            );
 
             let response = Response::builder()
                 .status(200)
-                .body(to_simple_body(Full::new(Bytes::from("Hello, world!"))))
+                .body(to_simple_body(Full::new(Bytes::from(
+                    body.as_bytes().to_vec(),
+                ))))
                 .unwrap();
 
             Ok(response)

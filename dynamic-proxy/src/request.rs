@@ -1,3 +1,4 @@
+use crate::body::{to_simple_body, SimpleBody};
 use bytes::Bytes;
 use http::{
     request::Parts,
@@ -6,8 +7,6 @@ use http::{
 };
 use http_body::Body;
 use std::{net::SocketAddr, str::FromStr};
-
-use crate::body::{to_simple_body, SimpleBody};
 
 pub struct MutableRequest<T>
 where

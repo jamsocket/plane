@@ -19,5 +19,8 @@ async fn test_hello_world_http() {
     let client = reqwest::Client::new();
     let res = client.get(url).send().await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
-    assert_eq!(res.text().await.unwrap(), "Hello, world!");
+    assert_eq!(
+        res.text().await.unwrap(),
+        "Hello, world! X-Forwarded-For: 127.0.0.1, X-Forwarded-Proto: http"
+    );
 }
