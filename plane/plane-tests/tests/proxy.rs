@@ -1,6 +1,10 @@
 use std::{net::SocketAddr, str::FromStr};
 
-use common::{proxy_mock::MockProxy, test_env::TestEnvironment};
+use common::{
+    proxy_mock::MockProxy,
+    simple_axum_server::{RequestInfo, SimpleAxumServer},
+    test_env::TestEnvironment,
+};
 use plane::{
     log_types::BackendAddr,
     names::{BackendName, Name},
@@ -118,4 +122,40 @@ async fn proxy_backend_timeout(env: TestEnvironment) {
     let response = handle.await.unwrap();
 
     assert_eq!(response.status(), StatusCode::GATEWAY_TIMEOUT);
+}
+
+#[plane_test]
+async fn proxy_backend_accepts(env: TestEnvironment) {
+    let server = SimpleAxumServer::new().await;
+
+    let mut proxy = MockProxy::new().await;
+    let url = format!("http://{}/abc123/", proxy.addr());
+    let handle = tokio::spawn(async { reqwest::get(url).await.expect("Failed to send request") });
+
+    let route_info_request = proxy.recv_route_info_request().await;
+    assert_eq!(
+        route_info_request.token,
+        BearerToken::from("abc123".to_string())
+    );
+
+    proxy
+        .send_route_info_response(RouteInfoResponse {
+            token: BearerToken::from("abc123".to_string()),
+            route_info: Some(RouteInfo {
+                backend_id: BackendName::new_random(),
+                address: BackendAddr(server.addr()),
+                secret_token: SecretToken::from("secret".to_string()),
+                cluster: ClusterName::from_str("test").unwrap(),
+                user: None,
+                user_data: None,
+                subdomain: None,
+            }),
+        })
+        .await;
+
+    let response = handle.await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let request_info: RequestInfo = response.json().await.unwrap();
+    assert_eq!(request_info.path, "/");
+    assert_eq!(request_info.method, "GET");
 }
