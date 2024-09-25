@@ -2094,6 +2094,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "tokio-tungstenite 0.24.0",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
