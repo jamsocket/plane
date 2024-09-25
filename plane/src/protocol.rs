@@ -11,7 +11,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
+#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable, PartialEq)]
 pub struct KeyDeadlines {
     /// When the key should be renewed.
     pub renew_at: LoggableTime,
@@ -23,7 +23,7 @@ pub struct KeyDeadlines {
     pub hard_terminate_at: LoggableTime,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable)]
+#[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable, PartialEq)]
 pub struct AcquiredKey {
     /// Details of the key itself.
     pub key: KeyConfig,

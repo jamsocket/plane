@@ -6,7 +6,7 @@ use valuable::{Tuplable, TupleDef, Valuable, Value, Visit};
 
 // See: https://github.com/tokio-rs/valuable/issues/86#issuecomment-1760446976
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct LoggableTime(#[serde(with = "chrono::serde::ts_milliseconds")] pub DateTime<Utc>);
 
 impl Valuable for LoggableTime {

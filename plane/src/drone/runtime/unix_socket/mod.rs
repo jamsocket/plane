@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::PathBuf, pin::Pin};
 use tokio_stream::{Stream, StreamExt};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum MessageToServer {
     Prepare(DockerExecutorConfig),
     Spawn(
