@@ -8,13 +8,13 @@ use tokio::task::JoinHandle;
 
 type BackendNameListener = Box<dyn Fn(&BackendName) + Send + Sync + 'static>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BackendEntry {
     /// The current number of active connections to the backend.
-    active_connections: u32,
+    pub active_connections: u32,
 
     /// Whether the backend has had a recent connection (since this value was last checked).
-    had_recent_connection: bool,
+    pub had_recent_connection: bool,
 }
 
 #[derive(Default)]
@@ -147,6 +147,15 @@ impl ConnectionMonitorHandle {
             })
         };
         Self { monitor, handle }
+    }
+
+    pub fn get_backend_entry(&self, backend_id: &BackendName) -> Option<BackendEntry> {
+        self.monitor
+            .lock()
+            .expect("Monitor lock was poisoned.")
+            .backends
+            .get(backend_id)
+            .cloned()
     }
 
     pub fn monitor(&self) -> Arc<Mutex<ConnectionMonitor>> {

@@ -1,7 +1,8 @@
 use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use plane::{
+    names::BackendName,
     protocol::{RouteInfoRequest, RouteInfoResponse},
-    proxy::proxy_server::ProxyState,
+    proxy::{connection_monitor::BackendEntry, proxy_server::ProxyState},
 };
 use std::net::SocketAddr;
 use tokio::{net::TcpListener, sync::mpsc};
@@ -21,6 +22,10 @@ impl MockProxy {
 
     pub async fn new_with_root_redirect(root_redirect_url: String) -> Self {
         Self::new_inner(Some(root_redirect_url)).await
+    }
+
+    pub fn backend_entry(&self, backend_id: &BackendName) -> Option<BackendEntry> {
+        self.proxy_state.inner.monitor.get_backend_entry(backend_id)
     }
 
     async fn new_inner(root_redirect_url: Option<String>) -> Self {
