@@ -190,6 +190,45 @@ async fn proxy_backend_accepts(env: TestEnvironment) {
 }
 
 #[plane_test]
+async fn proxy_static_token(env: TestEnvironment) {
+    let server = SimpleAxumServer::new().await;
+
+    let mut proxy = MockProxy::new().await;
+    let port = proxy.port();
+    let cluster = ClusterName::from_str(&format!("plane.test:{}", port)).unwrap();
+    let url = format!("http://plane.test:{port}/s.abc123/foobar");
+    let client = localhost_client();
+    let handle = tokio::spawn(client.get(url).send());
+
+    let route_info_request = proxy.recv_route_info_request().await;
+    assert_eq!(
+        route_info_request.token,
+        BearerToken::from("s.abc123".to_string())
+    );
+
+    proxy
+        .send_route_info_response(RouteInfoResponse {
+            token: BearerToken::from("s.abc123".to_string()),
+            route_info: Some(RouteInfo {
+                backend_id: BackendName::new_random(),
+                address: BackendAddr(server.addr()),
+                secret_token: SecretToken::from("secret".to_string()),
+                cluster,
+                user: None,
+                user_data: None,
+                subdomain: None,
+            }),
+        })
+        .await;
+
+    let response = handle.await.unwrap().unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let request_info: RequestInfo = response.json().await.unwrap();
+    assert_eq!(request_info.path, "/s.abc123/foobar"); // With static tokens, we pass along the original path.
+    assert_eq!(request_info.method, "GET");
+}
+
+#[plane_test]
 async fn proxy_expected_subdomain_not_present(env: TestEnvironment) {
     let server = SimpleAxumServer::new().await;
 
