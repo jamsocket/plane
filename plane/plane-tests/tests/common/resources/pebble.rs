@@ -190,6 +190,7 @@ impl Pebble {
 /// inside the scratch directory. For whatever reason, first starting a dummy container that mounts
 /// the scratch directory itself (i.e. the parent of the pebble directory) seems to prevent this
 /// from happening.
+#[cfg(target_os = "macos")]
 pub async fn avoid_weird_mac_bug(name: &str, scratch_dir: &Path) -> Result<()> {
     println!(
         "Creating dummy container for macos {}",
