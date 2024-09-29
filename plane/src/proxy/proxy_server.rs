@@ -275,9 +275,5 @@ fn apply_general_headers(response: &mut Response<SimpleBody>) {
         header::ACCESS_CONTROL_ALLOW_HEADERS,
         HeaderValue::from_static("*"),
     );
-    headers.insert(
-        header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
-        HeaderValue::from_static("true"),
-    );
     headers.insert(header::SERVER, HeaderValue::from_static(SERVER_NAME));
 }
