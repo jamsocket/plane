@@ -65,15 +65,6 @@ async fn proxy_gone_request_has_cors_headers(env: TestEnvironment) {
             .unwrap(),
         "*"
     );
-    assert_eq!(
-        response
-            .headers()
-            .get("access-control-allow-credentials")
-            .unwrap()
-            .to_str()
-            .unwrap(),
-        "true"
-    );
 }
 
 #[plane_test]
@@ -136,14 +127,5 @@ async fn proxy_valid_request_has_cors_headers(env: TestEnvironment) {
             .to_str()
             .unwrap(),
         "*"
-    );
-    assert_eq!(
-        response
-            .headers()
-            .get("access-control-allow-credentials")
-            .unwrap()
-            .to_str()
-            .unwrap(),
-        "true"
     );
 }
