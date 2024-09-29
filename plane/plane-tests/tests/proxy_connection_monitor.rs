@@ -102,7 +102,7 @@ async fn proxy_marks_websocket_backend_as_active(env: TestEnvironment) {
         panic!("Backend entry not found");
     };
     assert_eq!(backend_entry.active_connections, 1);
-    assert_eq!(backend_entry.had_recent_connection, true);
+    assert!(backend_entry.had_recent_connection);
 
     ws_stream.close(None).await.unwrap();
     drop(ws_stream);
@@ -110,5 +110,5 @@ async fn proxy_marks_websocket_backend_as_active(env: TestEnvironment) {
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     let backend_entry = proxy.backend_entry(&backend_name).unwrap();
     assert_eq!(backend_entry.active_connections, 0);
-    assert_eq!(backend_entry.had_recent_connection, true);
+    assert!(backend_entry.had_recent_connection);
 }
