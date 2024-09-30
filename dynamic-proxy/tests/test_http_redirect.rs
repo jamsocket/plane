@@ -28,9 +28,8 @@ async fn do_request(url: &str) -> Response {
     url.set_port(Some(port)).unwrap();
 
     // Request to http://foo.bar.baz should redirect to https://foo.bar.baz
-    let response = get_client().get(url).send().await.unwrap();
 
-    response
+    get_client().get(url).send().await.unwrap()
 }
 
 #[tokio::test]
