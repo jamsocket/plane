@@ -46,9 +46,11 @@ async fn test_graceful_shutdown_https() {
         .build()
         .unwrap();
 
-    let _client = client.clone();
-    let _url = url.clone();
-    let response_handle = tokio::spawn(async move { _client.get(&_url).send().await.unwrap() });
+    let response_handle = {
+        let client = client.clone();
+        let url = url.clone();
+        tokio::spawn(async move { client.get(&url).send().await.unwrap() })
+    };
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
