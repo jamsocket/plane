@@ -48,14 +48,17 @@ async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
 
 async fn handle_socket(mut socket: WebSocket) {
     while let Some(msg) = socket.recv().await {
-        if let Ok(msg) = msg {
-            if let Message::Text(text) = msg {
-                if socket.send(Message::Text(text)).await.is_err() {
-                    break;
+        match msg {
+            Ok(msg) => {
+                if let Message::Text(text) = msg {
+                    if socket.send(Message::Text(text)).await.is_err() {
+                        break;
+                    }
                 }
             }
-        } else {
-            break;
+            Err(e) => {
+                panic!("Error receiving message: {}", e);
+            }
         }
     }
 }

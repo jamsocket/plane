@@ -47,7 +47,7 @@ pub fn get_and_maybe_remove_bearer_token(parts: &mut uri::Parts) -> Option<Beare
     // the full incoming path, and the path to proxy to is just `/`.
     let (token, path) = match full_path.split_once('/') {
         Some((token, path)) => (token, path),
-        None => (full_path, "/"),
+        None => (full_path, ""),
     };
 
     if token.is_empty() {
@@ -76,6 +76,8 @@ pub fn get_and_maybe_remove_bearer_token(parts: &mut uri::Parts) -> Option<Beare
 
 #[cfg(test)]
 mod tests {
+    use uri::Uri;
+
     use super::*;
     use std::str::FromStr;
 
@@ -133,5 +135,72 @@ mod tests {
         let host = "foobar.myhost:443";
         let cluster = ClusterName::from_str("myhost").unwrap();
         assert_eq!(subdomain_from_host(host, &cluster), Ok(Some("foobar")));
+    }
+
+    #[test]
+    fn test_get_and_maybe_remove_bearer_token() {
+        let url = Uri::from_str("https://example.com/foo/bar").unwrap();
+        let mut parts = url.into_parts();
+        assert_eq!(
+            get_and_maybe_remove_bearer_token(&mut parts),
+            Some(BearerToken::from("foo".to_string()))
+        );
+        assert_eq!(
+            parts.path_and_query,
+            Some(PathAndQuery::from_str("/bar").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_get_and_maybe_remove_bearer_token_ends_no_slash() {
+        let url = Uri::from_str("https://example.com/foo").unwrap();
+        let mut parts = url.into_parts();
+        assert_eq!(
+            get_and_maybe_remove_bearer_token(&mut parts),
+            Some(BearerToken::from("foo".to_string()))
+        );
+        assert_eq!(
+            parts.path_and_query,
+            Some(PathAndQuery::from_str("/").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_get_and_maybe_remove_bearer_token_ends_in_slash() {
+        let url = Uri::from_str("https://example.com/foo/").unwrap();
+        let mut parts = url.into_parts();
+        assert_eq!(
+            get_and_maybe_remove_bearer_token(&mut parts),
+            Some(BearerToken::from("foo".to_string()))
+        );
+        assert_eq!(
+            parts.path_and_query,
+            Some(PathAndQuery::from_str("/").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_get_and_maybe_remove_bearer_token_no_token() {
+        let url = Uri::from_str("https://example.com/").unwrap();
+        let mut parts = url.into_parts();
+        assert_eq!(get_and_maybe_remove_bearer_token(&mut parts), None);
+        assert_eq!(
+            parts.path_and_query,
+            Some(PathAndQuery::from_str("/").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_get_and_maybe_remove_bearer_token_static_token() {
+        let url = Uri::from_str("https://example.com/s.foo/bar").unwrap();
+        let mut parts = url.into_parts();
+        assert_eq!(
+            get_and_maybe_remove_bearer_token(&mut parts),
+            Some(BearerToken::from("s.foo".to_string()))
+        );
+        assert_eq!(
+            parts.path_and_query,
+            Some(PathAndQuery::from_str("/s.foo/bar").unwrap())
+        );
     }
 }

@@ -10,10 +10,10 @@ pub mod docker;
 pub mod localhost_resolver;
 pub mod proxy_mock;
 pub mod resources;
-pub mod simple_axum_server; // NOTE: copied from dynamic-proxy (until we merge them back)
+pub mod simple_axum_server; // TODO: copied from dynamic-proxy (until we merge them back)
 pub mod test_env;
 pub mod timeout;
-pub mod websocket_echo_server; // NOTE: copied from dynamic-proxy (until we merge them back)
+pub mod websocket_echo_server; // TODO: copied from dynamic-proxy (until we merge them back)
 
 pub fn run_test<F, Fut>(name: &str, time_limit: Duration, test_function: F)
 where
