@@ -144,7 +144,7 @@ impl Service<Request<Incoming>> for ProxyState {
             let (mut res, upgrade_handler) = match result {
                 Ok((res, upgrade_handler)) => (res, upgrade_handler),
                 Err(e) => {
-                    tracing::error!("Error proxying request: {}", e);
+                    tracing::error!(?e, "Error proxying request");
                     return status_code_to_response(StatusCode::INTERNAL_SERVER_ERROR);
                 }
             };
