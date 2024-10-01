@@ -60,7 +60,7 @@ async fn proxy_marks_backend_as_recently_active(env: TestEnvironment) {
         panic!("Backend entry not found");
     };
     assert_eq!(backend_entry.active_connections, 0);
-    assert_eq!(backend_entry.had_recent_connection, true);
+    assert!(backend_entry.had_recent_connection);
 }
 
 #[plane_test]
