@@ -12,7 +12,7 @@ use std::{
 };
 use tokio::sync::watch;
 
-#[derive(Clone)]
+#[derive(Clone)] // Added in Plane
 pub struct GracefulShutdown {
     tx: watch::Sender<()>,
 }
@@ -34,6 +34,7 @@ impl GracefulShutdown {
         })
     }
 
+    // Added in Plane
     pub fn subscribe(&self) -> watch::Receiver<()> {
         self.tx.subscribe()
     }
