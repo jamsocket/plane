@@ -5,6 +5,7 @@ use crate::{
 };
 use axum::{
     extract::{Path, State},
+    http::HeaderMap,
     response::{
         sse::{Event, KeepAlive},
         Response, Sse,
@@ -12,7 +13,6 @@ use axum::{
     Json,
 };
 use futures_util::{Stream, StreamExt};
-use hyper::HeaderMap;
 use std::convert::Infallible;
 
 async fn backend_status(

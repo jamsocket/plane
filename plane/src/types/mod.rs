@@ -372,6 +372,12 @@ impl Display for SecretToken {
     }
 }
 
+impl SecretToken {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ConnectResponse {
     pub backend_id: BackendName,

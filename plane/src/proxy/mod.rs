@@ -1,26 +1,26 @@
 use self::proxy_connection::ProxyConnection;
 use crate::names::ProxyName;
 use crate::proxy::cert_manager::watcher_manager_pair;
-use crate::proxy::proxy_service::ProxyMakeService;
-use crate::proxy::shutdown_signal::ShutdownSignal;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
+use dynamic_proxy::server::{
+    ServerWithHttpRedirect, ServerWithHttpRedirectConfig, ServerWithHttpRedirectHttpsConfig,
+};
+use proxy_server::ProxyState;
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 use url::Url;
 
 pub mod cert_manager;
 mod cert_pair;
 pub mod command;
-mod connection_monitor;
+pub mod connection_monitor;
 pub mod proxy_connection;
-mod proxy_service;
-mod rewriter;
+pub mod proxy_server;
+mod request;
 mod route_map;
-mod shutdown_signal;
-mod subdomain;
-mod tls;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Protocol {
@@ -37,22 +37,13 @@ impl Protocol {
     }
 }
 
-/// Information about the incoming request that is forwarded to the request in
-/// X-Forwarded-* headers.
-#[derive(Debug, Clone, Copy)]
-pub struct ForwardableRequestInfo {
-    /// The IP address of the client that made the request.
-    /// Forwarded as X-Forwarded-For.
-    ip: IpAddr,
-
-    /// The protocol of the incoming request.
-    /// Forwarded as X-Forwarded-Proto.
-    protocol: Protocol,
-}
-
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct ServerPortConfig {
+    /// The port to listen on for HTTP requests.
+    /// If https_port is provided, this port will only serve a redirect to HTTPS.
     pub http_port: u16,
+
+    /// The port to listen on for HTTPS requests.
     pub https_port: Option<u16>,
 }
 
@@ -119,45 +110,49 @@ pub async fn run_proxy(config: ProxyConfig) -> Result<()> {
     )
     .await?;
 
-    let proxy_connection = ProxyConnection::new(config.name, client, config.cluster, cert_manager);
-    let shutdown_signal = ShutdownSignal::new();
+    let state = Arc::new(ProxyState::new(
+        config.root_redirect_url.map(|u| u.to_string()),
+    ));
 
-    let https_redirect = config.port_config.https_port.is_some();
+    // This returns a guard, we need to keep it in scope so that the connection is not terminated.
+    let _proxy_connection = ProxyConnection::new(
+        config.name,
+        client,
+        config.cluster,
+        cert_manager,
+        state.clone(),
+    );
 
-    if config.port_config.https_port.is_some() {
-        cert_watcher.wait_for_initial_cert().await?;
-    }
-
-    let http_handle = ProxyMakeService {
-        state: proxy_connection.state(),
-        https_redirect,
-        root_redirect_url: config.root_redirect_url.clone(),
-    }
-    .serve_http(config.port_config.http_port, shutdown_signal.subscribe())?;
-
-    let https_handle = if let Some(https_port) = config.port_config.https_port {
+    let server = if let Some(https_port) = config.port_config.https_port {
         tracing::info!("Waiting for initial certificate.");
+        cert_watcher.wait_for_initial_cert().await?;
 
-        let https_handle = ProxyMakeService {
-            state: proxy_connection.state(),
-            https_redirect: false,
-            root_redirect_url: config.root_redirect_url,
-        }
-        .serve_https(https_port, cert_watcher, shutdown_signal.subscribe())?;
+        let https_config = ServerWithHttpRedirectHttpsConfig {
+            https_port,
+            resolver: Arc::new(cert_watcher),
+        };
 
-        Some(https_handle)
+        let server_config = ServerWithHttpRedirectConfig {
+            http_port: config.port_config.http_port,
+            https_config: Some(https_config),
+        };
+
+        ServerWithHttpRedirect::new(state, server_config).await?
     } else {
-        None
+        let server_config = ServerWithHttpRedirectConfig {
+            http_port: config.port_config.http_port,
+            https_config: None,
+        };
+
+        ServerWithHttpRedirect::new(state, server_config).await?
     };
 
     wait_for_shutdown_signal().await;
-    shutdown_signal.shutdown();
     tracing::info!("Shutting down proxy server.");
 
-    http_handle.await?;
-    if let Some(https_handle) = https_handle {
-        https_handle.await?;
-    }
+    server
+        .graceful_shutdown_with_timeout(Duration::from_secs(10))
+        .await;
 
     Ok(())
 }

@@ -1,13 +1,13 @@
 use crate::log_types::LoggableTime;
 use anyhow::{anyhow, Result};
+use dynamic_proxy::rustls::{
+    crypto::aws_lc_rs::sign::any_supported_type, pki_types::PrivateKeyDer,
+};
+use dynamic_proxy::tokio_rustls::rustls::sign::CertifiedKey;
 use pem::Pem;
-use rustls_pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs1KeyDer};
+use rustls_pki_types::CertificateDer;
 use serde::{Deserialize, Serialize};
 use std::{fs::Permissions, io, os::unix::fs::PermissionsExt, path::Path};
-use tokio_rustls::rustls::{
-    sign::{any_supported_type, CertifiedKey},
-    Certificate, PrivateKey,
-};
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,13 +68,14 @@ impl CertificatePair {
         let validity_start = validity.not_before.to_datetime();
         let validity_end = validity.not_after.to_datetime();
 
+        // Convert the Vec<CertificateDer<'_>> to a Vec<CertificateDer<'static>>
+        // by copying the certificate data.
         let certs = certs
             .into_iter()
-            .map(|cert| Certificate(cert.to_vec()))
+            .map(|cert| CertificateDer::from(cert.to_vec()))
             .collect();
 
-        let private_key = PrivateKey(key.secret_der().to_vec()); // NB. rustls 0.22 gets rid of this; the PrivateKeyDer is passed to any_supported_type directly.
-        let key = any_supported_type(&private_key)?;
+        let key = any_supported_type(key)?;
 
         let certified_key = CertifiedKey::new(certs, key);
 
@@ -93,8 +94,8 @@ impl CertificatePair {
             .map(|cert_der| CertificateDer::from(cert_der.to_vec()))
             .collect();
 
-        let key = PrivatePkcs1KeyDer::from(pkey_der.to_vec());
-        let key: PrivateKeyDer = key.into();
+        let key = PrivateKeyDer::try_from(pkey_der.to_vec())
+            .map_err(|e| anyhow!("Error converting private key to der: {}", e))?;
 
         Self::new(&key, certs)
     }

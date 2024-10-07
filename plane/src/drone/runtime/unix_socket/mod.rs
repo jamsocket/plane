@@ -142,7 +142,8 @@ impl Runtime for UnixSocketRuntime {
 
 impl UnixSocketRuntime {
     pub async fn new(config: UnixSocketRuntimeConfig) -> Result<Self> {
-        let client = TypedUnixSocketClient::new(&config.socket_path).await?;
+        let client: TypedUnixSocketClient<MessageToServer, MessageToClient> =
+            TypedUnixSocketClient::new(&config.socket_path).await?;
         Ok(Self { client })
     }
 }

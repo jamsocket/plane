@@ -1,10 +1,12 @@
+use std::sync::Arc;
+
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
 use plane::{
     names::{Name, ProxyName},
     proxy::{
-        cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection, AcmeConfig,
-        AcmeEabConfiguration,
+        cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection,
+        proxy_server::ProxyState, AcmeConfig, AcmeEabConfiguration,
     },
 };
 use plane_test_macro::plane_test;
@@ -39,11 +41,14 @@ async fn cert_manager_does_refresh(env: TestEnvironment) {
     .await
     .unwrap();
 
+    let state = Arc::new(ProxyState::new(None));
+
     let _proxy_connection = ProxyConnection::new(
         ProxyName::new_random(),
         controller.client(),
         env.cluster.clone(),
         cert_manager,
+        state.clone(),
     );
     cert_watcher
         .wait_for_initial_cert()
@@ -86,11 +91,14 @@ async fn cert_manager_does_refresh_eab(env: TestEnvironment) {
     .await
     .unwrap();
 
+    let state = Arc::new(ProxyState::new(None));
+
     let _proxy_connection = ProxyConnection::new(
         ProxyName::new_random(),
         controller.client(),
         env.cluster.clone(),
         cert_manager,
+        state.clone(),
     );
     cert_watcher
         .wait_for_initial_cert()
