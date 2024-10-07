@@ -1,9 +1,9 @@
 use crate::util::random_string;
 use axum::{
+    http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
-use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{
     error::Error,

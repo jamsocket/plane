@@ -76,10 +76,9 @@ pub fn get_and_maybe_remove_bearer_token(parts: &mut uri::Parts) -> Option<Beare
 
 #[cfg(test)]
 mod tests {
-    use uri::Uri;
-
     use super::*;
     use std::str::FromStr;
+    use uri::Uri;
 
     #[test]
     fn no_subdomains() {
