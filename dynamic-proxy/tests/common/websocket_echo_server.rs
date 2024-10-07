@@ -52,7 +52,7 @@ async fn handle_socket(mut socket: WebSocket) {
             Ok(msg) => {
                 if let Message::Text(text) = msg {
                     if socket.send(Message::Text(text)).await.is_err() {
-                        break;
+                        panic!("WebSocket connection closed.");
                     }
                 }
             }
