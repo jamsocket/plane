@@ -1,16 +1,20 @@
 use axum::{
-    body::{Body, BoxBody, Bytes},
-    extract::State,
-    http::{request, HeaderValue, Request},
+    body::{Body, Bytes},
+    extract::{Request, State},
+    http::Uri,
+    http::{request, HeaderValue, StatusCode},
     middleware::Next,
     response::Response,
 };
-use hyper::{Client, StatusCode, Uri};
+use hyper_util::{
+    client::legacy::{connect::HttpConnector, Client},
+    rt::TokioExecutor,
+};
 use url::Url;
 
-pub fn clone_request_with_empty_body(parts: &request::Parts) -> request::Request<Body> {
+pub fn clone_request_with_empty_body(parts: &request::Parts) -> hyper::http::Request<Body> {
     // Copy method and URL.
-    let mut builder = request::Builder::new()
+    let mut builder = hyper::http::request::Builder::new()
         .method(parts.method.clone())
         .uri(parts.uri.clone());
 
@@ -32,11 +36,7 @@ pub fn clone_request_with_empty_body(parts: &request::Parts) -> request::Request
         .expect("Request is always valid.")
 }
 
-pub async fn forward_layer<B>(
-    State(forward_url): State<Url>,
-    req: Request<B>,
-    next: Next<B>,
-) -> Response<BoxBody> {
+pub async fn forward_layer(State(forward_url): State<Url>, req: Request, next: Next) -> Response {
     let (parts, body) = req.into_parts();
     let mut forward_req = clone_request_with_empty_body(&parts);
     let req = Request::from_parts(parts, body);
@@ -48,7 +48,7 @@ pub async fn forward_layer<B>(
     *forward_req.uri_mut() = uri;
 
     // Create a client
-    let client = Client::new();
+    let client = Client::builder(TokioExecutor::new()).build(HttpConnector::new());
 
     // Forward the request
     let forwarded_resp = client.request(forward_req).await;
@@ -68,13 +68,8 @@ pub async fn forward_layer<B>(
     }
 }
 
-fn response_helper(status: StatusCode, body: &'static [u8]) -> Response<BoxBody> {
-    // This is a bit ugly. There seems to be no way to construct an http_body with an axum::Error error type (?),
-    // but we can use map_err from http_body::Body to convert the hyper::error::Error to an axum::Error.
-    // Then, we need to box it up for Axum.
-    let body = http_body::Full::new(Bytes::from_static(body));
-    let body = http_body::Body::map_err(body, axum::Error::new);
-    let body: BoxBody = BoxBody::new(body);
+fn response_helper(status: StatusCode, body: &'static [u8]) -> Response {
+    let body = Body::from(Bytes::from_static(body));
 
     Response::builder()
         .status(status.as_u16())

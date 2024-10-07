@@ -1,5 +1,4 @@
-use hyper::client::connect::dns::Name;
-use reqwest::dns::{Resolve, Resolving};
+use reqwest::dns::{Name, Resolve, Resolving};
 use std::{future::ready, net::SocketAddr, sync::Arc};
 
 /// A reqwest-compatible DNS resolver that resolves all requests to localhost.

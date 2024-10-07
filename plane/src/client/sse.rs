@@ -1,12 +1,11 @@
 use super::PlaneClientError;
 use crate::util::ExponentialBackoff;
 use reqwest::{
-    header::{ACCEPT, CONNECTION},
+    header::{HeaderValue, ACCEPT, CONNECTION},
     Client, Response,
 };
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
-use tungstenite::http::HeaderValue;
 use url::Url;
 
 struct RawSseStream {
@@ -177,15 +176,15 @@ mod tests {
     use async_stream::stream;
     use axum::{
         extract::State,
+        http::HeaderMap,
         response::sse::{Event, KeepAlive, Sse},
         routing::get,
         Router,
     };
     use futures_util::stream::Stream;
-    use reqwest::header::HeaderMap;
     use serde::{Deserialize, Serialize};
     use std::{convert::Infallible, time::Duration};
-    use tokio::{sync::broadcast, task::JoinHandle, time::timeout};
+    use tokio::{net::TcpListener, sync::broadcast, task::JoinHandle, time::timeout};
 
     #[derive(Serialize, Deserialize, Debug)]
     struct Count {
@@ -237,18 +236,17 @@ mod tests {
     }
 
     impl DemoSseServer {
-        fn new() -> Self {
+        async fn new() -> Self {
             let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
-            let listener = std::net::TcpListener::bind(addr).unwrap();
+            let listener = TcpListener::bind(addr).await.unwrap();
             let port = listener.local_addr().unwrap().port();
             let (disconnect_sender, _) = broadcast::channel::<()>(1);
 
             let app = Router::new()
                 .route("/counter", get(handle_sse))
                 .with_state(disconnect_sender.clone());
-            let server = axum::Server::from_tcp(listener)
-                .unwrap()
-                .serve(app.into_make_service());
+
+            let server = axum::serve(listener, app.into_make_service());
             let handle = tokio::spawn(async move { server.await.map_err(anyhow::Error::new) });
 
             Self {
@@ -270,7 +268,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_simple_sse() {
-        let server = DemoSseServer::new();
+        let server = DemoSseServer::new().await;
 
         let client = reqwest::Client::new();
         let mut stream = super::sse_request::<Count>(server.url(), client)
@@ -285,7 +283,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sse_reconnect() {
-        let server = DemoSseServer::new();
+        let server = DemoSseServer::new().await;
 
         let client = reqwest::Client::new();
         let mut stream = super::sse_request::<Count>(server.url(), client)
