@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use dynamic_proxy::body::{to_simple_body, SimpleBody};
+use http::header::CONNECTION;
 use http_body_util::{Empty, Full};
 use hyper::{
     body::Incoming,
@@ -30,8 +31,9 @@ impl Service<Request<Incoming>> for SimpleUpgradeService {
                 let mut res = Response::new(to_simple_body(Empty::new()));
                 *res.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
                 res.headers_mut()
+                    .insert(CONNECTION, HeaderValue::from_static("upgrade"));
+                res.headers_mut()
                     .insert(UPGRADE, HeaderValue::from_static("websocket"));
-
                 tokio::task::spawn(async move {
                     if let Ok(upgraded) = hyper::upgrade::on(&mut req).await {
                         if let Err(e) = handle_upgraded_connection(upgraded).await {

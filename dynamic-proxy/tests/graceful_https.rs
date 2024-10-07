@@ -52,12 +52,12 @@ async fn test_graceful_shutdown_https() {
         tokio::spawn(async move { client.get(&url).send().await.unwrap() })
     };
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(600)).await;
 
     // Call server.graceful_shutdown()
     let shutdown_task = tokio::spawn(async move { server.graceful_shutdown().await });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     let response = response_handle.await.unwrap();
 

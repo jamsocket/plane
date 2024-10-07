@@ -3,7 +3,7 @@ use common::simple_upgrade_service::SimpleUpgradeService;
 use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use http_body_util::Empty;
 use hyper::{
-    header::{HeaderValue, UPGRADE},
+    header::{HeaderValue, UPGRADE, CONNECTION},
     Request, StatusCode,
 };
 use hyper_util::rt::TokioIo;
@@ -53,6 +53,10 @@ async fn test_upgrade() {
     assert_eq!(
         res.headers().get(UPGRADE).unwrap(),
         &HeaderValue::from_static("websocket")
+    );
+    assert_eq!(
+        res.headers().get(CONNECTION).unwrap(),
+        &HeaderValue::from_static("upgrade")
     );
 
     let upgraded = hyper::upgrade::on(res).await.unwrap();
