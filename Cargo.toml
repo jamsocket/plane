@@ -13,5 +13,6 @@ members = [
 # https://github.com/rust-lang/cargo/pull/9252/files
 default-members = [
     "plane",
-    "plane/plane-tests"
+    "plane/plane-tests",
+    "dynamic-proxy",
 ]
