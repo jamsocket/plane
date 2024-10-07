@@ -14,18 +14,10 @@ use std::{convert::Infallible, time::Duration};
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// A client for proxying HTTP requests to an upstream server.
+#[derive(Clone)]
 pub struct ProxyClient {
     client: Client<HttpConnector, SimpleBody>,
     timeout: Duration,
-}
-
-impl Clone for ProxyClient {
-    fn clone(&self) -> Self {
-        Self {
-            client: self.client.clone(),
-            timeout: self.timeout,
-        }
-    }
 }
 
 impl Default for ProxyClient {
