@@ -235,7 +235,8 @@ where
     }
 
     if let Some(user_data) = &route_info.user_data {
-        let user_data_str = serde_json::to_string(user_data).unwrap_or_default();
+        let user_data_str =
+            serde_json::to_string(user_data).expect("User data is always serializable");
         request.add_header("x-verified-user-data", &user_data_str);
     }
 
