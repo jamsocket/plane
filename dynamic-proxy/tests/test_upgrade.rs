@@ -3,7 +3,7 @@ use common::simple_upgrade_service::SimpleUpgradeService;
 use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use http_body_util::Empty;
 use hyper::{
-    header::{HeaderValue, UPGRADE, CONNECTION},
+    header::{HeaderValue, CONNECTION, UPGRADE},
     Request, StatusCode,
 };
 use hyper_util::rt::TokioIo;

@@ -50,7 +50,7 @@ impl ProxyClient {
         let res = match res {
             Ok(res) => res,
             Err(ProxyError::Timeout) => {
-                tracing::error!(url, "Upstream request failed");
+                tracing::warn!(url, "Upstream request failed");
                 return Ok((
                     Response::builder()
                         .status(StatusCode::GATEWAY_TIMEOUT)
@@ -60,7 +60,7 @@ impl ProxyClient {
                 ));
             }
             Err(e) => {
-                tracing::error!(url, ?e, "Upstream request failed");
+                tracing::warn!(url, ?e, "Upstream request failed");
                 return Ok((
                     Response::builder()
                         .status(StatusCode::BAD_GATEWAY)
@@ -108,16 +108,12 @@ impl ProxyClient {
         &self,
         request: Request<SimpleBody>,
     ) -> Result<Response<SimpleBody>, ProxyError> {
-        let url = request.uri().to_string();
-
         let res = match tokio::time::timeout(self.timeout, self.client.request(request)).await {
             Ok(Ok(res)) => res,
             Err(_) => {
-                tracing::warn!(url, "Upstream request timed out.");
                 return Err(ProxyError::Timeout);
             }
             Ok(Err(e)) => {
-                tracing::error!(url, "Upstream request failed: {}", e);
                 return Err(ProxyError::RequestFailed(e.into()));
             }
         };
