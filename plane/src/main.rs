@@ -86,6 +86,8 @@ async fn main() {
 
     init_tracing();
 
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let result = run(opts).await;
     match result {
         Ok(()) => {}

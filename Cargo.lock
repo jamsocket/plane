@@ -1895,6 +1895,7 @@ dependencies = [
  "rand",
  "reqwest",
  "rusqlite",
+ "rustls",
  "rustls-pemfile",
  "rustls-pki-types",
  "serde",
