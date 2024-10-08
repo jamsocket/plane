@@ -33,6 +33,7 @@ pem = "3.0.2"
 rand = "0.8.5"
 reqwest = { version = "0.12.8", features = ["json", "rustls-tls"], default-features = false }
 rusqlite = { version = "0.32", features = ["bundled", "serde_json"] }
+rustls = "0.23.14"
 rustls-pemfile = "2.0.0"
 rustls-pki-types = "1.0.0"
 serde = { version = "1.0.190", features = ["derive"] }
