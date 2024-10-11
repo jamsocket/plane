@@ -1,12 +1,8 @@
 use crate::body::{to_simple_body, SimpleBody};
 use bytes::Bytes;
-use http::{
-    request::Parts,
-    uri::{Authority, Scheme},
-    HeaderMap, HeaderName, HeaderValue, Request, Uri,
-};
+use http::{request::Parts, HeaderMap, HeaderName, HeaderValue, Request};
 use http_body::Body;
-use std::{net::SocketAddr, str::FromStr};
+use std::str::FromStr;
 
 /// Represents an HTTP request (from hyper) with helpers for mutating it.
 pub struct MutableRequest<T>
@@ -34,18 +30,6 @@ where
 
     pub fn into_request_with_simple_body(self) -> Request<SimpleBody> {
         Request::from_parts(self.parts, to_simple_body(self.body))
-    }
-
-    /// Rewrite the request so that it points to the given upstream address.
-    pub fn set_upstream_address(&mut self, address: SocketAddr) {
-        let uri = std::mem::take(&mut self.parts.uri);
-        let mut uri_parts = uri.into_parts();
-        uri_parts.scheme = Some(Scheme::HTTP);
-        uri_parts.authority = Some(
-            Authority::try_from(address.to_string())
-                .expect("SocketAddr should always be a valid authority."),
-        );
-        self.parts.uri = Uri::from_parts(uri_parts).expect("URI should always be valid.");
     }
 
     /// Add a header to the request.

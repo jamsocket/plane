@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use crate::common::simple_axum_server::SimpleAxumServer;
 use anyhow::Result;
 use bytes::Bytes;
@@ -9,6 +11,7 @@ use dynamic_proxy::{
 };
 use http::{Method, Request, StatusCode};
 use http_body_util::{combinators::BoxBody, BodyExt, Full};
+use tokio::net::TcpListener;
 
 mod common;
 
@@ -17,11 +20,14 @@ async fn make_request(req: Request<BoxBody<Bytes, BoxedError>>) -> Result<Reques
     let proxy_client = ProxyClient::new();
 
     let mut req = MutableRequest::from_request(req);
-    req.set_upstream_address(server.addr());
+    let host = req.parts.uri.host().unwrap().to_string();
+    req.add_header("host", &host);
 
-    let (res, upgrade_handler) = proxy_client.request(req.into_request()).await.unwrap();
+    let (res, upgrade_handler) = proxy_client.request(server.addr(), req.into_request()).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     assert!(upgrade_handler.is_none());
+
+    
 
     let body = res.into_body().collect().await.unwrap().to_bytes();
     let result: RequestInfo = serde_json::from_slice(&body).unwrap();
@@ -114,23 +120,22 @@ async fn test_proxy_body() {
     assert_eq!(result.body, "test");
 }
 
-// TODO: Re-enable when timeout is re-implemented. (Paul 2024-10-11)
-// #[tokio::test]
-// async fn test_proxy_no_upstream() {
-//     let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-//     let tcp_listener = TcpListener::bind(addr).await.unwrap();
-//     let addr = tcp_listener.local_addr().unwrap();
+#[tokio::test]
+async fn test_proxy_no_upstream() {
+    let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+    let tcp_listener = TcpListener::bind(addr).await.unwrap();
+    let addr = tcp_listener.local_addr().unwrap();
 
-//     let req = Request::builder()
-//         .method(Method::GET)
-//         .uri(format!("http://{}", addr))
-//         .body(simple_empty_body())
-//         .unwrap();
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri(format!("http://{}", addr))
+        .body(simple_empty_body())
+        .unwrap();
 
-//     let client = ProxyClient::new();
-//     let (result, upgrade_handler) = client.request(req).await.unwrap();
+    let client = ProxyClient::new();
+    let (result, upgrade_handler) = client.request(addr, req).await.unwrap();
 
-//     // expect error HTTP 502 after timeout
-//     assert_eq!(result.status(), StatusCode::GATEWAY_TIMEOUT);
-//     assert!(upgrade_handler.is_none());
-// }
+    // expect error HTTP 502 after timeout
+    assert_eq!(result.status(), StatusCode::GATEWAY_TIMEOUT);
+    assert!(upgrade_handler.is_none());
+}

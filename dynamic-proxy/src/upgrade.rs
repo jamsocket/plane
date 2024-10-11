@@ -47,12 +47,12 @@ impl UpgradeHandler {
     pub async fn run(self) -> Result<(), ProxyError> {
         let response = hyper::upgrade::on(self.response)
             .await
-            .map_err(ProxyError::UpgradeError)?;
+            .map_err(ProxyError::ResponseUpgradeError)?;
         let mut response = TokioIo::new(response);
 
         let request = hyper::upgrade::on(self.request)
             .await
-            .map_err(ProxyError::UpgradeError)?;
+            .map_err(ProxyError::RequestUpgradeError)?;
         let mut request = TokioIo::new(request);
 
         copy_bidirectional(&mut request, &mut response)

@@ -803,6 +803,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",
+ "tower",
  "tracing",
 ]
 

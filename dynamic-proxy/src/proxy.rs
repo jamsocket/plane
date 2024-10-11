@@ -3,21 +3,20 @@ use crate::{
     request::should_upgrade,
     upgrade::{split_request, split_response, UpgradeHandler},
 };
+use futures_util::future::BoxFuture;
 use http::StatusCode;
 use hyper::{Request, Response};
-use hyper_util::{
-    client::legacy::{connect::HttpConnector, Client},
-    rt::TokioExecutor,
-};
-use std::{convert::Infallible, time::Duration};
+use hyper_util::rt::TokioIo;
+use std::{convert::Infallible, net::SocketAddr, time::Duration};
+use tokio::net::TcpStream;
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+
+type BodyFuture = BoxFuture<'static, Result<(), ProxyError>>;
 
 /// A client for proxying HTTP requests to an upstream server.
 #[derive(Clone)]
 pub struct ProxyClient {
-    client: Client<HttpConnector, SimpleBody>,
-    #[allow(unused)] // TODO: implement this.
     timeout: Duration,
 }
 
@@ -29,24 +28,25 @@ impl Default for ProxyClient {
 
 impl ProxyClient {
     pub fn new() -> Self {
-        let client = Client::builder(TokioExecutor::new()).build(HttpConnector::new());
         Self {
-            client,
             timeout: DEFAULT_TIMEOUT,
         }
     }
 
-    /// Sends an HTTP request to the upstream server and returns the response.
-    /// If the request establishes a websocket connection, an upgrade handler is returned.
-    /// In this case, you must call and await `.run()` on the upgrade handler (i.e. in a tokio task)
-    /// to ensure that messages are properly sent and received.
+    /// Sends an HTTP request to the upstream server and returns a pair of the response and an
+    /// optional future.
+    ///
+    /// If future is provided, it must be awaited to ensure that the request and response bodies
+    /// are fully transferred, or if the connection is a WebSocket connection, that WebSocket
+    /// messages are properly sent and received.
     pub async fn request(
         &self,
+        addr: SocketAddr,
         request: Request<SimpleBody>,
-    ) -> Result<(Response<SimpleBody>, Option<UpgradeHandler>), Infallible> {
+    ) -> Result<(Response<SimpleBody>, Option<BodyFuture>), Infallible> {
         let url = request.uri().to_string();
 
-        let res = self.handle_request(request).await;
+        let res = self.handle_request(addr, request).await;
 
         let res = match res {
             Ok(res) => res,
@@ -81,40 +81,54 @@ impl ProxyClient {
 
     async fn handle_request(
         &self,
+        addr: SocketAddr,
         request: Request<SimpleBody>,
-    ) -> Result<(Response<SimpleBody>, Option<UpgradeHandler>), ProxyError> {
+    ) -> Result<(Response<SimpleBody>, Option<BodyFuture>), ProxyError> {
         if should_upgrade(&request) {
-            let (response, upgrade_handler) = self.handle_upgrade(request).await?;
+            let (response, upgrade_handler) = self.handle_upgrade(addr, request).await?;
             Ok((response, Some(upgrade_handler)))
         } else {
-            let result = self.upstream_request(request).await?;
+            let result = self.upstream_request(addr, request).await?;
             Ok((result, None))
         }
     }
 
     async fn handle_upgrade(
         &self,
+        addr: SocketAddr,
         request: Request<SimpleBody>,
-    ) -> Result<(Response<SimpleBody>, UpgradeHandler), ProxyError> {
+    ) -> Result<(Response<SimpleBody>, BodyFuture), ProxyError> {
         let (upstream_request, request_with_body) = split_request(request);
-        let res = self.upstream_request(upstream_request).await?;
+        let res = self.upstream_request(addr, upstream_request).await?;
         let (upstream_response, response_with_body) = split_response(res);
 
         let upgrade_handler = UpgradeHandler::new(request_with_body, response_with_body);
 
-        Ok((upstream_response, upgrade_handler))
+        Ok((upstream_response, Box::pin(upgrade_handler.run())))
     }
 
     async fn upstream_request(
         &self,
+        addr: SocketAddr,
         request: Request<SimpleBody>,
     ) -> Result<Response<SimpleBody>, ProxyError> {
-        let res = match self.client.request(request).await {
-            Ok(res) => res,
-            Err(e) => {
-                return Err(ProxyError::RequestFailed(e.into()));
+        let stream = TcpStream::connect(addr).await?;
+        let io = TokioIo::new(stream);
+
+        let (mut sender, conn) = hyper::client::conn::http1::handshake(io)
+            .await
+            .map_err(ProxyError::ConnectionHandshakeError)?;
+
+        tokio::task::spawn(async move {
+            if let Err(err) = conn.with_upgrades().await {
+                println!("Connection failed: {:?}", err);
             }
-        };
+        });
+
+        let res = tokio::time::timeout(self.timeout, sender.send_request(request))
+            .await
+            .map_err(|_| ProxyError::Timeout)?
+            .map_err(ProxyError::RequestSendError)?;
 
         let (parts, body) = res.into_parts();
         let res = Response::from_parts(parts, to_simple_body(body));
@@ -131,8 +145,17 @@ pub enum ProxyError {
     #[error("Upstream request failed: {0}")]
     RequestFailed(#[from] Box<dyn std::error::Error + Send + Sync>),
 
+    #[error("Connection handshake failed: {0}")]
+    ConnectionHandshakeError(hyper::Error),
+
+    #[error("Error sending request: {0}")]
+    RequestSendError(hyper::Error),
+
+    #[error("Failed to upgrade request: {0}")]
+    RequestUpgradeError(hyper::Error),
+
     #[error("Failed to upgrade response: {0}")]
-    UpgradeError(#[from] hyper::Error),
+    ResponseUpgradeError(hyper::Error),
 
     #[error("IO error: {0}")]
     IoError(#[from] tokio::io::Error),
