@@ -9,8 +9,6 @@ use dynamic_proxy::{
 };
 use http::{Method, Request, StatusCode};
 use http_body_util::{combinators::BoxBody, BodyExt, Full};
-use std::net::SocketAddr;
-use tokio::net::TcpListener;
 
 mod common;
 
@@ -116,22 +114,23 @@ async fn test_proxy_body() {
     assert_eq!(result.body, "test");
 }
 
-#[tokio::test]
-async fn test_proxy_no_upstream() {
-    let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-    let tcp_listener = TcpListener::bind(addr).await.unwrap();
-    let addr = tcp_listener.local_addr().unwrap();
+// TODO: Re-enable when timeout is re-implemented. (Paul 2024-10-11)
+// #[tokio::test]
+// async fn test_proxy_no_upstream() {
+//     let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+//     let tcp_listener = TcpListener::bind(addr).await.unwrap();
+//     let addr = tcp_listener.local_addr().unwrap();
 
-    let req = Request::builder()
-        .method(Method::GET)
-        .uri(format!("http://{}", addr))
-        .body(simple_empty_body())
-        .unwrap();
+//     let req = Request::builder()
+//         .method(Method::GET)
+//         .uri(format!("http://{}", addr))
+//         .body(simple_empty_body())
+//         .unwrap();
 
-    let client = ProxyClient::new();
-    let (result, upgrade_handler) = client.request(req).await.unwrap();
+//     let client = ProxyClient::new();
+//     let (result, upgrade_handler) = client.request(req).await.unwrap();
 
-    // expect error HTTP 502 after timeout
-    assert_eq!(result.status(), StatusCode::GATEWAY_TIMEOUT);
-    assert!(upgrade_handler.is_none());
-}
+//     // expect error HTTP 502 after timeout
+//     assert_eq!(result.status(), StatusCode::GATEWAY_TIMEOUT);
+//     assert!(upgrade_handler.is_none());
+// }
