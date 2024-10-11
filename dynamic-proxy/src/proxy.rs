@@ -17,6 +17,7 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 #[derive(Clone)]
 pub struct ProxyClient {
     client: Client<HttpConnector, SimpleBody>,
+    #[allow(unused)] // TODO: implement this.
     timeout: Duration,
 }
 
@@ -108,12 +109,9 @@ impl ProxyClient {
         &self,
         request: Request<SimpleBody>,
     ) -> Result<Response<SimpleBody>, ProxyError> {
-        let res = match tokio::time::timeout(self.timeout, self.client.request(request)).await {
-            Ok(Ok(res)) => res,
-            Err(_) => {
-                return Err(ProxyError::Timeout);
-            }
-            Ok(Err(e)) => {
+        let res = match self.client.request(request).await {
+            Ok(res) => res,
+            Err(e) => {
                 return Err(ProxyError::RequestFailed(e.into()));
             }
         };
