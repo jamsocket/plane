@@ -10,8 +10,10 @@ use hyper_util::rt::TokioIo;
 use std::{convert::Infallible, net::SocketAddr, time::Duration};
 use tokio::net::TcpStream;
 
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60 * 5); // 5 minutes
 
+/// A boxed future that is responsible for proxying all communication between the client
+/// and upstream server after the initial exchange of headers.
 type BodyFuture = BoxFuture<'static, Result<(), ProxyError>>;
 
 /// A client for proxying HTTP requests to an upstream server.
@@ -121,7 +123,7 @@ impl ProxyClient {
 
         tokio::task::spawn(async move {
             if let Err(err) = conn.with_upgrades().await {
-                println!("Connection failed: {:?}", err);
+                tracing::warn!(?err, "Upstream connection failed.");
             }
         });
 

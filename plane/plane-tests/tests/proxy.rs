@@ -12,8 +12,8 @@ use plane::{
 };
 use plane_test_macro::plane_test;
 use reqwest::StatusCode;
-use tokio::net::TcpListener;
 use std::{net::SocketAddr, str::FromStr};
+use tokio::net::TcpListener;
 
 mod common;
 
