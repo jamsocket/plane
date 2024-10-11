@@ -6,20 +6,19 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.89"
 bytes = "1.7.2"
+futures-util = "0.3.31"
 http = "1.1.0"
 http-body = "1.0.1"
 http-body-util = "0.1.2"
-hyper = "1.4.1"
+hyper = { version = "1.4.1", features = ["client"] }
 hyper-util = { version = "0.1.8", features = ["http1", "http2", "server", "server-graceful", "server-auto"] }
 pin-project-lite = "0.2.14"
 rustls = { version = "0.23.13", features = ["ring"] }
-thiserror = "1.0.63"
 serde = { version = "1.0.210", features = ["derive"] }
+thiserror = "1.0.63"
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
 tokio-rustls = "0.26.0"
 tracing = "0.1.40"
-tower = "0.5.1"
-futures-util = "0.3.31"
 
 [dev-dependencies]
 axum = { version = "0.7.6", features = ["http2", "ws"] }
