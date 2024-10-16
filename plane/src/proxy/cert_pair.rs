@@ -124,7 +124,7 @@ impl CertificatePair {
                 .as_slice(),
         );
 
-        let key = pem::encode(&Pem::new("PRIVATE KEY", self.private_key_der.clone()));
+        let key = pem::encode(&Pem::new("RSA PRIVATE KEY", self.private_key_der.clone()));
 
         let cert_pair = SerializedCertificatePair { cert, key };
 
