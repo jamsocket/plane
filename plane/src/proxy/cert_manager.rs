@@ -138,7 +138,13 @@ impl CertManager {
     ) -> Result<Self> {
         let initial_cert = if let Some(cert_path) = cert_path {
             if cert_path.exists() {
-                Some(CertificatePair::load(cert_path)?)
+                match CertificatePair::load(cert_path) {
+                    Ok(cert) => Some(cert),
+                    Err(err) => {
+                        tracing::error!(?err, ?cert_path, "Error loading certificate; obtaining via ACME instead.");
+                        None
+                    }
+                }
             } else {
                 None
             }
