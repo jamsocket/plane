@@ -141,7 +141,11 @@ impl CertManager {
                 match CertificatePair::load(cert_path) {
                     Ok(cert) => Some(cert),
                     Err(err) => {
-                        tracing::error!(?err, ?cert_path, "Error loading certificate; obtaining via ACME instead.");
+                        tracing::error!(
+                            ?err,
+                            ?cert_path,
+                            "Error loading certificate; obtaining via ACME instead."
+                        );
                         None
                     }
                 }
