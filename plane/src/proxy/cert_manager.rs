@@ -118,6 +118,7 @@ pub struct CertManager {
     send_cert: Arc<Sender<Option<CertificatePair>>>,
     refresh_loop: Option<tokio::task::JoinHandle<()>>,
 
+    /// Configuration used for the ACME certificate request.
     acme_config: Option<AcmeConfig>,
 
     /// Sender for forwarding responses from the controller to the refresh loop
@@ -262,6 +263,8 @@ async fn refresh_loop_step(
         }
     }
 
+    // We only need to create one account per drone, so we store it in `maybe_account`,
+    // a mutable `Option` reference which is used across calls to `refresh_loop_step`.
     let account = match maybe_account {
         Some(account) => account,
         None => {
