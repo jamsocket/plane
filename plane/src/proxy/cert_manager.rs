@@ -118,12 +118,12 @@ pub struct CertManager {
     send_cert: Arc<Sender<Option<CertificatePair>>>,
     refresh_loop: Option<tokio::task::JoinHandle<()>>,
 
+    /// Configuration used for the ACME certificate request.
+    acme_config: Option<AcmeConfig>,
+
     /// Sender for forwarding responses from the controller to the refresh loop
     /// task.
     response_sender: broadcast::Sender<CertManagerResponse>,
-
-    /// Configuration used for the ACME certificate request.
-    acme_account: Option<Arc<Account>>,
 
     /// Path to save the certificate to.
     path: Option<PathBuf>,
@@ -169,43 +169,13 @@ impl CertManager {
 
         let (response_sender, _) = broadcast::channel(1);
 
-        let acme_account = if let Some(acme_config) = acme_config {
-            let client = if acme_config.accept_insecure_certs_for_testing {
-                tracing::warn!("ACME server certificate chain will not be validated! This is ONLY for testing, and should not be used otherwise.");
-                reqwest::Client::builder()
-                    .danger_accept_invalid_certs(true)
-                    .build()?
-            } else {
-                reqwest::Client::new()
-            };
-
-            let dir = DirectoryBuilder::new(acme_config.endpoint.to_string())
-                .http_client(client)
-                .build()
-                .await
-                .context("Building directory")?;
-
-            let mut builder = AccountBuilder::new(dir);
-            builder.contact(vec![format!("mailto:{}", acme_config.mailto_email)]);
-            if let Some(acme_eab_keypair) = acme_config.acme_eab_keypair.clone() {
-                let eab_key = openssl::pkey::PKey::hmac(&acme_eab_keypair.key_bytes()?)?;
-                builder.external_account_binding(acme_eab_keypair.key_id.clone(), eab_key);
-            }
-            builder.terms_of_service_agreed(true);
-            let account = builder.build().await.context("Building account")?;
-
-            Some(account)
-        } else {
-            None
-        };
-
         Ok(Self {
             cluster,
             send_cert: Arc::new(send_cert),
             refresh_loop: None,
-            acme_account,
             path: cert_path.map(|p| p.to_owned()),
             response_sender,
+            acme_config,
         })
     }
 
@@ -217,18 +187,18 @@ impl CertManager {
             handle.abort();
         }
 
-        if let Some(account) = self.acme_account.as_ref() {
+        if let Some(acme_config) = self.acme_config.as_ref() {
             let send_cert = self.send_cert.clone();
             let response_sender = self.response_sender.subscribe();
             let path = self.path.clone();
 
             let handle = tokio::spawn(refresh_loop(
-                account.clone(),
                 self.cluster.clone(),
                 send_cert,
                 sender,
                 response_sender,
                 path,
+                acme_config.clone(),
             ));
 
             self.refresh_loop = Some(handle);
@@ -261,7 +231,8 @@ pub async fn watcher_manager_pair(
 /// Otherwise, request a certificate lease from the cert manager, and then
 /// request a certificate from the ACME server.
 async fn refresh_loop_step(
-    account: Arc<Account>,
+    maybe_account: &mut Option<Arc<Account>>,
+    acme_config: &AcmeConfig,
     cluster: &ClusterName,
     send_cert: &Arc<Sender<Option<CertificatePair>>>,
     request_sender: &(impl Fn(CertManagerRequest) + Send + Sync + 'static),
@@ -292,6 +263,39 @@ async fn refresh_loop_step(
         }
     }
 
+    // We only need to create one account per drone, so we store it in `maybe_account`,
+    // a mutable `Option` reference which is used across calls to `refresh_loop_step`.
+    let account = match maybe_account {
+        Some(account) => account,
+        None => {
+            let client = if acme_config.accept_insecure_certs_for_testing {
+                tracing::warn!("ACME server certificate chain will not be validated! This is ONLY for testing, and should not be used otherwise.");
+                reqwest::Client::builder()
+                    .danger_accept_invalid_certs(true)
+                    .build()?
+            } else {
+                reqwest::Client::new()
+            };
+
+            let dir = DirectoryBuilder::new(acme_config.endpoint.to_string())
+                .http_client(client)
+                .build()
+                .await
+                .context("Building directory")?;
+
+            let mut builder = AccountBuilder::new(dir);
+            builder.contact(vec![format!("mailto:{}", acme_config.mailto_email)]);
+            if let Some(acme_eab_keypair) = acme_config.acme_eab_keypair.clone() {
+                let eab_key = openssl::pkey::PKey::hmac(&acme_eab_keypair.key_bytes()?)?;
+                builder.external_account_binding(acme_eab_keypair.key_id.clone(), eab_key);
+            }
+            builder.terms_of_service_agreed(true);
+            let account = builder.build().await.context("Building account")?;
+
+            maybe_account.insert(account)
+        }
+    };
+
     tracing::info!("Requesting certificate lease.");
     request_sender(CertManagerRequest::CertLeaseRequest);
 
@@ -319,7 +323,7 @@ async fn refresh_loop_step(
 
     tracing::info!("Cert manager accepted cert lease request.");
 
-    let result = get_certificate(account, cluster, request_sender, response_receiver).await;
+    let result = get_certificate(account.clone(), cluster, request_sender, response_receiver).await;
 
     match result {
         Ok(cert_pair) => {
@@ -339,16 +343,19 @@ async fn refresh_loop_step(
 }
 
 pub async fn refresh_loop(
-    account: Arc<Account>,
     cluster: ClusterName,
     send_cert: Arc<Sender<Option<CertificatePair>>>,
     request_sender: impl Fn(CertManagerRequest) + Send + Sync + 'static,
     mut response_receiver: broadcast::Receiver<CertManagerResponse>,
     path: Option<PathBuf>,
+    acme_config: AcmeConfig,
 ) {
+    let mut account: Option<Arc<Account>> = None;
+
     loop {
         let result = refresh_loop_step(
-            account.clone(),
+            &mut account,
+            &acme_config,
             &cluster,
             &send_cert,
             &request_sender,
