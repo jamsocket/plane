@@ -39,17 +39,17 @@ impl Service<Request<Incoming>> for SimpleProxyService {
     >;
 
     fn call(&self, request: Request<Incoming>) -> Self::Future {
-        let mut request = MutableRequest::from_request(request);
-        request.set_upstream_address(self.upstream);
+        let request = MutableRequest::from_request(request);
         let request = request.into_request_with_simple_body();
         let client = self.client.clone();
 
+        let upstream = self.upstream;
         Box::pin(async move {
-            let (res, upgrade_handler) = client.request(request).await.unwrap();
+            let (res, body_future) = client.request(upstream, request).await.unwrap();
 
-            let upgrade_handler = upgrade_handler.unwrap();
+            let body_future = body_future.unwrap();
             tokio::spawn(async move {
-                upgrade_handler.run().await.unwrap();
+                body_future.await.unwrap();
             });
 
             Ok(res)

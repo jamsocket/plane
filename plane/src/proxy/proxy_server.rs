@@ -138,8 +138,17 @@ impl Service<Request<Incoming>> for ProxyState {
             }
 
             let request = request.into_request_with_simple_body();
+            let monitor = inner.monitor.monitor();
 
-            let result = inner.proxy_client.request(request).await;
+            monitor
+                .lock()
+                .expect("Monitor lock poisoned")
+                .inc_connection(&route_info.backend_id);
+
+            let result = inner
+                .proxy_client
+                .request(route_info.address.0, request)
+                .await;
 
             let (mut res, upgrade_handler) = match result {
                 Ok((res, upgrade_handler)) => (res, upgrade_handler),
@@ -149,15 +158,10 @@ impl Service<Request<Incoming>> for ProxyState {
                 }
             };
 
+            let backend_id = route_info.backend_id.clone();
             if let Some(upgrade_handler) = upgrade_handler {
-                let monitor = inner.monitor.monitor();
-                monitor
-                    .lock()
-                    .expect("Monitor lock poisoned")
-                    .inc_connection(&route_info.backend_id);
-                let backend_id = route_info.backend_id.clone();
                 tokio::spawn(async move {
-                    if let Err(err) = upgrade_handler.run().await {
+                    if let Err(err) = upgrade_handler.await {
                         tracing::error!("Error running upgrade handler: {}", err);
                     };
 
@@ -167,7 +171,10 @@ impl Service<Request<Incoming>> for ProxyState {
                         .dec_connection(&backend_id);
                 });
             } else {
-                inner.monitor.touch_backend(&route_info.backend_id);
+                monitor
+                    .lock()
+                    .expect("Monitor lock poisoned")
+                    .dec_connection(&backend_id);
             }
 
             apply_general_headers(&mut res);
@@ -211,8 +218,6 @@ where
             return Err(StatusCode::FORBIDDEN);
         }
     }
-
-    request.set_upstream_address(route_info.address.0);
 
     // Remove x-verified-* headers from inbound request.
     {
