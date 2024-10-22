@@ -1,8 +1,8 @@
-use dynamic_proxy::{
+use http::{header, StatusCode};
+use plane_dynamic_proxy::{
     https_redirect::HttpsRedirectService,
     server::{HttpsConfig, SimpleHttpServer},
 };
-use http::{header, StatusCode};
 use reqwest::{Response, Url};
 use std::net::{IpAddr, SocketAddr};
 use tokio::net::TcpListener;

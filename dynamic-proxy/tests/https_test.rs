@@ -1,5 +1,5 @@
 use common::{cert::StaticCertificateResolver, hello_world_service::HelloWorldService};
-use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
+use plane_dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
