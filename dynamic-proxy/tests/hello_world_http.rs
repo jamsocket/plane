@@ -1,6 +1,6 @@
 use common::hello_world_service::HelloWorldService;
-use plane_dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use hyper::StatusCode;
+use plane_dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 

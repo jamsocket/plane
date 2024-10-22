@@ -10,7 +10,7 @@ use acme2_eab::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
-use dynamic_proxy::tokio_rustls::rustls::{
+use plane_dynamic_proxy::tokio_rustls::rustls::{
     server::{ClientHello, ResolvesServerCert},
     sign::CertifiedKey,
 };

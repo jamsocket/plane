@@ -3,7 +3,7 @@ use crate::names::ProxyName;
 use crate::proxy::cert_manager::watcher_manager_pair;
 use crate::{client::PlaneClient, signals::wait_for_shutdown_signal, types::ClusterName};
 use anyhow::Result;
-use dynamic_proxy::server::{
+use plane_dynamic_proxy::server::{
     ServerWithHttpRedirect, ServerWithHttpRedirectConfig, ServerWithHttpRedirectHttpsConfig,
 };
 use proxy_server::ProxyState;

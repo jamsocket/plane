@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use common::cert::StaticCertificateResolver;
+use hyper::StatusCode;
 use plane_dynamic_proxy::body::to_simple_body;
 use plane_dynamic_proxy::server::HttpsConfig;
 use plane_dynamic_proxy::server::SimpleHttpServer;
-use hyper::StatusCode;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;

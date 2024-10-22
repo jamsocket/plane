@@ -1,7 +1,7 @@
 use bytes::Bytes;
-use plane_dynamic_proxy::body::{to_simple_body, SimpleBody};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Incoming, service::Service, Request, Response};
+use plane_dynamic_proxy::body::{to_simple_body, SimpleBody};
 use std::{convert::Infallible, future::Future, pin::Pin};
 
 /// A service that returns a greeting with the X-Forwarded-For and X-Forwarded-Proto headers.

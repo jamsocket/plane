@@ -1,12 +1,12 @@
 use bytes::Bytes;
 use common::simple_upgrade_service::SimpleUpgradeService;
-use plane_dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use http_body_util::Empty;
 use hyper::{
     header::{HeaderValue, CONNECTION, UPGRADE},
     Request, StatusCode,
 };
 use hyper_util::rt::TokioIo;
+use plane_dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use std::net::SocketAddr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};

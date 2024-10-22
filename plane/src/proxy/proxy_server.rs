@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{names::Name, protocol::RouteInfo, SERVER_NAME};
 use bytes::Bytes;
-use dynamic_proxy::{
+use plane_dynamic_proxy::{
     body::{simple_empty_body, SimpleBody},
     hyper::{
         body::{Body, Incoming},

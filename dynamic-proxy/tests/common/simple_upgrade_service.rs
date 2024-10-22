@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use plane_dynamic_proxy::body::{to_simple_body, SimpleBody};
 use http::header::CONNECTION;
 use http_body_util::{Empty, Full};
 use hyper::{
@@ -10,6 +9,7 @@ use hyper::{
     Request, Response, StatusCode,
 };
 use hyper_util::rt::TokioIo;
+use plane_dynamic_proxy::body::{to_simple_body, SimpleBody};
 use std::{convert::Infallible, future::Future, pin::Pin};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
