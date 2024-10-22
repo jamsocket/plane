@@ -2,7 +2,7 @@ use crate::common::simple_axum_server::SimpleAxumServer;
 use anyhow::Result;
 use bytes::Bytes;
 use common::simple_axum_server::RequestInfo;
-use dynamic_proxy::{
+use plane_dynamic_proxy::{
     body::{simple_empty_body, to_simple_body, BoxedError},
     proxy::ProxyClient,
     request::MutableRequest,

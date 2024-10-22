@@ -1,5 +1,5 @@
 use common::websocket_echo_server::WebSocketEchoServer;
-use dynamic_proxy::{
+use plane_dynamic_proxy::{
     body::SimpleBody,
     proxy::ProxyClient,
     request::MutableRequest,

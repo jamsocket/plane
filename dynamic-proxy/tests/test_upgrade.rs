@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use common::simple_upgrade_service::SimpleUpgradeService;
-use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
+use plane_dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use http_body_util::Empty;
 use hyper::{
     header::{HeaderValue, CONNECTION, UPGRADE},

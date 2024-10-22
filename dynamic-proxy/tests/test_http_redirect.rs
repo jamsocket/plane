@@ -1,4 +1,4 @@
-use dynamic_proxy::{
+use plane_dynamic_proxy::{
     https_redirect::HttpsRedirectService,
     server::{HttpsConfig, SimpleHttpServer},
 };

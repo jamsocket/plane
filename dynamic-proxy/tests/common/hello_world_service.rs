@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use dynamic_proxy::body::{to_simple_body, SimpleBody};
+use plane_dynamic_proxy::body::{to_simple_body, SimpleBody};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Incoming, service::Service, Request, Response};
 use std::{convert::Infallible, future::Future, pin::Pin};

@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use dynamic_proxy::body::{to_simple_body, SimpleBody};
+use plane_dynamic_proxy::body::{to_simple_body, SimpleBody};
 use http::header::CONNECTION;
 use http_body_util::{Empty, Full};
 use hyper::{
