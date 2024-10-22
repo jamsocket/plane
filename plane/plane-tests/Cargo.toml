@@ -1,6 +1,6 @@
 [package]
 name = "plane-tests"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 
 [dependencies]
@@ -9,12 +9,12 @@ async-trait = "0.1.74"
 axum = { version = "0.7.5", features = ["ws"] }
 bollard = "0.17.0"
 chrono = { version = "0.4.31", features = ["serde"] }
-dynamic-proxy = { path = "../../dynamic-proxy" }
 futures-util = "0.3.29"
 http = "1.1.0"
 http-body-util = "0.1.2"
 hyper = { version = "1.4.1", features = ["server"] }
 plane = { path = "../plane-dynamic", package = "plane-dynamic" }
+plane-dynamic-proxy = { path = "../../dynamic-proxy" }
 plane-test-macro = { path = "plane-test-macro" }
 reqwest = { version = "0.12.8", features = ["json", "rustls-tls"], default-features = false }
 serde = "1.0.210"

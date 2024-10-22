@@ -1,6 +1,6 @@
 [package]
-name = "dynamic-proxy"
-version = "0.5.0"
+name = "plane-dynamic-proxy"
+version = "0.5.1"
 edition = "2021"
 
 [dependencies]

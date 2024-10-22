@@ -1,6 +1,6 @@
 [package]
 name = "plane"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 default-run = "plane"
 description = "Session backend orchestrator for ambitious browser-based apps."
@@ -22,7 +22,6 @@ clap = { version = "4.4.10", features = ["derive"] }
 colored = "2.0.4"
 dashmap = "6.1"
 data-encoding = "2.4.0"
-dynamic-proxy = { path="../dynamic-proxy" }
 futures-util = "0.3.29"
 http-body = "1.0.1"
 hyper = { version = "1.4.1", features = ["server"] }
@@ -30,6 +29,7 @@ hyper-util = { version = "0.1.9", features = ["client", "client-legacy", "http1"
 lru = "0.12.1"
 openssl = "0.10.66"
 pem = "3.0.2"
+plane-dynamic-proxy = { path="../dynamic-proxy", version = "0.5.1" }
 rand = "0.8.5"
 reqwest = { version = "0.12.8", features = ["json", "rustls-tls"], default-features = false }
 rusqlite = { version = "0.32", features = ["bundled", "serde_json"] }
