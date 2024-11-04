@@ -1,4 +1,5 @@
 pub mod body;
+pub mod connector;
 mod graceful_shutdown;
 pub mod https_redirect;
 pub mod proxy;

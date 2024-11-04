@@ -1,14 +1,12 @@
 use crate::{
     body::{simple_empty_body, to_simple_body, SimpleBody},
+    connector::TimeoutHttpConnector,
     request::should_upgrade,
     upgrade::{split_request, split_response, UpgradeHandler},
 };
 use http::StatusCode;
 use hyper::{Request, Response};
-use hyper_util::{
-    client::legacy::{connect::HttpConnector, Client},
-    rt::TokioExecutor,
-};
+use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 use std::{convert::Infallible, time::Duration};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -16,7 +14,7 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 /// A client for proxying HTTP requests to an upstream server.
 #[derive(Clone)]
 pub struct ProxyClient {
-    client: Client<HttpConnector, SimpleBody>,
+    client: Client<TimeoutHttpConnector, SimpleBody>,
     #[allow(unused)] // TODO: implement this.
     timeout: Duration,
 }
@@ -29,7 +27,7 @@ impl Default for ProxyClient {
 
 impl ProxyClient {
     pub fn new() -> Self {
-        let client = Client::builder(TokioExecutor::new()).build(HttpConnector::new());
+        let client = Client::builder(TokioExecutor::new()).build(TimeoutHttpConnector::default());
         Self {
             client,
             timeout: DEFAULT_TIMEOUT,
