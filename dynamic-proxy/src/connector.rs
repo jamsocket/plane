@@ -4,6 +4,8 @@ use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioIo};
 use std::{future::Future, pin::Pin, task::Poll, time::Duration};
 use tokio::net::TcpStream;
 
+/// Light wrapper of `hyper_util::client::legacy::connect::HttpConnector` that adds a timeout to the initial
+/// connection being established.
 #[derive(Clone)]
 pub struct TimeoutHttpConnector {
     pub timeout: Duration,
