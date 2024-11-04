@@ -405,8 +405,8 @@ impl<'a> BackendDatabase<'a> {
             secret_token: SecretToken::from(result.secret_token),
             cluster: ClusterName::from_str(&result.cluster)
                 .map_err(|_| sqlx::Error::Decode("Failed to decode cluster name.".into()))?,
-            user: None,
-            user_data: None,
+            user: result.username,
+            user_data: Some(result.auth),
             subdomain: result
                 .subdomain
                 .map(Subdomain::try_from)
