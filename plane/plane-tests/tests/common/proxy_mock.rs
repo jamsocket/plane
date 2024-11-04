@@ -1,9 +1,9 @@
-use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use plane::{
     names::BackendName,
     protocol::{RouteInfoRequest, RouteInfoResponse},
     proxy::{connection_monitor::BackendEntry, proxy_server::ProxyState},
 };
+use plane_dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use std::net::SocketAddr;
 use tokio::{net::TcpListener, sync::mpsc};
 

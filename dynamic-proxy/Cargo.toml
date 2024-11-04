@@ -1,7 +1,12 @@
 [package]
-name = "dynamic-proxy"
-version = "0.5.0"
+name = "plane-dynamic-proxy"
+version = "0.5.1"
 edition = "2021"
+description = "Dynamic proxy crate for Plane"
+repository = "https://github.com/jamsocket/plane"
+license = "MIT"
+homepage = "https://plane.dev"
+readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.89"
@@ -18,6 +23,8 @@ serde = { version = "1.0.210", features = ["derive"] }
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
 tokio-rustls = "0.26.0"
 tracing = "0.1.40"
+tower-service = "0.3.3"
+futures-util = "0.3.30"
 
 [dev-dependencies]
 axum = { version = "0.7.6", features = ["http2", "ws"] }

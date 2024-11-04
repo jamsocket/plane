@@ -3,7 +3,6 @@ use super::{
     resources::{database::DevDatabase, pebble::Pebble},
 };
 use chrono::Duration;
-use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use plane::{
     client::PlaneClient,
     controller::ControllerServer,
@@ -25,6 +24,7 @@ use plane::{
     types::{ClusterName, DronePoolName},
     util::random_string,
 };
+use plane_dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},

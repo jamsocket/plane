@@ -26,7 +26,7 @@ RUN touch /work/plane/plane-tests/src/lib.rs
 RUN touch /work/plane/plane-dynamic/src/lib.rs
 
 RUN cargo build -p plane --release --locked
-RUN cargo build -p dynamic-proxy --release --locked
+RUN cargo build -p plane-dynamic-proxy --release --locked
 
 COPY .cargo .cargo
 COPY .git .git

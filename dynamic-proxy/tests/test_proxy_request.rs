@@ -2,13 +2,13 @@ use crate::common::simple_axum_server::SimpleAxumServer;
 use anyhow::Result;
 use bytes::Bytes;
 use common::simple_axum_server::RequestInfo;
-use dynamic_proxy::{
+use http::{Method, Request, StatusCode};
+use http_body_util::{combinators::BoxBody, BodyExt, Full};
+use plane_dynamic_proxy::{
     body::{simple_empty_body, to_simple_body, BoxedError},
     proxy::ProxyClient,
     request::MutableRequest,
 };
-use http::{Method, Request, StatusCode};
-use http_body_util::{combinators::BoxBody, BodyExt, Full};
 
 mod common;
 

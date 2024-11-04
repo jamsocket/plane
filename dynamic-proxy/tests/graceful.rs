@@ -1,7 +1,7 @@
 use bytes::Bytes;
-use dynamic_proxy::body::to_simple_body;
-use dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use hyper::StatusCode;
+use plane_dynamic_proxy::body::to_simple_body;
+use plane_dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
@@ -11,7 +11,7 @@ use tokio::time::Duration;
 
 async fn slow_hello_world(
     _: hyper::Request<hyper::body::Incoming>,
-) -> Result<hyper::Response<dynamic_proxy::body::SimpleBody>, Infallible> {
+) -> Result<hyper::Response<plane_dynamic_proxy::body::SimpleBody>, Infallible> {
     tokio::time::sleep(Duration::from_secs(1)).await; // emulate slow request
     let body = http_body_util::Full::<Bytes>::from("Hello, world!".to_owned());
     let body = to_simple_body(body);

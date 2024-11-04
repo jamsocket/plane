@@ -1,5 +1,5 @@
 use crate::types::{BearerToken, ClusterName};
-use dynamic_proxy::hyper::http::uri::{self, PathAndQuery};
+use plane_dynamic_proxy::hyper::http::uri::{self, PathAndQuery};
 use std::str::FromStr;
 
 // If a cluster name does not specify a port, :443 is implied.
