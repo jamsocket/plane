@@ -194,6 +194,37 @@ impl Runtime for DockerRuntime {
     async fn terminate(&self, backend_id: &BackendName, hard: bool) -> Result<bool, anyhow::Error> {
         let container_id: ContainerId = backend_id.into();
 
+        // check if container is no longer running, since stop_container() returns Ok(()) even when the container is already gone
+        match self
+            .docker
+            .inspect_container(&container_id.to_string(), None)
+            .await
+        {
+            Ok(details) => {
+                if let Some(state) = details.state {
+                    if !state.running.unwrap_or(false) {
+                        tracing::warn!(
+                            %container_id,
+                            %backend_id,
+                            "Container could not be terminated, because it is not running."
+                        );
+                        return Ok(false);
+                    }
+                }
+            }
+            Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 404, ..
+            }) => {
+                tracing::warn!(
+                    %container_id,
+                    %backend_id,
+                    "Container not found, assuming it was already terminated."
+                );
+                return Ok(false);
+            }
+            Err(e) => return Err(e.into()),
+        };
+
         let result = if hard {
             self.docker
                 .kill_container::<String>(&container_id.to_string(), None)
@@ -217,16 +248,6 @@ impl Runtime for DockerRuntime {
                     %container_id,
                     %backend_id,
                     "Container could not be terminated, because it already was."
-                );
-                Ok(false)
-            }
-            Err(bollard::errors::Error::DockerResponseServerError {
-                status_code: 404, ..
-            }) => {
-                tracing::warn!(
-                    %container_id,
-                    %backend_id,
-                    "Container not found, assuming it was already terminated."
                 );
                 Ok(false)
             }
