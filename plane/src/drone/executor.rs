@@ -177,8 +177,8 @@ impl Executor {
                 let callback = {
                     let state_store = self.state_store.clone();
                     let backend_id = backend_id.clone();
-                    let timestamp = chrono::Utc::now();
                     move |state: &BackendState| {
+                        let timestamp = chrono::Utc::now();
                         state_store
                             .lock()
                             .expect("State store lock poisoned.")
