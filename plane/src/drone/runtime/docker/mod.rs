@@ -201,15 +201,13 @@ impl Runtime for DockerRuntime {
             .await
         {
             Ok(details) => {
-                if let Some(state) = details.state {
-                    if !state.running.unwrap_or(false) {
-                        tracing::warn!(
-                            %container_id,
-                            %backend_id,
-                            "Container could not be terminated, because it is not running."
-                        );
-                        return Ok(false);
-                    }
+                if !details.state.and_then(|s| s.running).unwrap_or(false) {
+                    tracing::warn!(
+                        %container_id,
+                        %backend_id,
+                        "Container could not be terminated, because it is not running."
+                    );
+                    return Ok(false);
                 }
             }
             Err(bollard::errors::Error::DockerResponseServerError {
