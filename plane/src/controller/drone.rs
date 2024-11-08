@@ -148,7 +148,15 @@ pub async fn process_pending_actions(
     drone_id: &NodeId,
 ) -> Result<(), anyhow::Error> {
     let mut count = 0;
-    for pending_action in db.backend_actions().pending_actions(*drone_id).await? {
+
+    // Limit the number of pending actions to avoid overwhelming the drone.
+    let pending_actions_limit = 50;
+
+    for pending_action in db
+        .backend_actions()
+        .pending_actions(*drone_id, pending_actions_limit)
+        .await?
+    {
         let message = MessageToDrone::Action(pending_action);
         socket.send(message)?;
         count += 1;
