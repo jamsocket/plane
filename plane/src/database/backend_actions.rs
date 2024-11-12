@@ -40,6 +40,7 @@ impl BackendActionDatabase {
     pub async fn pending_actions(
         &self,
         drone: NodeId,
+        limit: i64,
     ) -> anyhow::Result<Vec<BackendActionMessage>> {
         let rows = sqlx::query!(
             r#"
@@ -48,8 +49,10 @@ impl BackendActionDatabase {
             where "drone_id" = $1
             and acked_at is null
             order by created_at asc
+            limit $2
             "#,
             drone.as_i32(),
+            limit,
         )
         .fetch_all(&self.pool)
         .await?;
