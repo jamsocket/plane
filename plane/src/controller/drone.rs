@@ -165,6 +165,9 @@ pub async fn process_pending_actions(
     if count > 0 {
         tracing::info!(count, "Sent pending actions to drone.");
     }
+    if count == pending_actions_limit {
+        tracing::warn!(count, "Query returned the maximum number of pending actions; other pending actions may be missed.");
+    }
 
     Ok(())
 }
