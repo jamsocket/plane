@@ -3,7 +3,10 @@ use crate::{database::backend::BackendMetricsMessage, names::BackendName};
 use bollard::{container::StatsOptions, Docker};
 use futures_util::Stream;
 use std::sync::{Arc, Mutex};
+use tokio::time::{Duration, Instant};
 use tokio_stream::StreamExt;
+
+const METRICS_INTERVAL: Duration = Duration::from_secs(5);
 
 fn stream_metrics(
     docker: &Docker,
@@ -23,10 +26,17 @@ pub async fn metrics_loop(
     callback: Arc<Mutex<Option<MetricsCallback>>>,
 ) {
     let container_id = ContainerId::from(&backend_id);
-
     let mut stream = stream_metrics(&docker, &container_id);
+    let mut last_processed = Instant::now() - METRICS_INTERVAL;
 
     while let Some(stats) = stream.next().await {
+        // These metrics come from Docker every second, so let's throttle them to be less frequent.
+        let now = Instant::now();
+        if now.duration_since(last_processed) < METRICS_INTERVAL {
+            continue;
+        }
+        last_processed = now;
+
         let stats = match stats {
             Err(err) => {
                 tracing::error!(?err, "Error getting metrics for {container_id}");
