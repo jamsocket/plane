@@ -140,7 +140,7 @@ pub struct Notification<T> {
 impl EventSubscriptionManager {
     pub fn new(db: &PgPool) -> Self {
         let listeners: ListenerMap = Arc::new(RwLock::new(HashMap::new()));
-        let all_events = Sender::new(100);
+        let all_events = Sender::new(1000);
 
         let handle = {
             let all_events = all_events.clone();
@@ -334,7 +334,7 @@ impl EventSubscriptionManager {
                 }
             }
             std::collections::hash_map::Entry::Vacant(entry) => {
-                let sender = Sender::new(100);
+                let sender = Sender::new(1000);
                 let receiver = sender.subscribe();
                 entry.insert(Box::new(sender));
                 Subscription {
