@@ -1,18 +1,19 @@
-use std::path::PathBuf;
-
 use crate::{
-    client::{PlaneClient, PlaneClientError},
+    client::{sse::SseStream, PlaneClient, PlaneClientError},
     names::{BackendName, DroneName, Name, ProxyName},
     protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
     types::{
-        BackendStatus, ClusterName, ClusterState, ConnectRequest, DockerExecutorConfig,
-        DronePoolName, KeyConfig, Mount, NodeState, SpawnConfig, Subdomain,
+        backend_state::BackendStatusStreamEntry, BackendStatus, ClusterName, ClusterState,
+        ConnectRequest, DockerExecutorConfig, DronePoolName, KeyConfig, Mount, NodeState,
+        SpawnConfig, Subdomain,
     },
     PLANE_GIT_HASH, PLANE_VERSION,
 };
 use chrono::Duration;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use futures_util::{Stream, StreamExt};
+use std::path::PathBuf;
 use url::Url;
 
 fn show_error(error: &PlaneClientError) {
@@ -156,12 +157,32 @@ pub enum AdminCommand {
     ClusterState {
         cluster: ClusterName,
     },
+    BackendStatus {
+        backend: BackendName,
+    },
 }
 
 pub async fn run_admin_command(opts: AdminOpts) {
     if let Err(error) = run_admin_command_inner(opts).await {
         show_error(&error);
         std::process::exit(1);
+    }
+}
+
+pub async fn print_status_stream(
+    mut stream: SseStream<BackendStatusStreamEntry>,
+    until: BackendStatus,
+) {
+    while let Some(status) = stream.next().await {
+        println!(
+            "Status: {} at {}",
+            status.status.to_string().magenta(),
+            status.time.0.to_string().bright_cyan()
+        );
+
+        if status.status >= until {
+            break;
+        }
     }
 }
 
@@ -227,19 +248,8 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             }
 
             if !immediate {
-                let mut stream = client.backend_status_stream(&response.backend_id).await?;
-
-                while let Some(status) = stream.next().await {
-                    println!(
-                        "Status: {} at {}",
-                        status.status.to_string().magenta(),
-                        status.time.0.to_string().bright_cyan()
-                    );
-
-                    if status.status >= BackendStatus::Ready {
-                        break;
-                    }
-                }
+                let stream = client.backend_status_stream(&response.backend_id).await?;
+                print_status_stream(stream, BackendStatus::Ready).await;
             }
         }
         AdminCommand::Terminate {
@@ -259,19 +269,8 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             );
 
             if !immediate {
-                let mut stream = client.backend_status_stream(&backend).await?;
-
-                while let Some(status) = stream.next().await {
-                    println!(
-                        "Status: {} at {}",
-                        status.status.to_string().magenta(),
-                        status.time.0.to_string().bright_cyan()
-                    );
-
-                    if status.status >= BackendStatus::Terminated {
-                        break;
-                    }
-                }
+                let stream = client.backend_status_stream(&backend).await?;
+                print_status_stream(stream, BackendStatus::Terminated).await;
             }
         }
         AdminCommand::Drain { cluster, drone } => {
@@ -365,6 +364,10 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
         AdminCommand::ClusterState { cluster } => {
             let cluster_state = client.cluster_state(&cluster).await?;
             show_cluster_state(&cluster_state);
+        }
+        AdminCommand::BackendStatus { backend } => {
+            let stream = client.backend_status_stream(&backend).await?;
+            print_status_stream(stream, BackendStatus::Terminated).await;
         }
     };
 

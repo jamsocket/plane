@@ -13,7 +13,7 @@ use reqwest::{Response, StatusCode};
 use serde::de::DeserializeOwned;
 use url::{form_urlencoded, Url};
 pub mod controller_address;
-mod sse;
+pub mod sse;
 
 #[derive(thiserror::Error, Debug)]
 pub enum PlaneClientError {
