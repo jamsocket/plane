@@ -58,6 +58,11 @@ mod forward_auth;
 mod proxy;
 mod terminate;
 
+/// How long to wait for the server to terminate gracefully before forcing it to shut down.
+/// We want to keep this just high enough to serve short requests. Long-lived requests
+/// will continue blocking indefinitely, which is why we need a timeout.
+const TERMINATE_TIMEOUT_DURATION: std::time::Duration = std::time::Duration::from_secs(2);
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StatusResponse {
     pub status: String,
@@ -295,6 +300,7 @@ impl ControllerServer {
         self.heartbeat_handle.terminate().await;
 
         // Begin graceful shutdown of server.
+        tracing::info!("Initiating graceful shutdown of server");
         let Some(graceful_terminate_sender) = self.graceful_terminate_sender.take() else {
             return;
         };
@@ -307,15 +313,18 @@ impl ControllerServer {
                 return;
             };
 
-            match server_handle.await {
-                Ok(Ok(())) => {
+            match tokio::time::timeout(TERMINATE_TIMEOUT_DURATION, server_handle).await {
+                Ok(Ok(Ok(()))) => {
                     tracing::info!("Server gracefully terminated");
+                }
+                Ok(Ok(Err(err))) => {
+                    tracing::error!(?err, "Server error");
                 }
                 Ok(Err(err)) => {
                     tracing::error!(?err, "Server error");
                 }
-                Err(err) => {
-                    tracing::error!(?err, "Server error");
+                Err(_) => {
+                    tracing::warn!("Server did not terminate gracefully in time, forcing shutdown");
                 }
             }
         }

@@ -12,7 +12,6 @@ use crate::{
 use chrono::Duration;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use futures_util::{Stream, StreamExt};
 use std::path::PathBuf;
 use url::Url;
 
