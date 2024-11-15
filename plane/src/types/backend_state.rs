@@ -244,10 +244,10 @@ impl valuable::Valuable for TerminationReason {
         match self {
             TerminationReason::Swept => valuable::Value::String("swept"),
             TerminationReason::External => valuable::Value::String("external"),
-            TerminationReason::KeyExpired => valuable::Value::String("key_expired"),
+            TerminationReason::KeyExpired => valuable::Value::String("keyexpired"),
             TerminationReason::Lost => valuable::Value::String("lost"),
-            TerminationReason::StartupTimeout => valuable::Value::String("startup_timeout"),
-            TerminationReason::InternalError => valuable::Value::String("internal_error"),
+            TerminationReason::StartupTimeout => valuable::Value::String("startuptimeout"),
+            TerminationReason::InternalError => valuable::Value::String("internalerror"),
         }
     }
 
