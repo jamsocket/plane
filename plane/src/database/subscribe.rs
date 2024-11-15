@@ -1,4 +1,4 @@
-use crate::database::util::MapSqlxError;
+use crate::database::{backend::BackendMetricsMessage, util::MapSqlxError};
 use crate::util::ExponentialBackoff;
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -17,7 +17,8 @@ use tokio::{
 
 type ListenerMap = Arc<RwLock<HashMap<(String, Option<String>), Box<dyn TypedSender>>>>;
 
-const EVENT_CHANNEL: &str = "plane_events";
+pub const EVENT_CHANNEL: &str = "plane_events";
+pub const BACKEND_METRICS_EVENT_CHANNEL: &str = "plane_backend_metrics";
 
 pub trait NotificationPayload:
     Serialize + DeserializeOwned + Debug + Send + Sync + Clone + 'static
@@ -382,34 +383,6 @@ pub async fn emit_impl<T: NotificationPayload>(
     Ok(())
 }
 
-pub async fn emit_ephemeral_impl<T: NotificationPayload>(
-    db: &mut PgConnection,
-    key: Option<&str>,
-    payload: &T,
-) -> Result<(), sqlx::Error> {
-    let kind = T::kind().to_string();
-    sqlx::query!(
-        r#"
-        select pg_notify(
-            $4,
-            json_build_object(
-                'payload', $3::jsonb,
-                'timestamp', now(),
-                'kind', $1::text,
-                'key', $2::text
-            )::text
-        )"#,
-        kind,
-        key,
-        serde_json::to_value(&payload).map_sqlx_error()?,
-        EVENT_CHANNEL,
-    )
-    .execute(db)
-    .await?;
-
-    Ok(())
-}
-
 pub async fn emit<T: NotificationPayload>(
     db: &mut PgConnection,
     payload: &T,
@@ -425,17 +398,29 @@ pub async fn emit_with_key<T: NotificationPayload>(
     emit_impl(db, Some(key), payload).await
 }
 
-pub async fn emit_ephemeral<T: NotificationPayload>(
-    db: &mut PgConnection,
-    payload: &T,
-) -> Result<(), sqlx::Error> {
-    emit_ephemeral_impl(db, None, payload).await
-}
-
-pub async fn emit_ephemeral_with_key<T: NotificationPayload>(
+pub async fn emit_backend_metrics(
     db: &mut PgConnection,
     key: &str,
-    payload: &T,
+    payload: &BackendMetricsMessage,
 ) -> Result<(), sqlx::Error> {
-    emit_ephemeral_impl(db, Some(key), payload).await
+    sqlx::query!(
+        r#"
+        select pg_notify(
+            $4,
+            json_build_object(
+                'payload', $3::jsonb,
+                'timestamp', now(),
+                'kind', $1::text,
+                'key', $2::text
+            )::text
+        )"#,
+        BackendMetricsMessage::kind().to_string(),
+        key,
+        serde_json::to_value(&payload).map_sqlx_error()?,
+        BACKEND_METRICS_EVENT_CHANNEL,
+    )
+    .execute(db)
+    .await?;
+
+    Ok(())
 }

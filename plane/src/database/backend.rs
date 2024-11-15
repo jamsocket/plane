@@ -1,5 +1,5 @@
 use super::{
-    subscribe::{emit_ephemeral_with_key, emit_with_key},
+    subscribe::{emit_backend_metrics, emit_with_key},
     PlaneDatabase,
 };
 use crate::{
@@ -455,7 +455,7 @@ impl<'a> BackendDatabase<'a> {
 
     pub async fn publish_metrics(&self, metrics: BackendMetricsMessage) -> sqlx::Result<()> {
         let mut txn = self.db.pool.begin().await?;
-        emit_ephemeral_with_key(&mut txn, &metrics.backend_id.to_string(), &metrics).await?;
+        emit_backend_metrics(&mut txn, &metrics.backend_id.to_string(), &metrics).await?;
         txn.commit().await?;
         Ok(())
     }
