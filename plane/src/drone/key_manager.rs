@@ -124,14 +124,14 @@ impl KeyManager {
         self.sender.replace(sender);
 
         for (backend, (acquired_key, handle)) in self.handles.iter_mut() {
-            let mut new_handle = GuardHandle::new(renew_key_loop(
+            let new_handle = GuardHandle::new(renew_key_loop(
                 acquired_key.clone(),
                 backend.clone(),
                 self.sender.clone(),
                 self.executor.clone(),
             ));
 
-            std::mem::swap(handle, &mut new_handle);
+            *handle = new_handle;
         }
     }
 
