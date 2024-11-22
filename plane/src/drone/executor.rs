@@ -232,7 +232,7 @@ impl Executor {
                     manager.clone()
                 };
 
-                manager.terminate(*kind, *reason).await?;
+                manager.terminate(*kind, *reason).await;
             }
         }
 

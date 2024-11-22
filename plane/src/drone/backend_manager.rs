@@ -259,11 +259,7 @@ impl BackendManager {
         }
     }
 
-    pub async fn terminate(
-        self: &Arc<Self>,
-        kind: TerminationKind,
-        reason: TerminationReason,
-    ) -> Result<()> {
+    pub async fn terminate(self: &Arc<Self>, kind: TerminationKind, reason: TerminationReason) {
         let state = self
             .state
             .lock()
@@ -276,8 +272,6 @@ impl BackendManager {
             TerminationKind::Hard => state.to_hard_terminating(reason),
         };
         self.set_state(new_state);
-
-        Ok(())
     }
 
     pub fn mark_terminated(self: &Arc<Self>, exit_code: Option<i32>) -> Result<()> {
