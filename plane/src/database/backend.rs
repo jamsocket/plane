@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     log_types::BackendAddr,
-    names::{BackendActionName, BackendName},
+    names::{BackendActionName, BackendName, DroneName},
     protocol::{BackendAction, RouteInfo},
     types::{
         backend_state::BackendStatusStreamEntry, BackendState, BackendStatus, BearerToken,
@@ -265,6 +265,56 @@ impl<'a> BackendDatabase<'a> {
                 now() as "as_of!"
             from backend
             "#
+        )
+        .fetch_all(&self.db.pool)
+        .await?;
+
+        let mut result = Vec::new();
+
+        for row in query_result {
+            result.push(BackendRow {
+                id: BackendName::try_from(row.id)
+                    .map_err(|_| sqlx::Error::Decode("Failed to decode backend name.".into()))?,
+                cluster: row.cluster,
+                last_status_time: row.last_status_time,
+                state: serde_json::from_value(row.state)
+                    .map_err(|_| sqlx::Error::Decode("Failed to decode backend state.".into()))?,
+                last_keepalive: row.last_keepalive,
+                drone_id: NodeId::from(row.drone_id),
+                expiration_time: row.expiration_time,
+                allowed_idle_seconds: row.allowed_idle_seconds,
+                as_of: row.as_of,
+            });
+        }
+
+        Ok(result)
+    }
+
+    pub async fn list_alive_backends_for_drone(
+        &self,
+        cluster: &ClusterName,
+        drone: &DroneName,
+    ) -> sqlx::Result<Vec<BackendRow>> {
+        let query_result = sqlx::query!(
+            r#"
+            select
+                id,
+                cluster,
+                last_status,
+                last_status_time,
+                state,
+                drone_id,
+                expiration_time,
+                allowed_idle_seconds,
+                last_keepalive,
+                now() as "as_of!"
+            from backend
+            where
+                drone_id = (select id from node where name = $1 and cluster = $2) and
+                last_status != 'terminated'
+            "#,
+            drone.to_string(),
+            cluster.to_string(),
         )
         .fetch_all(&self.db.pool)
         .await?;

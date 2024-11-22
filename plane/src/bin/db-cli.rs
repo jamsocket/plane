@@ -49,8 +49,18 @@ enum Command {
         cleanup_batch_size: Option<i32>,
     },
     MarkBackendLost {
-        #[arg(required = true)]
+        #[arg(required = false)]
         backends: Vec<BackendName>,
+
+        /// If provided, all alive backends on the drone will be marked as lost.
+        /// Must also provide a cluster.
+        #[clap(long)]
+        drone: Option<DroneName>,
+
+        /// If provided, all alive backends on the drone will be marked as lost.
+        /// Must also provide a drone.
+        #[clap(long)]
+        cluster: Option<ClusterName>,
     },
 }
 
@@ -138,10 +148,30 @@ async fn main_inner(opts: Opts) -> anyhow::Result<()> {
                 );
             }
         }
-        Command::MarkBackendLost { backends } => {
+        Command::MarkBackendLost {
+            backends,
+            drone,
+            cluster,
+        } => {
             let stdin = std::io::stdin();
 
-            for backend in backends {
+            let backends_to_mark = match (drone, cluster, backends.is_empty()) {
+                (Some(drone), Some(cluster), true) => db
+                    .backend()
+                    .list_alive_backends_for_drone(&cluster, &drone)
+                    .await?
+                    .into_iter()
+                    .map(|b| b.id)
+                    .collect(),
+                (None, None, false) => backends,
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "Must either provide a list of backends, or a drone and cluster"
+                    ));
+                }
+            };
+
+            for backend in backends_to_mark {
                 let Some(backend) = db.backend().backend(&backend).await? else {
                     println!("Could not find backend: {}, skipping...", backend);
                     continue;
