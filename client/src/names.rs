@@ -172,6 +172,10 @@ impl BackendName {
             .to_string()
             .try_into()
     }
+
+    pub fn to_container_id(&self) -> String {
+        format!("plane-{}", self)
+    }
 }
 
 pub trait NodeName: Name {

@@ -15,7 +15,7 @@ use std::collections::HashMap;
 mod common;
 
 #[plane_test]
-async fn backend_lifecycle(env: TestEnvironment) {
+async fn backend_lifecycle_docker(env: TestEnvironment) {
     let db = env.db().await;
     let controller = env.controller().await;
     let client = controller.client();

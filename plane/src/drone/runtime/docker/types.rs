@@ -1,4 +1,4 @@
-use plane_client::names::BackendName;
+use plane_client::names::{BackendName, NameError};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
@@ -13,7 +13,7 @@ impl From<String> for ContainerId {
 
 impl From<&BackendName> for ContainerId {
     fn from(backend_id: &BackendName) -> Self {
-        Self(format!("plane-{}", backend_id))
+        ContainerId(backend_id.to_container_id())
     }
 }
 
@@ -28,15 +28,25 @@ impl Display for ContainerId {
         write!(f, "{}", &self.0)
     }
 }
+
+impl TryFrom<ContainerId> for BackendName {
+    type Error = NameError;
+
+    fn try_from(container_id: ContainerId) -> Result<Self, NameError> {
+        BackendName::from_container_id(container_id.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::drone::runtime::docker::types::ContainerId;
     use plane_client::names::{BackendName, Name};
 
     #[test]
     fn test_backend_name_container_id_roundtrip() {
         let original_name = BackendName::new_random();
-        let roundtrip_name =
-            BackendName::try_from(original_name.to_string()).expect("Should convert back");
+        let container_id: ContainerId = ContainerId::from(&original_name);
+        let roundtrip_name = BackendName::try_from(container_id).expect("Should convert back");
         assert_eq!(original_name, roundtrip_name);
     }
 }
