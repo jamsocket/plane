@@ -1,5 +1,5 @@
 use super::{cert_manager::CertManager, proxy_server::ProxyState};
-use plane_client::{
+use plane_common::{
     names::ProxyName,
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest},
     types::ClusterName,

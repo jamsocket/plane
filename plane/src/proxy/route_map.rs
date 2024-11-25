@@ -1,5 +1,5 @@
 use lru::LruCache;
-use plane_client::{
+use plane_common::{
     names::BackendName,
     protocol::{RouteInfo, RouteInfoRequest, RouteInfoResponse},
     types::BearerToken,

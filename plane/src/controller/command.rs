@@ -1,7 +1,7 @@
 use super::ControllerConfig;
 use anyhow::Result;
 use clap::Parser;
-use plane_client::{
+use plane_common::{
     names::{ControllerName, Name},
     types::ClusterName,
 };

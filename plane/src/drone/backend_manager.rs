@@ -1,7 +1,7 @@
 use crate::{drone::runtime::Runtime, util::GuardHandle};
 use anyhow::Result;
 use futures_util::Future;
-use plane_client::{
+use plane_common::{
     exponential_backoff::ExponentialBackoff,
     names::BackendName,
     protocol::AcquiredKey,

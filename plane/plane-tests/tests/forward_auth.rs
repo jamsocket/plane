@@ -1,5 +1,5 @@
 use common::{auth_mock::MockAuthServer, test_env::TestEnvironment};
-use plane_client::{PlaneClient, PlaneClientError};
+use plane_common::{PlaneClient, PlaneClientError};
 use plane_test_macro::plane_test;
 use reqwest::StatusCode;
 

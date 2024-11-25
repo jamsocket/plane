@@ -4,7 +4,7 @@ use super::{
 };
 use chrono::{DateTime, Utc};
 use futures_util::Stream;
-use plane_client::{
+use plane_common::{
     log_types::BackendAddr,
     names::{BackendName, DroneName},
     protocol::{BackendActionMessage, BackendMetricsMessage, RouteInfo},

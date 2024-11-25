@@ -1,7 +1,7 @@
 use chrono::Utc;
 use common::test_env::TestEnvironment;
 use hyper::StatusCode;
-use plane_client::{
+use plane_common::{
     log_types::LoggableTime,
     names::{DroneName, Name},
     protocol::{BackendAction, BackendActionMessage, Heartbeat, MessageFromDrone, MessageToDrone},

@@ -1,4 +1,4 @@
-use plane_client::names::{BackendName, NameError};
+use plane_common::names::{BackendName, NameError};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
@@ -40,7 +40,7 @@ impl TryFrom<ContainerId> for BackendName {
 #[cfg(test)]
 mod tests {
     use crate::drone::runtime::docker::types::ContainerId;
-    use plane_client::names::{BackendName, Name};
+    use plane_common::names::{BackendName, Name};
 
     #[test]
     fn test_backend_name_container_id_roundtrip() {

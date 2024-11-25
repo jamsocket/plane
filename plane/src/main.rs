@@ -16,7 +16,7 @@ use plane::init_tracing::init_tracing;
 use plane::proxy::command::ProxyOpts;
 use plane::proxy::run_proxy;
 use plane::Plan;
-use plane_client::version::{PLANE_GIT_HASH, PLANE_VERSION};
+use plane_common::version::{PLANE_GIT_HASH, PLANE_VERSION};
 use std::ffi::OsStr;
 use std::path::PathBuf;
 

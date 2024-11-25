@@ -5,7 +5,7 @@ use anyhow::Result;
 use chrono::Utc;
 use dashmap::DashMap;
 use futures_util::{future::join_all, StreamExt};
-use plane_client::{
+use plane_common::{
     exponential_backoff::ExponentialBackoff,
     names::BackendName,
     protocol::{BackendAction, BackendEventId, BackendStateMessage},

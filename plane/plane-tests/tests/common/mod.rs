@@ -1,6 +1,6 @@
 use self::{test_env::TestEnvironment, timeout::WithTimeout};
 use futures_util::Future;
-use plane_client::{names::BackendName, types::BackendStatus, PlaneClient};
+use plane_common::{names::BackendName, types::BackendStatus, PlaneClient};
 use std::{panic::AssertUnwindSafe, time::Duration};
 use tokio::time::timeout;
 

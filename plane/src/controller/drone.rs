@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use plane_client::{
+use plane_common::{
     log_types::LoggableTime,
     protocol::{
         ApiErrorKind, BackendAction, BackendActionMessage, Heartbeat, KeyDeadlines,

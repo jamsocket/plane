@@ -4,7 +4,7 @@ use super::{
     route_map::RouteMap,
 };
 use bytes::Bytes;
-use plane_client::{names::Name, protocol::RouteInfo, version::SERVER_NAME};
+use plane_common::{names::Name, protocol::RouteInfo, version::SERVER_NAME};
 use plane_dynamic_proxy::{
     body::{simple_empty_body, SimpleBody},
     hyper::{

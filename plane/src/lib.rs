@@ -5,7 +5,7 @@
 use controller::ControllerConfig;
 use dns::DnsConfig;
 use drone::DroneConfig;
-use plane_client::version::{PLANE_GIT_HASH, PLANE_VERSION};
+use plane_common::version::{PLANE_GIT_HASH, PLANE_VERSION};
 use proxy::ProxyConfig;
 use serde::{Deserialize, Serialize};
 

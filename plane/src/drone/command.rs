@@ -7,7 +7,7 @@ use super::{
 use anyhow::Result;
 use chrono::Duration;
 use clap::Parser;
-use plane_client::{
+use plane_common::{
     names::{DroneName, OrRandom},
     types::{ClusterName, DronePoolName},
 };

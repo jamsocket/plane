@@ -5,7 +5,7 @@ use plane::drone::runtime::docker::{
     commands::{get_container_config_from_executor_config, pull_image},
     types::ContainerId,
 };
-use plane_client::{
+use plane_common::{
     names::{BackendName, Name},
     types::{DockerExecutorConfig, ResourceLimits},
 };

@@ -5,7 +5,7 @@ use super::{
     Runtime,
 };
 use anyhow::{Error, Result};
-use plane_client::{
+use plane_common::{
     names::BackendName,
     protocol::{AcquiredKey, BackendMetricsMessage},
     types::{backend_state::BackendError, BearerToken, DockerExecutorConfig},

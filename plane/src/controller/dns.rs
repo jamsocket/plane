@@ -3,7 +3,7 @@ use axum::{
     extract::{ws::WebSocket, ConnectInfo, State, WebSocketUpgrade},
     response::IntoResponse,
 };
-use plane_client::{
+use plane_common::{
     protocol::{MessageFromDns, MessageToDns},
     typed_socket::server::new_server,
 };

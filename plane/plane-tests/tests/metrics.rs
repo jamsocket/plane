@@ -4,7 +4,7 @@ use plane::drone::{
     runtime::docker::{DockerRuntime, DockerRuntimeConfig},
     runtime::Runtime,
 };
-use plane_client::{
+use plane_common::{
     names::{BackendName, Name},
     types::DockerExecutorConfig,
 };

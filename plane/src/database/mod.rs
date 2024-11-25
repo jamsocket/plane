@@ -10,7 +10,7 @@ use self::{
     node::NodeDatabase,
     subscribe::{EventSubscriptionManager, Notification, NotificationPayload, Subscription},
 };
-use plane_client::{
+use plane_common::{
     types::{ClusterName, ConnectRequest, ConnectResponse, RevokeRequest},
     PlaneClient,
 };

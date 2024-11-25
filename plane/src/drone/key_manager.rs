@@ -2,7 +2,7 @@ use crate::util::GuardHandle;
 
 use super::executor::Executor;
 use chrono::Utc;
-use plane_client::{
+use plane_common::{
     log_types::LoggableTime,
     names::BackendName,
     protocol::{AcquiredKey, BackendAction, KeyDeadlines, RenewKeyRequest},

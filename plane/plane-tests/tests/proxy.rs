@@ -4,7 +4,7 @@ use common::{
     simple_axum_server::{RequestInfo, SimpleAxumServer},
     test_env::TestEnvironment,
 };
-use plane_client::{
+use plane_common::{
     log_types::BackendAddr,
     names::{BackendName, Name},
     protocol::{RouteInfo, RouteInfoResponse},

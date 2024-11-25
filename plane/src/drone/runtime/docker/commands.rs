@@ -6,7 +6,7 @@ use bollard::{
     Docker,
 };
 use futures_util::StreamExt;
-use plane_client::{
+use plane_common::{
     names::BackendName,
     protocol::AcquiredKey,
     types::{BearerToken, DockerExecutorConfig, Mount},
@@ -294,7 +294,7 @@ pub async fn run_container(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use plane_client::{
+    use plane_common::{
         log_types::LoggableTime,
         names::Name,
         protocol::{AcquiredKey, KeyDeadlines},

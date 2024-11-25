@@ -5,7 +5,7 @@ use super::{
 use crate::heartbeat_consts::UNHEALTHY_SECONDS;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use plane_client::{
+use plane_common::{
     names::{AnyNodeName, ControllerName, NodeName},
     types::{ClusterName, NodeId, NodeKind},
     version::PlaneVersionInfo,

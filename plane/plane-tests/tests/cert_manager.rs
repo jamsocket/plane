@@ -4,7 +4,7 @@ use plane::proxy::{
     cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection,
     proxy_server::ProxyState, AcmeConfig, AcmeEabConfiguration,
 };
-use plane_client::names::{Name, ProxyName};
+use plane_common::names::{Name, ProxyName};
 use plane_test_macro::plane_test;
 use std::sync::Arc;
 

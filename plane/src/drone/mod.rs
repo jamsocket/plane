@@ -13,7 +13,7 @@ use self::{
 };
 use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
-use plane_client::{
+use plane_common::{
     names::DroneName,
     protocol::{
         BackendAction, BackendActionMessage, MessageFromDrone, MessageToDrone, RenewKeyResponse,
@@ -291,7 +291,7 @@ pub struct DroneConfig {
         note = "Moved to `executor_config` (only applies to DockerRuntimeConfig)."
     )]
     pub auto_prune: Option<bool>,
-    #[serde(with = "plane_client::serialization::serialize_optional_duration_as_seconds")]
+    #[serde(with = "plane_common::serialization::serialize_optional_duration_as_seconds")]
     #[deprecated(
         since = "0.4.12",
         note = "Moved to `executor_config` (only applies to DockerRuntimeConfig)."

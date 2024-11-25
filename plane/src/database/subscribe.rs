@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use plane_client::{exponential_backoff::ExponentialBackoff, protocol::BackendMetricsMessage};
+use plane_common::{exponential_backoff::ExponentialBackoff, protocol::BackendMetricsMessage};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{postgres::PgListener, PgConnection, PgPool};

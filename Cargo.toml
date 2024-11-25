@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "client",
+    "common",
     "dynamic-proxy",
     "plane/plane-tests",
     "plane",

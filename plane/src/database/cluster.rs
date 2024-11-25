@@ -1,4 +1,4 @@
-use plane_client::{
+use plane_common::{
     names::{AnyNodeName, ControllerName},
     types::{BackendStatus, ClusterName, ClusterState, DroneState, NodeState},
 };

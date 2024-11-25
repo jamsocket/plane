@@ -4,7 +4,7 @@ use plane::drone::runtime::{
     docker::{types::ContainerId, SpawnResult, TerminateEvent},
     unix_socket::{MessageToClient, MessageToServer},
 };
-use plane_client::{
+use plane_common::{
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
     types::{

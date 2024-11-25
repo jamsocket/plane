@@ -1,4 +1,4 @@
-use plane_client::types::{ClusterName, NodeId};
+use plane_common::types::{ClusterName, NodeId};
 use sqlx::query;
 use sqlx::PgPool;
 

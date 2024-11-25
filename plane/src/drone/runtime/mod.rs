@@ -1,7 +1,7 @@
 use anyhow::Error;
 use docker::{SpawnResult, TerminateEvent};
 use futures_util::Stream;
-use plane_client::{
+use plane_common::{
     names::BackendName,
     protocol::{AcquiredKey, BackendMetricsMessage},
     types::{backend_state::BackendError, BearerToken},

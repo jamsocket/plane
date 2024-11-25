@@ -25,7 +25,7 @@ use axum::{
 };
 use forward_auth::forward_layer;
 use futures_util::never::Never;
-use plane_client::{
+use plane_common::{
     names::ControllerName,
     protocol::StatusResponse,
     types::ClusterName,

@@ -20,7 +20,7 @@ use plane::{
     },
     typed_unix_socket::{server::TypedUnixSocketServer, WrappedMessage},
 };
-use plane_client::{
+use plane_common::{
     names::{AcmeDnsServerName, ControllerName, DroneName, Name, ProxyName},
     types::{ClusterName, DronePoolName},
     util::random_string,

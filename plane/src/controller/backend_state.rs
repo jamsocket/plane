@@ -11,7 +11,7 @@ use axum::{
     Json,
 };
 use futures_util::{Stream, StreamExt};
-use plane_client::{
+use plane_common::{
     names::BackendName,
     types::{backend_state::BackendStatusStreamEntry, BackendStatus},
 };

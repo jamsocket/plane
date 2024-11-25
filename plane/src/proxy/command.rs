@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use plane_client::{
+use plane_common::{
     names::{OrRandom, ProxyName},
     types::ClusterName,
 };

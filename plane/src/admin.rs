@@ -1,7 +1,7 @@
 use chrono::Duration;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use plane_client::{
+use plane_common::{
     names::{BackendName, DroneName, Name, ProxyName},
     protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
     sse::SseStream,

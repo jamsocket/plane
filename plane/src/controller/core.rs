@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use plane_client::{
+use plane_common::{
     names::{AnyNodeName, ControllerName},
     typed_socket::Handshake,
     types::{ClusterName, ConnectRequest, ConnectResponse, NodeId},

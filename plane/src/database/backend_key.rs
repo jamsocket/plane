@@ -8,7 +8,7 @@
 //! ```
 
 use chrono::{DateTime, Utc};
-use plane_client::{
+use plane_common::{
     names::BackendName,
     types::{BackendStatus, BearerToken, ClusterName, KeyConfig, Subdomain},
 };

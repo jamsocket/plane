@@ -4,7 +4,7 @@ use self::{error::Result, name_to_cluster::NameToCluster};
 use anyhow::anyhow;
 use dashmap::DashMap;
 use error::OrDnsError;
-use plane_client::{
+use plane_common::{
     names::AcmeDnsServerName,
     protocol::{MessageFromDns, MessageToDns},
     typed_socket::client::TypedSocketConnector,

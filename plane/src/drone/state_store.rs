@@ -1,6 +1,6 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use plane_client::{
+use plane_common::{
     log_types::LoggableTime,
     names::BackendName,
     protocol::{BackendEventId, BackendStateMessage},
@@ -231,7 +231,7 @@ impl StateStore {
 #[cfg(test)]
 mod test {
     use super::*;
-    use plane_client::{
+    use plane_common::{
         log_types::BackendAddr,
         names::Name,
         types::{BackendStatus, TerminationReason},

@@ -3,7 +3,7 @@ use super::Controller;
 use crate::controller::error::IntoApiError;
 use crate::database::connect::ConnectError;
 use axum::{extract::State, http::StatusCode, response::Response, Json};
-use plane_client::{
+use plane_common::{
     protocol::ApiErrorKind,
     types::{ConnectRequest, ConnectResponse, RevokeRequest},
 };

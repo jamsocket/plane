@@ -1,4 +1,4 @@
-use plane_client::types::ClusterName;
+use plane_common::types::ClusterName;
 use std::str::FromStr;
 
 /// Maps a requested domain name to a cluster name.
@@ -46,7 +46,7 @@ impl NameToCluster {
 
 #[cfg(test)]
 mod test {
-    use plane_client::types::ClusterName;
+    use plane_common::types::ClusterName;
     use std::str::FromStr;
 
     #[test]

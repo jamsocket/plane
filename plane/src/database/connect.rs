@@ -9,7 +9,7 @@ use super::{
     backend_key::{KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER},
     drone::DroneForSpawn,
 };
-use plane_client::{
+use plane_common::{
     log_types::LoggableTime,
     names::{BackendName, OrRandom},
     protocol::{AcquiredKey, BackendAction, KeyDeadlines},

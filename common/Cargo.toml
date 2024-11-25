@@ -1,5 +1,5 @@
 [package]
-name = "plane-client"
+name = "plane-common"
 version = "0.5.1"
 edition = "2021"
 

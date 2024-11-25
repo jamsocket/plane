@@ -1,5 +1,5 @@
 use plane::proxy::{connection_monitor::BackendEntry, proxy_server::ProxyState};
-use plane_client::{
+use plane_common::{
     names::BackendName,
     protocol::{RouteInfoRequest, RouteInfoResponse},
 };

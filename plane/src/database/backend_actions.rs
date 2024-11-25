@@ -1,5 +1,5 @@
 use super::{connect::ConnectError, subscribe::emit_with_key};
-use plane_client::{
+use plane_common::{
     names::{BackendActionName, BackendName, Name},
     protocol::{BackendAction, BackendActionMessage},
     types::NodeId,

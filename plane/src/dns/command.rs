@@ -1,5 +1,5 @@
 use clap::Parser;
-use plane_client::names::{AcmeDnsServerName, OrRandom};
+use plane_common::names::{AcmeDnsServerName, OrRandom};
 use url::Url;
 
 #[derive(Parser)]

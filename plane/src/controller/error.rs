@@ -3,7 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use plane_client::{
+use plane_common::{
     protocol::{ApiError, ApiErrorKind},
     util::random_string,
 };

@@ -4,7 +4,7 @@ use axum::{
     response::Response,
     Json,
 };
-use plane_client::{
+use plane_common::{
     names::DroneName,
     types::{ClusterName, DrainResult},
 };

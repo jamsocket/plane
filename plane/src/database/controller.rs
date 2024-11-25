@@ -3,7 +3,7 @@ use crate::PLANE_VERSION;
 use anyhow::Result;
 use chrono::DateTime;
 use chrono::Utc;
-use plane_client::names::ControllerName;
+use plane_common::names::ControllerName;
 use sqlx::PgPool;
 
 pub struct ControllerDatabase<'a> {

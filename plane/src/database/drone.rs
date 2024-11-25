@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
-use plane_client::names::{ControllerName, DroneName};
-use plane_client::types::{BackendStatus, ClusterName, DronePoolName, NodeId};
+use plane_common::names::{ControllerName, DroneName};
+use plane_common::types::{BackendStatus, ClusterName, DronePoolName, NodeId};
 use sqlx::{postgres::types::PgInterval, query, PgPool};
 use std::str::FromStr;
 use std::time::Duration;

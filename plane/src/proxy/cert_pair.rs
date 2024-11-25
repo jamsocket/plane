@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use pem::Pem;
-use plane_client::log_types::LoggableTime;
+use plane_common::log_types::LoggableTime;
 use plane_dynamic_proxy::rustls::{
     crypto::aws_lc_rs::sign::any_supported_type, pki_types::PrivateKeyDer,
 };

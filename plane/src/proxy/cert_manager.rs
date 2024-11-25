@@ -5,7 +5,7 @@ use acme2_eab::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
-use plane_client::{
+use plane_common::{
     log_types::LoggableTime,
     protocol::{CertManagerRequest, CertManagerResponse},
     types::ClusterName,
