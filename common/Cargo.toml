@@ -4,7 +4,7 @@ version = "0.5.1"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.7.9", features = ["ws"] }
+axum = { version = "0.7.7", features = ["ws"] }
 bollard = "0.17.0"
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = "4.5.21"
