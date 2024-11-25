@@ -1,8 +1,22 @@
 use super::{ChannelMessage, Handshake, SocketAction, TypedSocket};
 use crate::version::plane_version_info;
-use anyhow::{anyhow, Context, Result};
 use axum::extract::ws::{CloseFrame, Message, WebSocket};
 use tokio::sync::mpsc::{Receiver, Sender};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Handshake message was not text.")]
+    HandshakeNotText,
+
+    #[error("Socket closed before handshake received.")]
+    SocketClosedBeforeHandshake,
+
+    #[error("Failed to parse message.")]
+    ParseMessage(#[from] serde_json::Error),
+
+    #[error("Failed to send message on websocket.")]
+    SendMessage(#[from] axum::Error),
+}
 
 pub async fn handle_messages<T: ChannelMessage>(
     mut messages_to_send: Receiver<SocketAction<T>>,
@@ -65,20 +79,20 @@ pub async fn handle_messages<T: ChannelMessage>(
 pub async fn new_server<T: ChannelMessage>(
     mut ws: WebSocket,
     name: String,
-) -> Result<TypedSocket<T>> {
+) -> Result<TypedSocket<T>, Error> {
     let msg = ws
         .recv()
         .await
-        .ok_or_else(|| anyhow!("Socket closed before handshake received."))??;
+        .ok_or(Error::SocketClosedBeforeHandshake)?
+        .map_err(Error::from)?;
     let msg = match msg {
         Message::Text(msg) => msg,
         msg => {
             tracing::warn!("Received ignored message: {:?}", msg);
-            return Err(anyhow!("Handshake message was not text."));
+            return Err(Error::HandshakeNotText);
         }
     };
-    let remote_handshake: Handshake =
-        serde_json::from_str(&msg).context("Parsing handshake from client.")?;
+    let remote_handshake: Handshake = serde_json::from_str(&msg).map_err(Error::ParseMessage)?;
     tracing::info!(
         client_version = %remote_handshake.version.version,
         client_hash = %remote_handshake.version.git_hash,
