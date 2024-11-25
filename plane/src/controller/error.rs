@@ -1,4 +1,3 @@
-use crate::util::random_string;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -9,34 +8,6 @@ use std::{
     error::Error,
     fmt::{Debug, Display},
 };
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-pub enum ApiErrorKind {
-    FailedToAcquireKey,
-    KeyUnheldNoSpawnConfig,
-    KeyHeldUnhealthy,
-    KeyHeld,
-    NoDroneAvailable,
-    FailedToRemoveKey,
-    DatabaseError,
-    NoClusterProvided,
-    NotFound,
-    InvalidClusterName,
-    Other,
-}
-
-#[derive(thiserror::Error, Debug, Serialize, Deserialize)]
-pub struct ApiError {
-    pub id: String,
-    pub kind: ApiErrorKind,
-    pub message: String,
-}
-
-impl Display for ApiError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
 
 pub fn err_to_response<E: Debug>(
     error: E,

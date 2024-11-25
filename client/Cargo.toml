@@ -4,11 +4,27 @@ version = "0.5.1"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.93"
+axum = { version = "0.7.9", features = ["ws"] }
+bollard = "0.17.0"
+chrono = { version = "0.4.38", features = ["serde"] }
+clap = "4.5.21"
+data-encoding = "2.6.0"
 futures-util = "0.3.31"
-reqwest = "0.12.9"
+rand = "0.8.5"
+reqwest = { version = "0.12.9", features = ["json"] }
 serde = "1.0.215"
+serde_json = "1.0.133"
+serde_with = "3.11.0"
 thiserror = "2.0.3"
 tokio = { version = "1.41.1", features = ["sync"] }
+tokio-tungstenite = "0.24.0"
 tracing = "0.1.40"
 tungstenite = "0.24.0"
 url = "2.5.4"
+valuable = { version = "0.1.0", features = ["derive"] }
+
+[dev-dependencies]
+anyhow = "1.0.93"
+async-stream = "0.3.6"
+axum = "0.7.9"

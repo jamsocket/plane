@@ -1,5 +1,7 @@
+use std::time::{Duration, SystemTime};
+
 pub struct ExponentialBackoff {
-    initial_duration_millis: i64,
+    initial_duration_millis: u128,
     max_duration: Duration,
     defer_duration: Duration,
     multiplier: f64,
@@ -14,7 +16,7 @@ impl ExponentialBackoff {
         multiplier: f64,
         defer_duration: Duration,
     ) -> Self {
-        let initial_duration_millis = initial_duration.num_milliseconds();
+        let initial_duration_millis = initial_duration.as_millis();
 
         Self {
             initial_duration_millis,
@@ -28,13 +30,7 @@ impl ExponentialBackoff {
 
     /// Reset the backoff, but only if `wait` is not called again for at least `defer_duration`.
     pub fn defer_reset(&mut self) {
-        self.deferred_reset = Some(
-            SystemTime::now()
-                + self
-                    .defer_duration
-                    .to_std()
-                    .expect("defer_duration is always valid"),
-        );
+        self.deferred_reset = Some(SystemTime::now() + self.defer_duration);
     }
 
     pub async fn wait(&mut self) {
@@ -47,11 +43,9 @@ impl ExponentialBackoff {
         }
 
         let duration = self.initial_duration_millis as f64 * self.multiplier.powi(self.step);
-        let duration =
-            Duration::try_milliseconds(duration as i64).expect("duration is always valid");
+        let duration = Duration::from_millis(duration as u64);
         let duration = duration.min(self.max_duration);
-
-        tokio::time::sleep(duration.to_std().expect("duration is always valid")).await;
+        tokio::time::sleep(duration).await;
 
         self.step += 1;
     }
@@ -65,10 +59,10 @@ impl ExponentialBackoff {
 impl Default for ExponentialBackoff {
     fn default() -> Self {
         Self::new(
-            Duration::try_seconds(1).expect("duration is always valid"),
-            Duration::try_minutes(1).expect("duration is always valid"),
+            Duration::from_secs(1),
+            Duration::from_secs(60),
             1.1,
-            Duration::try_minutes(1).expect("duration is always valid"),
+            Duration::from_secs(60),
         )
     }
 }

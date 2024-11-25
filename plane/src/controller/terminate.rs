@@ -1,9 +1,4 @@
 use super::{core::Controller, error::IntoApiError};
-use crate::{
-    names::BackendName,
-    protocol::BackendAction,
-    types::{backend_state::TerminationReason, TerminationKind},
-};
 use axum::{
     extract::{Path, State},
     response::Response,

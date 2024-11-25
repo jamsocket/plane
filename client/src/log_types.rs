@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, time::SystemTime};
-use time::OffsetDateTime;
+use std::net::SocketAddr;
 use valuable::{Tuplable, TupleDef, Valuable, Value, Visit};
 
 // See: https://github.com/tokio-rs/valuable/issues/86#issuecomment-1760446976
@@ -24,14 +23,6 @@ impl Valuable for LoggableTime {
 impl Tuplable for LoggableTime {
     fn definition(&self) -> TupleDef {
         TupleDef::new_static(1)
-    }
-}
-
-impl From<OffsetDateTime> for LoggableTime {
-    fn from(offset: OffsetDateTime) -> Self {
-        let t: SystemTime = offset.into();
-        let dt: DateTime<Utc> = t.into();
-        Self(dt)
     }
 }
 

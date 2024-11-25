@@ -1,5 +1,5 @@
 use super::{ChannelMessage, Handshake, SocketAction, TypedSocket};
-use crate::plane_version_info;
+use crate::version::plane_version_info;
 use anyhow::{anyhow, Context, Result};
 use axum::extract::ws::{CloseFrame, Message, WebSocket};
 use tokio::sync::mpsc::{Receiver, Sender};

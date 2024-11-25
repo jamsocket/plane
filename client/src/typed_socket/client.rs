@@ -1,8 +1,9 @@
 use super::{ChannelMessage, Handshake, SocketAction, TypedSocket};
 use crate::controller_address::AuthorizedAddress;
-use crate::PlaneClientError;
+use crate::exponential_backoff::ExponentialBackoff;
 use crate::names::NodeName;
-use crate::{plane_version_info, util::ExponentialBackoff};
+use crate::version::plane_version_info;
+use crate::PlaneClientError;
 use futures_util::{SinkExt, StreamExt};
 use std::marker::PhantomData;
 use tokio::net::TcpStream;
@@ -191,7 +192,7 @@ async fn new_client<T: ChannelMessage>(
 
 #[cfg(test)]
 mod test {
-    use crate::client::controller_address::AuthorizedAddress;
+    use crate::controller_address::AuthorizedAddress;
 
     #[test]
     fn test_url_no_token() {

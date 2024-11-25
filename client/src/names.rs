@@ -1,4 +1,4 @@
-use crate::{drone::runtime::docker::types::ContainerId, types::NodeKind};
+use crate::types::NodeKind;
 use clap::error::ErrorKind;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
@@ -17,8 +17,9 @@ pub enum NameError {
     InvalidCharacter(char, usize),
 
     #[error(
-        "too long ({0} characters; max is {} including prefix)",
-        MAX_NAME_LENGTH
+        "too long ({length} characters; max is {max} including prefix)",
+        length = "{0}",
+        max = MAX_NAME_LENGTH
     )]
     TooLong(usize),
 }
@@ -163,14 +164,11 @@ entity_name!(DroneName, Some("dr"));
 entity_name!(AcmeDnsServerName, Some("ns"));
 entity_name!(BackendActionName, Some("ak"));
 
-impl TryFrom<ContainerId> for BackendName {
-    type Error = NameError;
-
-    fn try_from(value: ContainerId) -> Result<Self, Self::Error> {
-        value
-            .as_str()
+impl BackendName {
+    pub fn from_container_id(container_id: String) -> Result<Self, NameError> {
+        container_id
             .strip_prefix("plane-")
-            .ok_or_else(|| NameError::InvalidPrefix(value.to_string(), "plane-".to_string()))?
+            .ok_or_else(|| NameError::InvalidPrefix(container_id.clone(), "plane-".to_string()))?
             .to_string()
             .try_into()
     }
@@ -294,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_backend_name_from_invalid_container_id() {
-        let container_id = ContainerId::from("invalid-123".to_string());
+        let container_id = "invalid-123".to_string();
         assert_eq!(
             Err(NameError::InvalidPrefix(
                 "invalid-123".to_string(),

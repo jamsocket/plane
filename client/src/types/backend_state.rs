@@ -1,7 +1,4 @@
-use crate::{
-    database::backend::BackendRow,
-    log_types::{BackendAddr, LoggableTime},
-};
+use crate::log_types::{BackendAddr, LoggableTime};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -452,11 +449,5 @@ impl BackendStatusStreamEntry {
             exit_error,
             time: LoggableTime(timestamp),
         }
-    }
-}
-
-impl From<BackendRow> for BackendStatusStreamEntry {
-    fn from(row: BackendRow) -> Self {
-        Self::from_state(row.state, row.last_status_time)
     }
 }

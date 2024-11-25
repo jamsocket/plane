@@ -1,18 +1,3 @@
-use super::{error::ApiErrorKind, Controller};
-use crate::{
-    controller::error::IntoApiError,
-    database::{
-        backend::RouteInfoResult,
-        subscribe::{Notification, Subscription},
-    },
-    names::{BackendName, Name},
-    protocol::{
-        CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy,
-        RouteInfoRequest, RouteInfoResponse,
-    },
-    typed_socket::{server::new_server, TypedSocket},
-    types::{BackendState, BearerToken, ClusterName, NodeId},
-};
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},
     http::StatusCode,

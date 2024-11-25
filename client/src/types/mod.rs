@@ -1,7 +1,7 @@
 use crate::{
-    client::PlaneClient,
     names::{AnyNodeName, BackendName, ControllerName, DroneName},
     util::{random_prefixed_string, random_token},
+    PlaneClient,
 };
 pub use backend_state::{BackendState, BackendStatus, TerminationKind, TerminationReason};
 use bollard::auth::DockerCredentials;
