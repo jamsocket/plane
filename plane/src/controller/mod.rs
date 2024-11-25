@@ -25,6 +25,13 @@ use axum::{
 };
 use forward_auth::forward_layer;
 use futures_util::never::Never;
+use plane_client::{
+    names::ControllerName,
+    protocol::StatusResponse,
+    types::ClusterName,
+    version::{PLANE_GIT_HASH, PLANE_VERSION},
+    PlaneClient,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::net::SocketAddr;

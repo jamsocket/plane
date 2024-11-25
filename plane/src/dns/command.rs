@@ -1,5 +1,5 @@
-use crate::names::{AcmeDnsServerName, OrRandom};
 use clap::Parser;
+use plane_client::names::{AcmeDnsServerName, OrRandom};
 use url::Url;
 
 #[derive(Parser)]

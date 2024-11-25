@@ -1,8 +1,6 @@
 use chrono::Duration;
 use futures_util::Future;
-use std::{
-    net::{IpAddr, ToSocketAddrs},
-};
+use std::net::{IpAddr, ToSocketAddrs};
 use tokio::task::JoinHandle;
 
 pub fn format_duration(duration: Duration) -> String {

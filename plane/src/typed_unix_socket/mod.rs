@@ -25,9 +25,10 @@ impl Drop for SocketPath {
 
 #[cfg(test)]
 mod tests {
+    use plane_client::util::random_string;
+
     use super::client::TypedUnixSocketClient;
     use super::server::TypedUnixSocketServer;
-    use crate::util::random_string;
     use std::collections::HashSet;
     use std::env;
     use std::path::PathBuf;

@@ -1,15 +1,15 @@
+use crate::database::{
+    backend_key::{KeysDatabase, KEY_LEASE_EXPIRATION},
+    drone::DroneDatabase,
+};
+
 use super::{
     backend::emit_state_change,
     backend_actions::create_pending_action,
     backend_key::{KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER},
     drone::DroneForSpawn,
 };
-use crate::{
-    client::PlaneClient,
-    database::{
-        backend_key::{KeysDatabase, KEY_LEASE_EXPIRATION},
-        drone::DroneDatabase,
-    },
+use plane_client::{
     log_types::LoggableTime,
     names::{BackendName, OrRandom},
     protocol::{AcquiredKey, BackendAction, KeyDeadlines},
@@ -18,6 +18,7 @@ use crate::{
         KeyConfig, RevokeRequest, SecretToken, SpawnConfig,
     },
     util::random_token,
+    PlaneClient,
 };
 use serde_json::{Map, Value};
 use sqlx::{postgres::types::PgInterval, PgPool};

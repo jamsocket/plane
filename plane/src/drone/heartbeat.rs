@@ -1,8 +1,6 @@
-use crate::{
-    heartbeat_consts::HEARTBEAT_INTERVAL, log_types::LoggableTime, protocol::Heartbeat,
-    typed_socket::TypedSocketSender,
-};
+use crate::heartbeat_consts::HEARTBEAT_INTERVAL;
 use chrono::Utc;
+use plane_client::{log_types::LoggableTime, protocol::Heartbeat, typed_socket::TypedSocketSender};
 use tokio::task::JoinHandle;
 
 /// A background task that sends heartbeats to the server.

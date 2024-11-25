@@ -1,10 +1,10 @@
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
-use plane::{
-    drone::runtime::{
-        docker::{types::ContainerId, SpawnResult, TerminateEvent},
-        unix_socket::{MessageToClient, MessageToServer},
-    },
+use plane::drone::runtime::{
+    docker::{types::ContainerId, SpawnResult, TerminateEvent},
+    unix_socket::{MessageToClient, MessageToServer},
+};
+use plane_client::{
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
     types::{

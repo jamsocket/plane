@@ -4,7 +4,6 @@ members = [
     "client",
     "dynamic-proxy",
     "plane/plane-tests",
-    "plane/plane-dynamic",
     "plane",
     "plane/plane-tests/plane-test-macro",
 ]

@@ -1,14 +1,13 @@
-use crate::{
-    names::{OrRandom, ProxyName},
-    proxy::{AcmeConfig, AcmeEabConfiguration, ServerPortConfig},
-    types::ClusterName,
-};
 use anyhow::{anyhow, Result};
 use clap::Parser;
+use plane_client::{
+    names::{OrRandom, ProxyName},
+    types::ClusterName,
+};
 use std::path::PathBuf;
 use url::Url;
 
-use super::ProxyConfig;
+use super::{AcmeConfig, AcmeEabConfiguration, ProxyConfig, ServerPortConfig};
 
 const LOCAL_HTTP_PORT: u16 = 9090;
 const PROD_HTTP_PORT: u16 = 80;

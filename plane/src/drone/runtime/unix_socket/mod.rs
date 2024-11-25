@@ -1,15 +1,15 @@
+use crate::typed_unix_socket::client::TypedUnixSocketClient;
+
 use super::{
     docker::{SpawnResult, TerminateEvent},
     Runtime,
 };
-use crate::{
-    database::backend::BackendMetricsMessage,
+use anyhow::{Error, Result};
+use plane_client::{
     names::BackendName,
-    protocol::AcquiredKey,
-    typed_unix_socket::client::TypedUnixSocketClient,
+    protocol::{AcquiredKey, BackendMetricsMessage},
     types::{backend_state::BackendError, BearerToken, DockerExecutorConfig},
 };
-use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::PathBuf, pin::Pin};
 use tokio_stream::{Stream, StreamExt};

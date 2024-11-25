@@ -7,11 +7,11 @@
 //! assert!(KEY_LEASE_EXPIRATION > KEY_LEASE_HARD_TERMINATE_AFTER);
 //! ```
 
-use crate::{
+use chrono::{DateTime, Utc};
+use plane_client::{
     names::BackendName,
     types::{BackendStatus, BearerToken, ClusterName, KeyConfig, Subdomain},
 };
-use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgInterval, PgPool};
 use std::{str::FromStr, time::Duration};
 

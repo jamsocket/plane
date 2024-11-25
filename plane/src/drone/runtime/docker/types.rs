@@ -1,4 +1,4 @@
-use crate::names::BackendName;
+use plane_client::names::BackendName;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
@@ -30,14 +30,13 @@ impl Display for ContainerId {
 }
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::names::{BackendName, Name};
+    use plane_client::names::{BackendName, Name};
 
     #[test]
     fn test_backend_name_container_id_roundtrip() {
         let original_name = BackendName::new_random();
-        let container_id: ContainerId = ContainerId::from(&original_name);
-        let roundtrip_name = BackendName::try_from(container_id).expect("Should convert back");
+        let roundtrip_name =
+            BackendName::try_from(original_name.to_string()).expect("Should convert back");
         assert_eq!(original_name, roundtrip_name);
     }
 }

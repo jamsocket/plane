@@ -1,5 +1,5 @@
 use common::test_env::TestEnvironment;
-use plane::{
+use plane_client::{
     names::{Name, ProxyName},
     protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
 };

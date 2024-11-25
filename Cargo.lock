@@ -2055,13 +2055,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "plane-dynamic"
-version = "0.4.9"
-dependencies = [
- "plane",
-]
-
-[[package]]
 name = "plane-dynamic-proxy"
 version = "0.5.1"
 dependencies = [
@@ -2110,7 +2103,8 @@ dependencies = [
  "http",
  "http-body-util",
  "hyper",
- "plane-dynamic",
+ "plane",
+ "plane-client",
  "plane-dynamic-proxy",
  "plane-test-macro",
  "reqwest",

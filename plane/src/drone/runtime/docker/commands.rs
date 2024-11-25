@@ -1,9 +1,4 @@
 use super::{types::ContainerId, DockerRuntime};
-use crate::{
-    names::BackendName,
-    protocol::AcquiredKey,
-    types::{BearerToken, DockerExecutorConfig, Mount},
-};
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials,
@@ -11,6 +6,11 @@ use bollard::{
     Docker,
 };
 use futures_util::StreamExt;
+use plane_client::{
+    names::BackendName,
+    protocol::AcquiredKey,
+    types::{BearerToken, DockerExecutorConfig, Mount},
+};
 use std::{
     collections::HashMap,
     path::{Component, Path, PathBuf},
@@ -294,7 +294,7 @@ pub async fn run_container(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
+    use plane_client::{
         log_types::LoggableTime,
         names::Name,
         protocol::{AcquiredKey, KeyDeadlines},

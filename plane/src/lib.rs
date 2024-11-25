@@ -22,8 +22,6 @@ pub mod signals;
 pub mod typed_unix_socket;
 pub mod util;
 
-pub const SERVER_NAME: &str = concat!("Plane/", PLANE_VERSION, "-", PLANE_GIT_HASH);
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Plan {
     Controller(ControllerConfig),

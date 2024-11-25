@@ -1,6 +1,6 @@
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
-use plane::types::{
+use plane_client::types::{
     BackendStatus, ConnectRequest, DockerExecutorConfig, DronePoolName, KeyConfig, PullPolicy,
     ResourceLimits, SpawnConfig,
 };

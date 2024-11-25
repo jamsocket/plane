@@ -1,11 +1,11 @@
-use crate::{
+use anyhow::Result;
+use chrono::{DateTime, Utc};
+use plane_client::{
     log_types::LoggableTime,
     names::BackendName,
     protocol::{BackendEventId, BackendStateMessage},
     types::BackendState,
 };
-use anyhow::Result;
-use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 
 /// An array of sqlite commands used to initialize the state store.
@@ -231,7 +231,7 @@ impl StateStore {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
+    use plane_client::{
         log_types::BackendAddr,
         names::Name,
         types::{BackendStatus, TerminationReason},

@@ -1,12 +1,11 @@
-use crate::{
-    database::backend::BackendMetricsMessage,
-    names::BackendName,
-    protocol::AcquiredKey,
-    types::{backend_state::BackendError, BearerToken},
-};
 use anyhow::Error;
 use docker::{SpawnResult, TerminateEvent};
 use futures_util::Stream;
+use plane_client::{
+    names::BackendName,
+    protocol::{AcquiredKey, BackendMetricsMessage},
+    types::{backend_state::BackendError, BearerToken},
+};
 use std::{net::SocketAddr, pin::Pin};
 
 pub mod docker;

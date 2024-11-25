@@ -3,7 +3,7 @@ use common::{
     simple_axum_server::SimpleAxumServer, test_env::TestEnvironment,
     websocket_echo_server::WebSocketEchoServer,
 };
-use plane::{
+use plane_client::{
     log_types::BackendAddr,
     names::{BackendName, Name},
     protocol::{RouteInfo, RouteInfoResponse},

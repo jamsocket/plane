@@ -1,7 +1,7 @@
 use super::{types::ContainerId, MetricsCallback};
-use crate::{database::backend::BackendMetricsMessage, names::BackendName};
 use bollard::{container::StatsOptions, Docker};
 use futures_util::Stream;
+use plane_client::{names::BackendName, protocol::BackendMetricsMessage};
 use std::sync::{Arc, Mutex};
 use tokio::time::{Duration, Instant};
 use tokio_stream::StreamExt;

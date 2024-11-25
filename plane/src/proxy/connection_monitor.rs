@@ -1,10 +1,12 @@
-use crate::{heartbeat_consts::HEARTBEAT_INTERVAL, names::BackendName};
+use plane_client::names::BackendName;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::{Arc, Mutex},
     time::SystemTime,
 };
 use tokio::task::JoinHandle;
+
+use crate::heartbeat_consts::HEARTBEAT_INTERVAL;
 
 type BackendNameListener = Box<dyn Fn(&BackendName) + Send + Sync + 'static>;
 

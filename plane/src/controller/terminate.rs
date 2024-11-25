@@ -4,6 +4,11 @@ use axum::{
     response::Response,
     Json,
 };
+use plane_client::{
+    names::BackendName,
+    protocol::BackendAction,
+    types::{TerminationKind, TerminationReason},
+};
 
 async fn terminate(
     controller: &Controller,

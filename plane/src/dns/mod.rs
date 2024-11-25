@@ -1,15 +1,16 @@
+use crate::signals::wait_for_shutdown_signal;
+
 use self::{error::Result, name_to_cluster::NameToCluster};
-use crate::{
-    client::PlaneClient,
-    dns::error::OrDnsError,
-    names::AcmeDnsServerName,
-    protocol::{MessageFromDns, MessageToDns},
-    signals::wait_for_shutdown_signal,
-    typed_socket::client::TypedSocketConnector,
-    types::ClusterName,
-};
 use anyhow::anyhow;
 use dashmap::DashMap;
+use error::OrDnsError;
+use plane_client::{
+    names::AcmeDnsServerName,
+    protocol::{MessageFromDns, MessageToDns},
+    typed_socket::client::TypedSocketConnector,
+    types::ClusterName,
+    PlaneClient,
+};
 use serde::{Deserialize, Serialize};
 use std::{net::Ipv4Addr, sync::Arc, time::Duration};
 use tokio::{

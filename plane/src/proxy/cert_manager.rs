@@ -1,15 +1,15 @@
 use super::{cert_pair::CertificatePair, AcmeConfig};
-use crate::{
-    log_types::LoggableTime,
-    protocol::{CertManagerRequest, CertManagerResponse},
-    types::ClusterName,
-};
 use acme2_eab::{
     gen_rsa_private_key, Account, AccountBuilder, AuthorizationStatus, ChallengeStatus, Csr,
     DirectoryBuilder, OrderBuilder, OrderStatus,
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
+use plane_client::{
+    log_types::LoggableTime,
+    protocol::{CertManagerRequest, CertManagerResponse},
+    types::ClusterName,
+};
 use plane_dynamic_proxy::tokio_rustls::rustls::{
     server::{ClientHello, ResolvesServerCert},
     sign::CertifiedKey,

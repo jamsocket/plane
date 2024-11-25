@@ -1,13 +1,16 @@
-use super::{runtime::unix_socket::UnixSocketRuntimeConfig, ExecutorConfig};
-use crate::{
-    drone::{runtime::docker::DockerRuntimeConfig, DroneConfig},
-    names::{DroneName, OrRandom},
-    types::{ClusterName, DronePoolName},
-    util::resolve_hostname,
+use crate::util::resolve_hostname;
+
+use super::{
+    runtime::{docker::DockerRuntimeConfig, unix_socket::UnixSocketRuntimeConfig},
+    DroneConfig, ExecutorConfig,
 };
 use anyhow::Result;
 use chrono::Duration;
 use clap::Parser;
+use plane_client::{
+    names::{DroneName, OrRandom},
+    types::{ClusterName, DronePoolName},
+};
 use std::{net::IpAddr, path::PathBuf};
 use url::Url;
 

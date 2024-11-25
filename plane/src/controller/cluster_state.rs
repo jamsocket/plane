@@ -1,10 +1,10 @@
 use super::{core::Controller, error::IntoApiError};
-use crate::types::{ClusterName, ClusterState};
 use axum::{
     extract::{Path, State},
     response::Response,
     Json,
 };
+use plane_client::types::{ClusterName, ClusterState};
 
 pub async fn handle_cluster_state(
     Path(cluster_name): Path<ClusterName>,

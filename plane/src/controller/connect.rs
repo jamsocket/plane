@@ -1,9 +1,12 @@
-use super::error::{err_to_response, ApiErrorKind};
+use super::error::err_to_response;
 use super::Controller;
 use crate::controller::error::IntoApiError;
 use crate::database::connect::ConnectError;
-use crate::types::{ConnectRequest, ConnectResponse, RevokeRequest};
 use axum::{extract::State, http::StatusCode, response::Response, Json};
+use plane_client::{
+    protocol::ApiErrorKind,
+    types::{ConnectRequest, ConnectResponse, RevokeRequest},
+};
 
 fn connect_error_to_response(connect_error: &ConnectError) -> Response {
     match connect_error {

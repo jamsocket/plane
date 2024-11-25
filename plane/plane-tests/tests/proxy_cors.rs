@@ -2,7 +2,7 @@ use common::{
     localhost_resolver::localhost_client, proxy_mock::MockProxy,
     simple_axum_server::SimpleAxumServer, test_env::TestEnvironment,
 };
-use plane::{
+use plane_client::{
     log_types::BackendAddr,
     names::{BackendName, Name},
     protocol::{RouteInfo, RouteInfoResponse},

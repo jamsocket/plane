@@ -1,6 +1,6 @@
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
-use plane::{
+use plane_client::{
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
     types::{

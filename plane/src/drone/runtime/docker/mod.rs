@@ -4,12 +4,8 @@ use self::{
     wait_backend::wait_for_backend,
 };
 use crate::{
-    database::backend::BackendMetricsMessage,
     drone::runtime::{docker::metrics::metrics_loop, Runtime},
     heartbeat_consts::KILL_AFTER_SOFT_TERMINATE_SECONDS,
-    names::BackendName,
-    protocol::AcquiredKey,
-    types::{backend_state::BackendError, BearerToken, DockerExecutorConfig, PullPolicy},
     util::GuardHandle,
 };
 use anyhow::Result;
@@ -21,6 +17,11 @@ use bollard::{
     Docker,
 };
 use chrono::{DateTime, Duration, Utc};
+use plane_client::{
+    names::BackendName,
+    protocol::{AcquiredKey, BackendMetricsMessage},
+    types::{backend_state::BackendError, BearerToken, DockerExecutorConfig, PullPolicy},
+};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, pin::Pin};
 use std::{
@@ -53,7 +54,7 @@ pub struct DockerRuntimeConfig {
     pub auto_prune: Option<bool>,
 
     #[serde(default)] // Necessary because we use a custom deserializer; see https://stackoverflow.com/a/44303505
-    #[serde(with = "crate::serialization::serialize_optional_duration_as_seconds")]
+    #[serde(with = "plane_client::serialization::serialize_optional_duration_as_seconds")]
     pub cleanup_min_age: Option<Duration>,
 }
 
@@ -113,7 +114,7 @@ async fn events_loop(
             tracing::warn!(?e.actor, "Ignoring event without name attribute.");
             continue;
         };
-        let Ok(backend_id) = BackendName::try_from(container_id.clone()) else {
+        let Ok(backend_id) = BackendName::try_from(container_id.to_string()) else {
             tracing::warn!(?e.actor, ?container_id, "Ignoring event with invalid backend ID.");
             continue;
         };

@@ -1,4 +1,4 @@
-use crate::{
+use plane_client::{
     names::{AnyNodeName, ControllerName},
     types::{BackendStatus, ClusterName, ClusterState, DroneState, NodeState},
 };

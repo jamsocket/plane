@@ -18,3 +18,5 @@ pub fn plane_version_info() -> PlaneVersionInfo {
         git_hash: PLANE_GIT_HASH.to_string(),
     }
 }
+
+pub const SERVER_NAME: &str = concat!("Plane/", env!("CARGO_PKG_VERSION"), "-", env!("GIT_HASH"));

@@ -1,27 +1,18 @@
-use super::{error::ApiErrorKind, Controller};
-use crate::{
-    controller::error::IntoApiError,
-    database::{
-        backend::BackendActionMessage,
-        backend_key::{
-            KEY_LEASE_HARD_TERMINATE_AFTER, KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER,
-        },
-        subscribe::Subscription,
-        PlaneDatabase,
-    },
+use axum::{
+    extract::{ws::WebSocket, ConnectInfo, Path, Query, State, WebSocketUpgrade},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use plane_client::{
     log_types::LoggableTime,
     protocol::{
-        BackendAction, Heartbeat, KeyDeadlines, MessageFromDrone, MessageToDrone, RenewKeyResponse,
+        ApiErrorKind, BackendAction, BackendActionMessage, Heartbeat, KeyDeadlines,
+        MessageFromDrone, MessageToDrone, RenewKeyResponse,
     },
     typed_socket::{server::new_server, TypedSocket},
     types::{
         backend_state::TerminationReason, ClusterName, DronePoolName, NodeId, TerminationKind,
     },
-};
-use axum::{
-    extract::{ws::WebSocket, ConnectInfo, Path, Query, State, WebSocketUpgrade},
-    http::StatusCode,
-    response::{IntoResponse, Response},
 };
 use serde::Deserialize;
 use std::{
@@ -29,6 +20,16 @@ use std::{
     time::Duration,
 };
 use valuable::Valuable;
+
+use crate::database::{
+    backend_key::{
+        KEY_LEASE_HARD_TERMINATE_AFTER, KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER,
+    },
+    subscribe::Subscription,
+    PlaneDatabase,
+};
+
+use super::{core::Controller, error::IntoApiError};
 
 #[derive(Deserialize)]
 pub struct DroneSocketQuery {

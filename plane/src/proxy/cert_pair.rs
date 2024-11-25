@@ -1,13 +1,16 @@
-use crate::log_types::LoggableTime;
 use anyhow::{anyhow, Result};
+use chrono::{DateTime, Utc};
 use pem::Pem;
+use plane_client::log_types::LoggableTime;
 use plane_dynamic_proxy::rustls::{
     crypto::aws_lc_rs::sign::any_supported_type, pki_types::PrivateKeyDer,
 };
 use plane_dynamic_proxy::tokio_rustls::rustls::sign::CertifiedKey;
 use rustls_pki_types::CertificateDer;
 use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 use std::{fs::Permissions, io, os::unix::fs::PermissionsExt, path::Path};
+use time::OffsetDateTime;
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +50,12 @@ pub struct CertificatePair {
     pub validity_end: LoggableTime,
 }
 
+fn convert_time(time: OffsetDateTime) -> LoggableTime {
+    let t: SystemTime = time.into();
+    let t: DateTime<Utc> = t.into();
+    LoggableTime(t)
+}
+
 impl CertificatePair {
     fn new(key: &PrivateKeyDer, certs: Vec<CertificateDer>) -> Result<Self> {
         let private_key_der = key.secret_der().to_vec();
@@ -83,8 +92,8 @@ impl CertificatePair {
             certified_key,
             common_name,
             private_key_der,
-            validity_start: validity_start.into(),
-            validity_end: validity_end.into(),
+            validity_start: convert_time(validity_start),
+            validity_end: convert_time(validity_end),
         })
     }
 
