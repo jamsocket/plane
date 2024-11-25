@@ -12,8 +12,11 @@ use crate::{
 use reqwest::{Response, StatusCode};
 use serde::de::DeserializeOwned;
 use url::{form_urlencoded, Url};
+
+pub mod exponential_backoff;
 pub mod controller_address;
 pub mod sse;
+pub mod typed_socket;
 
 #[derive(thiserror::Error, Debug)]
 pub enum PlaneClientError {

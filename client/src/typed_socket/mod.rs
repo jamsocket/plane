@@ -1,4 +1,4 @@
-use crate::client::PlaneClientError;
+use crate::PlaneClientError;
 use crate::PlaneVersionInfo;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};

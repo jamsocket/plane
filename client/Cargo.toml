@@ -1,0 +1,14 @@
+[package]
+name = "plane-client"
+version = "0.5.1"
+edition = "2021"
+
+[dependencies]
+futures-util = "0.3.31"
+reqwest = "0.12.9"
+serde = "1.0.215"
+thiserror = "2.0.3"
+tokio = { version = "1.41.1", features = ["sync"] }
+tracing = "0.1.40"
+tungstenite = "0.24.0"
+url = "2.5.4"

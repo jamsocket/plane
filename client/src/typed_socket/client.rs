@@ -1,6 +1,6 @@
 use super::{ChannelMessage, Handshake, SocketAction, TypedSocket};
-use crate::client::controller_address::AuthorizedAddress;
-use crate::client::PlaneClientError;
+use crate::controller_address::AuthorizedAddress;
+use crate::PlaneClientError;
 use crate::names::NodeName;
 use crate::{plane_version_info, util::ExponentialBackoff};
 use futures_util::{SinkExt, StreamExt};
