@@ -1,10 +1,10 @@
 use super::ControllerConfig;
-use crate::{
+use anyhow::Result;
+use clap::Parser;
+use plane_common::{
     names::{ControllerName, Name},
     types::ClusterName,
 };
-use anyhow::Result;
-use clap::Parser;
 use std::net::IpAddr;
 use url::Url;
 

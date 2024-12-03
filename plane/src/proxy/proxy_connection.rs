@@ -1,9 +1,9 @@
 use super::{cert_manager::CertManager, proxy_server::ProxyState};
-use crate::{
-    client::PlaneClient,
+use plane_common::{
     names::ProxyName,
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest},
     types::ClusterName,
+    PlaneClient,
 };
 use std::sync::Arc;
 use tokio::task::JoinHandle;

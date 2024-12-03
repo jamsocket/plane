@@ -1,6 +1,6 @@
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
-use plane::{
+use plane_common::{
     names::{Name, ProxyName},
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest, RouteInfoResponse},
     types::{
@@ -15,7 +15,7 @@ use std::collections::HashMap;
 mod common;
 
 #[plane_test]
-async fn backend_lifecycle(env: TestEnvironment) {
+async fn backend_lifecycle_docker(env: TestEnvironment) {
     let db = env.db().await;
     let controller = env.controller().await;
     let client = controller.client();

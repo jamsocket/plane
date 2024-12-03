@@ -1,15 +1,44 @@
+use std::fmt::Display;
+
 use crate::{
-    database::backend::{BackendActionMessage, BackendMetricsMessage},
     log_types::{BackendAddr, LoggableTime},
     names::{BackendActionName, BackendName},
     typed_socket::ChannelMessage,
     types::{
         backend_state::TerminationReason, BackendState, BearerToken, ClusterName, KeyConfig,
-        SecretToken, Subdomain, TerminationKind,
+        NodeId, SecretToken, Subdomain, TerminationKind,
     },
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum ApiErrorKind {
+    FailedToAcquireKey,
+    KeyUnheldNoSpawnConfig,
+    KeyHeldUnhealthy,
+    KeyHeld,
+    NoDroneAvailable,
+    FailedToRemoveKey,
+    DatabaseError,
+    NoClusterProvided,
+    NotFound,
+    InvalidClusterName,
+    Other,
+}
+
+#[derive(thiserror::Error, Debug, Serialize, Deserialize)]
+pub struct ApiError {
+    pub id: String,
+    pub kind: ApiErrorKind,
+    pub message: String,
+}
+
+impl Display for ApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, valuable::Valuable, PartialEq)]
 pub struct KeyDeadlines {
@@ -132,6 +161,29 @@ pub enum MessageFromDrone {
     RenewKey(RenewKeyRequest),
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BackendMetricsMessage {
+    pub backend_id: BackendName,
+    /// Memory used by backend excluding inactive file cache, same as use shown by docker stats
+    /// ref: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go#L227C45-L227C45
+    pub mem_used: u64,
+    /// Memory used by backend in bytes
+    /// (calculated using kernel memory used by cgroup + page cache memory used by cgroup)
+    pub mem_total: u64,
+    /// Active memory (non reclaimable)
+    pub mem_active: u64,
+    /// Inactive memory (reclaimable)
+    pub mem_inactive: u64,
+    /// Unevictable memory (mlock etc)
+    pub mem_unevictable: u64,
+    /// The backend's memory limit
+    pub mem_limit: u64,
+    /// Nanoseconds of CPU used by backend since last message
+    pub cpu_used: u64,
+    /// Total CPU nanoseconds for system since last message
+    pub sys_cpu: u64,
+}
+
 impl ChannelMessage for MessageFromDrone {
     type Reply = MessageToDrone;
 }
@@ -144,6 +196,14 @@ pub struct RenewKeyResponse {
     /// The key that was renewed, if successful.
     /// If the key was not renewed, this will be None.
     pub deadlines: Option<KeyDeadlines>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackendActionMessage {
+    pub action_id: BackendActionName,
+    pub backend_id: BackendName,
+    pub drone_id: NodeId,
+    pub action: BackendAction,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -262,4 +322,11 @@ pub enum MessageToDns {
 
 impl ChannelMessage for MessageToDns {
     type Reply = MessageFromDns;
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StatusResponse {
+    pub status: String,
+    pub version: String,
+    pub hash: String,
 }

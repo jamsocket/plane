@@ -1,7 +1,9 @@
 use super::WrappedMessage;
-use crate::util::{random_token, ExponentialBackoff, GuardHandle};
+use crate::util::GuardHandle;
 use anyhow::{Error, Result};
 use dashmap::DashMap;
+use plane_common::exponential_backoff::ExponentialBackoff;
+use plane_common::util::random_token;
 use serde::{Deserialize, Serialize};
 use std::{clone::Clone, fmt::Debug, path::Path, sync::Arc};
 use tokio::io::AsyncWriteExt;
@@ -107,10 +109,10 @@ where
 async fn connect<P: AsRef<Path>>(socket_path: P) -> UnixStream {
     let socket_path = socket_path.as_ref().to_path_buf();
     let mut backoff = ExponentialBackoff::new(
-        chrono::Duration::milliseconds(10),
-        chrono::Duration::seconds(1),
+        Duration::from_millis(10),
+        Duration::from_secs(1),
         1.5,
-        chrono::Duration::seconds(1),
+        Duration::from_secs(1),
     );
     loop {
         match UnixStream::connect(&socket_path).await {

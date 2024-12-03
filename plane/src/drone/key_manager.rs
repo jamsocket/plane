@@ -1,13 +1,13 @@
 use super::executor::Executor;
-use crate::{
+use crate::util::GuardHandle;
+use chrono::Utc;
+use plane_common::{
     log_types::LoggableTime,
     names::BackendName,
     protocol::{AcquiredKey, BackendAction, KeyDeadlines, RenewKeyRequest},
     typed_socket::TypedSocketSender,
     types::{backend_state::TerminationReason, TerminationKind},
-    util::GuardHandle,
 };
-use chrono::Utc;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::sleep;
 use valuable::Valuable;

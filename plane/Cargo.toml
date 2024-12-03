@@ -29,6 +29,7 @@ hyper-util = { version = "0.1.9", features = ["client", "client-legacy", "http1"
 lru = "0.12.1"
 openssl = "0.10.66"
 pem = "3.0.2"
+plane-common = { path="../common", version = "0.5.1" }
 plane-dynamic-proxy = { path="../dynamic-proxy", version = "0.5.1" }
 rand = "0.8.5"
 reqwest = { version = "0.12.8", features = ["json", "rustls-tls"], default-features = false }

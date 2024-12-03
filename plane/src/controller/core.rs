@@ -1,11 +1,11 @@
-use crate::{
-    client::PlaneClient,
-    database::{connect::ConnectError, PlaneDatabase},
+use crate::database::{connect::ConnectError, PlaneDatabase};
+use chrono::{DateTime, Utc};
+use plane_common::{
     names::{AnyNodeName, ControllerName},
     typed_socket::Handshake,
     types::{ClusterName, ConnectRequest, ConnectResponse, NodeId},
+    PlaneClient,
 };
-use chrono::{DateTime, Utc};
 use std::net::IpAddr;
 use url::Url;
 

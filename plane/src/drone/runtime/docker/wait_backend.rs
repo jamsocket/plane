@@ -1,4 +1,4 @@
-use crate::types::backend_state::BackendError;
+use plane_common::types::backend_state::BackendError;
 use std::{
     net::SocketAddr,
     time::{Duration, Instant},

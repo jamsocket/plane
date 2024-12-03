@@ -1,4 +1,4 @@
-use crate::types::{BearerToken, ClusterName};
+use plane_common::types::{BearerToken, ClusterName};
 use plane_dynamic_proxy::hyper::http::uri::{self, PathAndQuery};
 use std::str::FromStr;
 

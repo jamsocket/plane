@@ -1,17 +1,18 @@
-use crate::{
-    client::{sse::SseStream, PlaneClient, PlaneClientError},
+use chrono::Duration;
+use clap::{Parser, Subcommand};
+use colored::Colorize;
+use plane_common::{
     names::{BackendName, DroneName, Name, ProxyName},
     protocol::{CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy},
+    sse::SseStream,
     types::{
         backend_state::BackendStatusStreamEntry, BackendStatus, ClusterName, ClusterState,
         ConnectRequest, DockerExecutorConfig, DronePoolName, KeyConfig, Mount, NodeState,
         SpawnConfig, Subdomain,
     },
-    PLANE_GIT_HASH, PLANE_VERSION,
+    version::{PLANE_GIT_HASH, PLANE_VERSION},
+    PlaneClient, PlaneClientError,
 };
-use chrono::Duration;
-use clap::{Parser, Subcommand};
-use colored::Colorize;
 use std::path::PathBuf;
 use url::Url;
 

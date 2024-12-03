@@ -1,8 +1,6 @@
+use crate::database::backend::BackendRow;
+
 use super::{core::Controller, error::IntoApiError};
-use crate::{
-    names::BackendName,
-    types::{backend_state::BackendStatusStreamEntry, BackendStatus},
-};
 use axum::{
     extract::{Path, State},
     http::HeaderMap,
@@ -13,7 +11,17 @@ use axum::{
     Json,
 };
 use futures_util::{Stream, StreamExt};
+use plane_common::{
+    names::BackendName,
+    types::{backend_state::BackendStatusStreamEntry, BackendStatus},
+};
 use std::convert::Infallible;
+
+impl From<BackendRow> for BackendStatusStreamEntry {
+    fn from(row: BackendRow) -> Self {
+        Self::from_state(row.state, row.last_status_time)
+    }
+}
 
 async fn backend_status(
     controller: &Controller,

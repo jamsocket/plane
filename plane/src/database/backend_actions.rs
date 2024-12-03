@@ -1,7 +1,7 @@
-use super::{backend::BackendActionMessage, connect::ConnectError, subscribe::emit_with_key};
-use crate::{
+use super::{connect::ConnectError, subscribe::emit_with_key};
+use plane_common::{
     names::{BackendActionName, BackendName, Name},
-    protocol::BackendAction,
+    protocol::{BackendAction, BackendActionMessage},
     types::NodeId,
 };
 use sqlx::{PgPool, Postgres};

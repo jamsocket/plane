@@ -1,15 +1,12 @@
-use std::sync::Arc;
-
 use crate::common::timeout::WithTimeout;
 use common::test_env::TestEnvironment;
-use plane::{
-    names::{Name, ProxyName},
-    proxy::{
-        cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection,
-        proxy_server::ProxyState, AcmeConfig, AcmeEabConfiguration,
-    },
+use plane::proxy::{
+    cert_manager::watcher_manager_pair, proxy_connection::ProxyConnection,
+    proxy_server::ProxyState, AcmeConfig, AcmeEabConfiguration,
 };
+use plane_common::names::{Name, ProxyName};
 use plane_test_macro::plane_test;
+use std::sync::Arc;
 
 mod common;
 

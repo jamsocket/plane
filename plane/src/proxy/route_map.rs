@@ -1,9 +1,9 @@
-use crate::{
+use lru::LruCache;
+use plane_common::{
     names::BackendName,
     protocol::{RouteInfo, RouteInfoRequest, RouteInfoResponse},
     types::BearerToken,
 };
-use lru::LruCache;
 use std::{
     collections::HashMap,
     num::NonZeroUsize,

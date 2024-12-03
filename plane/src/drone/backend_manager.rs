@@ -1,15 +1,15 @@
-use crate::drone::runtime::Runtime;
-use crate::{
+use crate::{drone::runtime::Runtime, util::GuardHandle};
+use anyhow::Result;
+use futures_util::Future;
+use plane_common::{
+    exponential_backoff::ExponentialBackoff,
     names::BackendName,
     protocol::AcquiredKey,
     types::{
         backend_state::{BackendError, TerminationReason},
         BackendState, BearerToken, TerminationKind,
     },
-    util::{ExponentialBackoff, GuardHandle},
 };
-use anyhow::Result;
-use futures_util::Future;
 use std::{error::Error, fmt::Debug};
 use std::{future::pending, pin::Pin};
 use std::{

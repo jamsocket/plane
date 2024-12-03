@@ -10,9 +10,9 @@ use self::{
     node::NodeDatabase,
     subscribe::{EventSubscriptionManager, Notification, NotificationPayload, Subscription},
 };
-use crate::{
-    client::PlaneClient,
+use plane_common::{
     types::{ClusterName, ConnectRequest, ConnectResponse, RevokeRequest},
+    PlaneClient,
 };
 use serde_json::Value;
 use sqlx::{postgres::PgPoolOptions, PgPool};

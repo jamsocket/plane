@@ -1,5 +1,5 @@
 use super::PlaneClientError;
-use crate::util::ExponentialBackoff;
+use crate::exponential_backoff::ExponentialBackoff;
 use reqwest::{
     header::{HeaderValue, ACCEPT, CONNECTION},
     Client, Response,

@@ -1,5 +1,5 @@
-use crate::client::PlaneClientError;
-use crate::PlaneVersionInfo;
+use crate::version::PlaneVersionInfo;
+use crate::PlaneClientError;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;

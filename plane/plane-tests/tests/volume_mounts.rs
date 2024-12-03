@@ -1,6 +1,6 @@
 use crate::common::test_env::TestEnvironment;
 use crate::common::wait_until_backend_terminated;
-use plane::types::{
+use plane_common::types::{
     ConnectRequest, DockerExecutorConfig, DronePoolName, KeyConfig, Mount, PullPolicy,
     ResourceLimits, SpawnConfig,
 };

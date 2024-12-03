@@ -2,18 +2,17 @@ use super::{
     subscribe::{emit_backend_metrics, emit_with_key},
     PlaneDatabase,
 };
-use crate::{
+use chrono::{DateTime, Utc};
+use futures_util::Stream;
+use plane_common::{
     log_types::BackendAddr,
-    names::{BackendActionName, BackendName, DroneName},
-    protocol::{BackendAction, RouteInfo},
+    names::{BackendName, DroneName},
+    protocol::{BackendActionMessage, BackendMetricsMessage, RouteInfo},
     types::{
         backend_state::BackendStatusStreamEntry, BackendState, BackendStatus, BearerToken,
         ClusterName, NodeId, SecretToken, Subdomain,
     },
 };
-use chrono::{DateTime, Utc};
-use futures_util::Stream;
-use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use std::{fmt::Debug, net::SocketAddr, str::FromStr};
 use valuable::Valuable;
@@ -22,41 +21,10 @@ pub struct BackendDatabase<'a> {
     db: &'a PlaneDatabase,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BackendActionMessage {
-    pub action_id: BackendActionName,
-    pub backend_id: BackendName,
-    pub drone_id: NodeId,
-    pub action: BackendAction,
-}
-
 impl super::subscribe::NotificationPayload for BackendActionMessage {
     fn kind() -> &'static str {
         "backend_action"
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BackendMetricsMessage {
-    pub backend_id: BackendName,
-    /// Memory used by backend excluding inactive file cache, same as use shown by docker stats
-    /// ref: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go#L227C45-L227C45
-    pub mem_used: u64,
-    /// Memory used by backend in bytes
-    /// (calculated using kernel memory used by cgroup + page cache memory used by cgroup)
-    pub mem_total: u64,
-    /// Active memory (non reclaimable)
-    pub mem_active: u64,
-    /// Inactive memory (reclaimable)
-    pub mem_inactive: u64,
-    /// Unevictable memory (mlock etc)
-    pub mem_unevictable: u64,
-    /// The backend's memory limit
-    pub mem_limit: u64,
-    /// Nanoseconds of CPU used by backend since last message
-    pub cpu_used: u64,
-    /// Total CPU nanoseconds for system since last message
-    pub sys_cpu: u64,
 }
 
 impl super::subscribe::NotificationPayload for BackendMetricsMessage {

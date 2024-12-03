@@ -3,8 +3,8 @@ use super::{
     request::{get_and_maybe_remove_bearer_token, subdomain_from_host},
     route_map::RouteMap,
 };
-use crate::{names::Name, protocol::RouteInfo, SERVER_NAME};
 use bytes::Bytes;
+use plane_common::{names::Name, protocol::RouteInfo, version::SERVER_NAME};
 use plane_dynamic_proxy::{
     body::{simple_empty_body, SimpleBody},
     hyper::{

@@ -9,15 +9,11 @@ use self::{
 };
 use crate::{
     cleanup,
-    client::PlaneClient,
     controller::{connect::handle_connect, core::Controller, drone::handle_drone_socket},
     database::{connect_and_migrate, PlaneDatabase},
     heartbeat_consts::HEARTBEAT_INTERVAL,
-    names::ControllerName,
     signals::wait_for_shutdown_signal,
-    types::ClusterName,
     util::GuardHandle,
-    PLANE_GIT_HASH, PLANE_VERSION,
 };
 use anyhow::{Context, Result};
 use axum::{
@@ -29,6 +25,13 @@ use axum::{
 };
 use forward_auth::forward_layer;
 use futures_util::never::Never;
+use plane_common::{
+    names::ControllerName,
+    protocol::StatusResponse,
+    types::ClusterName,
+    version::{PLANE_GIT_HASH, PLANE_VERSION},
+    PlaneClient,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
@@ -62,13 +65,6 @@ mod terminate;
 /// We want to keep this just high enough to serve short requests. Long-lived requests
 /// will continue blocking indefinitely, which is why we need a timeout.
 const TERMINATE_TIMEOUT_DURATION: std::time::Duration = std::time::Duration::from_secs(2);
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StatusResponse {
-    pub status: String,
-    pub version: String,
-    pub hash: String,
-}
 
 pub async fn status(
     State(controller): State<Controller>,

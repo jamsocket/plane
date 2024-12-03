@@ -1,7 +1,7 @@
-use plane::{
+use plane::proxy::{connection_monitor::BackendEntry, proxy_server::ProxyState};
+use plane_common::{
     names::BackendName,
     protocol::{RouteInfoRequest, RouteInfoResponse},
-    proxy::{connection_monitor::BackendEntry, proxy_server::ProxyState},
 };
 use plane_dynamic_proxy::server::{HttpsConfig, SimpleHttpServer};
 use std::net::SocketAddr;

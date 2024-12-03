@@ -1,22 +1,21 @@
-use super::{error::ApiErrorKind, Controller};
-use crate::{
-    controller::error::IntoApiError,
-    database::{
-        backend::RouteInfoResult,
-        subscribe::{Notification, Subscription},
-    },
-    names::{BackendName, Name},
-    protocol::{
-        CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy,
-        RouteInfoRequest, RouteInfoResponse,
-    },
-    typed_socket::{server::new_server, TypedSocket},
-    types::{BackendState, BearerToken, ClusterName, NodeId},
+use super::{core::Controller, error::IntoApiError};
+use crate::database::{
+    backend::RouteInfoResult,
+    subscribe::{Notification, Subscription},
 };
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},
     http::StatusCode,
     response::{IntoResponse, Response},
+};
+use plane_common::{
+    names::{BackendName, Name},
+    protocol::{
+        ApiErrorKind, CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy,
+        RouteInfoRequest, RouteInfoResponse,
+    },
+    typed_socket::{server::new_server, TypedSocket},
+    types::{BackendState, BearerToken, ClusterName, NodeId},
 };
 use std::net::{IpAddr, SocketAddr};
 use tokio::select;

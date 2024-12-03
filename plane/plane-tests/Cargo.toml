@@ -14,7 +14,8 @@ futures-util = "0.3.29"
 http = "1.1.0"
 http-body-util = "0.1.2"
 hyper = { version = "1.4.1", features = ["server"] }
-plane = { path = "../plane-dynamic", package = "plane-dynamic" }
+plane = { path = "../", package = "plane" }
+plane-common = { path="../../common", version = "0.5.1" }
 plane-dynamic-proxy = { path = "../../dynamic-proxy" }
 plane-test-macro = { path = "plane-test-macro" }
 reqwest = { version = "0.12.8", features = ["json", "rustls-tls"], default-features = false }

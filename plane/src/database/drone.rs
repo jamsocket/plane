@@ -1,12 +1,11 @@
-use crate::{
-    heartbeat_consts::UNHEALTHY_SECONDS,
-    names::{ControllerName, DroneName},
-    types::{BackendStatus, ClusterName, DronePoolName, NodeId},
-};
 use chrono::{DateTime, Utc};
+use plane_common::names::{ControllerName, DroneName};
+use plane_common::types::{BackendStatus, ClusterName, DronePoolName, NodeId};
 use sqlx::{postgres::types::PgInterval, query, PgPool};
 use std::str::FromStr;
 use std::time::Duration;
+
+use crate::heartbeat_consts::UNHEALTHY_SECONDS;
 
 pub struct DroneDatabase<'a> {
     pool: &'a PgPool,

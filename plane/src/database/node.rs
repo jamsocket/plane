@@ -3,13 +3,13 @@ use super::{
     util::MapSqlxError,
 };
 use crate::heartbeat_consts::UNHEALTHY_SECONDS;
-use crate::{
-    names::{AnyNodeName, ControllerName, NodeName},
-    types::{ClusterName, NodeId, NodeKind},
-    PlaneVersionInfo,
-};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use plane_common::{
+    names::{AnyNodeName, ControllerName, NodeName},
+    types::{ClusterName, NodeId, NodeKind},
+    version::PlaneVersionInfo,
+};
 use serde::{Deserialize, Serialize};
 use sqlx::{postgres::types::PgInterval, query, types::ipnetwork::IpNetwork, PgPool};
 use std::{net::IpAddr, time::Duration};

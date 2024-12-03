@@ -1,4 +1,5 @@
-use crate::{heartbeat_consts::HEARTBEAT_INTERVAL, names::BackendName};
+use crate::heartbeat_consts::HEARTBEAT_INTERVAL;
+use plane_common::names::BackendName;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::{Arc, Mutex},

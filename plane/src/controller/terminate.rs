@@ -1,13 +1,13 @@
 use super::{core::Controller, error::IntoApiError};
-use crate::{
-    names::BackendName,
-    protocol::BackendAction,
-    types::{backend_state::TerminationReason, TerminationKind},
-};
 use axum::{
     extract::{Path, State},
     response::Response,
     Json,
+};
+use plane_common::{
+    names::BackendName,
+    protocol::BackendAction,
+    types::{TerminationKind, TerminationReason},
 };
 
 async fn terminate(

@@ -4,12 +4,8 @@ use self::{
     wait_backend::wait_for_backend,
 };
 use crate::{
-    database::backend::BackendMetricsMessage,
     drone::runtime::{docker::metrics::metrics_loop, Runtime},
     heartbeat_consts::KILL_AFTER_SOFT_TERMINATE_SECONDS,
-    names::BackendName,
-    protocol::AcquiredKey,
-    types::{backend_state::BackendError, BearerToken, DockerExecutorConfig, PullPolicy},
     util::GuardHandle,
 };
 use anyhow::Result;
@@ -21,6 +17,11 @@ use bollard::{
     Docker,
 };
 use chrono::{DateTime, Duration, Utc};
+use plane_common::{
+    names::BackendName,
+    protocol::{AcquiredKey, BackendMetricsMessage},
+    types::{backend_state::BackendError, BearerToken, DockerExecutorConfig, PullPolicy},
+};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, pin::Pin};
 use std::{
@@ -53,7 +54,7 @@ pub struct DockerRuntimeConfig {
     pub auto_prune: Option<bool>,
 
     #[serde(default)] // Necessary because we use a custom deserializer; see https://stackoverflow.com/a/44303505
-    #[serde(with = "crate::serialization::serialize_optional_duration_as_seconds")]
+    #[serde(with = "plane_common::serialization::serialize_optional_duration_as_seconds")]
     pub cleanup_min_age: Option<Duration>,
 }
 

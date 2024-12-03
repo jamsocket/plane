@@ -1,12 +1,12 @@
 use super::{core::Controller, error::IntoApiError};
-use crate::{
-    names::DroneName,
-    types::{ClusterName, DrainResult},
-};
 use axum::{
     extract::{Path, State},
     response::Response,
     Json,
+};
+use plane_common::{
+    names::DroneName,
+    types::{ClusterName, DrainResult},
 };
 
 async fn drain(

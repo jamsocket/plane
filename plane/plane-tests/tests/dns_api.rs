@@ -1,5 +1,5 @@
 use common::test_env::TestEnvironment;
-use plane::{
+use plane_common::{
     names::{AcmeDnsServerName, Name, ProxyName},
     protocol::{
         CertManagerRequest, CertManagerResponse, MessageFromDns, MessageFromProxy, MessageToDns,

@@ -9,18 +9,19 @@ use self::{
     },
     state_store::StateStore,
 };
-use crate::{
-    client::PlaneClient,
-    database::backend::BackendActionMessage,
-    drone::runtime::docker::DockerRuntime,
-    names::DroneName,
-    protocol::{BackendAction, MessageFromDrone, MessageToDrone, RenewKeyResponse},
-    signals::wait_for_shutdown_signal,
-    typed_socket::{client::TypedSocketConnector, TypedSocketSender},
-    types::{BackendState, ClusterName, DronePoolName},
-};
+use crate::signals::wait_for_shutdown_signal;
 use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
+use plane_common::{
+    names::DroneName,
+    protocol::{
+        BackendAction, BackendActionMessage, MessageFromDrone, MessageToDrone, RenewKeyResponse,
+    },
+    typed_socket::{client::TypedSocketConnector, TypedSocketSender},
+    types::{BackendState, ClusterName, DronePoolName},
+    PlaneClient,
+};
+use runtime::docker::DockerRuntime;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -289,7 +290,7 @@ pub struct DroneConfig {
         note = "Moved to `executor_config` (only applies to DockerRuntimeConfig)."
     )]
     pub auto_prune: Option<bool>,
-    #[serde(with = "crate::serialization::serialize_optional_duration_as_seconds")]
+    #[serde(with = "plane_common::serialization::serialize_optional_duration_as_seconds")]
     #[deprecated(
         since = "0.4.12",
         note = "Moved to `executor_config` (only applies to DockerRuntimeConfig)."

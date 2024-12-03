@@ -1,6 +1,5 @@
 use self::controller_address::AuthorizedAddress;
 use crate::{
-    controller::{error::ApiError, StatusResponse},
     names::{BackendName, DroneName},
     protocol::{MessageFromDns, MessageFromDrone, MessageFromProxy},
     typed_socket::client::TypedSocketConnector,
@@ -9,11 +8,22 @@ use crate::{
         ConnectResponse, DrainResult, DronePoolName, RevokeRequest,
     },
 };
+use protocol::{ApiError, StatusResponse};
 use reqwest::{Response, StatusCode};
 use serde::de::DeserializeOwned;
 use url::{form_urlencoded, Url};
+
 pub mod controller_address;
+pub mod exponential_backoff;
+pub mod log_types;
+pub mod names;
+pub mod protocol;
+pub mod serialization;
 pub mod sse;
+pub mod typed_socket;
+pub mod types;
+pub mod util;
+pub mod version;
 
 #[derive(thiserror::Error, Debug)]
 pub enum PlaneClientError {

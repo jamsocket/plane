@@ -2,9 +2,8 @@
 
 use clap::{Parser, Subcommand};
 use colored::{self, Colorize};
-use plane::{
-    database::connect,
-    init_tracing::init_tracing,
+use plane::{database::connect, init_tracing::init_tracing};
+use plane_common::{
     names::{BackendName, DroneName},
     types::{BackendState, BackendStatus, ClusterName, TerminationReason},
 };

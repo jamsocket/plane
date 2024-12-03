@@ -1,11 +1,11 @@
 use super::Controller;
-use crate::{
-    protocol::{MessageFromDns, MessageToDns},
-    typed_socket::server::new_server,
-};
 use axum::{
     extract::{ws::WebSocket, ConnectInfo, State, WebSocketUpgrade},
     response::IntoResponse,
+};
+use plane_common::{
+    protocol::{MessageFromDns, MessageToDns},
+    typed_socket::server::new_server,
 };
 use std::net::{IpAddr, SocketAddr};
 use valuable::Valuable;

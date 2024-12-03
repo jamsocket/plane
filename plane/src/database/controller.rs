@@ -1,9 +1,9 @@
-use crate::names::ControllerName;
 use crate::PLANE_GIT_HASH;
 use crate::PLANE_VERSION;
 use anyhow::Result;
 use chrono::DateTime;
 use chrono::Utc;
+use plane_common::names::ControllerName;
 use sqlx::PgPool;
 
 pub struct ControllerDatabase<'a> {

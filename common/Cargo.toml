@@ -1,0 +1,29 @@
+[package]
+name = "plane-common"
+version = "0.5.1"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.7.7", features = ["ws"] }
+bollard = "0.17.0"
+chrono = { version = "0.4.31", features = ["serde"] }
+clap = "4.4.10"
+data-encoding = "2.4.0"
+futures-util = "0.3.29"
+rand = "0.8.5"
+reqwest = { version = "0.12.8", features = ["json"] }
+serde = "1.0.109"
+serde_json = "1.0.107"
+serde_with = "3.4.0"
+thiserror = "1.0.50"
+tokio = { version = "1.33.0", features = ["sync"] }
+tokio-tungstenite = "0.24.0"
+tracing = "0.1.40"
+tungstenite = "0.24.0"
+url = "2.4.1"
+valuable = { version = "0.1.0", features = ["derive"] }
+
+[dev-dependencies]
+anyhow = "1.0.93"
+async-stream = "0.3.6"
+axum = "0.7.9"
