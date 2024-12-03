@@ -1,6 +1,5 @@
-use crate::util::GuardHandle;
-
 use super::executor::Executor;
+use crate::util::GuardHandle;
 use chrono::Utc;
 use plane_common::{
     log_types::LoggableTime,

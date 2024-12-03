@@ -1,9 +1,8 @@
-use crate::util::resolve_hostname;
-
 use super::{
     runtime::{docker::DockerRuntimeConfig, unix_socket::UnixSocketRuntimeConfig},
     DroneConfig, ExecutorConfig,
 };
+use crate::util::resolve_hostname;
 use anyhow::Result;
 use chrono::Duration;
 use clap::Parser;

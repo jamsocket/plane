@@ -1,3 +1,4 @@
+use crate::database::{connect::ConnectError, PlaneDatabase};
 use chrono::{DateTime, Utc};
 use plane_common::{
     names::{AnyNodeName, ControllerName},
@@ -7,8 +8,6 @@ use plane_common::{
 };
 use std::net::IpAddr;
 use url::Url;
-
-use crate::database::{connect::ConnectError, PlaneDatabase};
 
 #[derive(Clone)]
 pub struct Controller {

@@ -1,5 +1,3 @@
-use crate::signals::wait_for_shutdown_signal;
-
 use self::{
     executor::Executor,
     heartbeat::HeartbeatLoop,
@@ -11,6 +9,7 @@ use self::{
     },
     state_store::StateStore,
 };
+use crate::signals::wait_for_shutdown_signal;
 use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
 use plane_common::{
