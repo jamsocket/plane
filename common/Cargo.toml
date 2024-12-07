@@ -2,6 +2,10 @@
 name = "plane-common"
 version = "0.5.2"
 edition = "2021"
+description = "Client library and common utilities for the Plane session backend orchestrator."
+license = "MIT"
+repository = "https://github.com/jamsocket/plane"
+readme = "README.md"
 
 [dependencies]
 axum = { version = "0.7.7", features = ["ws"] }
