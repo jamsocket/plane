@@ -7,6 +7,11 @@ use std::str::FromStr;
 // will, so we strip it.
 const HTTPS_PORT_SUFFIX: &str = ":443";
 
+/// Minimum length of a bearer token. This is mostly a protection against vulnerability
+/// scanners that will send a lot of requests to random endpoints, which we don't want
+/// filling up the LRU cache.
+const MIN_BEARER_TOKEN_LENGTH: usize = 16;
+
 /// Returns Ok(Some(subdomain)) if a subdomain is found.
 /// Returns Ok(None) if no subdomain is found, but the host header matches the cluster name.
 /// Returns Err(()) if the host header does not
@@ -50,7 +55,7 @@ pub fn get_and_maybe_remove_bearer_token(parts: &mut uri::Parts) -> Option<Beare
         None => (full_path, ""),
     };
 
-    if token.is_empty() {
+    if token.len() < MIN_BEARER_TOKEN_LENGTH {
         return None;
     }
 
@@ -138,11 +143,11 @@ mod tests {
 
     #[test]
     fn test_get_and_maybe_remove_bearer_token() {
-        let url = Uri::from_str("https://example.com/foo/bar").unwrap();
+        let url = Uri::from_str("https://example.com/abcdef1234567890/bar").unwrap();
         let mut parts = url.into_parts();
         assert_eq!(
             get_and_maybe_remove_bearer_token(&mut parts),
-            Some(BearerToken::from("foo".to_string()))
+            Some(BearerToken::from("abcdef1234567890".to_string()))
         );
         assert_eq!(
             parts.path_and_query,
@@ -152,11 +157,11 @@ mod tests {
 
     #[test]
     fn test_get_and_maybe_remove_bearer_token_ends_no_slash() {
-        let url = Uri::from_str("https://example.com/foo").unwrap();
+        let url = Uri::from_str("https://example.com/abcdef1234567890").unwrap();
         let mut parts = url.into_parts();
         assert_eq!(
             get_and_maybe_remove_bearer_token(&mut parts),
-            Some(BearerToken::from("foo".to_string()))
+            Some(BearerToken::from("abcdef1234567890".to_string()))
         );
         assert_eq!(
             parts.path_and_query,
@@ -166,11 +171,11 @@ mod tests {
 
     #[test]
     fn test_get_and_maybe_remove_bearer_token_ends_in_slash() {
-        let url = Uri::from_str("https://example.com/foo/").unwrap();
+        let url = Uri::from_str("https://example.com/abcdef1234567890/").unwrap();
         let mut parts = url.into_parts();
         assert_eq!(
             get_and_maybe_remove_bearer_token(&mut parts),
-            Some(BearerToken::from("foo".to_string()))
+            Some(BearerToken::from("abcdef1234567890".to_string()))
         );
         assert_eq!(
             parts.path_and_query,
@@ -191,15 +196,27 @@ mod tests {
 
     #[test]
     fn test_get_and_maybe_remove_bearer_token_static_token() {
-        let url = Uri::from_str("https://example.com/s.foo/bar").unwrap();
+        let url = Uri::from_str("https://example.com/s.abcdef1234567890/bar").unwrap();
         let mut parts = url.into_parts();
         assert_eq!(
             get_and_maybe_remove_bearer_token(&mut parts),
-            Some(BearerToken::from("s.foo".to_string()))
+            Some(BearerToken::from("s.abcdef1234567890".to_string()))
         );
         assert_eq!(
             parts.path_and_query,
-            Some(PathAndQuery::from_str("/s.foo/bar").unwrap())
+            Some(PathAndQuery::from_str("/s.abcdef1234567890/bar").unwrap())
         );
+    }
+
+    #[test]
+    fn test_bearer_token_has_minimum_length() {
+        let url = Uri::from_str("https://example.com/foo/bar").unwrap();
+        let mut parts = url.into_parts();
+        assert_eq!(get_and_maybe_remove_bearer_token(&mut parts), None);
+
+        // Minimum length is 16.
+        let url = Uri::from_str("https://example.com/1234567890abcde/bar").unwrap();
+        let mut parts = url.into_parts();
+        assert_eq!(get_and_maybe_remove_bearer_token(&mut parts), None);
     }
 }
