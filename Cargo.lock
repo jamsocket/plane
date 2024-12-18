@@ -1979,7 +1979,7 @@ checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 
 [[package]]
 name = "plane"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "acme2-eab",
  "anyhow",
@@ -2030,7 +2030,7 @@ dependencies = [
 
 [[package]]
 name = "plane-common"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2056,7 +2056,7 @@ dependencies = [
 
 [[package]]
 name = "plane-dynamic-proxy"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "anyhow",
  "axum",
