@@ -105,10 +105,11 @@ impl RouteMap {
             .lock()
             .expect("Routes lock was poisoned.")
             .push(token.clone(), route_info);
-        let listener_lock = self.listeners.lock().expect("Listeners lock was poisoned.");
-        if let Some(listener_lock) = listener_lock.get(&token) {
+        let mut listener_lock = self.listeners.lock().expect("Listeners lock was poisoned.");
+        if let Some(channel) = listener_lock.get(&token) {
             // We are just using the watch channel as a signal; this will ensure that anyone listening on `.changed()` resolves.
-            listener_lock.send_modify(|()| ());
+            channel.send_modify(|()| ());
+            listener_lock.remove(&token);
         };
     }
 
@@ -119,7 +120,7 @@ impl RouteMap {
     pub fn remove_backend(&self, backend: &BackendName) {
         // When a backend is terminated, we invalidate all routes that point to it.
         // We do this by looping over the connection tokens, but this is relatively inexpensive
-        // because we have a maximum of 1,000 connection tokens in the LRU cache.
+        // because we have a maximum of <CACHE_SIZE> connection tokens in the LRU cache.
         let mut count = 0;
         let mut lock = self.routes.lock().expect("Routes lock was poisoned.");
         for (_, maybe_route_info) in lock.iter_mut() {
