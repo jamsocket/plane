@@ -15,7 +15,7 @@ clap = "4.4.10"
 data-encoding = "2.4.0"
 futures-util = "0.3.29"
 rand = "0.8.5"
-reqwest = { version = "0.12.8", features = ["json"] }
+reqwest = { version = "0.12.8", features = ["json", "rustls-tls"], default-features = false }
 serde = "1.0.109"
 serde_json = "1.0.107"
 serde_with = "3.4.0"
