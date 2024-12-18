@@ -1,6 +1,6 @@
 [package]
 name = "plane-dynamic-proxy"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 description = "Dynamic proxy crate for Plane"
 repository = "https://github.com/jamsocket/plane"
