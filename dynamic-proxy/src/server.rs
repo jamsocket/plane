@@ -14,7 +14,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::{net::TcpListener, select, task::JoinSet};
+use tokio::{net::TcpListener, select};
 use tokio_rustls::TlsAcceptor;
 
 /// Header which passes the client's IP address to the backend.
@@ -27,7 +27,7 @@ const X_FORWARDED_PROTO: &str = "x-forwarded-proto";
 /// The server can be configured to listen for either HTTP and HTTPS,
 /// and supports graceful shutdown and x-forwarded-* headers.
 pub struct SimpleHttpServer {
-    handle: tokio::task::JoinHandle<JoinSet<()>>,
+    handle: tokio::task::JoinHandle<()>,
     graceful_shutdown: Option<GracefulShutdown>,
 }
 
@@ -36,14 +36,13 @@ async fn listen_loop<S>(
     listener: TcpListener,
     service: S,
     graceful_shutdown: GracefulShutdown,
-) -> JoinSet<()>
+) -> ()
 where
     S: Service<Request<Incoming>, Response = Response<SimpleBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
     let mut recv = graceful_shutdown.subscribe();
-    let mut join_set = JoinSet::new();
 
     loop {
         let stream = select! {
@@ -66,17 +65,12 @@ where
         let conn = server.serve_connection_with_upgrades(io, service);
 
         let conn = graceful_shutdown.watch(conn.into_owned());
-        join_set.spawn(async {
+        tokio::spawn(async {
             if let Err(e) = conn.await {
                 tracing::warn!(?e, "Failed to serve connection.");
             }
         });
     }
-
-    // Even though join_set is never used, we return it to keep it from being dropped
-    // until the graceful shutdown (or timeout) is complete. Otherwise, the tasks we started
-    // would be stopped as soon as the graceful shutdown is initiated.
-    join_set
 }
 
 #[must_use] // Otherwise, the tasks we started would be stopped as soon as the graceful shutdown is initiated.
@@ -85,7 +79,7 @@ async fn listen_loop_tls<S>(
     service: S,
     resolver: Arc<dyn ResolvesServerCert>,
     graceful_shutdown: GracefulShutdown,
-) -> JoinSet<()>
+) -> ()
 where
     S: Service<Request<Incoming>, Response = Response<SimpleBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
@@ -96,7 +90,6 @@ where
         .with_cert_resolver(resolver);
     let tls_acceptor = TlsAcceptor::from(Arc::new(server_config));
     let mut recv = graceful_shutdown.subscribe();
-    let mut join_set = JoinSet::new();
 
     loop {
         let stream = select! {
@@ -116,7 +109,7 @@ where
         let tls_acceptor = tls_acceptor.clone();
 
         let graceful_shutdown = graceful_shutdown.clone();
-        join_set.spawn(async move {
+        tokio::spawn(async move {
             let server = ServerBuilder::new(TokioExecutor::new());
 
             let stream = match tls_acceptor.accept(stream).await {
@@ -136,11 +129,6 @@ where
             }
         });
     }
-
-    // Even though join_set is never used, we return it to keep it from being dropped
-    // until the graceful shutdown (or timeout) is complete. Otherwise, the tasks we started
-    // would be stopped as soon as the graceful shutdown is initiated.
-    join_set
 }
 
 pub enum HttpsConfig {
