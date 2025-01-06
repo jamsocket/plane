@@ -31,12 +31,7 @@ pub struct SimpleHttpServer {
     graceful_shutdown: Option<GracefulShutdown>,
 }
 
-#[must_use] // Otherwise, the tasks we started would be stopped as soon as the graceful shutdown is initiated.
-async fn listen_loop<S>(
-    listener: TcpListener,
-    service: S,
-    graceful_shutdown: GracefulShutdown,
-) -> ()
+async fn listen_loop<S>(listener: TcpListener, service: S, graceful_shutdown: GracefulShutdown)
 where
     S: Service<Request<Incoming>, Response = Response<SimpleBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
@@ -73,14 +68,12 @@ where
     }
 }
 
-#[must_use] // Otherwise, the tasks we started would be stopped as soon as the graceful shutdown is initiated.
 async fn listen_loop_tls<S>(
     listener: TcpListener,
     service: S,
     resolver: Arc<dyn ResolvesServerCert>,
     graceful_shutdown: GracefulShutdown,
-) -> ()
-where
+) where
     S: Service<Request<Incoming>, Response = Response<SimpleBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
