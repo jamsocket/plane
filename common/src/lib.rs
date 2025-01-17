@@ -217,8 +217,16 @@ async fn get_response<T: DeserializeOwned>(response: Response) -> Result<T, Plan
         Ok(response.json::<T>().await?)
     } else {
         let url = response.url().to_string();
-        tracing::error!(?url, "Got error response from API server.");
         let status = response.status();
+        if status.is_server_error() {
+            tracing::error!(?url, ?status, "Got 5xx response from Plane API server.");
+        } else {
+            tracing::warn!(
+                ?url,
+                ?status,
+                "Got unsuccessful response from Plane API server."
+            );
+        }
         if let Ok(api_error) = response.json::<ApiError>().await {
             Err(PlaneClientError::PlaneError(api_error, status))
         } else {
