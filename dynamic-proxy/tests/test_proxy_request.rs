@@ -3,7 +3,7 @@ use anyhow::Result;
 use bytes::Bytes;
 use common::simple_axum_server::RequestInfo;
 use http::{Method, Request, StatusCode};
-use http_body_util::{combinators::BoxBody, BodyExt, Full};
+use http_body_util::{combinators::UnsyncBoxBody, BodyExt, Full};
 use plane_dynamic_proxy::{
     body::{simple_empty_body, to_simple_body, BoxedError},
     proxy::ProxyClient,
@@ -12,7 +12,7 @@ use plane_dynamic_proxy::{
 
 mod common;
 
-async fn make_request(req: Request<BoxBody<Bytes, BoxedError>>) -> Result<RequestInfo> {
+async fn make_request(req: Request<UnsyncBoxBody<Bytes, BoxedError>>) -> Result<RequestInfo> {
     let server = SimpleAxumServer::new().await;
     let proxy_client = ProxyClient::new();
 

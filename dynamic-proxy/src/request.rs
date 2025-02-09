@@ -11,7 +11,7 @@ use std::{net::SocketAddr, str::FromStr};
 /// Represents an HTTP request (from hyper) with helpers for mutating it.
 pub struct MutableRequest<T>
 where
-    T: Body<Data = Bytes> + Send + Sync + 'static,
+    T: Body<Data = Bytes> + Send + 'static,
     T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
     pub parts: Parts,
@@ -20,7 +20,7 @@ where
 
 impl<T> MutableRequest<T>
 where
-    T: Body<Data = Bytes> + Send + Sync + 'static,
+    T: Body<Data = Bytes> + Send + 'static,
     T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
     pub fn from_request(request: Request<T>) -> Self {
