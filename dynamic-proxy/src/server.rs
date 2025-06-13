@@ -108,7 +108,7 @@ async fn listen_loop_tls<S>(
             let stream = match tls_acceptor.accept(stream).await {
                 Ok(stream) => stream,
                 Err(e) => {
-                    tracing::warn!(?e, "Failed to accept TLS connection.");
+                    tracing::warn!(?e, ?remote_ip, "Failed to accept TLS connection.");
                     return;
                 }
             };
