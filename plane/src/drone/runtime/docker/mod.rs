@@ -387,10 +387,17 @@ pub async fn prune(docker: &Docker, until: DateTime<Utc>, prune_images: bool) ->
     }
 
     if prune_images {
-        let filters: HashMap<String, Vec<String>> =
-            vec![("until".to_string(), vec![since_unixtime.to_string()])]
-                .into_iter()
-                .collect();
+        let filters: HashMap<String, Vec<String>> = vec![
+            ("until".to_string(), vec![since_unixtime.to_string()]),
+            // Ref: https://docs.docker.com/reference/api/engine/version/v1.50/#tag/Image/operation/ImagePrune
+            // > When set to true (or 1), prune only unused and untagged images. When set to false (or 0), all unused images are pruned.
+            // The documentation doesn't specify the default value, so we set it to false to ensure that all unused images are pruned.
+            // Note that Docker does not allow images to be labeled after they are created, so we end up pruning all images whether
+            // created by Plane or not.
+            ("dangling".to_string(), vec!["false".to_string()]),
+        ]
+        .into_iter()
+        .collect();
         match docker
             .prune_images(Some(PruneImagesOptions { filters }))
             .await
