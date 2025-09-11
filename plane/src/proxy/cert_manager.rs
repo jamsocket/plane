@@ -32,7 +32,7 @@ const DNS_01: &str = "dns-01";
 const LOCK_SLEEP_TIME: Duration = Duration::from_secs(60); // 1 minute
 
 /// How long to sleep after failing to renew the certificate.
-const FAILURE_SLEEP_TIME: Duration = Duration::from_secs(60 * 5); // 5 minutes
+const FAILURE_SLEEP_TIME: Duration = Duration::from_secs(30);
 
 /// How long in advance of the certificate expiring to renew it.
 const RENEWAL_WINDOW: Duration = Duration::from_secs(24 * 60 * 60 * 30); // 30 days
