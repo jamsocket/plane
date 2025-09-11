@@ -261,7 +261,7 @@ fn status_code_to_response(
 }
 
 /// Mutates a request to add static headers present on all responses
-/// (error or valid).
+/// (error or valid), unless any CORS headers are already present.
 fn apply_general_headers(response: &mut Response<SimpleBody>) {
     let headers = response.headers_mut();
 
