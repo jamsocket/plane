@@ -427,11 +427,14 @@ async fn get_certificate(
             }
         }
 
+        // Wait 15 seconds before checking the challenge status.
+        tokio::time::sleep(Duration::from_secs(15)).await;
+
         if challenge.status != ChallengeStatus::Valid {
             tracing::info!("Validating challenge.");
             let challenge = challenge.validate().await.context("Validating challenge")?;
             let challenge = challenge
-                .wait_done(Duration::from_secs(5), 3)
+                .wait_done(Duration::from_secs(5), 6)
                 .await
                 .context("Waiting for challenge")?;
             if challenge.status != ChallengeStatus::Valid {

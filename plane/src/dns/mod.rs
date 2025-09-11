@@ -162,7 +162,7 @@ impl AcmeDnsServer {
                     .map(|result| {
                         Record::from_rdata(
                             request.query().name().into(),
-                            300,
+                            1,
                             RData::TXT(TXT::new(vec![result])),
                         )
                     })
