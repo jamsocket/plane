@@ -264,17 +264,27 @@ fn status_code_to_response(
 /// (error or valid).
 fn apply_general_headers(response: &mut Response<SimpleBody>) {
     let headers = response.headers_mut();
-    headers.insert(
-        header::ACCESS_CONTROL_ALLOW_ORIGIN,
-        HeaderValue::from_static("*"),
-    );
-    headers.insert(
-        header::ACCESS_CONTROL_ALLOW_METHODS,
-        HeaderValue::from_static("*"),
-    );
-    headers.insert(
-        header::ACCESS_CONTROL_ALLOW_HEADERS,
-        HeaderValue::from_static("*"),
-    );
+
+    let any_cors_headers_present = headers.contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        || headers.contains_key(header::ACCESS_CONTROL_ALLOW_METHODS)
+        || headers.contains_key(header::ACCESS_CONTROL_ALLOW_HEADERS);
+
+    if !any_cors_headers_present {
+        headers.insert(
+            header::ACCESS_CONTROL_ALLOW_ORIGIN,
+            HeaderValue::from_static("*"),
+        );
+        headers.insert(
+            header::ACCESS_CONTROL_ALLOW_METHODS,
+            HeaderValue::from_static("*"),
+        );
+        // > When the `Access-Control-Allow-Headers` is `*`, the `Authorization` header
+        // > is not covered. To include the `Authorization` header, it must be explicitly
+        // > listed in CORS header `Access-Control-Allow-Headers`
+        headers.insert(
+            header::ACCESS_CONTROL_ALLOW_HEADERS,
+            HeaderValue::from_static("*, Authorization"),
+        );
+    }
     headers.insert(header::SERVER, HeaderValue::from_static(SERVER_NAME));
 }
