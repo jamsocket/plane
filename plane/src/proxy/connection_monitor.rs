@@ -33,6 +33,10 @@ impl ConnectionMonitor {
         self.listener = Some(Box::new(listener));
     }
 
+    pub fn remove_backend(&mut self, backend_id: &BackendName) {
+        self.backends.remove(backend_id);
+    }
+
     pub fn touch_backend(&mut self, backend_id: &BackendName) {
         match self.backends.entry(backend_id.clone()) {
             Entry::Occupied(mut entry) => {
@@ -126,7 +130,7 @@ impl ConnectionMonitorHandle {
                     let mut monitor_lock = monitor.lock().expect("Monitor lock was poisoned.");
 
                     let Some(backend_entry) = monitor_lock.backends.get_mut(&backend) else {
-                        // This shouldn't happen.
+                        // This will happen if the backend has been removed.
                         continue;
                     };
 
@@ -178,6 +182,13 @@ impl ConnectionMonitorHandle {
             .lock()
             .expect("Monitor lock was poisoned")
             .touch_backend(backend_id);
+    }
+
+    pub fn remove_backend(&self, backend_id: &BackendName) {
+        self.monitor
+            .lock()
+            .expect("Monitor lock was poisoned")
+            .remove_backend(backend_id);
     }
 }
 
