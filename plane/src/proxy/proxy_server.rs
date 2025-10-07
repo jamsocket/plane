@@ -157,9 +157,8 @@ impl Service<Request<Incoming>> for ProxyState {
                     .inc_connection(&route_info.backend_id);
                 let backend_id = route_info.backend_id.clone();
                 tokio::spawn(async move {
-                    if let Err(err) = upgrade_handler.run().await {
-                        tracing::error!("Error running upgrade handler: {}", err);
-                    };
+                    // ignore noisy errors caused by IO issues (dropped connections, etc.)
+                    let _ = upgrade_handler.run().await;
 
                     monitor
                         .lock()
