@@ -72,6 +72,7 @@ impl ProxyConnection {
                             }
                             MessageToProxy::BackendRemoved { backend } => {
                                 state.inner.route_map.remove_backend(&backend);
+                                state.inner.monitor.remove_backend(&backend);
                             }
                         }
                     }
