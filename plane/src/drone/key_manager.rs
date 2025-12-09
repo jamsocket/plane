@@ -81,7 +81,7 @@ async fn renew_key_loop(
         }
 
         if now >= deadlines.renew_at.0 {
-            tracing::info!(key = key.key.as_value(), "Renewing key.");
+            tracing::debug!(key = key.key.as_value(), "Renewing key.");
 
             if let Some(ref sender) = sender {
                 let request = RenewKeyRequest {
@@ -90,7 +90,7 @@ async fn renew_key_loop(
                 };
 
                 if let Err(err) = sender.send(request) {
-                    tracing::error!(%err, "Error sending renew key request.");
+                    tracing::error!(%err, key = key.key.as_value(), "Error sending renew key request.");
                 }
             }
 
