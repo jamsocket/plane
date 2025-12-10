@@ -218,8 +218,8 @@ impl<'a> DroneDatabase<'a> {
 
         // select best of the results (lowest backend count)
         // ref: https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf
-        let best = result.iter().min_by_key(|r| r.backend_count);
-        
+        let best = result.into_iter().min_by_key(|r| r.backend_count);
+
         Ok(best.map(|r| DroneForSpawn {
             id: NodeId::from(r.id),
             drone: DroneName::try_from(r.name).expect("valid drone name"),
