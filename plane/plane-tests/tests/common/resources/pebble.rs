@@ -12,7 +12,7 @@ use std::time::{Duration, SystemTime};
 use url::Url;
 
 const POLL_LOOP_SLEEP: u64 = 100;
-const PEBBLE_IMAGE: &str = "docker.io/letsencrypt/pebble:latest";
+const PEBBLE_IMAGE: &str = "ghcr.io/letsencrypt/pebble:latest";
 
 fn get_start_script(dns_port: u16) -> String {
     format!(
