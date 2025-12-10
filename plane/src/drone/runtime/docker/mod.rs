@@ -299,7 +299,7 @@ pub struct SpawnResult {
 impl DockerRuntime {
     pub async fn new(config: DockerRuntimeConfig) -> Result<Self> {
         let docker = Docker::connect_with_local_defaults()?;
-        let (events_sender, _) = tokio::sync::broadcast::channel::<TerminateEvent>(128);
+        let (events_sender, _) = tokio::sync::broadcast::channel::<TerminateEvent>(1024);
 
         let cleanup_handle = {
             let docker = docker.clone();

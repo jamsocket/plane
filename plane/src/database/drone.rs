@@ -181,7 +181,14 @@ impl<'a> DroneDatabase<'a> {
             select
                 drone.id,
                 node.name,
-                drone.last_local_time as "last_local_time!"
+                drone.last_local_time as "last_local_time!",
+                (
+                    select
+                        count(*)
+                    from backend
+                    where drone_id = node.id
+                    and last_status != $4
+                ) as "backend_count"
             from node
             left join drone
                 on node.id = drone.id
@@ -197,14 +204,8 @@ impl<'a> DroneDatabase<'a> {
                 and draining = false
                 and last_local_time is not null
                 and pool = $3
-            order by (
-                select
-                    count(*)
-                from backend
-                where drone_id = node.id
-                and last_status != $4
-            ) asc, random()
-            limit 1
+            order by random()
+            limit 2
             "#,
             cluster.to_string(),
             PgInterval::try_from(Duration::from_secs(UNHEALTHY_SECONDS as _))
@@ -212,25 +213,18 @@ impl<'a> DroneDatabase<'a> {
             pool.to_string(),
             BackendStatus::Terminated.to_string(),
         )
-        .fetch_optional(self.pool)
+        .fetch_all(self.pool)
         .await?;
 
-        let result = match result {
-            Some(result) => {
-                let id = NodeId::from(result.id);
-                let drone = DroneName::try_from(result.name).expect("valid drone name");
-                let last_local_time = result.last_local_time;
+        // select best of the results (lowest backend count)
+        // ref: https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf
+        let best = result.into_iter().min_by_key(|r| r.backend_count);
 
-                Some(DroneForSpawn {
-                    id,
-                    drone,
-                    last_local_time,
-                })
-            }
-            None => return Ok(None),
-        };
-
-        Ok(result)
+        Ok(best.map(|r| DroneForSpawn {
+            id: NodeId::from(r.id),
+            drone: DroneName::try_from(r.name).expect("valid drone name"),
+            last_local_time: r.last_local_time,
+        }))
     }
 }
 

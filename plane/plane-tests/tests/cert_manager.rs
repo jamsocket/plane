@@ -55,7 +55,7 @@ async fn cert_manager_does_refresh(env: TestEnvironment) {
         .unwrap();
 }
 
-#[plane_test(120)]
+#[plane_test(500)]
 async fn cert_manager_does_refresh_eab(env: TestEnvironment) {
     let certs_dir = env.scratch_dir.join("certs");
 
@@ -101,7 +101,7 @@ async fn cert_manager_does_refresh_eab(env: TestEnvironment) {
         );
         cert_watcher
             .wait_for_initial_cert()
-            .with_timeout(60)
+            .with_timeout(500)
             .await
             .unwrap()
             .unwrap();

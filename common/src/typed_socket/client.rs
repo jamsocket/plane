@@ -125,9 +125,9 @@ async fn new_client<T: ChannelMessage>(
     mut socket: Socket,
     remote_handshake: Handshake,
 ) -> Result<TypedSocket<T>, PlaneClientError> {
-    let (send_to_client, recv_to_client) = tokio::sync::mpsc::channel::<T::Reply>(100);
+    let (send_to_client, recv_to_client) = tokio::sync::mpsc::channel::<T::Reply>(1024);
     let (send_from_client, mut recv_from_client) =
-        tokio::sync::mpsc::channel::<SocketAction<T>>(100);
+        tokio::sync::mpsc::channel::<SocketAction<T>>(1024);
 
     tokio::spawn(async move {
         loop {

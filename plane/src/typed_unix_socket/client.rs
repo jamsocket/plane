@@ -38,9 +38,9 @@ where
 {
     /// Creates a new `TypedUnixSocketClient` and connects to the specified Unix socket path.
     pub async fn new<P: AsRef<Path>>(socket_path: P) -> Result<Self, Elapsed> {
-        let (tx, _) = broadcast::channel(100);
+        let (tx, _) = broadcast::channel(1024);
         let response_map = Arc::new(DashMap::new());
-        let (event_tx, _) = broadcast::channel(100);
+        let (event_tx, _) = broadcast::channel(1024);
 
         let loop_task = {
             let socket_path = socket_path.as_ref().to_path_buf();

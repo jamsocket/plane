@@ -35,9 +35,9 @@ where
             fs::remove_file(&socket_path)?;
         }
         let listener = UnixListener::bind(&socket_path)?;
-        let (event_tx, _) = broadcast::channel(100);
-        let (request_tx, _) = broadcast::channel(100);
-        let (response_tx, _) = broadcast::channel(100);
+        let (event_tx, _) = broadcast::channel(1024);
+        let (request_tx, _) = broadcast::channel(1024);
+        let (response_tx, _) = broadcast::channel(1024);
 
         let loop_task = {
             let event_tx = event_tx.clone();

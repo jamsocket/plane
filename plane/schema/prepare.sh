@@ -9,7 +9,7 @@ echo "Starting postgres"
 PG_IMAGE="postgres@sha256:b7662e5572febc3380fd5773fa600824f0433b82935e7e5b4c180e9541b2b3d7"
 
 docker stop postgres-sqlx || true
-CONTAINER_ID=$(docker run --platform linux/amd64 --rm -d --name postgres-sqlx -p 5555:5432 -e POSTGRES_HOST_AUTH_METHOD=trust $PG_IMAGE)
+CONTAINER_ID=$(docker run --platform linux/amd64 --rm -d --name postgres-sqlx -p 5566:5432 -e POSTGRES_HOST_AUTH_METHOD=trust $PG_IMAGE)
 
 echo "Waiting for postgres to start ${CONTAINER_ID}"
 
@@ -17,7 +17,7 @@ CONTAINER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddres
 
 echo "Postgres IP: ${CONTAINER_IP}"
 
-export DATABASE_URL=postgres://postgres@localhost:5555
+export DATABASE_URL=postgres://postgres@localhost:5566
 
 echo "Waiting for postgres to become ready"
 for i in {1..30}; do
