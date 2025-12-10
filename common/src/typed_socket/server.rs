@@ -109,8 +109,8 @@ pub async fn new_server<T: ChannelMessage>(
 
     local_handshake.check_compat(&remote_handshake);
 
-    let (outgoing_message_sender, outgoing_message_receiver) = tokio::sync::mpsc::channel(100);
-    let (incoming_message_sender, incoming_message_receiver) = tokio::sync::mpsc::channel(100);
+    let (outgoing_message_sender, outgoing_message_receiver) = tokio::sync::mpsc::channel(1024);
+    let (incoming_message_sender, incoming_message_receiver) = tokio::sync::mpsc::channel(1024);
     tokio::spawn(async move {
         handle_messages(outgoing_message_receiver, incoming_message_sender, ws).await;
     });
