@@ -94,7 +94,10 @@ impl Container {
             sleep(Duration::from_millis(100)).await;
         }
 
-        Err(anyhow::anyhow!("Failed to get port after retries."))
+        Err(anyhow::anyhow!(
+            "Failed to get port {} after retries.",
+            container_port
+        ))
     }
 
     pub async fn collect_stdout(&self) -> Result<Vec<u8>> {

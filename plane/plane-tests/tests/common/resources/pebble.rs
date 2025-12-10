@@ -7,31 +7,14 @@ use bollard::{container::Config, Docker};
 use plane::proxy::AcmeEabConfiguration;
 use reqwest::Client;
 use serde_json::json;
-use std::os::unix::fs::PermissionsExt;
+use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 use url::Url;
 
 const POLL_LOOP_SLEEP: u64 = 100;
 const PEBBLE_IMAGE: &str = "ghcr.io/letsencrypt/pebble:latest";
 
-fn get_start_script(dns_port: u16) -> String {
-    format!(
-        r#"#!/bin/sh
-
-set -e
-
-DNS_PORT={}
-DNS_IP=$(getent hosts host.docker.internal | awk '{{ print $1 }}')
-DNS_SERVER=$DNS_IP:$DNS_PORT
-
-echo "Starting pebble with DNS server $DNS_SERVER"
-
-/usr/bin/pebble -config /etc/pebble/config.json -dnsserver $DNS_SERVER
-"#,
-        dns_port
-    )
-}
-
+const DNS_IP: &str = "172.18.0.1";
 pub struct Pebble {
     container: Container,
     #[allow(dead_code)] // Used in tests
@@ -132,20 +115,25 @@ impl Pebble {
             serde_json::to_string_pretty(&pebble_config)?,
         )?;
 
-        std::fs::write(pebble_dir.join("start.sh"), get_start_script(dns_port))?;
-
-        std::fs::set_permissions(
-            pebble_dir.join("start.sh"),
-            std::fs::Permissions::from_mode(0o755),
-        )?;
+        let dns_server = format!("{}:{}", DNS_IP, dns_port);
 
         let config = Config {
             image: Some(PEBBLE_IMAGE.to_string()),
-            cmd: Some(vec!["/etc/pebble/start.sh".to_string()]),
+            cmd: Some(vec![
+                "-config".to_string(),
+                "/etc/pebble/config.json".to_string(),
+                "-dnsserver".to_string(),
+                dns_server,
+            ]),
             env: Some(vec![
                 // https://github.com/letsencrypt/pebble?tab=readme-ov-file#testing-at-full-speed
                 "PEBBLE_VA_NOSLEEP=1".to_string(),
             ]),
+            exposed_ports: Some(
+                vec![("14000/tcp".to_string(), HashMap::new())]
+                    .into_iter()
+                    .collect(),
+            ),
             host_config: Some(bollard::service::HostConfig {
                 binds: Some(vec![format!(
                     "{}:/etc/pebble",
@@ -156,7 +144,7 @@ impl Pebble {
                         "14000/tcp".to_string(),
                         Some(vec![bollard::service::PortBinding {
                             host_ip: Some("0.0.0.0".to_string()),
-                            host_port: None,
+                            host_port: Some("14000".to_string()),
                         }]),
                     )]
                     .into_iter()
