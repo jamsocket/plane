@@ -97,7 +97,12 @@ impl Controller {
     ) -> Result<ConnectResponse, ConnectError> {
         let response = self
             .db
-            .connect(self.default_cluster.as_ref(), connect_request, &self.client, self.best_of)
+            .connect(
+                self.default_cluster.as_ref(),
+                connect_request,
+                &self.client,
+                self.best_of,
+            )
             .await?;
 
         Ok(response)

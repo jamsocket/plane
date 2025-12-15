@@ -202,8 +202,14 @@ impl ControllerServer {
         let (graceful_terminate_sender, graceful_terminate_receiver) =
             tokio::sync::oneshot::channel::<()>();
 
-        let controller =
-            Controller::new(db.clone(), id.clone(), controller_url, default_cluster, best_of).await;
+        let controller = Controller::new(
+            db.clone(),
+            id.clone(),
+            controller_url,
+            default_cluster,
+            best_of,
+        )
+        .await;
 
         let trace_layer = TraceLayer::new_for_http()
             .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
