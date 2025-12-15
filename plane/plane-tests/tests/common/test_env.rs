@@ -121,6 +121,7 @@ impl TestEnvironment {
             None,
             None,
             None,
+            2,
         )
         .await
         .expect("Unable to construct controller.")
@@ -179,6 +180,7 @@ impl TestEnvironment {
             None,
             None,
             Some(forward_auth.clone()),
+            2,
         )
         .await
         .expect("Unable to construct controller.")

@@ -15,6 +15,7 @@ pub struct Controller {
     pub id: ControllerName,
     pub client: PlaneClient,
     pub default_cluster: Option<ClusterName>,
+    pub best_of: i64,
 }
 
 pub struct NodeHandle {
@@ -77,6 +78,7 @@ impl Controller {
         id: ControllerName,
         controller_url: Url,
         default_cluster: Option<ClusterName>,
+        best_of: i64,
     ) -> Self {
         let client = PlaneClient::new(controller_url);
 
@@ -85,6 +87,7 @@ impl Controller {
             id,
             client,
             default_cluster,
+            best_of,
         }
     }
 
@@ -94,7 +97,7 @@ impl Controller {
     ) -> Result<ConnectResponse, ConnectError> {
         let response = self
             .db
-            .connect(self.default_cluster.as_ref(), connect_request, &self.client)
+            .connect(self.default_cluster.as_ref(), connect_request, &self.client, self.best_of)
             .await?;
 
         Ok(response)

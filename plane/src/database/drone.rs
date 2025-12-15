@@ -175,6 +175,7 @@ impl<'a> DroneDatabase<'a> {
         &self,
         cluster: &ClusterName,
         pool: &DronePoolName,
+        best_of: i64,
     ) -> sqlx::Result<Option<DroneForSpawn>> {
         let result = query!(
             r#"
@@ -205,13 +206,14 @@ impl<'a> DroneDatabase<'a> {
                 and last_local_time is not null
                 and pool = $3
             order by random()
-            limit 2
+            limit $5
             "#,
             cluster.to_string(),
             PgInterval::try_from(Duration::from_secs(UNHEALTHY_SECONDS as _))
                 .expect("valid interval"),
             pool.to_string(),
             BackendStatus::Terminated.to_string(),
+            best_of,
         )
         .fetch_all(self.pool)
         .await?;

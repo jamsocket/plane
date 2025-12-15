@@ -172,6 +172,7 @@ impl ControllerServer {
             config.cleanup_min_age_days,
             config.cleanup_batch_size,
             config.forward_auth,
+            config.best_of,
         )
         .await
     }
@@ -186,6 +187,7 @@ impl ControllerServer {
         cleanup_min_age_days: Option<i32>,
         cleanup_batch_size: Option<i32>,
         forward_auth: Option<Url>,
+        best_of: i64,
     ) -> Result<Self> {
         let bind_addr = listener.local_addr()?;
 
@@ -201,7 +203,7 @@ impl ControllerServer {
             tokio::sync::oneshot::channel::<()>();
 
         let controller =
-            Controller::new(db.clone(), id.clone(), controller_url, default_cluster).await;
+            Controller::new(db.clone(), id.clone(), controller_url, default_cluster, best_of).await;
 
         let trace_layer = TraceLayer::new_for_http()
             .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
@@ -353,6 +355,7 @@ pub struct ControllerConfig {
     pub cleanup_min_age_days: Option<i32>,
     pub cleanup_batch_size: Option<i32>,
     pub forward_auth: Option<Url>,
+    pub best_of: i64,
 }
 
 pub async fn run_controller(config: ControllerConfig) -> Result<()> {

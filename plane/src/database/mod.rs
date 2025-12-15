@@ -100,8 +100,9 @@ impl PlaneDatabase {
         default_cluster: Option<&ClusterName>,
         request: &ConnectRequest,
         client: &PlaneClient,
+        best_of: i64,
     ) -> Result<ConnectResponse, ConnectError> {
-        connect::connect(&self.pool, default_cluster, request, client).await
+        connect::connect(&self.pool, default_cluster, request, client, best_of).await
     }
     pub async fn revoke(&self, request: &RevokeRequest) -> Result<(), ConnectError> {
         connect::revoke(&self.pool, request).await
