@@ -243,6 +243,7 @@ async fn attempt_connect(
     default_cluster: Option<&ClusterName>,
     request: &ConnectRequest,
     client: &PlaneClient,
+    best_of: i64,
 ) -> Result<ConnectResponse> {
     let key = if let Some(key) = &request.key {
         // Request includes a key, so we need to check if it is held.
@@ -317,7 +318,7 @@ async fn attempt_connect(
         .ok_or(ConnectError::NoClusterProvided)?;
 
     let drone = DroneDatabase::new(pool)
-        .pick_drone_for_spawn(cluster, &spawn_config.pool)
+        .pick_drone_for_spawn(cluster, &spawn_config.pool, best_of)
         .await?
         .ok_or(ConnectError::NoDroneAvailable)?;
 
@@ -372,10 +373,11 @@ pub async fn connect(
     default_cluster: Option<&ClusterName>,
     request: &ConnectRequest,
     client: &PlaneClient,
+    best_of: i64,
 ) -> Result<ConnectResponse> {
     let mut attempt = 1;
     loop {
-        match attempt_connect(pool, default_cluster, request, client).await {
+        match attempt_connect(pool, default_cluster, request, client, best_of).await {
             Ok(response) => return Ok(response),
             Err(error) => {
                 if !error.retryable() || attempt >= 3 {

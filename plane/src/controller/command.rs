@@ -34,6 +34,9 @@ pub struct ControllerOpts {
     /// (after stripping `/ctrl` and everything before it).
     #[clap(long)]
     forward_auth: Option<Url>,
+
+    #[clap(long, default_value = "2")]
+    best_of: i64,
 }
 
 impl ControllerOpts {
@@ -56,6 +59,7 @@ impl ControllerOpts {
             cleanup_min_age_days: self.cleanup_min_age_days,
             cleanup_batch_size: None,
             forward_auth: self.forward_auth,
+            best_of: self.best_of,
         })
     }
 }
