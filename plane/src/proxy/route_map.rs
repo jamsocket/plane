@@ -96,7 +96,7 @@ impl RouteMap {
     }
 
     fn insert(&self, token: BearerToken, route_info: Option<RouteInfo>) {
-        tracing::info!(
+        tracing::debug!(
             token = token.as_value(),
             ?route_info,
             "Inserting route info"

@@ -54,7 +54,7 @@ pub async fn handle_message_from_drone(
                 .await?;
         }
         MessageFromDrone::BackendEvent(backend_event) => {
-            tracing::info!(event = backend_event.as_value(), "Received backend event");
+            tracing::debug!(event = backend_event.as_value(), "Received backend event");
 
             controller
                 .db
