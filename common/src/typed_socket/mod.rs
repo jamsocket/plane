@@ -99,6 +99,13 @@ impl<T: ChannelMessage> TypedSocket<T> {
     pub async fn close(&mut self) {
         let _ = self.send.send(SocketAction::Close).await;
     }
+
+    /// Returns (pending_outgoing, pending_incoming) message counts
+    pub fn channel_depths(&self) -> (usize, usize) {
+        let outgoing = self.send.max_capacity() - self.send.capacity();
+        let incoming = self.recv.len();
+        (outgoing, incoming)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

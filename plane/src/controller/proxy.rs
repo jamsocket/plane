@@ -17,7 +17,11 @@ use plane_common::{
     typed_socket::{server::new_server, TypedSocket},
     types::{BackendState, BearerToken, ClusterName, NodeId},
 };
-use std::net::{IpAddr, SocketAddr};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    time::Duration,
+};
 use tokio::select;
 use valuable::Valuable;
 
@@ -264,11 +268,41 @@ pub async fn proxy_socket_inner(
 
     let mut event_subscription: Subscription<BackendState> = controller.db.subscribe();
 
+    let mut log_interval = tokio::time::interval(Duration::from_secs(60));
+    log_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut message_counts: HashMap<&'static str, u64> = HashMap::new();
+
     loop {
         select! {
+            _ = log_interval.tick() => {
+                let (outgoing, incoming) = socket.channel_depths();
+                tracing::info!(
+                    node_id = node_guard.id.as_i32(),
+                    outgoing_pending = outgoing,
+                    incoming_pending = incoming,
+                    route_info_request = message_counts.get("route_info_request").copied().unwrap_or(0),
+                    keep_alive = message_counts.get("keep_alive").copied().unwrap_or(0),
+                    cert_manager_request = message_counts.get("cert_manager_request").copied().unwrap_or(0),
+                    "Proxy channel stats (last 60s)"
+                );
+                message_counts.clear();
+            }
             message_from_proxy_result = socket.recv() => {
                 match message_from_proxy_result {
-                    Some(message) => handle_message_from_proxy(message, &controller, &mut socket, &cluster, node_guard.id).await?,
+                    Some(message) => {
+                        match &message {
+                            MessageFromProxy::RouteInfoRequest(_) => {
+                                *message_counts.entry("route_info_request").or_insert(0) += 1;
+                            }
+                            MessageFromProxy::KeepAlive(_) => {
+                                *message_counts.entry("keep_alive").or_insert(0) += 1;
+                            }
+                            MessageFromProxy::CertManagerRequest(_) => {
+                                *message_counts.entry("cert_manager_request").or_insert(0) += 1;
+                            }
+                        }
+                        handle_message_from_proxy(message, &controller, &mut socket, &cluster, node_guard.id).await?
+                    }
                     None => {
                         tracing::info!("Proxy socket closed");
                         break;

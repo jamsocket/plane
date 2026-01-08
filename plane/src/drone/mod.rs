@@ -25,6 +25,7 @@ use runtime::docker::DockerRuntime;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fs::{set_permissions, File, Permissions},
     net::IpAddr,
     os::unix::fs::PermissionsExt,
@@ -93,19 +94,51 @@ pub async fn drone_loop(
             }
         }
 
-        loop {
-            let Some(message) = socket.recv().await else {
-                tracing::warn!("Connection closed.");
-                break;
-            };
+        let mut log_interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        log_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut message_counts: HashMap<&'static str, u64> = HashMap::new();
 
-            let key_manager = key_manager.clone();
-            tokio::spawn(handle_message(
-                message,
-                key_manager,
-                socket.sender(|x| x),
-                executor.clone(),
-            ));
+        loop {
+            tokio::select! {
+                _ = log_interval.tick() => {
+                    let (outgoing, incoming) = socket.channel_depths();
+                    tracing::info!(
+                        outgoing_pending = outgoing,
+                        incoming_pending = incoming,
+                        action = message_counts.get("action").copied().unwrap_or(0),
+                        ack_event = message_counts.get("ack_event").copied().unwrap_or(0),
+                        renew_key_response = message_counts.get("renew_key_response").copied().unwrap_or(0),
+                        "Drone channel stats (last 60s)"
+                    );
+                    message_counts.clear();
+                }
+                message_result = socket.recv() => {
+                    let Some(message) = message_result else {
+                        tracing::warn!("Connection closed.");
+                        break;
+                    };
+
+                    match &message {
+                        MessageToDrone::Action(_) => {
+                            *message_counts.entry("action").or_insert(0) += 1;
+                        }
+                        MessageToDrone::AckEvent { .. } => {
+                            *message_counts.entry("ack_event").or_insert(0) += 1;
+                        }
+                        MessageToDrone::RenewKeyResponse(_) => {
+                            *message_counts.entry("renew_key_response").or_insert(0) += 1;
+                        }
+                    }
+
+                    let key_manager = key_manager.clone();
+                    tokio::spawn(handle_message(
+                        message,
+                        key_manager,
+                        socket.sender(|x| x),
+                        executor.clone(),
+                    ));
+                }
+            }
         }
     }
 
