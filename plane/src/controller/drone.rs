@@ -16,6 +16,7 @@ use plane_common::{
 };
 use serde::Deserialize;
 use std::{
+    collections::HashMap,
     net::{IpAddr, SocketAddr},
     time::Duration,
 };
@@ -204,10 +205,29 @@ pub async fn drone_socket_inner(
     let mut interval = tokio::time::interval(Duration::from_secs(5));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
+    let mut log_interval = tokio::time::interval(Duration::from_secs(60));
+    log_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut message_counts: HashMap<&'static str, u64> = HashMap::new();
+
     loop {
         tokio::select! {
             _ = interval.tick() => {
                 process_pending_actions(&controller.db, &mut socket, &drone_id).await?;
+            }
+            _ = log_interval.tick() => {
+                let (outgoing, incoming) = socket.channel_depths();
+                tracing::info!(
+                    drone_id = drone_id.as_i32(),
+                    outgoing_pending = outgoing,
+                    incoming_pending = incoming,
+                    heartbeat = message_counts.get("heartbeat").copied().unwrap_or(0),
+                    backend_event = message_counts.get("backend_event").copied().unwrap_or(0),
+                    ack_action = message_counts.get("ack_action").copied().unwrap_or(0),
+                    renew_key = message_counts.get("renew_key").copied().unwrap_or(0),
+                    backend_metrics = message_counts.get("backend_metrics").copied().unwrap_or(0),
+                    "Drone channel stats (last 60s)"
+                );
+                message_counts.clear();
             }
             backend_action_result = backend_actions.next() => {
                 match backend_action_result {
@@ -226,6 +246,23 @@ pub async fn drone_socket_inner(
             message_from_drone_result = socket.recv() => {
                 match message_from_drone_result {
                     Some(message_from_drone) => {
+                        match &message_from_drone {
+                            MessageFromDrone::Heartbeat(_) => {
+                                *message_counts.entry("heartbeat").or_insert(0) += 1;
+                            }
+                            MessageFromDrone::BackendEvent(_) => {
+                                *message_counts.entry("backend_event").or_insert(0) += 1;
+                            }
+                            MessageFromDrone::AckAction { .. } => {
+                                *message_counts.entry("ack_action").or_insert(0) += 1;
+                            }
+                            MessageFromDrone::RenewKey(_) => {
+                                *message_counts.entry("renew_key").or_insert(0) += 1;
+                            }
+                            MessageFromDrone::BackendMetrics(_) => {
+                                *message_counts.entry("backend_metrics").or_insert(0) += 1;
+                            }
+                        }
                         if let Err(err) = handle_message_from_drone(message_from_drone, drone_id, &controller, &mut socket).await {
                             tracing::error!(?err, "Error handling message from drone");
                         }

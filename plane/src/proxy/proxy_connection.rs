@@ -5,7 +5,7 @@ use plane_common::{
     types::ClusterName,
     PlaneClient,
 };
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 use valuable::Valuable;
 
@@ -58,21 +58,57 @@ impl ProxyConnection {
                         }
                     });
 
-                    while let Some(message) = conn.recv().await {
-                        match message {
-                            MessageToProxy::RouteInfoResponse(response) => {
-                                state.inner.route_map.receive(response);
-                            }
-                            MessageToProxy::CertManagerResponse(response) => {
+                    let mut log_interval = tokio::time::interval(Duration::from_secs(60));
+                    log_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    let mut message_counts: HashMap<&'static str, u64> = HashMap::new();
+
+                    loop {
+                        tokio::select! {
+                            _ = log_interval.tick() => {
+                                let (outgoing, incoming) = conn.channel_depths();
                                 tracing::info!(
-                                    response = response.as_value(),
-                                    "Received cert manager response"
+                                    outgoing_pending = outgoing,
+                                    incoming_pending = incoming,
+                                    route_info_response = message_counts.get("route_info_response").copied().unwrap_or(0),
+                                    cert_manager_response = message_counts.get("cert_manager_response").copied().unwrap_or(0),
+                                    backend_removed = message_counts.get("backend_removed").copied().unwrap_or(0),
+                                    "Proxy channel stats (last 60s)"
                                 );
-                                cert_manager.receive(response);
+                                message_counts.clear();
                             }
-                            MessageToProxy::BackendRemoved { backend } => {
-                                state.inner.route_map.remove_backend(&backend);
-                                state.inner.monitor.remove_backend(&backend);
+                            message_result = conn.recv() => {
+                                let Some(message) = message_result else {
+                                    break;
+                                };
+
+                                match &message {
+                                    MessageToProxy::RouteInfoResponse(_) => {
+                                        *message_counts.entry("route_info_response").or_insert(0) += 1;
+                                    }
+                                    MessageToProxy::CertManagerResponse(_) => {
+                                        *message_counts.entry("cert_manager_response").or_insert(0) += 1;
+                                    }
+                                    MessageToProxy::BackendRemoved { .. } => {
+                                        *message_counts.entry("backend_removed").or_insert(0) += 1;
+                                    }
+                                }
+
+                                match message {
+                                    MessageToProxy::RouteInfoResponse(response) => {
+                                        state.inner.route_map.receive(response);
+                                    }
+                                    MessageToProxy::CertManagerResponse(response) => {
+                                        tracing::info!(
+                                            response = response.as_value(),
+                                            "Received cert manager response"
+                                        );
+                                        cert_manager.receive(response);
+                                    }
+                                    MessageToProxy::BackendRemoved { backend } => {
+                                        state.inner.route_map.remove_backend(&backend);
+                                        state.inner.monitor.remove_backend(&backend);
+                                    }
+                                }
                             }
                         }
                     }
