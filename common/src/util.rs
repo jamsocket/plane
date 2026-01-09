@@ -22,3 +22,14 @@ pub fn random_token() -> String {
 pub fn random_prefixed_string(prefix: &str) -> String {
     format!("{}-{}", prefix, random_string())
 }
+
+/// Returns a duration of approximately 1 hour, with random jitter of +/- 10 minutes.
+pub fn random_reconnect_interval() -> std::time::Duration {
+    const BASE_SECONDS: u64 = 60 * 60; // 1 hour
+    const JITTER_SECONDS: u64 = 10 * 60; // 10 minutes
+
+    let jitter: i64 =
+        rand::thread_rng().gen_range(-(JITTER_SECONDS as i64)..=(JITTER_SECONDS as i64));
+    let total_seconds = (BASE_SECONDS as i64 + jitter) as u64;
+    std::time::Duration::from_secs(total_seconds)
+}
