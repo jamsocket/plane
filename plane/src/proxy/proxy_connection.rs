@@ -3,6 +3,7 @@ use plane_common::{
     names::ProxyName,
     protocol::{MessageFromProxy, MessageToProxy, RouteInfoRequest},
     types::ClusterName,
+    util::random_reconnect_interval,
     PlaneClient,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -62,8 +63,14 @@ impl ProxyConnection {
                     log_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                     let mut message_counts: HashMap<&'static str, u64> = HashMap::new();
 
+                    let reconnect_at = tokio::time::Instant::now() + random_reconnect_interval();
+
                     loop {
                         tokio::select! {
+                            _ = tokio::time::sleep_until(reconnect_at) => {
+                                tracing::info!("Periodic reconnect triggered.");
+                                break;
+                            }
                             _ = log_interval.tick() => {
                                 let (outgoing, incoming) = conn.channel_depths();
                                 tracing::info!(

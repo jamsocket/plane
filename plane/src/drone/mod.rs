@@ -19,6 +19,7 @@ use plane_common::{
     },
     typed_socket::{client::TypedSocketConnector, TypedSocketSender},
     types::{BackendState, ClusterName, DronePoolName},
+    util::random_reconnect_interval,
     PlaneClient,
 };
 use runtime::docker::DockerRuntime;
@@ -98,8 +99,14 @@ pub async fn drone_loop(
         log_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut message_counts: HashMap<&'static str, u64> = HashMap::new();
 
+        let reconnect_at = tokio::time::Instant::now() + random_reconnect_interval();
+
         loop {
             tokio::select! {
+                _ = tokio::time::sleep_until(reconnect_at) => {
+                    tracing::info!("Periodic reconnect triggered.");
+                    break;
+                }
                 _ = log_interval.tick() => {
                     let (outgoing, incoming) = socket.channel_depths();
                     tracing::info!(
