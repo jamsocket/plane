@@ -22,12 +22,15 @@ use std::{
 };
 use valuable::Valuable;
 
-use crate::database::{
-    backend_key::{
-        KEY_LEASE_HARD_TERMINATE_AFTER, KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER,
+use crate::{
+    database::{
+        backend_key::{
+            KEY_LEASE_HARD_TERMINATE_AFTER, KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER,
+        },
+        subscribe::Subscription,
+        PlaneDatabase,
     },
-    subscribe::Subscription,
-    PlaneDatabase,
+    util::GuardHandle,
 };
 
 use super::{core::Controller, error::IntoApiError};
@@ -146,7 +149,11 @@ pub async fn sweep_loop(db: PlaneDatabase, drone_id: NodeId) {
 
 pub async fn process_pending_actions(
     db: &PlaneDatabase,
+<<<<<<< Updated upstream
     socket: &mut TypedSocket<MessageToDrone>,
+=======
+    socket: &mut TypedSocketSender<MessageToDrone>,
+>>>>>>> Stashed changes
     drone_id: &NodeId,
 ) -> Result<(), anyhow::Error> {
     let mut count = 0;
@@ -202,18 +209,29 @@ pub async fn drone_socket_inner(
 
     process_pending_actions(&controller.db, &mut socket, &drone_id).await?;
 
-    let mut interval = tokio::time::interval(Duration::from_secs(5));
-    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
     let mut log_interval = tokio::time::interval(Duration::from_secs(60));
     log_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut message_counts: HashMap<&'static str, u64> = HashMap::new();
 
+    let mut sender = socket.sender();
+    let db = controller.db.clone();
+    let _pending_actions_handle = GuardHandle::new(async move {
+        loop {
+            if let Err(err) = process_pending_actions(&db, &mut sender, &drone_id).await {
+                tracing::error!(?err, "Error processing pending actions");
+            }
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+    });
+
     loop {
         tokio::select! {
+<<<<<<< Updated upstream
             _ = interval.tick() => {
                 process_pending_actions(&controller.db, &mut socket, &drone_id).await?;
             }
+=======
+>>>>>>> Stashed changes
             _ = log_interval.tick() => {
                 let (outgoing, incoming) = socket.channel_depths();
                 tracing::info!(
