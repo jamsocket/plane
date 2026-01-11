@@ -80,64 +80,57 @@ pub async fn handle_route_info_request(
             }
 
             let socket = socket.wrap(MessageToProxy::RouteInfoResponse);
-            tokio::spawn(async move {
-                loop {
-                    // Note: this timeout is arbitrary to avoid a memory leak. Under normal system operation, the critical
-                    // timeout will be that of the backend failing to start. We use a large timeout to avoid it becoming
-                    // the critical timeout when the system is functioning.
-                    let result = match tokio::time::timeout(
-                        std::time::Duration::from_secs(30 * 60 /* 30 minutes */),
-                        sub.next(),
-                    )
-                    .await
-                    {
-                        Ok(Some(result)) => result,
-                        Ok(None) => {
-                            tracing::error!("Event subscription closed!");
-                            break;
-                        }
-                        Err(_) => {
-                            tracing::error!("Timeout waiting for backend state");
-                            break;
-                        }
-                    };
 
-                    let Notification { payload, .. } = result;
-
-                    match payload {
-                        BackendState::Ready { address } => {
-                            let route_info = partial_route_info.set_address(address);
-                            let response = RouteInfoResponse {
-                                token,
-                                route_info: Some(route_info),
-                            };
-                            if let Err(err) = socket.send(response) {
-                                tracing::error!(
-                                    ?err,
-                                    "Error sending route info response to proxy."
-                                );
-                            }
-                            break;
-                        }
-                        BackendState::Terminated { .. }
-                        | BackendState::Terminating { .. }
-                        | BackendState::HardTerminating { .. } => {
-                            let response = RouteInfoResponse {
-                                token,
-                                route_info: None,
-                            };
-                            if let Err(err) = socket.send(response) {
-                                tracing::error!(
-                                    ?err,
-                                    "Error sending route info response to proxy."
-                                );
-                            }
-                            break;
-                        }
-                        _ => {}
+            loop {
+                // Note: this timeout is arbitrary to avoid a memory leak. Under normal system operation, the critical
+                // timeout will be that of the backend failing to start. We use a large timeout to avoid it becoming
+                // the critical timeout when the system is functioning.
+                let result = match tokio::time::timeout(
+                    std::time::Duration::from_secs(30 * 60 /* 30 minutes */),
+                    sub.next(),
+                )
+                .await
+                {
+                    Ok(Some(result)) => result,
+                    Ok(None) => {
+                        tracing::error!("Event subscription closed!");
+                        break;
                     }
+                    Err(_) => {
+                        tracing::error!("Timeout waiting for backend state");
+                        break;
+                    }
+                };
+
+                let Notification { payload, .. } = result;
+
+                match payload {
+                    BackendState::Ready { address } => {
+                        let route_info = partial_route_info.set_address(address);
+                        let response = RouteInfoResponse {
+                            token,
+                            route_info: Some(route_info),
+                        };
+                        if let Err(err) = socket.send(response) {
+                            tracing::error!(?err, "Error sending route info response to proxy.");
+                        }
+                        break;
+                    }
+                    BackendState::Terminated { .. }
+                    | BackendState::Terminating { .. }
+                    | BackendState::HardTerminating { .. } => {
+                        let response = RouteInfoResponse {
+                            token,
+                            route_info: None,
+                        };
+                        if let Err(err) = socket.send(response) {
+                            tracing::error!(?err, "Error sending route info response to proxy.");
+                        }
+                        break;
+                    }
+                    _ => {}
                 }
-            });
+            }
         }
         Ok(RouteInfoResult::NotFound) => {
             let response = RouteInfoResponse {
