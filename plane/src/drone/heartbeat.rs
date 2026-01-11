@@ -1,6 +1,8 @@
 use crate::heartbeat_consts::HEARTBEAT_INTERVAL;
 use chrono::Utc;
-use plane_common::{log_types::LoggableTime, protocol::Heartbeat, typed_socket::TypedSocketSender};
+use plane_common::{
+    log_types::LoggableTime, protocol::Heartbeat, typed_socket::WrappedTypedSocketSender,
+};
 use tokio::task::JoinHandle;
 
 /// A background task that sends heartbeats to the server.
@@ -9,7 +11,7 @@ pub struct HeartbeatLoop {
 }
 
 impl HeartbeatLoop {
-    pub fn start(sender: TypedSocketSender<Heartbeat>) -> Self {
+    pub fn start(sender: WrappedTypedSocketSender<Heartbeat>) -> Self {
         let handle = tokio::spawn(async move {
             loop {
                 let local_time = LoggableTime(Utc::now());

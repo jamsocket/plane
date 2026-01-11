@@ -126,6 +126,6 @@ async fn proxy_valid_request_has_cors_headers(env: TestEnvironment) {
             .unwrap()
             .to_str()
             .unwrap(),
-        "authorization, accept, content-type"
+        "*, Authorization"
     );
 }

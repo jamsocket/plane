@@ -14,7 +14,7 @@ use plane_common::{
         ApiErrorKind, CertManagerRequest, CertManagerResponse, MessageFromProxy, MessageToProxy,
         RouteInfoRequest, RouteInfoResponse,
     },
-    typed_socket::{server::new_server, TypedSocket},
+    typed_socket::{server::new_server, TypedSocketSender},
     types::{BackendState, BearerToken, ClusterName, NodeId},
 };
 use std::{
@@ -28,7 +28,7 @@ use valuable::Valuable;
 pub async fn handle_route_info_request(
     token: BearerToken,
     controller: &Controller,
-    socket: &mut TypedSocket<MessageToProxy>,
+    socket: TypedSocketSender<MessageToProxy>,
 ) -> anyhow::Result<()> {
     match controller.db.backend().route_info_for_token(&token).await {
         // When a proxy requests a route, either:
@@ -79,65 +79,58 @@ pub async fn handle_route_info_request(
                 }
             }
 
-            let socket = socket.sender(MessageToProxy::RouteInfoResponse);
-            tokio::spawn(async move {
-                loop {
-                    // Note: this timeout is arbitrary to avoid a memory leak. Under normal system operation, the critical
-                    // timeout will be that of the backend failing to start. We use a large timeout to avoid it becoming
-                    // the critical timeout when the system is functioning.
-                    let result = match tokio::time::timeout(
-                        std::time::Duration::from_secs(30 * 60 /* 30 minutes */),
-                        sub.next(),
-                    )
-                    .await
-                    {
-                        Ok(Some(result)) => result,
-                        Ok(None) => {
-                            tracing::error!("Event subscription closed!");
-                            break;
-                        }
-                        Err(_) => {
-                            tracing::error!("Timeout waiting for backend state");
-                            break;
-                        }
-                    };
+            let socket = socket.wrap(MessageToProxy::RouteInfoResponse);
 
-                    let Notification { payload, .. } = result;
-
-                    match payload {
-                        BackendState::Ready { address } => {
-                            let route_info = partial_route_info.set_address(address);
-                            let response = RouteInfoResponse {
-                                token,
-                                route_info: Some(route_info),
-                            };
-                            if let Err(err) = socket.send(response) {
-                                tracing::error!(
-                                    ?err,
-                                    "Error sending route info response to proxy."
-                                );
-                            }
-                            break;
-                        }
-                        BackendState::Terminated { .. }
-                        | BackendState::Terminating { .. }
-                        | BackendState::HardTerminating { .. } => {
-                            let response = RouteInfoResponse {
-                                token,
-                                route_info: None,
-                            };
-                            if let Err(err) = socket.send(response) {
-                                tracing::error!(
-                                    ?err,
-                                    "Error sending route info response to proxy."
-                                );
-                            }
-                            break;
-                        }
-                        _ => {}
+            loop {
+                // Note: this timeout is arbitrary to avoid a memory leak. Under normal system operation, the critical
+                // timeout will be that of the backend failing to start. We use a large timeout to avoid it becoming
+                // the critical timeout when the system is functioning.
+                let result = match tokio::time::timeout(
+                    std::time::Duration::from_secs(30 * 60 /* 30 minutes */),
+                    sub.next(),
+                )
+                .await
+                {
+                    Ok(Some(result)) => result,
+                    Ok(None) => {
+                        tracing::error!("Event subscription closed!");
+                        break;
                     }
+                    Err(_) => {
+                        tracing::error!("Timeout waiting for backend state");
+                        break;
+                    }
+                };
+
+                let Notification { payload, .. } = result;
+
+                match payload {
+                    BackendState::Ready { address } => {
+                        let route_info = partial_route_info.set_address(address);
+                        let response = RouteInfoResponse {
+                            token,
+                            route_info: Some(route_info),
+                        };
+                        if let Err(err) = socket.send(response) {
+                            tracing::error!(?err, "Error sending route info response to proxy.");
+                        }
+                        break;
+                    }
+                    BackendState::Terminated { .. }
+                    | BackendState::Terminating { .. }
+                    | BackendState::HardTerminating { .. } => {
+                        let response = RouteInfoResponse {
+                            token,
+                            route_info: None,
+                        };
+                        if let Err(err) = socket.send(response) {
+                            tracing::error!(?err, "Error sending route info response to proxy.");
+                        }
+                        break;
+                    }
+                    _ => {}
                 }
-            });
+            }
         }
         Ok(RouteInfoResult::NotFound) => {
             let response = RouteInfoResponse {
@@ -159,7 +152,7 @@ pub async fn handle_route_info_request(
 pub async fn handle_message_from_proxy(
     message: MessageFromProxy,
     controller: &Controller,
-    socket: &mut TypedSocket<MessageToProxy>,
+    socket: TypedSocketSender<MessageToProxy>,
     cluster: &ClusterName,
     node_id: NodeId,
 ) -> anyhow::Result<()> {
@@ -301,7 +294,15 @@ pub async fn proxy_socket_inner(
                                 *message_counts.entry("cert_manager_request").or_insert(0) += 1;
                             }
                         }
-                        handle_message_from_proxy(message, &controller, &mut socket, &cluster, node_guard.id).await?
+
+                        let sender = socket.sender();
+                        let controller = controller.clone();
+                        let cluster = cluster.clone();
+                        tokio::spawn(async move {
+                            if let Err(err) = handle_message_from_proxy(message, &controller, sender, &cluster, node_guard.id).await {
+                                tracing::error!(?err, "Error handling message from proxy");
+                            }
+                        });
                     }
                     None => {
                         tracing::info!("Proxy socket closed");
