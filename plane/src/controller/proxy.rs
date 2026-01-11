@@ -301,7 +301,15 @@ pub async fn proxy_socket_inner(
                                 *message_counts.entry("cert_manager_request").or_insert(0) += 1;
                             }
                         }
-                        handle_message_from_proxy(message, &controller, socket.sender(), &cluster, node_guard.id).await?
+
+                        let sender = socket.sender();
+                        let controller = controller.clone();
+                        let cluster = cluster.clone();
+                        tokio::spawn(async move {
+                            if let Err(err) = handle_message_from_proxy(message, &controller, sender, &cluster, node_guard.id).await {
+                                tracing::error!(?err, "Error handling message from proxy");
+                            }
+                        });
                     }
                     None => {
                         tracing::info!("Proxy socket closed");
