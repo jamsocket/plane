@@ -36,14 +36,14 @@ impl ProxyConnection {
                     let mut conn = proxy_connection.connect_with_retry(&name).await;
                     state.set_ready(true);
 
-                    let sender = conn.sender(MessageFromProxy::CertManagerRequest);
+                    let sender = conn.sender().wrap(MessageFromProxy::CertManagerRequest);
                     cert_manager.set_request_sender(move |m| {
                         if let Err(e) = sender.send(m) {
                             tracing::error!(?e, "Error sending cert manager request.");
                         }
                     });
 
-                    let sender = conn.sender(MessageFromProxy::RouteInfoRequest);
+                    let sender = conn.sender().wrap(MessageFromProxy::RouteInfoRequest);
                     state
                         .inner
                         .route_map
@@ -52,7 +52,7 @@ impl ProxyConnection {
                                 tracing::error!(?e, "Error sending route info request.");
                             }
                         });
-                    let sender = conn.sender(MessageFromProxy::KeepAlive);
+                    let sender = conn.sender().wrap(MessageFromProxy::KeepAlive);
                     state.inner.monitor.set_listener(move |backend| {
                         if let Err(err) = sender.send(backend.clone()) {
                             tracing::error!(?err, "Error sending keepalive.");
