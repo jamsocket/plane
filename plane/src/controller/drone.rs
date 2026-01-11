@@ -22,12 +22,15 @@ use std::{
 };
 use valuable::Valuable;
 
-use crate::database::{
-    backend_key::{
-        KEY_LEASE_HARD_TERMINATE_AFTER, KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER,
+use crate::{
+    database::{
+        backend_key::{
+            KEY_LEASE_HARD_TERMINATE_AFTER, KEY_LEASE_RENEW_AFTER, KEY_LEASE_SOFT_TERMINATE_AFTER,
+        },
+        subscribe::Subscription,
+        PlaneDatabase,
     },
-    subscribe::Subscription,
-    PlaneDatabase,
+    util::GuardHandle,
 };
 
 use super::{core::Controller, error::IntoApiError};
@@ -146,7 +149,7 @@ pub async fn sweep_loop(db: PlaneDatabase, drone_id: NodeId) {
 
 pub async fn process_pending_actions(
     db: &PlaneDatabase,
-    socket: TypedSocketSender<MessageToDrone>,
+    socket: &mut TypedSocketSender<MessageToDrone>,
     drone_id: &NodeId,
 ) -> Result<(), anyhow::Error> {
     let mut count = 0;
@@ -200,26 +203,25 @@ pub async fn drone_socket_inner(
     let mut backend_actions: Subscription<BackendActionMessage> =
         controller.db.subscribe_with_key(&drone_id.to_string());
 
-    process_pending_actions(&controller.db, socket.sender(), &drone_id).await?;
-
-    let mut interval = tokio::time::interval(Duration::from_secs(5));
-    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    process_pending_actions(&controller.db, &mut socket.sender(), &drone_id).await?;
 
     let mut log_interval = tokio::time::interval(Duration::from_secs(60));
     log_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut message_counts: HashMap<&'static str, u64> = HashMap::new();
 
+    let mut sender = socket.sender();
+    let db = controller.db.clone();
+    let _pending_actions_handle = GuardHandle::new(async move {
+        loop {
+            if let Err(err) = process_pending_actions(&db, &mut sender, &drone_id).await {
+                tracing::error!(?err, "Error processing pending actions");
+            }
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+    });
+
     loop {
         tokio::select! {
-            _ = interval.tick() => {
-                let sender = socket.sender();
-                let db = controller.db.clone();
-                tokio::spawn(async move {
-                    if let Err(err) = process_pending_actions(&db, sender, &drone_id).await {
-                        tracing::error!(?err, "Error processing pending actions");
-                    }
-                });
-            }
             _ = log_interval.tick() => {
                 let (outgoing, incoming) = socket.channel_depths();
                 tracing::info!(
