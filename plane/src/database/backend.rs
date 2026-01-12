@@ -457,7 +457,7 @@ impl<'a> BackendDatabase<'a> {
             update backend
             set
                 last_keepalive = now()
-            where id = $1
+            where id = $1 and last_status != 'terminated'
             "#,
             backend_id.to_string(),
         )
