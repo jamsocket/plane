@@ -11,7 +11,6 @@ use std::sync::Arc;
 mod common;
 
 #[plane_test]
-#[ignore = "Doesn't work"]
 async fn cert_manager_does_refresh(env: TestEnvironment) {
     let controller = env.controller().await;
 
@@ -57,7 +56,6 @@ async fn cert_manager_does_refresh(env: TestEnvironment) {
 }
 
 #[plane_test(500)]
-#[ignore = "Doesn't work"]
 async fn cert_manager_does_refresh_eab(env: TestEnvironment) {
     let certs_dir = env.scratch_dir.join("certs");
 

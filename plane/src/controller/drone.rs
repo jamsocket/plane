@@ -9,7 +9,7 @@ use plane_common::{
         ApiErrorKind, BackendAction, BackendActionMessage, Heartbeat, KeyDeadlines,
         MessageFromDrone, MessageToDrone, RenewKeyResponse,
     },
-    typed_socket::{server::new_server, TypedSocketSender},
+    typed_socket::{server::new_server, TypedSocket},
     types::{
         backend_state::TerminationReason, ClusterName, DronePoolName, NodeId, TerminationKind,
     },
@@ -41,7 +41,7 @@ pub async fn handle_message_from_drone(
     msg: MessageFromDrone,
     drone_id: NodeId,
     controller: &Controller,
-    sender: TypedSocketSender<MessageToDrone>,
+    sender: &mut TypedSocket<MessageToDrone>,
 ) -> anyhow::Result<()> {
     match msg {
         MessageFromDrone::BackendMetrics(metrics_msg) => {
@@ -146,7 +146,7 @@ pub async fn sweep_loop(db: PlaneDatabase, drone_id: NodeId) {
 
 pub async fn process_pending_actions(
     db: &PlaneDatabase,
-    socket: TypedSocketSender<MessageToDrone>,
+    socket: &mut TypedSocket<MessageToDrone>,
     drone_id: &NodeId,
 ) -> Result<(), anyhow::Error> {
     let mut count = 0;
@@ -200,7 +200,7 @@ pub async fn drone_socket_inner(
     let mut backend_actions: Subscription<BackendActionMessage> =
         controller.db.subscribe_with_key(&drone_id.to_string());
 
-    process_pending_actions(&controller.db, socket.sender(), &drone_id).await?;
+    process_pending_actions(&controller.db, &mut socket, &drone_id).await?;
 
     let mut interval = tokio::time::interval(Duration::from_secs(5));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -212,13 +212,7 @@ pub async fn drone_socket_inner(
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                let sender = socket.sender();
-                let db = controller.db.clone();
-                tokio::spawn(async move {
-                    if let Err(err) = process_pending_actions(&db, sender, &drone_id).await {
-                        tracing::error!(?err, "Error processing pending actions");
-                    }
-                });
+                process_pending_actions(&controller.db, &mut socket, &drone_id).await?;
             }
             _ = log_interval.tick() => {
                 let (outgoing, incoming) = socket.channel_depths();
@@ -269,14 +263,9 @@ pub async fn drone_socket_inner(
                                 *message_counts.entry("backend_metrics").or_insert(0) += 1;
                             }
                         }
-
-                        let sender = socket.sender();
-                        let controller = controller.clone();
-                        tokio::spawn(async move {
-                            if let Err(err) = handle_message_from_drone(message_from_drone, drone_id, &controller, sender).await {
-                                tracing::error!(?err, "Error handling message from drone");
-                            }
-                        });
+                        if let Err(err) = handle_message_from_drone(message_from_drone, drone_id, &controller, &mut socket).await {
+                            tracing::error!(?err, "Error handling message from drone");
+                        }
                     }
                     None => {
                         tracing::info!("Drone socket closed");

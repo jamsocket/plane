@@ -5,7 +5,7 @@ use plane_common::{
     log_types::LoggableTime,
     names::BackendName,
     protocol::{AcquiredKey, BackendAction, KeyDeadlines, RenewKeyRequest},
-    typed_socket::WrappedTypedSocketSender,
+    typed_socket::TypedSocketSender,
     types::{backend_state::TerminationReason, TerminationKind},
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -20,13 +20,13 @@ pub struct KeyManager {
     /// and terminating the backend if the key cannot be renewed.
     handles: HashMap<BackendName, (AcquiredKey, GuardHandle)>,
 
-    sender: Option<WrappedTypedSocketSender<RenewKeyRequest>>,
+    sender: Option<TypedSocketSender<RenewKeyRequest>>,
 }
 
 async fn renew_key_loop(
     key: AcquiredKey,
     backend: BackendName,
-    sender: Option<WrappedTypedSocketSender<RenewKeyRequest>>,
+    sender: Option<TypedSocketSender<RenewKeyRequest>>,
     executor: Arc<Executor>,
 ) {
     loop {
@@ -120,7 +120,7 @@ impl KeyManager {
         }
     }
 
-    pub fn set_sender(&mut self, sender: WrappedTypedSocketSender<RenewKeyRequest>) {
+    pub fn set_sender(&mut self, sender: TypedSocketSender<RenewKeyRequest>) {
         self.sender.replace(sender);
 
         for (backend, (acquired_key, handle)) in self.handles.iter_mut() {
