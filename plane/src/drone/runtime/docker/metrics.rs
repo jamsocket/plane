@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use tokio::time::{Duration, Instant};
 use tokio_stream::StreamExt;
 
-const METRICS_INTERVAL: Duration = Duration::from_secs(5);
+const METRICS_INTERVAL: Duration = Duration::from_secs(10);
 
 fn stream_metrics(
     docker: &Docker,
