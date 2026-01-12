@@ -55,11 +55,10 @@ pub async fn drone_loop(
 
     loop {
         let mut socket = connection.connect_with_retry(&name).await;
-        let _heartbeat_guard =
-            HeartbeatLoop::start(socket.sender().wrap(MessageFromDrone::Heartbeat));
+        let _heartbeat_guard = HeartbeatLoop::start(socket.sender(MessageFromDrone::Heartbeat));
 
         {
-            let socket = socket.sender().wrap(MessageFromDrone::BackendMetrics);
+            let socket = socket.sender(MessageFromDrone::BackendMetrics);
             executor
                 .runtime
                 .metrics_callback(Box::new(move |metrics_message| {
@@ -72,12 +71,12 @@ pub async fn drone_loop(
         key_manager
             .lock()
             .expect("Key manager lock poisoned")
-            .set_sender(socket.sender().wrap(MessageFromDrone::RenewKey));
+            .set_sender(socket.sender(MessageFromDrone::RenewKey));
 
         {
             // Forward state changes to the socket.
             // This will start by sending any existing unacked events.
-            let sender = socket.sender().wrap(MessageFromDrone::BackendEvent);
+            let sender = socket.sender(MessageFromDrone::BackendEvent);
             let key_manager = key_manager.clone();
             if let Err(err) = executor.register_listener(move |message| {
                 if matches!(message.state, BackendState::Terminated { .. }) {
@@ -142,7 +141,7 @@ pub async fn drone_loop(
                     tokio::spawn(handle_message(
                         message,
                         key_manager,
-                        socket.sender(),
+                        socket.sender(|x| x),
                         executor.clone(),
                     ));
                 }
