@@ -96,7 +96,7 @@ async fn events_loop(
             Ok(e) => e,
         };
 
-        tracing::info!(event=?e, "Received event");
+        tracing::debug!(event=?e, "Received event");
 
         let Some(actor) = &e.actor else {
             tracing::warn!("Received event without actor.");
@@ -120,11 +120,11 @@ async fn events_loop(
         };
 
         if e.action.as_deref() == Some("start") {
-            tracing::info!(?backend_id, "Received start event.");
+            tracing::debug!(?backend_id, "Received start event.");
 
             let docker = docker.clone();
             let metrics_callback = metrics_callback.clone();
-            tracing::info!(%backend_id, "Spawning metrics loop.");
+            tracing::debug!(%backend_id, "Spawning metrics loop.");
             tokio::spawn(async move {
                 metrics_loop(backend_id, docker, metrics_callback).await;
             });
@@ -137,7 +137,7 @@ async fn events_loop(
         let exit_code = attributes.get("exitCode");
         let exit_code = exit_code.and_then(|s| s.parse::<i32>().ok());
 
-        tracing::info!(
+        tracing::debug!(
             exit_code,
             backend_id = backend_id.as_value(),
             "Received exit code"

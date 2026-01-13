@@ -153,12 +153,12 @@ impl BackendManager {
                 let runtime = self.runtime.clone();
                 let backend_id = self.backend_id.clone();
                 StepStatusResult::future_status(async move {
-                    tracing::info!(%backend_id, "preparing...");
+                    tracing::debug!(%backend_id, "preparing...");
                     if let Err(err) = runtime.prepare(&executor_config).await {
                         tracing::error!(?err, %backend_id, "failed to prepare");
                         state.to_terminated(None)
                     } else {
-                        tracing::info!(%backend_id, "done preparing...");
+                        tracing::debug!(%backend_id, "done preparing...");
                         state.to_starting()
                     }
                 })
@@ -224,7 +224,7 @@ impl BackendManager {
     pub fn set_state(self: &Arc<Self>, state: BackendState) {
         let mut lock = self.state.lock().expect("State lock is poisoned");
 
-        tracing::info!(
+        tracing::debug!(
             backend_id = self.backend_id.as_value(),
             state = state.as_value(),
             "Updating backend state"
@@ -281,7 +281,7 @@ impl BackendManager {
             .expect("State lock is poisoned")
             .state
             .clone();
-        tracing::info!(
+        tracing::debug!(
             backend_id = self.backend_id.as_value(),
             state = state.as_value(),
             "Marking backend as terminated"

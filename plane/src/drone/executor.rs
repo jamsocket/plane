@@ -42,7 +42,7 @@ impl Executor {
                 let mut events = docker.events();
                 while let Some(event) = events.next().await {
                     if let Some((_, manager)) = backends.remove(&event.backend_id) {
-                        tracing::info!(
+                        tracing::debug!(
                             backend_id = event.backend_id.as_value(),
                             exit_code = event.exit_code.unwrap_or(-1),
                             "Backend terminated.",
@@ -54,7 +54,7 @@ impl Executor {
                     }
                 }
 
-                tracing::info!("Backend event listener stopped.");
+                tracing::debug!("Backend event listener stopped.");
             })
         };
 
@@ -198,11 +198,11 @@ impl Executor {
                     key.clone(),
                     static_token.clone(),
                 );
-                tracing::info!(backend_id = backend_id.as_value(), "Inserting backend.");
+                tracing::debug!(backend_id = backend_id.as_value(), "Inserting backend.");
                 self.backends.insert(backend_id.clone(), manager);
             }
             BackendAction::Terminate { kind, reason } => {
-                tracing::info!("Terminating backend {}.", backend_id);
+                tracing::debug!("Terminating backend {}.", backend_id);
 
                 let manager = {
                     // We need to be careful here not to hold the lock when we call terminate, or

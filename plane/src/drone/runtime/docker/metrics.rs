@@ -100,11 +100,11 @@ fn metrics_message_from_container_stats(
         .ok_or_else(|| anyhow::anyhow!("No memory limit found in stats."))?;
 
     let Some(total_system_cpu_used) = stats.cpu_stats.system_cpu_usage else {
-        tracing::info!("No system cpu usage found in stats (normal on first stats event).");
+        tracing::debug!("No system cpu usage found in stats (normal on first stats event).");
         return Ok(None);
     };
     let Some(prev_total_system_cpu_used) = stats.precpu_stats.system_cpu_usage else {
-        tracing::info!(
+        tracing::debug!(
             "No previous system cpu usage found in stats (normal on first stats event)."
         );
         return Ok(None);
