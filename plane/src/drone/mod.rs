@@ -207,7 +207,7 @@ pub async fn drone_loop(
             }
             MessageToDrone::RenewKeyResponse(renew_key_response) => {
                 let RenewKeyResponse { backend, deadlines } = renew_key_response;
-                tracing::info!(
+                tracing::debug!(
                     backend_id = backend.as_value(),
                     deadlines = deadlines.as_value(),
                     "Received key renewal response."

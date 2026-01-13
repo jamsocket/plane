@@ -29,7 +29,7 @@ pub async fn pull_image(
     force: bool,
 ) -> Result<()> {
     if !force && image_exists(docker, image).await? {
-        tracing::info!(image, "Skipping image that already exists.");
+        tracing::debug!(image, "Skipping image that already exists.");
         return Ok(());
     }
 
@@ -47,7 +47,7 @@ pub async fn pull_image(
         }
     }
 
-    tracing::info!(?image, "Pulled image.");
+    tracing::debug!(?image, "Pulled image.");
 
     Ok(())
 }
